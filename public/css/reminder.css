@@ -1,0 +1,12 @@
+/* Blink / starting / stopped reminder popups */
+#blink, #starting, #stopped {
+  font-size: 2rem;
+  font-weight: bold;
+  text-shadow: 0 2px 8px #0004;
+  opacity: 0;
+  animation: fadeInOut 2.5s forwards;
+}
+
+#blink.camera-mode {
+  animation: fadeIn 0.5s forwards;
+}

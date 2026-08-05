@@ -1,0 +1,1 @@
+"""Blink detector sidecar package."""

@@ -1,25 +1,54 @@
 import App from "@/app";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 
-describe("app page", () => {
-	const setup = () => {
+const send = vi.fn();
+const listeners = new Map<string, (...args: unknown[]) => void>();
+
+beforeEach(() => {
+	listeners.clear();
+	Object.defineProperty(window, "ipcRenderer", {
+		configurable: true,
+		value: {
+			send,
+			on: vi.fn((channel: string, listener: (...args: unknown[]) => void) => {
+				listeners.set(channel, listener);
+			}),
+			off: vi.fn(),
+		},
+	});
+});
+
+describe("settings shell", () => {
+	it("renders the main settings controls", () => {
 		render(<App />);
-	};
 
-	it("should render app page", () => {
-		setup();
+		expect(screen.getByRole("heading", { name: "ScreenBlink" })).toBeDefined();
 		expect(
-			screen.getByText("Build modern apps with Electron and React!"),
+			screen.getByRole("button", { name: "Start Reminders" }),
 		).toBeDefined();
+		expect(screen.getByText("Keyboard Shortcut")).toBeDefined();
 	});
 
-	it("should change phrase when button is clicked", () => {
-		setup();
-		const button = screen.getByTestId("random-button");
-		fireEvent.click(button);
-		expect(
-			screen.getByText("Create high-quality desktop apps fast."),
-		).toBeDefined();
+	it("starts reminders with the renderer interval converted to milliseconds", () => {
+		render(<App />);
+
+		fireEvent.click(screen.getByRole("button", { name: "Start Reminders" }));
+
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.startBlinkReminders, 3000);
+	});
+
+	it("records and sends a keyboard shortcut", () => {
+		render(<App />);
+
+		fireEvent.click(screen.getByRole("button", { name: "Change" }));
+		fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+		fireEvent.keyDown(window, { key: "Enter" });
+
+		expect(send).toHaveBeenCalledWith(
+			IPC_CHANNELS.updateKeyboardShortcut,
+			"Ctrl+K",
+		);
 	});
 });

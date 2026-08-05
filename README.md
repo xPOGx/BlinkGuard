@@ -29,6 +29,29 @@ Upstream project / releases: [screenblink.org](https://www.screenblink.org/) · 
 | Computer vision (optional) | Python, OpenCV, dlib, NumPy, PyInstaller |
 | Tooling | Biome, Vitest, Electron Builder |
 
+## Architecture
+
+Pragmatic Clean Architecture: domain/application stay free of Electron/React/OpenCV; infrastructure and UI adapters sit outside. `electron/main.ts` is a thin composition root — orchestration lives in `electron/application/`, Electron/Node I/O in `electron/infrastructure/`. Details, Flutter analogies, and anti-patterns: [docs/architecture.md](docs/architecture.md). IPC/preference traps: [docs/ipc-and-preferences.md](docs/ipc-and-preferences.md).
+
+```text
+React settings / public popups / IPC
+        ↓
+application services + ports
+        ↓
+domain policies          ←  infrastructure adapters (store, paths, process, sidecar protocol, …)
+shared/ (IPC + preference contracts)
+optional Python package: domain → application → infrastructure
+```
+
+| Want to change… | Open… |
+|---|---|
+| Settings UI | `src/app.tsx`, `src/features/*/ui`, `src/features/*/model`, `src/shared/ipc/` |
+| Popup look / copy | `public/*.html`, `public/css/`, `public/js/` |
+| Reminder / face-gate rules | `electron/domain/reminder-policy.ts`, `electron/application/reminder-service.ts` |
+| Preferences shape / defaults | `shared/preferences.ts`, `electron/application/preferences-service.ts`, `electron/infrastructure/store/` |
+| Camera / sidecar | `python/blink_detector_package/`, `electron/infrastructure/sidecar/` |
+| Packaging | `package.json` → `"build"` (Electron Builder); optional binary via `python/build_and_install.sh` |
+
 ## Development
 
 ```bash
