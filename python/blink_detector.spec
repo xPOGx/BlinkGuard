@@ -1,11 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_submodules
+
+hiddenimports = collect_submodules('blink_detector_package')
+
 a = Analysis(
     ['blink_detector.py'],
-    pathex=[],
+    pathex=['.'],
     binaries=[],
     datas=[('../electron/assets/models', 'assets/models')],
-    hiddenimports=[],
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
