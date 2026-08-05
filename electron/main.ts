@@ -102,6 +102,13 @@ let isAutoResuming = false; // Prevents overlapping between automatic and user-i
 
 let popupEditorWindow: BrowserWindow | null = null;
 
+// Face presence (camera mode) — gate blink reminders + silent status toast
+let isFaceDetected = false;
+let noFacePopup: BrowserWindow | null = null;
+let noFaceDebounceTimer: NodeJS.Timeout | null = null;
+const NO_FACE_DEBOUNCE_MS = 750;
+const NO_FACE_POPUP_SIZE = { width: 220, height: 48 };
+
 // Windows process management
 let isQuitting = false;
 let childProcesses = new Set<any>();
@@ -114,6 +121,128 @@ function getCenteredPopupPosition(popupWidth: number, popupHeight: number) {
 		x: Math.floor((width - popupWidth) / 2),
 		y: Math.floor((height - popupHeight) / 2)
 	};
+}
+
+function getTopCenterPopupPosition(popupWidth: number) {
+	const display = screen.getPrimaryDisplay();
+	const { x, y, width } = display.workArea;
+	const topMargin = 4;
+	return {
+		x: Math.floor(x + (width - popupWidth) / 2),
+		y: Math.floor(y + topMargin)
+	};
+}
+
+function hideNoFacePopup() {
+	if (noFaceDebounceTimer) {
+		clearTimeout(noFaceDebounceTimer);
+		noFaceDebounceTimer = null;
+	}
+	if (noFacePopup && !noFacePopup.isDestroyed()) {
+		noFacePopup.close();
+	}
+	noFacePopup = null;
+}
+
+function resetFaceTrackingState() {
+	isFaceDetected = false;
+	hideNoFacePopup();
+}
+
+function showNoFacePopup() {
+	if (!preferences.isTracking || !preferences.cameraEnabled) {
+		return;
+	}
+	if (noFacePopup && !noFacePopup.isDestroyed()) {
+		return;
+	}
+
+	const { width, height } = NO_FACE_POPUP_SIZE;
+	const { x, y } = getTopCenterPopupPosition(width);
+
+	const popup = new BrowserWindow({
+		width,
+		height,
+		x,
+		y,
+		frame: false,
+		transparent: true,
+		alwaysOnTop: true,
+		resizable: false,
+		skipTaskbar: true,
+		focusable: false,
+		show: false,
+		hasShadow: false,
+		acceptFirstMouse: false,
+		type: "panel",
+		webPreferences: {
+			nodeIntegration: false,
+			contextIsolation: true,
+			preload: path.join(__dirname, "preload.mjs"),
+		},
+	});
+
+	const level = process.platform === "darwin" ? "floating" : "screen-saver";
+	popup.setAlwaysOnTop(true, level);
+	popup.setVisibleOnAllWorkspaces(true, {
+		visibleOnFullScreen: true,
+		skipTransformProcessType: true,
+	});
+
+	noFacePopup = popup;
+	popup.loadFile(path.join(process.env.VITE_PUBLIC, "no-face.html"));
+	popup.webContents.on("did-finish-load", () => {
+		popup.setIgnoreMouseEvents(true);
+	});
+	popup.once("ready-to-show", () => {
+		popup.showInactive();
+	});
+	popup.on("closed", () => {
+		if (noFacePopup === popup) {
+			noFacePopup = null;
+		}
+	});
+}
+
+function handleFaceDetectionUpdate(faceDetected: boolean) {
+	if (!preferences.isTracking || !preferences.cameraEnabled) {
+		return;
+	}
+
+	if (faceDetected) {
+		const wasDetected = isFaceDetected;
+		isFaceDetected = true;
+		hideNoFacePopup();
+		if (!wasDetected) {
+			lastBlinkTime = Date.now();
+		}
+		return;
+	}
+
+	// Already awaiting debounce or showing no-face toast
+	if (noFaceDebounceTimer || (noFacePopup && !noFacePopup.isDestroyed())) {
+		return;
+	}
+
+	noFaceDebounceTimer = setTimeout(() => {
+		noFaceDebounceTimer = null;
+		if (!preferences.isTracking || !preferences.cameraEnabled) {
+			return;
+		}
+
+		isFaceDetected = false;
+
+		try {
+			if (currentPopup && !currentPopup.isDestroyed()) {
+				currentPopup.close();
+				currentPopup = null;
+			}
+		} catch {
+			currentPopup = null;
+		}
+
+		showNoFacePopup();
+	}, NO_FACE_DEBOUNCE_MS);
 }
 
 const preferences = {
@@ -975,6 +1104,7 @@ function stopBlinkReminderLoop() {
 	}
 	
 	stopCamera();
+	resetFaceTrackingState();
 	
 	if (currentPopup) {
 		currentPopup.close();
@@ -1006,6 +1136,7 @@ function ensureNoReminderActivity() {
 	}
 	
 	stopCamera();
+	resetFaceTrackingState();
 	
 	if (currentPopup) {
 		currentPopup.close();
@@ -1259,6 +1390,7 @@ function startBlinkDetector() {
 						console.log('Camera started successfully, resetting retry counter');
 					}
 				} else if (parsed.faceData) {
+					handleFaceDetectionUpdate(!!parsed.faceData.faceDetected);
 					if (cameraWindow && !cameraWindow.isDestroyed()) {
 						cameraWindow.webContents.send('face-tracking-data', parsed.faceData);
 					}
@@ -1290,6 +1422,8 @@ function startCamera() {
 }
 
 function stopCamera() {
+	resetFaceTrackingState();
+
 	if (!isBlinkDetectorRunning || !blinkDetectorProcess || !blinkDetectorProcess.stdin) {
 		return;
 	}
@@ -1304,6 +1438,7 @@ async function startCameraMonitoring() {
 	}
 	isCameraReady = false; 
 	cameraRetryCount = 0;
+	resetFaceTrackingState();
 	
 	showStartingPopup();
 	
@@ -1355,7 +1490,9 @@ async function startCameraMonitoring() {
 					// Set up interval for subsequent popups
 					blinkIntervalId = setInterval(() => {
 						if (mgdReminderLoopActive && preferences.isTracking && preferences.mgdMode && isBlinkDetectorRunning) {
-							showBlinkPopup();
+							if (isFaceDetected) {
+								showBlinkPopup();
+							}
 						} else {
 							console.log('Stopping MGD interval - tracking no longer active');
 							if (blinkIntervalId) {
@@ -1366,7 +1503,7 @@ async function startCameraMonitoring() {
 						}
 					}, preferences.reminderInterval + 2500); 
 				} else {
-					// Normal mode - only show popup if no blink detected
+					// Normal mode - only show popup if no blink detected while face is tracked
 					cameraMonitoringInterval = setInterval(() => {
 						if (!preferences.isTracking || !isBlinkDetectorRunning) {
 							console.log('Stopping camera monitoring interval - tracking no longer active');
@@ -1378,7 +1515,12 @@ async function startCameraMonitoring() {
 						}
 						
 						const timeSinceLastBlink = Date.now() - lastBlinkTime;
-						if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup && isBlinkDetectorRunning) {
+						if (
+							isFaceDetected &&
+							timeSinceLastBlink >= preferences.reminderInterval &&
+							!currentPopup &&
+							isBlinkDetectorRunning
+						) {
 							showBlinkPopup();
 							setTimeout(() => {
 								try {
@@ -1781,6 +1923,7 @@ powerMonitor.on('resume', () => {
 					}
 					
 					// Start monitoring with existing process
+					resetFaceTrackingState();
 					if (preferences.mgdMode) {
 						mgdReminderLoopActive = true;
 						
@@ -1790,7 +1933,9 @@ powerMonitor.on('resume', () => {
 						
 						blinkIntervalId = setInterval(() => {
 							if (mgdReminderLoopActive && preferences.isTracking && preferences.mgdMode && isBlinkDetectorRunning) {
-								showBlinkPopup();
+								if (isFaceDetected) {
+									showBlinkPopup();
+								}
 							} else {
 								console.log('Stopping MGD interval - tracking no longer active');
 								if (blinkIntervalId) {
@@ -1812,7 +1957,12 @@ powerMonitor.on('resume', () => {
 							}
 							
 							const timeSinceLastBlink = Date.now() - lastBlinkTime;
-							if (timeSinceLastBlink >= preferences.reminderInterval && !currentPopup && isBlinkDetectorRunning) {
+							if (
+								isFaceDetected &&
+								timeSinceLastBlink >= preferences.reminderInterval &&
+								!currentPopup &&
+								isBlinkDetectorRunning
+							) {
 								showBlinkPopup();
 								setTimeout(() => {
 									try {
