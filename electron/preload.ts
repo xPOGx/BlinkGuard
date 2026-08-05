@@ -1,20 +1,14 @@
 import { ipcRenderer, contextBridge } from 'electron'
+import {
+  IPC_CHANNELS,
+  MAIN_RENDERER_RECEIVE_CHANNELS,
+  MAIN_RENDERER_SEND_CHANNELS,
+} from "../shared/ipc-channels";
 
 // Expose API to the Renderer process (main window)
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on: (channel: string, func: (...args: any[]) => void) => {
-    const validChannels = [
-      'main-process-message', 
-      'load-preferences',
-      'camera-error',
-      'video-stream',
-      'camera-window-closed',
-      'update-message',
-      'face-tracking-data',
-      'blink-detected',
-      'threshold-updated'
-    ];
-    if (validChannels.includes(channel)) {
+    if ((MAIN_RENDERER_RECEIVE_CHANNELS as readonly string[]).includes(channel)) {
       ipcRenderer.on(channel, (_event, ...args) => func(...args));
     }
   },
@@ -23,37 +17,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     return ipcRenderer.off(channel, ...omit)
   },
   send: (channel: string, ...args: any[]) => {
-    const validChannels = [
-      'start-blink-reminders',
-      'stop-blink-reminders',
-      'update-popup-position',
-      'update-interval',
-      'update-popup-colors',
-      'update-popup-transparency',
-      'update-dark-mode',
-      'update-camera-enabled',
-      'update-eye-exercises-enabled',
-      'update-exercise-interval',
-      'update-popup-message',
-      'update-keyboard-shortcut',
-      'blink-detected',
-      'start-camera-tracking',
-      'stop-camera-tracking',
-      'skip-exercise',
-      'snooze-exercise',
-      'update-mgd-mode',
-      'show-camera-window',
-      'close-camera-window',
-      'show-popup-editor',
-      'popup-editor-saved',
-      'reset-preferences',
-      'show-size-editor',
-      'size-saved',
-      'update-sound-enabled',
-      'audio-finished',
-      'request-video-stream'
-    ];
-    if (validChannels.includes(channel)) {
+    if ((MAIN_RENDERER_SEND_CHANNELS as readonly string[]).includes(channel)) {
       ipcRenderer.send(channel, ...args);
     }
   },
@@ -67,55 +31,55 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 contextBridge.exposeInMainWorld('popupAPI', {
   // For blink popups
   onUpdateColors: (callback: (colors: any) => void) => {
-    ipcRenderer.on('update-colors', (_event, colors) => callback(colors));
+    ipcRenderer.on(IPC_CHANNELS.updateColors, (_event, colors) => callback(colors));
   },
   onUpdateMessage: (callback: (message: string) => void) => {
-    ipcRenderer.on('update-message', (_event, message) => callback(message));
+    ipcRenderer.on(IPC_CHANNELS.updateMessage, (_event, message) => callback(message));
   },
   onCameraMode: (callback: (isEnabled: boolean) => void) => {
-    ipcRenderer.on('camera-mode', (_event, isEnabled) => callback(isEnabled));
+    ipcRenderer.on(IPC_CHANNELS.cameraMode, (_event, isEnabled) => callback(isEnabled));
   },
   
   // For sound player
   onPlaySound: (callback: (soundPath: string) => void) => {
-    ipcRenderer.on('play-sound', (_event, soundPath) => callback(soundPath));
+    ipcRenderer.on(IPC_CHANNELS.playSound, (_event, soundPath) => callback(soundPath));
   },
   notifyAudioFinished: () => {
-    ipcRenderer.send('audio-finished');
+    ipcRenderer.send(IPC_CHANNELS.audioFinished);
   },
   
   // For camera window
   onFaceTrackingData: (callback: (data: any) => void) => {
-    ipcRenderer.on('face-tracking-data', (_event, data) => callback(data));
+    ipcRenderer.on(IPC_CHANNELS.faceTrackingData, (_event, data) => callback(data));
   },
   onBlinkDetected: (callback: (blinkData: any) => void) => {
-    ipcRenderer.on('blink-detected', (_event, blinkData) => callback(blinkData));
+    ipcRenderer.on(IPC_CHANNELS.blinkDetected, (_event, blinkData) => callback(blinkData));
   },
   onVideoStream: (callback: (streamData: string) => void) => {
-    ipcRenderer.on('video-stream', (_event, streamData) => callback(streamData));
+    ipcRenderer.on(IPC_CHANNELS.videoStream, (_event, streamData) => callback(streamData));
   },
   onThresholdUpdated: (callback: (threshold: number) => void) => {
-    ipcRenderer.on('threshold-updated', (_event, threshold) => callback(threshold));
+    ipcRenderer.on(IPC_CHANNELS.thresholdUpdated, (_event, threshold) => callback(threshold));
   },
   requestVideoStream: () => {
-    ipcRenderer.send('request-video-stream');
+    ipcRenderer.send(IPC_CHANNELS.requestVideoStream);
   },
   
   // For exercise popups
   skipExercise: () => {
-    ipcRenderer.send('skip-exercise');
+    ipcRenderer.send(IPC_CHANNELS.skipExercise);
   },
   snoozeExercise: () => {
-    ipcRenderer.send('snooze-exercise');
+    ipcRenderer.send(IPC_CHANNELS.snoozeExercise);
   },
   
   // For popup editor
   onPopupEditorUpdate: (callback: (data: any) => void) => {
-    ipcRenderer.on('update-colors', (_event, colors) => callback({ type: 'colors', data: colors }));
-    ipcRenderer.on('current-popup-state', (_event, state) => callback({ type: 'state', data: state }));
+    ipcRenderer.on(IPC_CHANNELS.updateColors, (_event, colors) => callback({ type: 'colors', data: colors }));
+    ipcRenderer.on(IPC_CHANNELS.currentPopupState, (_event, state) => callback({ type: 'state', data: state }));
   },
   savePopupEditor: (data: any) => {
-    ipcRenderer.send('popup-editor-saved', data);
+    ipcRenderer.send(IPC_CHANNELS.popupEditorSaved, data);
   },
   
   // Utility functions
