@@ -17,7 +17,7 @@ export type BlinkDebugLogSource = "sidecar" | "main";
 /**
  * Append-only blink-detector debug log under Electron userData:
  * `{userData}/logs/blink-detector.jsonl`
- * (Windows: typically `%APPDATA%/ScreenBlink/logs/blink-detector.jsonl`).
+ * (Windows: typically `%APPDATA%/BlinkGuard/logs/blink-detector.jsonl`).
  *
  * Console stays short (credited / rejected); the file gets full JSONL payloads.
  */

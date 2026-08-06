@@ -17,7 +17,7 @@ import { ShortcutSettings } from "@/features/shortcuts/ui/shortcut-settings";
 import { Eye } from "lucide-react";
 import { useEffect } from "react";
 
-export default function ScreenBlinkHomepage() {
+export default function BlinkGuardHomepage() {
 	const {
 		preferences,
 		setPreferences,
@@ -51,7 +51,7 @@ export default function ScreenBlinkHomepage() {
 					<div className="flex justify-center items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
 						<Eye className="w-10 h-10 sm:w-12 sm:h-12 text-blue-600 dark:text-blue-400" />
 						<h1 className="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-white">
-							ScreenBlink
+							BlinkGuard
 						</h1>
 					</div>
 					<p className="text-base sm:text-lg text-gray-600 dark:text-gray-300 px-4">

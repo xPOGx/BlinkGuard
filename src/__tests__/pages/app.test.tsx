@@ -24,7 +24,7 @@ describe("settings shell", () => {
 	it("renders the main settings controls", () => {
 		render(<App />);
 
-		expect(screen.getByRole("heading", { name: "ScreenBlink" })).toBeDefined();
+		expect(screen.getByRole("heading", { name: "BlinkGuard" })).toBeDefined();
 		expect(
 			screen.getByRole("button", { name: "Start Reminders" }),
 		).toBeDefined();

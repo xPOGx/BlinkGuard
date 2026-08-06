@@ -5,7 +5,7 @@ export function configureFileLogging(): void {
 	if (process.platform !== "win32") return;
 	const logPath = path.join(
 		process.env.APPDATA || process.env.USERPROFILE || "",
-		"ScreenBlink",
+		"BlinkGuard",
 		"app.log",
 	);
 	const directory = path.dirname(logPath);
@@ -28,5 +28,5 @@ export function configureFileLogging(): void {
 		stream.write(`[${new Date().toISOString()}] ERROR: ${args.join(" ")}\n`);
 		originalError(...args);
 	};
-	console.log("ScreenBlink app started - logs will be written to:", logPath);
+	console.log("BlinkGuard app started - logs will be written to:", logPath);
 }

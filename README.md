@@ -1,10 +1,8 @@
-# ScreenBlink (Fork)
+# BlinkGuard
 
-This repository is a **fork** of [katunli/ScreenBlink](https://github.com/katunli/ScreenBlink) — a cross-platform desktop app that helps prevent dry eyes and eye strain with blink reminders and optional camera-based blink detection.
+Cross-platform desktop app that helps prevent dry eyes and eye strain with blink reminders and optional camera-based blink detection.
 
-Upstream project / releases: [screenblink.org](https://www.screenblink.org/) · [katunli/ScreenBlink](https://github.com/katunli/ScreenBlink)
-
-## Current features
+## Features
 
 - **Blink reminders** — start/stop tracking from the control panel; interval slider from 1–10 seconds
 - **Timer mode** — show a reminder popup on a fixed interval
@@ -72,6 +70,6 @@ cd python
 
 See `AGENTS.md` for Cursor Cloud–specific notes.
 
-## Installation (upstream builds)
+## Attribution
 
-Prebuilt installers are published by the upstream project — download from [screenblink.org](https://www.screenblink.org/) or the [upstream releases](https://github.com/katunli/ScreenBlink/releases) page.
+BlinkGuard is originally based on [ScreenBlink](https://github.com/katunli/ScreenBlink) by Katun Li ([screenblink.org](https://www.screenblink.org/)).

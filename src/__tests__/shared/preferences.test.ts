@@ -51,7 +51,7 @@ describe("camera quality presets", () => {
 			targetFps: 20,
 			processingResolution: [640, 480],
 			faceDetectInterval: 1,
-			poseStrictness: "strict",
+			poseStrictness: "normal",
 		});
 	});
 
@@ -64,7 +64,7 @@ describe("camera quality presets", () => {
 			target_fps: 20,
 			processing_resolution: [640, 480],
 			face_detect_interval: 1,
-			pose_strictness: "strict",
+			pose_strictness: "normal",
 		});
 	});
 

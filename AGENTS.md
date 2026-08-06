@@ -2,7 +2,7 @@
 
 ## Cursor Cloud specific instructions
 
-ScreenBlink is a single desktop app (not a monorepo): an Electron 30 + React 18 + Vite 5 + TypeScript app, with an **optional** Python (OpenCV/dlib) computer-vision sidecar for camera-based blink detection. There is no web backend, database, or docker. State is local (`electron-store`). Standard commands live in `package.json` scripts; the notes below only cover non-obvious cloud caveats.
+BlinkGuard is a single desktop app (not a monorepo): an Electron 30 + React 18 + Vite 5 + TypeScript app, with an **optional** Python (OpenCV/dlib) computer-vision sidecar for camera-based blink detection. There is no web backend, database, or docker. State is local (`electron-store`). Standard commands live in `package.json` scripts; the notes below only cover non-obvious cloud caveats.
 
 ### Layout (post-refactor)
 
@@ -43,4 +43,4 @@ Cursor rules under `.cursor/rules/` and the blink-detector skill under `.cursor/
 
 Not runnable in this cloud VM without extra work and is not needed to run/test the core app. It requires building a `dlib` wheel (C++/CMake toolchain), pulling the ~99MB Git LFS model `electron/assets/models/shape_predictor_68_face_landmarks.dat` (`git lfs pull`), building the PyInstaller binary (`cd python && ./build_and_install.sh`), and a physical webcam — none of which are available headless. Setup lives in `python/setup.sh` and `python/requirements.txt`. Protocol strings and NDJSON semantics must stay in sync with `electron/infrastructure/sidecar/protocol.ts` and the spawn/parse loop in `electron/infrastructure/sidecar/blink-detector-sidecar.ts` — see `.cursor/skills/blink-detector-sidecar/SKILL.md`. Camera quality presets and EAR helpers live in `shared/camera-quality.ts` / `shared/ear-calibration.ts`.
 
-Blink debug capture (Electron): structured JSONL at `{app.getPath('userData')}/logs/blink-detector.jsonl` (Windows: typically `%APPDATA%/ScreenBlink/logs/blink-detector.jsonl`). Console prints the absolute path once at startup (`Blink debug log: …`) and short credited/rejected lines only; full `blinkDebug` payloads go to the file via `electron/infrastructure/logging/blink-detector-debug-logger.ts`.
+Blink debug capture (Electron): structured JSONL at `{app.getPath('userData')}/logs/blink-detector.jsonl` (Windows: typically `%APPDATA%/BlinkGuard/logs/blink-detector.jsonl`). Console prints the absolute path once at startup (`Blink debug log: …`) and short credited/rejected lines only; full `blinkDebug` payloads go to the file via `electron/infrastructure/logging/blink-detector-debug-logger.ts`.

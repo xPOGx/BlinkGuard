@@ -1,11 +1,11 @@
 {
-	"name": "screenblink",
+	"name": "blinkguard",
 	"private": true,
 	"version": "1.0.1",
 	"type": "module",
 	"description": "A desktop application to help prevent dry eyes by reminding you to blink regularly",
 	"author": {
-		"name": "Katun Li"
+		"name": "Pavlo Dzhevaha"
 	},
 	"scripts": {
 		"dev": "vite",
@@ -59,8 +59,8 @@
 	},
 	"main": "dist-electron/main.js",
 	"build": {
-		"appId": "com.screenblink.app",
-		"productName": "ScreenBlink",
+		"appId": "com.xpogx.blinkguard",
+		"productName": "BlinkGuard",
 		"publish": null,
 		"artifactName": "${productName}-${arch}.${ext}",
 		"files": [
@@ -86,7 +86,7 @@
 			"allowToChangeInstallationDirectory": true,
 			"createDesktopShortcut": true,
 			"createStartMenuShortcut": true,
-			"shortcutName": "ScreenBlink",
+			"shortcutName": "BlinkGuard",
 			"installerIcon": "assets/icons/icon.ico",
 			"uninstallerIcon": "assets/icons/icon.ico",
 			"installerHeaderIcon": "assets/icons/icon.ico",
@@ -96,7 +96,7 @@
 				"en-US"
 			],
 			"language": "1033",
-			"artifactName": "ScreenBlink.Setup.${ext}"
+			"artifactName": "BlinkGuard.Setup.${ext}"
 		},
 		"mac": {
 			"target": [
@@ -110,7 +110,7 @@
 			"entitlements": "build/entitlements.mac.plist",
 			"entitlementsInherit": "build/entitlements.mac.plist",
 			"notarize": true,
-			"artifactName": "ScreenBlink-${arch}.${ext}"
+			"artifactName": "BlinkGuard-${arch}.${ext}"
 		},
 		"win": {
 			"target": [
