@@ -1,13 +1,20 @@
+import { Activity, Camera, Crosshair } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/button";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
+import {
+	SettingPanel,
+	SettingRow,
+	ToggleSwitch,
+} from "@/features/settings/ui/setting-panel";
+import { cn } from "@/lib/utils";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import {
 	CAMERA_QUALITY_OPTIONS,
 	CAMERA_QUALITY_PRESETS,
 } from "../../../../shared/camera-quality";
 import type { CameraQuality } from "../../../../shared/preferences";
-import { Activity, Camera, Crosshair } from "lucide-react";
-import { useEffect, useState } from "react";
 
 interface CameraErrorBannerProps {
 	error: string | null;
@@ -21,18 +28,18 @@ export function CameraErrorBanner({
 	if (!error) return null;
 
 	return (
-		<div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg mx-4 mt-4">
-			<div className="flex items-center justify-between">
-				<div className="flex items-center gap-2">
-					<Camera className="w-4 h-4" />
+		<div className="mx-4 mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-destructive sm:mx-6">
+			<div className="flex items-center justify-between gap-3">
+				<div className="flex min-w-0 items-center gap-2 text-sm">
+					<Camera className="h-4 w-4 shrink-0" aria-hidden />
 					<span className="font-medium">Camera Error:</span>
-					<span>{error}</span>
+					<span className="truncate">{error}</span>
 				</div>
 				<button
 					type="button"
 					aria-label="Dismiss camera error"
 					onClick={onDismiss}
-					className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200"
+					className="shrink-0 text-lg leading-none opacity-70 hover:opacity-100"
 				>
 					×
 				</button>
@@ -85,9 +92,7 @@ export function CameraControls({
 					`Calibration saved (EAR ${payload.baseline.toFixed(3)})`,
 				);
 			} else {
-				setCalibrationMessage(
-					payload.error ?? "Calibration did not complete",
-				);
+				setCalibrationMessage(payload.error ?? "Calibration did not complete");
 			}
 		});
 		return () => {
@@ -182,260 +187,236 @@ export function CameraControls({
 
 	return (
 		<>
-			<div className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-hidden">
-				<span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-					<Camera className="w-4 h-4" />
-					Camera Detection
-				</span>
-				<div className="flex items-center gap-2">
-					{preferences.cameraEnabled &&
-						(isWindowOpen ? (
-							<button
-								type="button"
-								onClick={() => {
-									rendererIpc.closeCameraWindow();
-									setIsWindowOpen(false);
-								}}
-								className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-							>
-								Stop Showing
-							</button>
-						) : (
-							<button
-								type="button"
-								onClick={() => {
-									if (!preferences.isTracking) {
-										setPreferences((current) => ({
-											...current,
-											isTracking: true,
-										}));
-									}
-									rendererIpc.showCameraWindow();
-									setIsWindowOpen(true);
-								}}
-								className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-							>
-								Show Camera
-							</button>
-						))}
-					<button
-						type="button"
-						aria-label="Toggle camera detection"
-						onClick={toggleCamera}
-						className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-							preferences.cameraEnabled
-								? "bg-blue-600"
-								: "bg-gray-200 dark:bg-gray-600"
-						}`}
-					>
-						<span
-							className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-								preferences.cameraEnabled ? "translate-x-6" : "translate-x-1"
-							}`}
-						/>
-					</button>
-				</div>
-			</div>
-
-			{preferences.cameraEnabled && (
-				<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-hidden">
-					<div className="flex items-center justify-between mb-3">
-						<span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-							Camera Quality
-						</span>
-						<span className="text-xs text-gray-500 dark:text-gray-400">
-							{activePreset.targetFps} FPS ·{" "}
-							{activePreset.processingResolution[0]}×
-							{activePreset.processingResolution[1]}
-						</span>
-					</div>
-					<div
-						role="group"
-						aria-label="Camera quality"
-						className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600"
-					>
-						{CAMERA_QUALITY_OPTIONS.map((option) => {
-							const selected = preferences.cameraQuality === option;
-							return (
-								<button
-									key={option}
-									type="button"
-									aria-pressed={selected}
-									onClick={() => setCameraQuality(option)}
-									className={`flex-1 px-2 py-1.5 text-xs sm:text-sm font-medium transition-colors focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-500 ${
-										selected
-											? "bg-blue-600 text-white"
-											: "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-									}`}
-								>
-									{QUALITY_LABELS[option]}
-								</button>
-							);
-						})}
-					</div>
-					<p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-						Medium is recommended. Performance saves CPU; High improves blink
-						timing accuracy.
-					</p>
-				</div>
-			)}
-
-			{preferences.cameraEnabled && (
-				<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-hidden">
-					<div className="flex items-center justify-between mb-2">
+			<SettingPanel>
+				<SettingRow
+					title={
+						<>
+							<Camera className="h-4 w-4 text-muted-foreground" aria-hidden />
+							Camera Detection
+						</>
+					}
+					action={
 						<div className="flex items-center gap-2">
-							<Crosshair className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-							<span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-								Open-eye Calibration
-							</span>
-						</div>
-						{preferences.earCalibration !== null && (
-							<span className="text-xs text-green-600 dark:text-green-400">
-								EAR {preferences.earCalibration.toFixed(3)}
-							</span>
-						)}
-					</div>
-					<p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-						Keep eyes open and look at the camera for about 8 seconds. This
-						tunes blink thresholds to your face.
-					</p>
-					<div className="flex flex-wrap items-center gap-2">
-						{calibrating ? (
-							<button
-								type="button"
-								onClick={cancelCalibration}
-								className="px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-							>
-								Cancel ({remainingSec}s)
-							</button>
-						) : (
-							<button
-								type="button"
-								onClick={startCalibration}
-								className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-							>
-								Calibrate
-							</button>
-						)}
-						{preferences.earCalibration !== null && !calibrating && (
-							<button
-								type="button"
-								onClick={resetCalibration}
-								className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
-							>
-								Reset
-							</button>
-						)}
-					</div>
-					{calibrating && (
-						<div className="mt-3 h-1.5 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
-							<div
-								className="h-full bg-blue-600 transition-[width] duration-200"
-								style={{ width: `${progressRatio * 100}%` }}
+							{preferences.cameraEnabled ? (
+								isWindowOpen ? (
+									<Button
+										type="button"
+										size="sm"
+										variant="destructive"
+										onClick={() => {
+											rendererIpc.closeCameraWindow();
+											setIsWindowOpen(false);
+										}}
+									>
+										Stop Showing
+									</Button>
+								) : (
+									<Button
+										type="button"
+										size="sm"
+										onClick={() => {
+											if (!preferences.isTracking) {
+												setPreferences((current) => ({
+													...current,
+													isTracking: true,
+												}));
+											}
+											rendererIpc.showCameraWindow();
+											setIsWindowOpen(true);
+										}}
+									>
+										Show Camera
+									</Button>
+								)
+							) : null}
+							<ToggleSwitch
+								aria-label="Toggle camera detection"
+								checked={preferences.cameraEnabled}
+								onChange={toggleCamera}
 							/>
 						</div>
-					)}
-					{calibrationMessage && (
-						<p className="mt-2 text-xs text-gray-600 dark:text-gray-300">
-							{calibrationMessage}
-						</p>
-					)}
-				</div>
-			)}
+					}
+				/>
+			</SettingPanel>
 
-			{preferences.cameraEnabled && (
-				<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-hidden">
-					<div className="flex items-center justify-between mb-2">
-						<div className="flex items-center gap-2">
-							<span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-								MediaPipe Backend
-							</span>
-							<span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
-								Experimental
-							</span>
-						</div>
-						<button
-							type="button"
-							aria-label="Toggle MediaPipe backend"
-							onClick={toggleMediaPipe}
-							className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-								preferences.useMediaPipe
-									? "bg-blue-600"
-									: "bg-gray-300 dark:bg-gray-600"
-							}`}
-						>
-							<span
-								className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-									preferences.useMediaPipe ? "translate-x-6" : "translate-x-1"
-								}`}
-							/>
-						</button>
-					</div>
-					<p className="text-xs text-gray-500 dark:text-gray-400">
-						Architecture flag only — MediaPipe is not bundled yet. When
-						enabled, the detector stays on dlib and reports that fallback.
-					</p>
-				</div>
-			)}
-
-			{preferences.cameraEnabled && (
-				<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-hidden">
-					<div className="flex items-center justify-between mb-3">
-						<div className="flex items-center gap-2">
-							<Activity className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-							<span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-								Meibomian Gland Dysfunction (MGD) Mode
-							</span>
-						</div>
-						<button
-							type="button"
-							aria-label="Toggle MGD mode"
-							onClick={toggleMgd}
-							className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-								preferences.mgdMode
-									? "bg-blue-600"
-									: "bg-gray-300 dark:bg-gray-600"
-							}`}
-						>
-							<span
-								className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-									preferences.mgdMode ? "translate-x-6" : "translate-x-1"
-								}`}
-							/>
-						</button>
-					</div>
-					<div className="flex items-center gap-2">
-						<button
-							type="button"
-							onClick={() =>
-								setPreferences((current) => ({
-									...current,
-									showMgdInfo: !current.showMgdInfo,
-								}))
+			{preferences.cameraEnabled ? (
+				<>
+					<SettingPanel>
+						<SettingRow
+							title="Camera Quality"
+							description="Medium is recommended. Performance saves CPU; High improves blink timing accuracy."
+							action={
+								<span className="text-xs text-muted-foreground">
+									{activePreset.targetFps} FPS ·{" "}
+									{activePreset.processingResolution[0]}×
+									{activePreset.processingResolution[1]}
+								</span>
 							}
-							className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
 						>
-							{preferences.showMgdInfo ? "Hide Info" : "Learn More"}
-						</button>
-						{preferences.mgdMode && (
-							<span className="text-xs text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 px-2 py-1 rounded">
-								MGD mode is active
-							</span>
-						)}
+							<fieldset
+								aria-label="Camera quality"
+								className="m-0 flex overflow-hidden rounded-md border border-border p-0"
+							>
+								{CAMERA_QUALITY_OPTIONS.map((option) => {
+									const selected = preferences.cameraQuality === option;
+									return (
+										<button
+											key={option}
+											type="button"
+											aria-pressed={selected}
+											onClick={() => setCameraQuality(option)}
+											className={cn(
+												"flex-1 px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:text-sm",
+												selected
+													? "bg-primary text-primary-foreground"
+													: "bg-background text-foreground hover:bg-muted",
+											)}
+										>
+											{QUALITY_LABELS[option]}
+										</button>
+									);
+								})}
+							</fieldset>
+						</SettingRow>
+					</SettingPanel>
+
+					<SettingPanel>
+						<SettingRow
+							title={
+								<>
+									<Crosshair
+										className="h-4 w-4 text-muted-foreground"
+										aria-hidden
+									/>
+									Open-eye Calibration
+								</>
+							}
+							description="Keep eyes open and look at the camera for about 8 seconds. This tunes blink thresholds to your face."
+							action={
+								preferences.earCalibration !== null ? (
+									<span className="text-xs text-primary">
+										EAR {preferences.earCalibration.toFixed(3)}
+									</span>
+								) : null
+							}
+						>
+							<div className="flex flex-wrap items-center gap-2">
+								{calibrating ? (
+									<Button
+										type="button"
+										size="sm"
+										variant="secondary"
+										onClick={cancelCalibration}
+									>
+										Cancel ({remainingSec}s)
+									</Button>
+								) : (
+									<Button type="button" size="sm" onClick={startCalibration}>
+										Calibrate
+									</Button>
+								)}
+								{preferences.earCalibration !== null && !calibrating ? (
+									<Button
+										type="button"
+										size="sm"
+										variant="ghost"
+										onClick={resetCalibration}
+									>
+										Reset
+									</Button>
+								) : null}
+							</div>
+							{calibrating ? (
+								<div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+									<div
+										className="h-full bg-primary transition-[width] duration-200"
+										style={{ width: `${progressRatio * 100}%` }}
+									/>
+								</div>
+							) : null}
+							{calibrationMessage ? (
+								<p className="mt-2 text-xs text-muted-foreground">
+									{calibrationMessage}
+								</p>
+							) : null}
+						</SettingRow>
+					</SettingPanel>
+
+					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<SettingPanel>
+							<SettingRow
+								title={
+									<>
+										MediaPipe Backend
+										<span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+											Experimental
+										</span>
+									</>
+								}
+								description="Architecture flag only — MediaPipe is not bundled yet. When enabled, the detector stays on dlib and reports that fallback."
+								action={
+									<ToggleSwitch
+										aria-label="Toggle MediaPipe backend"
+										checked={preferences.useMediaPipe}
+										onChange={toggleMediaPipe}
+									/>
+								}
+							/>
+						</SettingPanel>
+
+						<SettingPanel>
+							<SettingRow
+								title={
+									<>
+										<Activity
+											className="h-4 w-4 text-muted-foreground"
+											aria-hidden
+										/>
+										MGD Mode
+									</>
+								}
+								description="Reminders on a fixed interval regardless of blinks. Popup still closes when a blink is detected."
+								action={
+									<ToggleSwitch
+										aria-label="Toggle MGD mode"
+										checked={preferences.mgdMode}
+										onChange={toggleMgd}
+									/>
+								}
+							>
+								<div className="flex flex-wrap items-center gap-2">
+									<button
+										type="button"
+										onClick={() =>
+											setPreferences((current) => ({
+												...current,
+												showMgdInfo: !current.showMgdInfo,
+											}))
+										}
+										className="text-xs text-primary hover:underline"
+									>
+										{preferences.showMgdInfo ? "Hide Info" : "Learn More"}
+									</button>
+									{preferences.mgdMode ? (
+										<span className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary">
+											MGD mode is active
+										</span>
+									) : null}
+								</div>
+								{preferences.showMgdInfo ? (
+									<div className="mt-2 rounded-md bg-accent/60 p-3 text-xs text-muted-foreground sm:text-sm">
+										MGD is a common condition where the meibomian glands in your
+										eyelids don't produce enough oil, leading to dry eyes. When
+										enabled, reminders appear at regular intervals regardless of
+										detected blinks. The popup still closes when a blink is
+										detected.
+									</div>
+								) : null}
+							</SettingRow>
+						</SettingPanel>
 					</div>
-					{preferences.showMgdInfo && (
-						<div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-							<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-								MGD is a common condition where the meibomian glands in your
-								eyelids don't produce enough oil, leading to dry eyes. When
-								enabled, reminders appear at regular intervals regardless of
-								detected blinks. The popup still closes when a blink is
-								detected.
-							</p>
-						</div>
-					)}
-				</div>
-			)}
+				</>
+			) : null}
 		</>
 	);
 }

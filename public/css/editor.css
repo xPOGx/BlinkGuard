@@ -1,240 +1,235 @@
 /* Popup size/position editor */
 .editor-container {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background: var(--popup-bg-color);
-  font-family: system-ui, -apple-system, sans-serif;
-  -webkit-app-region: drag;
-  position: relative;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	background: var(--popup-bg-color);
+	font-family: var(--popup-font);
+	-webkit-app-region: drag;
+	position: relative;
 }
 
 .editor-content {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 6px;
-  position: relative;
-  z-index: 10;
-  min-height: 60px;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	padding: 6px;
+	position: relative;
+	z-index: 10;
+	min-height: 60px;
+}
+
+.editor-title,
+.editor-instructions,
+.editor-size-display {
+	-webkit-app-region: drag;
+	background: rgba(15, 23, 42, 0.72);
+	color: #f8fafc;
+	border: 1px solid var(--popup-border);
+	backdrop-filter: blur(6px);
+	border-radius: var(--popup-radius-sm);
+	text-align: center;
+	cursor: pointer;
+	max-width: 95%;
+}
+
+.editor-title:hover,
+.editor-instructions:hover,
+.editor-size-display:hover {
+	background: rgba(15, 23, 42, 0.88);
+	border-color: rgba(248, 250, 252, 0.18);
 }
 
 .editor-title {
-  font-size: 0.9rem;
-  font-weight: 700;
-  text-align: center;
-  margin-bottom: 2px;
-  -webkit-app-region: drag;
-  background: #FFFFFF;
-  color: #000000;
-  padding: 2px 4px;
-  border-radius: 3px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.editor-title:hover {
-  background: #F0F0F0;
+	font-size: 0.85rem;
+	font-weight: 700;
+	margin-bottom: 2px;
+	padding: 3px 8px;
+	white-space: nowrap;
+	line-height: 1.25;
 }
 
 .editor-instructions {
-  font-size: 0.65rem;
-  text-align: center;
-  margin-bottom: 3px;
-  -webkit-app-region: drag;
-  line-height: 1.2;
-  max-width: 95%;
-  background: #FFFFFF;
-  color: #000000;
-  padding: 1px 3px;
-  border-radius: 2px;
-  cursor: pointer;
-}
-
-.editor-instructions:hover {
-  background: #F0F0F0;
+	font-size: 0.65rem;
+	margin-bottom: 3px;
+	padding: 2px 6px;
+	color: #e2e8f0;
+	line-height: 1.2;
 }
 
 .editor-size-display {
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-align: center;
-  margin-bottom: 4px;
-  -webkit-app-region: drag;
-  background: #FFFFFF;
-  color: #000000;
-  padding: 3px 6px;
-  border-radius: 3px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.editor-size-display:hover {
-  background: #F0F0F0;
+	font-size: 0.7rem;
+	font-weight: 600;
+	margin-bottom: 4px;
+	padding: 3px 8px;
+	white-space: nowrap;
 }
 
 .editor-buttons {
-  display: flex;
-  gap: 6px;
-  -webkit-app-region: no-drag;
+	display: flex;
+	gap: 6px;
+	-webkit-app-region: no-drag;
 }
 
 .editor-button {
-  padding: 3px 8px;
-  border: none;
-  border-radius: 3px;
-  font-size: 0.65rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-width: 50px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-  color: #FFFFFF;
+	padding: 4px 10px;
+	border: none;
+	border-radius: var(--popup-radius-sm);
+	font-size: 0.65rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition:
+		opacity 0.15s ease,
+		transform 0.1s ease;
+	min-width: 50px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+	color: #fff;
 }
 
 .editor-button:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 5px rgba(0,0,0,0.6);
+	opacity: 0.92;
+	transform: translateY(-1px);
 }
 
 .editor-button:active {
-  transform: translateY(0px);
+	transform: translateY(0);
 }
 
 .editor-button.save {
-  background: #10B981;
+	background: var(--popup-accent);
 }
 
 .editor-button.cancel {
-  background: #EF4444;
+	background: var(--popup-danger);
 }
 
 .resize-handle {
-  position: absolute;
-  background: transparent;
+	position: absolute;
+	background: transparent;
 }
 
 .resize-handle.n {
-  top: 0;
-  left: 10px;
-  right: 10px;
-  height: 10px;
-  cursor: n-resize;
+	top: 0;
+	left: 10px;
+	right: 10px;
+	height: 10px;
+	cursor: n-resize;
 }
 
 .resize-handle.s {
-  bottom: 0;
-  left: 10px;
-  right: 10px;
-  height: 10px;
-  cursor: s-resize;
+	bottom: 0;
+	left: 10px;
+	right: 10px;
+	height: 10px;
+	cursor: s-resize;
 }
 
 .resize-handle.e {
-  top: 10px;
-  right: 0;
-  bottom: 10px;
-  width: 10px;
-  cursor: e-resize;
+	top: 10px;
+	right: 0;
+	bottom: 10px;
+	width: 10px;
+	cursor: e-resize;
 }
 
 .resize-handle.w {
-  top: 10px;
-  left: 0;
-  bottom: 10px;
-  width: 10px;
-  cursor: w-resize;
+	top: 10px;
+	left: 0;
+	bottom: 10px;
+	width: 10px;
+	cursor: w-resize;
 }
 
 .resize-handle.ne {
-  top: 0;
-  right: 0;
-  width: 10px;
-  height: 10px;
-  cursor: ne-resize;
+	top: 0;
+	right: 0;
+	width: 10px;
+	height: 10px;
+	cursor: ne-resize;
 }
 
 .resize-handle.nw {
-  top: 0;
-  left: 0;
-  width: 10px;
-  height: 10px;
-  cursor: nw-resize;
+	top: 0;
+	left: 0;
+	width: 10px;
+	height: 10px;
+	cursor: nw-resize;
 }
 
 .resize-handle.se {
-  bottom: 0;
-  right: 0;
-  width: 10px;
-  height: 10px;
-  cursor: se-resize;
+	bottom: 0;
+	right: 0;
+	width: 10px;
+	height: 10px;
+	cursor: se-resize;
 }
 
 .resize-handle.sw {
-  bottom: 0;
-  left: 0;
-  width: 10px;
-  height: 10px;
-  cursor: sw-resize;
+	bottom: 0;
+	left: 0;
+	width: 10px;
+	height: 10px;
+	cursor: sw-resize;
 }
 
 .corner-indicator {
-  position: absolute;
-  font-size: 12px;
-  color: var(--popup-text-color);
-  opacity: 0.6;
+	position: absolute;
+	font-size: 12px;
+	color: var(--popup-text-color);
+	opacity: 0.55;
 }
 
 .corner-indicator.ne {
-  top: 2px;
-  right: 2px;
+	top: 2px;
+	right: 2px;
 }
 
 .corner-indicator.nw {
-  top: 2px;
-  left: 2px;
+	top: 2px;
+	left: 2px;
 }
 
 .corner-indicator.se {
-  bottom: 2px;
-  right: 2px;
+	bottom: 2px;
+	right: 2px;
 }
 
 .corner-indicator.sw {
-  bottom: 2px;
-  left: 2px;
+	bottom: 2px;
+	left: 2px;
 }
 
 .drag-indicator {
-  position: absolute;
-  top: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #FFFFFF;
-  color: #000000;
-  padding: 3px 6px;
-  border-radius: 3px;
-  font-size: 0.6rem;
-  font-weight: 600;
-  z-index: 30;
-  -webkit-app-region: no-drag;
-  opacity: 0;
-  transition: opacity 0.3s;
-  pointer-events: none;
-  white-space: nowrap;
+	position: absolute;
+	top: 6px;
+	left: 50%;
+	transform: translateX(-50%);
+	background: rgba(15, 23, 42, 0.8);
+	color: #f8fafc;
+	border: 1px solid var(--popup-border);
+	backdrop-filter: blur(6px);
+	padding: 3px 8px;
+	border-radius: var(--popup-radius-sm);
+	font-size: 0.6rem;
+	font-weight: 600;
+	z-index: 30;
+	-webkit-app-region: no-drag;
+	opacity: 0;
+	transition: opacity 0.3s;
+	pointer-events: none;
+	white-space: nowrap;
 }
 
 .drag-indicator.show {
-  opacity: 1;
+	opacity: 1;
 }

@@ -1,27 +1,28 @@
 /* Silent no-face status toast (top-center, camera mode) */
 html.no-face-root,
 body.no-face-body {
-  background: transparent !important;
+	background: transparent !important;
 }
 
 body.no-face-body {
-  justify-content: center;
-  align-items: center;
-  padding: 0;
+	justify-content: center;
+	align-items: center;
+	padding: 0;
 }
 
 #no-face {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-  font-size: 0.8rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: #ef4444;
-  background: rgba(17, 24, 39, 0.82);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 8px 12px;
-  white-space: nowrap;
-  opacity: 0;
-  animation: fadeIn 0.35s forwards;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+	font-family: var(--popup-font);
+	font-size: 0.8rem;
+	font-weight: 500;
+	letter-spacing: 0.01em;
+	color: #f87171;
+	background: var(--popup-surface);
+	border: 1px solid var(--popup-border);
+	border-radius: var(--popup-radius-sm);
+	padding: 8px 12px;
+	white-space: nowrap;
+	opacity: 0;
+	animation: fadeIn 0.35s forwards;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+	backdrop-filter: blur(8px);
 }

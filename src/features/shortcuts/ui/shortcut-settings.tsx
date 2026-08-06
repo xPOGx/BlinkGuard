@@ -1,4 +1,6 @@
 import { Zap } from "lucide-react";
+import { Button } from "@/components/button";
+import { SettingPanel, SettingRow } from "@/features/settings/ui/setting-panel";
 
 interface ShortcutSettingsProps {
 	shortcut: string;
@@ -20,23 +22,24 @@ export function ShortcutSettings({
 	onCancel,
 }: ShortcutSettingsProps) {
 	return (
-		<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6 overflow-hidden">
-			<div className="flex items-center justify-between mb-3">
-				<div className="flex items-center gap-2">
-					<Zap className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-					<span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">
+		<SettingPanel>
+			<SettingRow
+				title={
+					<>
+						<Zap className="h-4 w-4 text-muted-foreground" aria-hidden />
 						Keyboard Shortcut
-					</span>
-				</div>
-			</div>
-			<div className="space-y-4">
+					</>
+				}
+				description="Press the shortcut to start/stop reminders. Use at least one modifier key (Ctrl, Shift, Alt, Cmd, Win) and one regular key."
+			>
 				<div className="flex items-center gap-2">
 					<div
+						role="status"
 						aria-label="Current keyboard shortcut"
-						className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm"
+						className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
 					>
 						{isRecording ? (
-							<span className="text-blue-600 dark:text-blue-400">
+							<span className="text-primary">
 								{temporaryShortcut || "Press keys..."}
 							</span>
 						) : (
@@ -45,37 +48,23 @@ export function ShortcutSettings({
 					</div>
 					{isRecording ? (
 						<div className="flex gap-2">
-							<button
-								type="button"
-								onClick={onCancel}
-								className="px-3 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-							>
+							<Button type="button" variant="secondary" onClick={onCancel}>
 								Cancel
-							</button>
-							<button
-								type="button"
-								onClick={onSave}
-								className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-							>
+							</Button>
+							<Button type="button" onClick={onSave}>
 								Save
-							</button>
+							</Button>
 						</div>
 					) : (
-						<button
-							type="button"
-							onClick={onStartRecording}
-							className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-						>
+						<Button type="button" onClick={onStartRecording}>
 							Change
-						</button>
+						</Button>
 					)}
 				</div>
-				{error && <p className="text-red-500 text-sm">{error}</p>}
-				<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-					Press the shortcut to start/stop reminders. Use at least one modifier
-					key (Ctrl, Shift, Alt, Cmd, Win) and one regular key.
-				</p>
-			</div>
-		</div>
+				{error ? (
+					<p className="mt-2 text-sm text-destructive">{error}</p>
+				) : null}
+			</SettingRow>
+		</SettingPanel>
 	);
 }

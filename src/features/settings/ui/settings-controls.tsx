@@ -1,41 +1,60 @@
+import { LogIn, Moon, Sun, Volume2, VolumeX } from "lucide-react";
+import { Button } from "@/components/button";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
-import { LogIn, Moon, Settings, Sun, Volume2, VolumeX } from "lucide-react";
 import type { SettingsPreferences } from "../model/preferences";
 import type { SetPreferences } from "../model/use-preferences";
+import { SettingPanel, SettingRow, ToggleSwitch } from "./setting-panel";
 
-interface SettingsHeaderProps {
+interface DarkModeToggleProps {
 	darkMode: boolean;
 	setPreferences: SetPreferences;
+	variant?: "icon" | "row";
 }
 
-export function SettingsHeader({
+export function DarkModeToggle({
 	darkMode,
 	setPreferences,
-}: SettingsHeaderProps) {
-	return (
-		<div className="flex justify-between items-center">
-			<h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-white flex items-center gap-2">
-				<Settings className="w-5 h-5 sm:w-6 sm:h-6" />
-				Control Panel
-			</h2>
+	variant = "icon",
+}: DarkModeToggleProps) {
+	const toggle = () =>
+		setPreferences((current) => ({
+			...current,
+			darkMode: !current.darkMode,
+		}));
+
+	if (variant === "row") {
+		return (
 			<button
 				type="button"
-				onClick={() =>
-					setPreferences((current) => ({
-						...current,
-						darkMode: !current.darkMode,
-					}))
-				}
-				className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+				onClick={toggle}
+				className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-muted"
 				aria-label="Toggle dark mode"
 			>
-				{darkMode ? (
-					<Sun className="w-5 h-5 text-yellow-500" />
-				) : (
-					<Moon className="w-5 h-5 text-gray-600" />
-				)}
+				<span className="flex items-center gap-2">
+					{darkMode ? (
+						<Sun className="h-4 w-4 text-amber-400" aria-hidden />
+					) : (
+						<Moon className="h-4 w-4" aria-hidden />
+					)}
+					{darkMode ? "Light mode" : "Dark mode"}
+				</span>
 			</button>
-		</div>
+		);
+	}
+
+	return (
+		<button
+			type="button"
+			onClick={toggle}
+			className="rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:bg-muted"
+			aria-label="Toggle dark mode"
+		>
+			{darkMode ? (
+				<Sun className="h-4 w-4 text-amber-400" aria-hidden />
+			) : (
+				<Moon className="h-4 w-4" aria-hidden />
+			)}
+		</button>
 	);
 }
 
@@ -49,44 +68,33 @@ export function SoundSettings({
 	setPreferences,
 }: SoundSettingsProps) {
 	return (
-		<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6 overflow-hidden">
-			<div className="flex items-center justify-between mb-3">
-				<div className="flex items-center gap-2">
-					{preferences.soundEnabled ? (
-						<Volume2 className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-					) : (
-						<VolumeX className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-					)}
-					<span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">
+		<SettingPanel>
+			<SettingRow
+				title={
+					<>
+						{preferences.soundEnabled ? (
+							<Volume2 className="h-4 w-4 text-muted-foreground" aria-hidden />
+						) : (
+							<VolumeX className="h-4 w-4 text-muted-foreground" aria-hidden />
+						)}
 						Notification Sound
-					</span>
-				</div>
-				<button
-					type="button"
-					aria-label="Toggle notification sound"
-					onClick={() =>
-						setPreferences((current) => ({
-							...current,
-							soundEnabled: !current.soundEnabled,
-						}))
-					}
-					className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-						preferences.soundEnabled
-							? "bg-blue-600"
-							: "bg-gray-300 dark:bg-gray-600"
-					}`}
-				>
-					<span
-						className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-							preferences.soundEnabled ? "translate-x-6" : "translate-x-1"
-						}`}
+					</>
+				}
+				description="Play sounds for blink reminders and exercise prompts"
+				action={
+					<ToggleSwitch
+						aria-label="Toggle notification sound"
+						checked={preferences.soundEnabled}
+						onChange={() =>
+							setPreferences((current) => ({
+								...current,
+								soundEnabled: !current.soundEnabled,
+							}))
+						}
 					/>
-				</button>
-			</div>
-			<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-				Play sounds for blink reminders and exercise prompts
-			</p>
-		</div>
+				}
+			/>
+		</SettingPanel>
 	);
 }
 
@@ -100,40 +108,29 @@ export function LaunchAtLoginSettings({
 	setPreferences,
 }: LaunchAtLoginSettingsProps) {
 	return (
-		<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6 overflow-hidden">
-			<div className="flex items-center justify-between mb-3">
-				<div className="flex items-center gap-2">
-					<LogIn className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-					<span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">
+		<SettingPanel>
+			<SettingRow
+				title={
+					<>
+						<LogIn className="h-4 w-4 text-muted-foreground" aria-hidden />
 						Launch at login
-					</span>
-				</div>
-				<button
-					type="button"
-					aria-label="Toggle launch at login"
-					onClick={() =>
-						setPreferences((current) => ({
-							...current,
-							launchAtLogin: !current.launchAtLogin,
-						}))
-					}
-					className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-						preferences.launchAtLogin
-							? "bg-blue-600"
-							: "bg-gray-300 dark:bg-gray-600"
-					}`}
-				>
-					<span
-						className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-							preferences.launchAtLogin ? "translate-x-6" : "translate-x-1"
-						}`}
+					</>
+				}
+				description="Start BlinkGuard hidden in the system tray when you sign in"
+				action={
+					<ToggleSwitch
+						aria-label="Toggle launch at login"
+						checked={preferences.launchAtLogin}
+						onChange={() =>
+							setPreferences((current) => ({
+								...current,
+								launchAtLogin: !current.launchAtLogin,
+							}))
+						}
 					/>
-				</button>
-			</div>
-			<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-				Start BlinkGuard hidden in the system tray when you sign in
-			</p>
-		</div>
+				}
+			/>
+		</SettingPanel>
 	);
 }
 
@@ -149,14 +146,23 @@ export function ResetPreferencesButton() {
 	};
 
 	return (
-		<div className="flex justify-center items-center mt-4">
-			<button
-				type="button"
-				onClick={reset}
-				className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-			>
+		<SettingPanel className="flex items-center justify-center">
+			<Button type="button" variant="destructive" onClick={reset}>
 				Reset Preferences
-			</button>
-		</div>
+			</Button>
+		</SettingPanel>
+	);
+}
+
+export function GamingNotice() {
+	return (
+		<aside className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-900 dark:text-amber-100">
+			<h3 className="mb-1 text-sm font-semibold">Gaming notice</h3>
+			<p className="text-sm opacity-90">
+				If you use blink reminders while gaming, prefer{" "}
+				<strong>Borderless Windowed</strong> or <strong>Windowed</strong> mode.
+				Fullscreen games may be interrupted when popups appear.
+			</p>
+		</aside>
 	);
 }

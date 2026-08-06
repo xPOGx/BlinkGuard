@@ -1,8 +1,10 @@
-import type { SettingsPreferences } from "@/features/settings/model/preferences";
-import type { SetPreferences } from "@/features/settings/model/use-preferences";
-import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import { Palette, Settings } from "lucide-react";
 import { useId, useState } from "react";
+import { Button } from "@/components/button";
+import type { SettingsPreferences } from "@/features/settings/model/preferences";
+import type { SetPreferences } from "@/features/settings/model/use-preferences";
+import { SettingPanel, SettingRow } from "@/features/settings/ui/setting-panel";
+import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 
 interface PopupSettingsProps {
 	preferences: SettingsPreferences;
@@ -32,55 +34,50 @@ export function PopupSettings({
 	};
 
 	return (
-		<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6 overflow-hidden">
-			<div className="flex items-center justify-between mb-3">
-				<div className="flex items-center gap-2">
-					<Settings className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-					<span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">
+		<SettingPanel>
+			<SettingRow
+				title={
+					<>
+						<Settings className="h-4 w-4 text-muted-foreground" aria-hidden />
 						Popup Settings
-					</span>
-				</div>
-				<button
+					</>
+				}
+				description={`Current size: ${preferences.popupSize.width}px × ${preferences.popupSize.height}px`}
+				action={
+					<button
+						type="button"
+						onClick={() =>
+							setPreferences((current) => ({
+								...current,
+								showPopupColors: !current.showPopupColors,
+							}))
+						}
+						className="text-xs text-primary hover:underline"
+					>
+						{preferences.showPopupColors ? "Hide" : "Customize Appearance"}
+					</button>
+				}
+			>
+				<Button
 					type="button"
-					onClick={() =>
-						setPreferences((current) => ({
-							...current,
-							showPopupColors: !current.showPopupColors,
-						}))
-					}
-					className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-				>
-					{preferences.showPopupColors ? "Hide" : "Customize Appearance"}
-				</button>
-			</div>
-			<div className="mt-2">
-				<button
-					type="button"
+					className="w-full gap-2"
 					onClick={rendererIpc.showPopupEditor}
-					className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
 				>
-					<Settings className="w-4 h-4" />
+					<Settings className="h-4 w-4" aria-hidden />
 					Change Position or Size
-				</button>
-			</div>
-			<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
-				Current size: {preferences.popupSize.width}px ×{" "}
-				{preferences.popupSize.height}px
-			</p>
+				</Button>
 
-			{preferences.showPopupColors && (
-				<div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-					<div className="flex items-center gap-2 mb-3">
-						<Palette className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-						<span className="font-medium text-gray-800 dark:text-white text-sm">
+				{preferences.showPopupColors ? (
+					<div className="mt-4 space-y-4 border-t border-border pt-4">
+						<div className="flex items-center gap-2 text-sm font-medium text-foreground">
+							<Palette className="h-4 w-4 text-muted-foreground" aria-hidden />
 							Popup Appearance
-						</span>
-					</div>
-					<div className="space-y-4">
+						</div>
+
 						<div>
 							<label
 								htmlFor="popup-message"
-								className="block text-xs text-gray-600 dark:text-gray-400 mb-1"
+								className="mb-1 block text-xs text-muted-foreground"
 							>
 								Popup Message
 							</label>
@@ -99,29 +96,26 @@ export function PopupSettings({
 											else if (event.key === "Escape")
 												setIsEditingMessage(false);
 										}}
-										className="w-full px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
+										className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
 										ref={(input) => input?.focus()}
 									/>
 									<div className="flex items-center gap-2">
-										<button
-											type="button"
-											onClick={saveMessage}
-											className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-										>
+										<Button type="button" size="sm" onClick={saveMessage}>
 											Save
-										</button>
-										<button
+										</Button>
+										<Button
 											type="button"
+											size="sm"
+											variant="secondary"
 											onClick={() => setIsEditingMessage(false)}
-											className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
 										>
 											Cancel
-										</button>
+										</Button>
 									</div>
 								</div>
 							) : (
-								<div className="flex items-center gap-2 min-w-0">
-									<p className="flex-1 text-sm text-gray-800 dark:text-gray-200 truncate min-w-0 overflow-hidden">
+								<div className="flex min-w-0 items-center gap-2">
+									<p className="min-w-0 flex-1 truncate text-sm text-foreground">
 										"{preferences.popupMessage}"
 									</p>
 									<button
@@ -130,7 +124,7 @@ export function PopupSettings({
 											setTemporaryMessage(preferences.popupMessage);
 											setIsEditingMessage(true);
 										}}
-										className="text-xs text-blue-600 dark:text-blue-400 hover:underline shrink-0"
+										className="shrink-0 text-xs text-primary hover:underline"
 									>
 										Edit
 									</button>
@@ -138,21 +132,23 @@ export function PopupSettings({
 							)}
 						</div>
 
-						<ColorSetting
-							label="Background Color"
-							value={preferences.popupColors.background}
-							onChange={(value) => updateColor("background", value)}
-						/>
-						<ColorSetting
-							label="Text Color"
-							value={preferences.popupColors.text}
-							onChange={(value) => updateColor("text", value)}
-						/>
+						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+							<ColorSetting
+								label="Background Color"
+								value={preferences.popupColors.background}
+								onChange={(value) => updateColor("background", value)}
+							/>
+							<ColorSetting
+								label="Text Color"
+								value={preferences.popupColors.text}
+								onChange={(value) => updateColor("text", value)}
+							/>
+						</div>
 
 						<div>
 							<label
 								htmlFor="window-transparency"
-								className="block text-xs text-gray-600 dark:text-gray-400 mb-1"
+								className="mb-1 block text-xs text-muted-foreground"
 							>
 								Window Transparency
 							</label>
@@ -174,22 +170,20 @@ export function PopupSettings({
 											},
 										}))
 									}
-									className="flex-1 h-2 bg-blue-200 dark:bg-blue-900 rounded-lg appearance-none cursor-pointer"
+									className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-muted"
 								/>
-								<span className="text-sm text-gray-600 dark:text-gray-400 w-12 text-right">
+								<span className="w-12 text-right text-sm text-muted-foreground">
 									{Math.round(preferences.popupColors.transparency * 100)}%
 								</span>
 							</div>
+							<p className="mt-2 text-xs text-muted-foreground sm:text-sm">
+								Higher values make the window more transparent.
+							</p>
 						</div>
 					</div>
-					<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
-						Customize the transparency of the entire popup window. Higher values
-						make the window more transparent, allowing you to see through to
-						what's behind it.
-					</p>
-				</div>
-			)}
-		</div>
+				) : null}
+			</SettingRow>
+		</SettingPanel>
 	);
 }
 
@@ -206,7 +200,7 @@ function ColorSetting({ label, value, onChange }: ColorSettingProps) {
 		<div>
 			<label
 				htmlFor={inputId}
-				className="block text-xs text-gray-600 dark:text-gray-400 mb-1"
+				className="mb-1 block text-xs text-muted-foreground"
 			>
 				{label}
 			</label>
@@ -216,7 +210,7 @@ function ColorSetting({ label, value, onChange }: ColorSettingProps) {
 					type="color"
 					value={value}
 					onChange={(event) => onChange(event.target.value)}
-					className="w-10 h-10 rounded cursor-pointer"
+					className="h-10 w-10 cursor-pointer rounded-md border border-border"
 				/>
 				<input
 					id={inputId}
@@ -224,7 +218,7 @@ function ColorSetting({ label, value, onChange }: ColorSettingProps) {
 					type="text"
 					value={value}
 					onChange={(event) => onChange(event.target.value)}
-					className="flex-1 px-2 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded"
+					className="flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
 					placeholder="#000000"
 				/>
 			</div>

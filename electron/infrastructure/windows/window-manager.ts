@@ -27,8 +27,10 @@ export class WindowManager {
 
 	createMain(onClose: (event: Electron.Event) => void): BrowserWindow {
 		const window = new BrowserWindow({
-			width: 500,
-			height: 700,
+			width: 900,
+			height: 640,
+			minWidth: 720,
+			minHeight: 520,
 			icon: path.join(this.paths.publicDir, "electron-vite.svg"),
 			autoHideMenuBar: true,
 			webPreferences: {

@@ -2,8 +2,8 @@
 
 function initReminderPopup() {
 	updateColors({
-		background: "#1F2937",
-		text: "#F9FAFB",
+		background: "#0F172A",
+		text: "#F8FAFC",
 		transparency: 0.15,
 	});
 

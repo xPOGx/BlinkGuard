@@ -5,7 +5,7 @@ body:has(.reminder-card) {
 }
 
 .reminder-card {
-	--popup-accent-color: #2563eb;
+	--popup-accent-color: var(--popup-accent);
 
 	box-sizing: border-box;
 	width: 100%;
@@ -19,18 +19,7 @@ body:has(.reminder-card) {
 	border: none;
 	border-radius: 0;
 	box-shadow: none;
-	font-family:
-		system-ui,
-		-apple-system,
-		BlinkMacSystemFont,
-		"Segoe UI",
-		Roboto,
-		Oxygen,
-		Ubuntu,
-		Cantarell,
-		"Open Sans",
-		"Helvetica Neue",
-		sans-serif;
+	font-family: var(--popup-font);
 	opacity: 0;
 	animation: fadeInOut 2.5s forwards;
 }
@@ -56,8 +45,8 @@ body:has(.reminder-card) {
 	width: clamp(2rem, 22%, 3rem);
 	height: clamp(2rem, 55%, 3rem);
 	aspect-ratio: 1;
-	border-radius: 0.75rem;
-	background: rgba(37, 99, 235, 0.12);
+	border-radius: var(--popup-radius-sm);
+	background: var(--popup-accent-soft);
 	color: var(--popup-accent-color);
 }
 
@@ -78,11 +67,11 @@ body:has(.reminder-card) {
 }
 
 .reminder-card[data-kind="starting"] .reminder-icon {
-	background: rgba(34, 197, 94, 0.14);
-	color: #16a34a;
+	background: rgba(22, 163, 74, 0.14);
+	color: var(--popup-success);
 }
 
 .reminder-card[data-kind="stopped"] .reminder-icon {
-	background: rgba(239, 68, 68, 0.14);
-	color: #dc2626;
+	background: rgba(220, 38, 38, 0.14);
+	color: var(--popup-danger);
 }

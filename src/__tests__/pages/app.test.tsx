@@ -1,6 +1,6 @@
-import App from "@/app";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import App from "@/app";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 
 const send = vi.fn();
@@ -28,6 +28,8 @@ describe("settings shell", () => {
 		expect(
 			screen.getByRole("button", { name: "Start Reminders" }),
 		).toBeDefined();
+
+		fireEvent.click(screen.getByRole("button", { name: "System" }));
 		expect(screen.getByText("Keyboard Shortcut")).toBeDefined();
 	});
 
@@ -42,6 +44,7 @@ describe("settings shell", () => {
 	it("records and sends a keyboard shortcut", () => {
 		render(<App />);
 
+		fireEvent.click(screen.getByRole("button", { name: "System" }));
 		fireEvent.click(screen.getByRole("button", { name: "Change" }));
 		fireEvent.keyDown(window, { key: "k", ctrlKey: true });
 		fireEvent.keyDown(window, { key: "Enter" });
