@@ -13,7 +13,10 @@ export class AppRuntimeState {
 	isAutoResuming = false;
 	wasTrackingBeforeSleep = false;
 	wasCameraEnabledBeforeSleep = false;
+	/** Last real blink / grace credit (never auto-dismiss). */
 	lastBlinkTime = Date.now();
+	/** Last reminder show/auto-dismiss; used to avoid spam without forging blink credit. */
+	lastReminderShownAt = Date.now();
 
 	clearReminderTimers(): void {
 		if (this.blinkInterval) clearInterval(this.blinkInterval);

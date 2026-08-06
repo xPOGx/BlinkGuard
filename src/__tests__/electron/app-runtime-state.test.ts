@@ -6,6 +6,16 @@ describe("AppRuntimeState", () => {
 		vi.useRealTimers();
 	});
 
+	it("tracks blink credit and reminder timestamps separately", () => {
+		const state = new AppRuntimeState();
+		expect(state.lastBlinkTime).toEqual(expect.any(Number));
+		expect(state.lastReminderShownAt).toEqual(expect.any(Number));
+		state.lastBlinkTime = 1;
+		state.lastReminderShownAt = 2;
+		expect(state.lastBlinkTime).toBe(1);
+		expect(state.lastReminderShownAt).toBe(2);
+	});
+
 	it("clearReminderTimers clears intervals/timeouts and reminder flags", () => {
 		vi.useFakeTimers();
 		const state = new AppRuntimeState();

@@ -1,7 +1,9 @@
 import type { AppPreferences } from "../../shared/preferences";
 import {
+	BLINK_CREDIT_DEBOUNCE_MS,
 	CAMERA_POLL_INTERVAL_MS,
 	REMINDER_POPUP_VISIBLE_MS,
+	type BlinkCreditSource,
 	nextTimerReminderDelay,
 	shouldShowCameraReminder,
 } from "../domain/reminder-policy";
@@ -13,6 +15,8 @@ import type {
 } from "./ports/runtime-ports";
 
 export class ReminderService {
+	private lastDetectedBlinkAt = 0;
+
 	constructor(
 		private readonly preferences: AppPreferences,
 		private readonly state: AppRuntimeState,
@@ -48,9 +52,31 @@ export class ReminderService {
 		this.windows.sendToMain("stop-camera");
 	}
 
+	/** Sidecar-detected blink only. Debounced; closes any open reminder. */
 	onBlink(): void {
-		this.state.lastBlinkTime = Date.now();
+		if (!this.creditBlink("detected")) return;
 		this.windows.closeReminder();
+	}
+
+	/**
+	 * Credits a blink (or grace reset). Returns false when a detected blink is
+	 * dropped by the main-side debounce.
+	 */
+	creditBlink(source: BlinkCreditSource): boolean {
+		if (source === "detected") {
+			const now = Date.now();
+			if (now - this.lastDetectedBlinkAt < BLINK_CREDIT_DEBOUNCE_MS) {
+				return false;
+			}
+			this.lastDetectedBlinkAt = now;
+		}
+		this.state.lastBlinkTime = Date.now();
+		return true;
+	}
+
+	/** Auto-dismiss / show cooldown — does not forge blink credit. */
+	markReminderShown(): void {
+		this.state.lastReminderShownAt = Date.now();
 	}
 
 	onFaceDetection(faceDetected: boolean): void {
@@ -60,7 +86,7 @@ export class ReminderService {
 			this.state.isFaceDetected = true;
 			this.cancelNoFaceDebounce();
 			this.windows.hideNoFace();
-			if (!wasDetected) this.state.lastBlinkTime = Date.now();
+			if (!wasDetected) this.creditBlink("face-return");
 			return;
 		}
 		if (
@@ -82,7 +108,7 @@ export class ReminderService {
 
 	resumeAfterSleep(useCamera: boolean): void {
 		this.state.isAutoResuming = true;
-		this.state.lastBlinkTime = Date.now();
+		this.creditBlink("sleep");
 		this.preferences.isTracking = true;
 		if (useCamera) {
 			this.startCameraMonitoring(false);
@@ -93,6 +119,28 @@ export class ReminderService {
 		setTimeout(() => {
 			this.state.isAutoResuming = false;
 		}, 3000);
+	}
+
+	/**
+	 * Mid-session MGD toggle: swap face-aware ↔ MGD loop without full stop.
+	 * Pref `mgdMode` must already be updated by the caller.
+	 */
+	syncCameraLoopForMgdMode(): void {
+		if (
+			!this.preferences.isTracking ||
+			!this.preferences.cameraEnabled ||
+			!this.sidecar.isRunning ||
+			!this.sidecar.isCameraReady
+		) {
+			return;
+		}
+		this.state.clearReminderTimers();
+		this.windows.closeReminder();
+		if (this.preferences.mgdMode) {
+			this.startMgdLoop();
+		} else {
+			this.startFaceAwareLoop();
+		}
 	}
 
 	/** Ensure camera sidecar is running so preview / face tracking can work. */
@@ -142,7 +190,7 @@ export class ReminderService {
 			}
 			if (!this.sidecar.isRunning || !this.sidecar.isCameraReady) return;
 			clearInterval(waitForCamera);
-			this.state.lastBlinkTime = Date.now();
+			this.creditBlink("camera-ready");
 			if (this.preferences.mgdMode) {
 				this.startMgdLoop();
 			} else {
@@ -184,6 +232,8 @@ export class ReminderService {
 					isFaceDetected: this.state.isFaceDetected,
 					hasPopup: this.windows.hasReminder(),
 					timeSinceLastBlinkMs: Date.now() - this.state.lastBlinkTime,
+					timeSinceLastReminderMs:
+						Date.now() - this.state.lastReminderShownAt,
 					reminderIntervalMs: this.preferences.reminderInterval,
 				})
 			) {
@@ -191,7 +241,7 @@ export class ReminderService {
 				const popup = this.windows.showReminder("blink");
 				setTimeout(() => {
 					if (this.windows.closeReminderIfCurrent(popup)) {
-						this.state.lastBlinkTime = Date.now();
+						this.markReminderShown();
 					}
 				}, REMINDER_POPUP_VISIBLE_MS);
 			}
