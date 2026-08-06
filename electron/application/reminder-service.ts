@@ -95,6 +95,17 @@ export class ReminderService {
 		}, 3000);
 	}
 
+	/** Ensure camera sidecar is running so preview / face tracking can work. */
+	ensureCameraActive(): void {
+		if (!this.preferences.cameraEnabled) return;
+		if (!this.preferences.isTracking) {
+			this.start();
+			return;
+		}
+		if (!this.sidecar.isRunning) this.sidecar.start();
+		if (!this.sidecar.isCameraReady) this.sidecar.startCamera();
+	}
+
 	private startTimerLoop(): void {
 		this.state.blinkReminderActive = true;
 		this.sound.play("blink");

@@ -107,6 +107,11 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		preferences.set("soundEnabled", enabled);
 	});
 	ipcMain.on(IPC_CHANNELS.showCameraWindow, () => {
+		if (!current.cameraEnabled) {
+			preferences.set("cameraEnabled", true);
+		}
+		reminders.ensureCameraActive();
+		windows.sendPreferences();
 		windows.showCamera(() => {
 			windows.sendToMain(IPC_CHANNELS.cameraWindowClosed);
 		});

@@ -31,21 +31,14 @@ export class ProcessCleanup {
 		);
 		this.processes.clear();
 
+		// Orphaned sidecar only — never kill system python/conhost by image name.
 		if (process.platform === "win32") {
-			for (const name of [
-				"blink_detector.exe",
-				"conhost.exe",
-				"python.exe",
-				"pythonw.exe",
-			]) {
-				await execute(`taskkill /im ${name} /f /t`);
-			}
+			await execute("taskkill /im blink_detector.exe /f /t");
 		} else if (process.platform === "darwin") {
-			for (const name of ["blink_detector", "python", "python3"]) {
-				await execute(`pkill -f ${name}`);
-			}
-			await execute('pkill -f "ScreenBlink"');
+			await execute("pkill -x blink_detector");
 			await execute("killall -9 blink_detector");
+		} else {
+			await execute("pkill -x blink_detector");
 		}
 	}
 }

@@ -87,8 +87,7 @@ export function CameraControls({
 					Camera Detection
 				</span>
 				<div className="flex items-center gap-2">
-					{preferences.isTracking &&
-						preferences.cameraEnabled &&
+					{preferences.cameraEnabled &&
 						(isWindowOpen ? (
 							<button
 								type="button"
@@ -104,6 +103,12 @@ export function CameraControls({
 							<button
 								type="button"
 								onClick={() => {
+									if (!preferences.isTracking) {
+										setPreferences((current) => ({
+											...current,
+											isTracking: true,
+										}));
+									}
 									rendererIpc.showCameraWindow();
 									setIsWindowOpen(true);
 								}}
