@@ -46,9 +46,9 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	popupPosition: null,
 	popupSize: { width: 300, height: 120 },
 	popupColors: {
-		background: "#FFFFFF",
-		text: "#00FF11",
-		transparency: 0.3,
+		background: "#1F2937",
+		text: "#F9FAFB",
+		transparency: 0.15,
 	},
 	popupMessage: "Blink!",
 	keyboardShortcut: "Ctrl+I",

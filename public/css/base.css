@@ -1,8 +1,8 @@
 /* Shared popup base: CSS variables, layout, animations */
 :root {
-  --popup-bg-color: #1E1E1E;
-  --popup-text-color: #FFFFFF;
-  --popup-transparency: 0.3;
+  --popup-bg-color: #1F2937;
+  --popup-text-color: #F9FAFB;
+  --popup-transparency: 0.15;
 }
 
 html, body {

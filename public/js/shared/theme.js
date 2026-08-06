@@ -11,18 +11,17 @@ function updateColors(colors) {
 
 function updateMessage(message) {
 	const blinkElement = document.getElementById("blink");
-	if (blinkElement) {
+	if (!blinkElement) return;
+	const messageEl = blinkElement.querySelector(".reminder-message");
+	if (messageEl) {
+		messageEl.textContent = message;
+	} else {
 		blinkElement.textContent = message;
 	}
 }
 
 function updateCameraMode(isEnabled) {
 	const blinkElement = document.getElementById("blink");
-	if (blinkElement) {
-		if (isEnabled) {
-			blinkElement.classList.add("camera-mode");
-		} else {
-			blinkElement.classList.remove("camera-mode");
-		}
-	}
+	if (!blinkElement) return;
+	blinkElement.classList.toggle("camera-mode", Boolean(isEnabled));
 }

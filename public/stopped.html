@@ -9,7 +9,16 @@
   <link rel="stylesheet" href="css/reminder.css">
 </head>
 <body>
-  <div id="stopped">Stopped</div>
+  <div class="reminder-card" id="stopped" data-kind="stopped">
+    <div class="reminder-content">
+      <div class="reminder-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect width="14" height="14" x="5" y="5" rx="2"/>
+        </svg>
+      </div>
+      <div class="reminder-message">Stopped</div>
+    </div>
+  </div>
   <script src="js/shared/theme.js"></script>
   <script src="js/reminder.js"></script>
 </body>
