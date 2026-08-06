@@ -1,5 +1,5 @@
-setuptools>=65.5.0
-opencv-python>=4.8.1.78
-numpy>=1.24.3
-dlib>=19.24.9
-pyinstaller>=6.0.0
+setuptools>=70.0.0,<84
+opencv-python>=4.10.0,<5
+numpy>=1.26.0,<3
+dlib>=19.24.9,<21
+pyinstaller>=6.6.0,<7

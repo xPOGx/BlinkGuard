@@ -130,7 +130,7 @@ export function PopupSettings({
 											setTemporaryMessage(preferences.popupMessage);
 											setIsEditingMessage(true);
 										}}
-										className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex-shrink-0"
+										className="text-xs text-blue-600 dark:text-blue-400 hover:underline shrink-0"
 									>
 										Edit
 									</button>

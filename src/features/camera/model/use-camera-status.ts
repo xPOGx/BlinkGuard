@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 export function useCameraStatus() {
 	const [error, setError] = useState<string | null>(null);
 	const [isWindowOpen, setIsWindowOpen] = useState(false);
-	const errorTimeout = useRef<ReturnType<typeof setTimeout>>();
+	const errorTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined,
+	);
 
 	useEffect(() => {
 		const unsubscribeError = rendererIpc.onCameraError((cameraError) => {

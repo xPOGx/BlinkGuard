@@ -45,7 +45,7 @@ export default function ScreenBlinkHomepage() {
 	}, []);
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4 sm:p-6">
+		<div className="min-h-screen bg-linear-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4 sm:p-6">
 			<div className="max-w-4xl mx-auto">
 				<header className="text-center mb-6 sm:mb-8">
 					<div className="flex justify-center items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
