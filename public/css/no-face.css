@@ -1,12 +1,12 @@
-/* Silent no-face status toast (top-right, camera mode) */
+/* Silent no-face status toast (top-center, camera mode) */
 html.no-face-root,
 body.no-face-body {
   background: transparent !important;
 }
 
 body.no-face-body {
-  justify-content: flex-end;
-  align-items: flex-start;
+  justify-content: center;
+  align-items: center;
   padding: 0;
 }
 
