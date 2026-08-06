@@ -14,10 +14,17 @@ export interface PopupColors {
 	transparency: number;
 }
 
+export type CameraQuality = "performance" | "medium" | "high";
+
 export interface PersistedPreferences {
 	darkMode: boolean;
 	reminderInterval: number;
 	cameraEnabled: boolean;
+	cameraQuality: CameraQuality;
+	/** Personal open-eye EAR baseline; null when unset. */
+	earCalibration: number | null;
+	/** Experimental: request MediaPipe backend (falls back to dlib if unbundled). */
+	useMediaPipe: boolean;
 	eyeExercisesEnabled: boolean;
 	exerciseInterval: number;
 	popupPosition: Point | null;
@@ -41,6 +48,9 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	darkMode: true,
 	reminderInterval: 3000,
 	cameraEnabled: false,
+	cameraQuality: "medium",
+	earCalibration: null,
+	useMediaPipe: false,
 	eyeExercisesEnabled: true,
 	exerciseInterval: 20,
 	popupPosition: null,

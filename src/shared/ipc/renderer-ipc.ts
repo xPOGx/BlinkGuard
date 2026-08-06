@@ -1,5 +1,6 @@
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import type {
+	CameraQuality,
 	PopupColors,
 	RendererPreferences,
 } from "../../../shared/preferences";
@@ -47,6 +48,27 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateDarkMode, enabled),
 	updateCameraEnabled: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateCameraEnabled, enabled),
+	updateCameraQuality: (quality: CameraQuality) =>
+		send(IPC_CHANNELS.updateCameraQuality, quality),
+	updateEarCalibration: (baseline: number | null) =>
+		send(IPC_CHANNELS.updateEarCalibration, baseline),
+	startEarCalibration: () => send(IPC_CHANNELS.startEarCalibration),
+	cancelEarCalibration: () => send(IPC_CHANNELS.cancelEarCalibration),
+	updateUseMediaPipe: (enabled: boolean) =>
+		send(IPC_CHANNELS.updateUseMediaPipe, enabled),
+	onEarCalibrationProgress: (
+		listener: (payload: {
+			elapsedMs: number;
+			sampleCount: number;
+			durationMs: number;
+		}) => void,
+	) => subscribe(IPC_CHANNELS.earCalibrationProgress, listener),
+	onEarCalibrationComplete: (
+		listener: (payload: {
+			baseline: number | null;
+			error?: string;
+		}) => void,
+	) => subscribe(IPC_CHANNELS.earCalibrationComplete, listener),
 	updateEyeExercisesEnabled: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateEyeExercisesEnabled, enabled),
 	updateExerciseInterval: (minutes: number) =>

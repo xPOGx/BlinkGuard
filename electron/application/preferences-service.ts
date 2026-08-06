@@ -1,3 +1,5 @@
+import { isValidEarCalibration } from "../../shared/ear-calibration";
+import { isCameraQuality } from "../../shared/camera-quality";
 import {
 	DEFAULT_PREFERENCES,
 	type AppPreferences,
@@ -16,6 +18,18 @@ export class PreferencesService {
 		const persisted = { ...DEFAULT_PREFERENCES } as PersistedPreferences;
 		for (const key of PERSISTED_KEYS) {
 			persisted[key] = this.store.get(key, DEFAULT_PREFERENCES[key]) as never;
+		}
+		if (!isCameraQuality(persisted.cameraQuality)) {
+			persisted.cameraQuality = DEFAULT_PREFERENCES.cameraQuality;
+		}
+		if (
+			persisted.earCalibration !== null &&
+			!isValidEarCalibration(persisted.earCalibration)
+		) {
+			persisted.earCalibration = DEFAULT_PREFERENCES.earCalibration;
+		}
+		if (typeof persisted.useMediaPipe !== "boolean") {
+			persisted.useMediaPipe = DEFAULT_PREFERENCES.useMediaPipe;
 		}
 
 		this.current = {

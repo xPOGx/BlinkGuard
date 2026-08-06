@@ -2,6 +2,20 @@ import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import {
+	EAR_CALIBRATION_DURATION_MS,
+	isValidEarCalibration,
+	medianEarCalibration,
+} from "../../../shared/ear-calibration";
+import {
+	isCameraQuality,
+	toSidecarCameraQualityMessage,
+} from "../../../shared/camera-quality";
+import type {
+	AppPreferences,
+	CameraQuality,
+} from "../../../shared/preferences";
+import type { BlinkDetectorDebugLogger } from "../logging/blink-detector-debug-logger";
 import type { AppPaths } from "../paths/app-paths";
 import type { ChildProcessRegistry } from "../process/child-process-registry";
 import { NdjsonBuffer, SIDECAR_STATUS, encodeSidecarMessage } from "./protocol";
@@ -12,6 +26,22 @@ interface SidecarCallbacks {
 	onVideoStream: (data: unknown) => void;
 	onError: (message: string) => void;
 	shouldRetryCamera: () => boolean;
+	onCalibrationProgress?: (payload: {
+		elapsedMs: number;
+		sampleCount: number;
+		durationMs: number;
+	}) => void;
+	onCalibrationComplete?: (payload: {
+		baseline: number | null;
+		error?: string;
+	}) => void;
+}
+
+interface FaceDataSample {
+	faceDetected?: boolean;
+	ear?: number;
+	blink?: boolean;
+	blink_phase?: string;
 }
 
 export class BlinkDetectorSidecar {
@@ -20,12 +50,21 @@ export class BlinkDetectorSidecar {
 	private cameraReady = false;
 	private retryCount = 0;
 	private readonly maxRetries = 20;
+	private calibrationSamples: number[] = [];
+	private calibrationActive = false;
+	private calibrationStartedAt = 0;
+	private calibrationDurationMs = EAR_CALIBRATION_DURATION_MS;
+	private calibrationTimer: ReturnType<typeof setTimeout> | null = null;
+	private calibrationProgressTimer: ReturnType<typeof setInterval> | null =
+		null;
 
 	constructor(
 		private readonly paths: AppPaths,
 		private readonly isProd: boolean,
 		private readonly processes: ChildProcessRegistry,
+		private readonly preferences: AppPreferences,
 		private readonly callbacks: SidecarCallbacks,
+		private readonly debugLogger?: BlinkDetectorDebugLogger,
 	) {}
 
 	get isRunning(): boolean {
@@ -34,6 +73,10 @@ export class BlinkDetectorSidecar {
 
 	get isCameraReady(): boolean {
 		return this.cameraReady;
+	}
+
+	get isCalibrating(): boolean {
+		return this.calibrationActive;
 	}
 
 	start(): void {
@@ -82,6 +125,7 @@ export class BlinkDetectorSidecar {
 			if (this.process === child) this.process = null;
 			this.running = false;
 			this.cameraReady = false;
+			this.cancelEarCalibration("Blink detector stopped");
 		});
 		child.on("error", (error) => {
 			console.error("Blink detector process error:", error);
@@ -90,6 +134,7 @@ export class BlinkDetectorSidecar {
 			if (this.process === child) this.process = null;
 			this.running = false;
 			this.cameraReady = false;
+			this.cancelEarCalibration("Blink detector error");
 		});
 		this.readStdout(child);
 		child.stderr.on("data", (data: Buffer) => {
@@ -119,8 +164,140 @@ export class BlinkDetectorSidecar {
 		this.write({ request_video: true });
 	}
 
+	/** Push the given (or current) quality preset to a live sidecar. */
+	applyCameraQuality(quality?: CameraQuality): void {
+		const resolved = quality ?? this.preferences.cameraQuality;
+		if (!isCameraQuality(resolved)) return;
+		this.write(toSidecarCameraQualityMessage(resolved));
+	}
+
+	/** Push personal open-eye EAR baseline (or clear with null). */
+	applyEarCalibration(baseline?: number | null): void {
+		const resolved =
+			baseline === undefined
+				? this.preferences.earCalibration
+				: baseline;
+		if (resolved === null) {
+			this.write({ ear_calibration: null });
+			return;
+		}
+		if (!isValidEarCalibration(resolved)) return;
+		this.write({ ear_calibration: resolved });
+	}
+
+	/**
+	 * Request detector backend. MediaPipe is architecture-ready but falls
+	 * back to dlib until packaged; set notify to surface that in the UI.
+	 */
+	applyDetectorBackend(useMediaPipe?: boolean, notify = false): void {
+		const resolved =
+			useMediaPipe === undefined
+				? this.preferences.useMediaPipe
+				: useMediaPipe;
+		this.write({
+			detector_backend: resolved ? "mediapipe" : "dlib",
+			notify,
+		});
+	}
+
+	/** Apply quality + calibration + backend after models are ready. */
+	applySessionConfig(): void {
+		this.applyCameraQuality();
+		this.applyEarCalibration();
+		this.applyDetectorBackend(undefined, false);
+	}
+
+	startEarCalibration(durationMs = EAR_CALIBRATION_DURATION_MS): boolean {
+		if (this.calibrationActive) return false;
+		if (!this.running) {
+			this.callbacks.onCalibrationComplete?.({
+				baseline: null,
+				error: "Blink detector is not running",
+			});
+			return false;
+		}
+
+		this.calibrationActive = true;
+		this.calibrationSamples = [];
+		this.calibrationStartedAt = Date.now();
+		this.calibrationDurationMs = durationMs;
+
+		this.calibrationProgressTimer = setInterval(() => {
+			if (!this.calibrationActive) return;
+			this.callbacks.onCalibrationProgress?.({
+				elapsedMs: Date.now() - this.calibrationStartedAt,
+				sampleCount: this.calibrationSamples.length,
+				durationMs: this.calibrationDurationMs,
+			});
+		}, 250);
+
+		this.calibrationTimer = setTimeout(() => {
+			this.finishEarCalibration();
+		}, durationMs);
+
+		this.callbacks.onCalibrationProgress?.({
+			elapsedMs: 0,
+			sampleCount: 0,
+			durationMs,
+		});
+		return true;
+	}
+
+	cancelEarCalibration(reason?: string): void {
+		if (!this.calibrationActive) return;
+		this.clearCalibrationTimers();
+		this.calibrationActive = false;
+		this.calibrationSamples = [];
+		this.callbacks.onCalibrationComplete?.({
+			baseline: null,
+			error: reason ?? "Calibration cancelled",
+		});
+	}
+
 	markCameraUnavailable(): void {
 		this.cameraReady = false;
+	}
+
+	private finishEarCalibration(): void {
+		if (!this.calibrationActive) return;
+		const samples = this.calibrationSamples;
+		this.clearCalibrationTimers();
+		this.calibrationActive = false;
+		this.calibrationSamples = [];
+
+		const baseline = medianEarCalibration(samples);
+		if (baseline === null) {
+			this.callbacks.onCalibrationComplete?.({
+				baseline: null,
+				error:
+					"Not enough open-eye samples. Keep your face centered with eyes open.",
+			});
+			return;
+		}
+		this.callbacks.onCalibrationComplete?.({ baseline });
+	}
+
+	private clearCalibrationTimers(): void {
+		if (this.calibrationTimer) {
+			clearTimeout(this.calibrationTimer);
+			this.calibrationTimer = null;
+		}
+		if (this.calibrationProgressTimer) {
+			clearInterval(this.calibrationProgressTimer);
+			this.calibrationProgressTimer = null;
+		}
+	}
+
+	private sampleFaceDataForCalibration(data: FaceDataSample): void {
+		if (!this.calibrationActive) return;
+		if (!data.faceDetected) return;
+		if (data.blink) return;
+		if (data.blink_phase === "start" || data.blink_phase === "complete") {
+			return;
+		}
+		const ear = data.ear;
+		if (typeof ear !== "number" || !Number.isFinite(ear)) return;
+		this.calibrationSamples.push(ear);
 	}
 
 	private readStdout(child: ChildProcessWithoutNullStreams): void {
@@ -137,7 +314,7 @@ export class BlinkDetectorSidecar {
 	}
 
 	private handleMessage(message: Record<string, any>): void {
-		if (message.debug) console.log("Blink detector debug:", message.debug);
+		this.debugLogger?.captureSidecarMessage(message);
 		if (message.blink) {
 			this.callbacks.onBlink(message);
 			return;
@@ -148,10 +325,7 @@ export class BlinkDetectorSidecar {
 		}
 		if (message.status) {
 			if (message.status === SIDECAR_STATUS.modelsReady) {
-				this.write({
-					target_fps: 10,
-					processing_resolution: [320, 240],
-				});
+				this.applySessionConfig();
 			} else if (message.status === SIDECAR_STATUS.cameraReady) {
 				this.cameraReady = true;
 				this.retryCount = 0;
@@ -159,6 +333,7 @@ export class BlinkDetectorSidecar {
 			return;
 		}
 		if (message.faceData) {
+			this.sampleFaceDataForCalibration(message.faceData as FaceDataSample);
 			this.callbacks.onFaceData(message.faceData);
 			return;
 		}
@@ -170,9 +345,14 @@ export class BlinkDetectorSidecar {
 	private handleCameraError(message: string): void {
 		console.error("Blink detector error:", message);
 		this.callbacks.onError(message);
+		const lower = message.toLowerCase();
+		// Soft / experimental notices must not tear down a working camera session.
+		if (lower.includes("mediapipe backend not bundled")) {
+			return;
+		}
 		this.cameraReady = false;
 		const isCameraError = ["camera", "permission", "access"].some((term) =>
-			message.includes(term),
+			lower.includes(term),
 		);
 		if (!isCameraError || !this.callbacks.shouldRetryCamera()) return;
 		this.retryCount++;

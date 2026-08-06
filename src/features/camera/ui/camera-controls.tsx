@@ -1,7 +1,13 @@
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
-import { Activity, Camera } from "lucide-react";
+import {
+	CAMERA_QUALITY_OPTIONS,
+	CAMERA_QUALITY_PRESETS,
+} from "../../../../shared/camera-quality";
+import type { CameraQuality } from "../../../../shared/preferences";
+import { Activity, Camera, Crosshair } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface CameraErrorBannerProps {
 	error: string | null;
@@ -35,6 +41,12 @@ export function CameraErrorBanner({
 	);
 }
 
+const QUALITY_LABELS: Record<CameraQuality, string> = {
+	performance: "Performance",
+	medium: "Medium",
+	high: "High",
+};
+
 interface CameraControlsProps {
 	preferences: SettingsPreferences;
 	setPreferences: SetPreferences;
@@ -48,6 +60,42 @@ export function CameraControls({
 	isWindowOpen,
 	setIsWindowOpen,
 }: CameraControlsProps) {
+	const [calibrating, setCalibrating] = useState(false);
+	const [calibrationElapsedMs, setCalibrationElapsedMs] = useState(0);
+	const [calibrationDurationMs, setCalibrationDurationMs] = useState(8000);
+	const [calibrationMessage, setCalibrationMessage] = useState<string | null>(
+		null,
+	);
+
+	useEffect(() => {
+		const offProgress = rendererIpc.onEarCalibrationProgress((payload) => {
+			setCalibrating(true);
+			setCalibrationElapsedMs(payload.elapsedMs);
+			setCalibrationDurationMs(payload.durationMs);
+		});
+		const offComplete = rendererIpc.onEarCalibrationComplete((payload) => {
+			setCalibrating(false);
+			setCalibrationElapsedMs(0);
+			if (payload.baseline !== null) {
+				setPreferences((current) => ({
+					...current,
+					earCalibration: payload.baseline,
+				}));
+				setCalibrationMessage(
+					`Calibration saved (EAR ${payload.baseline.toFixed(3)})`,
+				);
+			} else {
+				setCalibrationMessage(
+					payload.error ?? "Calibration did not complete",
+				);
+			}
+		});
+		return () => {
+			offProgress();
+			offComplete();
+		};
+	}, [setPreferences]);
+
 	const toggleCamera = () => {
 		const enabled = !preferences.cameraEnabled;
 		const update = () => {
@@ -78,6 +126,59 @@ export function CameraControls({
 		}));
 		rendererIpc.updateMgdMode(enabled);
 	};
+
+	const setCameraQuality = (cameraQuality: CameraQuality) => {
+		if (cameraQuality === preferences.cameraQuality) return;
+		setPreferences((current) => ({ ...current, cameraQuality }));
+		rendererIpc.updateCameraQuality(cameraQuality);
+	};
+
+	const startCalibration = () => {
+		setCalibrationMessage(null);
+		setCalibrating(true);
+		setCalibrationElapsedMs(0);
+		if (!preferences.cameraEnabled) {
+			setPreferences((current) => ({
+				...current,
+				cameraEnabled: true,
+			}));
+		}
+		rendererIpc.startEarCalibration();
+	};
+
+	const cancelCalibration = () => {
+		rendererIpc.cancelEarCalibration();
+		setCalibrating(false);
+		setCalibrationElapsedMs(0);
+		setCalibrationMessage("Calibration cancelled");
+	};
+
+	const resetCalibration = () => {
+		setPreferences((current) => ({
+			...current,
+			earCalibration: null,
+		}));
+		rendererIpc.updateEarCalibration(null);
+		setCalibrationMessage("Calibration cleared");
+	};
+
+	const toggleMediaPipe = () => {
+		const enabled = !preferences.useMediaPipe;
+		setPreferences((current) => ({
+			...current,
+			useMediaPipe: enabled,
+		}));
+		rendererIpc.updateUseMediaPipe(enabled);
+	};
+
+	const activePreset = CAMERA_QUALITY_PRESETS[preferences.cameraQuality];
+	const progressRatio = calibrating
+		? Math.min(1, calibrationElapsedMs / Math.max(1, calibrationDurationMs))
+		: 0;
+	const remainingSec = Math.max(
+		0,
+		Math.ceil((calibrationDurationMs - calibrationElapsedMs) / 1000),
+	);
 
 	return (
 		<>
@@ -135,6 +236,147 @@ export function CameraControls({
 					</button>
 				</div>
 			</div>
+
+			{preferences.cameraEnabled && (
+				<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-hidden">
+					<div className="flex items-center justify-between mb-3">
+						<span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+							Camera Quality
+						</span>
+						<span className="text-xs text-gray-500 dark:text-gray-400">
+							{activePreset.targetFps} FPS ·{" "}
+							{activePreset.processingResolution[0]}×
+							{activePreset.processingResolution[1]}
+						</span>
+					</div>
+					<div
+						role="group"
+						aria-label="Camera quality"
+						className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600"
+					>
+						{CAMERA_QUALITY_OPTIONS.map((option) => {
+							const selected = preferences.cameraQuality === option;
+							return (
+								<button
+									key={option}
+									type="button"
+									aria-pressed={selected}
+									onClick={() => setCameraQuality(option)}
+									className={`flex-1 px-2 py-1.5 text-xs sm:text-sm font-medium transition-colors focus:outline-hidden focus:ring-2 focus:ring-inset focus:ring-blue-500 ${
+										selected
+											? "bg-blue-600 text-white"
+											: "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+									}`}
+								>
+									{QUALITY_LABELS[option]}
+								</button>
+							);
+						})}
+					</div>
+					<p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+						Medium is recommended. Performance saves CPU; High improves blink
+						timing accuracy.
+					</p>
+				</div>
+			)}
+
+			{preferences.cameraEnabled && (
+				<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-hidden">
+					<div className="flex items-center justify-between mb-2">
+						<div className="flex items-center gap-2">
+							<Crosshair className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+							<span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+								Open-eye Calibration
+							</span>
+						</div>
+						{preferences.earCalibration !== null && (
+							<span className="text-xs text-green-600 dark:text-green-400">
+								EAR {preferences.earCalibration.toFixed(3)}
+							</span>
+						)}
+					</div>
+					<p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+						Keep eyes open and look at the camera for about 8 seconds. This
+						tunes blink thresholds to your face.
+					</p>
+					<div className="flex flex-wrap items-center gap-2">
+						{calibrating ? (
+							<button
+								type="button"
+								onClick={cancelCalibration}
+								className="px-3 py-1.5 text-sm bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+							>
+								Cancel ({remainingSec}s)
+							</button>
+						) : (
+							<button
+								type="button"
+								onClick={startCalibration}
+								className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+							>
+								Calibrate
+							</button>
+						)}
+						{preferences.earCalibration !== null && !calibrating && (
+							<button
+								type="button"
+								onClick={resetCalibration}
+								className="px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+							>
+								Reset
+							</button>
+						)}
+					</div>
+					{calibrating && (
+						<div className="mt-3 h-1.5 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+							<div
+								className="h-full bg-blue-600 transition-[width] duration-200"
+								style={{ width: `${progressRatio * 100}%` }}
+							/>
+						</div>
+					)}
+					{calibrationMessage && (
+						<p className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+							{calibrationMessage}
+						</p>
+					)}
+				</div>
+			)}
+
+			{preferences.cameraEnabled && (
+				<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-hidden">
+					<div className="flex items-center justify-between mb-2">
+						<div className="flex items-center gap-2">
+							<span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+								MediaPipe Backend
+							</span>
+							<span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+								Experimental
+							</span>
+						</div>
+						<button
+							type="button"
+							aria-label="Toggle MediaPipe backend"
+							onClick={toggleMediaPipe}
+							className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+								preferences.useMediaPipe
+									? "bg-blue-600"
+									: "bg-gray-300 dark:bg-gray-600"
+							}`}
+						>
+							<span
+								className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+									preferences.useMediaPipe ? "translate-x-6" : "translate-x-1"
+								}`}
+							/>
+						</button>
+					</div>
+					<p className="text-xs text-gray-500 dark:text-gray-400">
+						Architecture flag only — MediaPipe is not bundled yet. When
+						enabled, the detector stays on dlib and reports that fallback.
+					</p>
+				</div>
+			)}
 
 			{preferences.cameraEnabled && (
 				<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 overflow-hidden">

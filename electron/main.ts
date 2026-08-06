@@ -7,6 +7,7 @@ import { PreferencesService } from "./application/preferences-service";
 import { ReminderService } from "./application/reminder-service";
 import { AppLifecycle } from "./infrastructure/lifecycle/app-lifecycle";
 import { registerIpcHandlers } from "./infrastructure/ipc/register-ipc-handlers";
+import { BlinkDetectorDebugLogger } from "./infrastructure/logging/blink-detector-debug-logger";
 import { configureFileLogging } from "./infrastructure/logging/configure-file-logging";
 import { configureAppPaths } from "./infrastructure/paths/app-paths";
 import { ChildProcessRegistry } from "./infrastructure/process/child-process-registry";
@@ -39,10 +40,12 @@ const windows = new WindowManager(paths, preferences, VITE_DEV_SERVER_URL);
 const sound = new NotificationSoundPlayer(paths, preferences, app.isPackaged);
 
 let reminders: ReminderService;
+const blinkDebugLogger = new BlinkDetectorDebugLogger();
 const sidecar = new BlinkDetectorSidecar(
 	paths,
 	app.isPackaged,
 	processes,
+	preferences,
 	{
 		onBlink: (data) => {
 			reminders.onBlink();
@@ -60,7 +63,19 @@ const sidecar = new BlinkDetectorSidecar(
 		},
 		shouldRetryCamera: () =>
 			preferences.isTracking && preferences.cameraEnabled,
+		onCalibrationProgress: (payload) => {
+			windows.sendToMain(IPC_CHANNELS.earCalibrationProgress, payload);
+		},
+		onCalibrationComplete: (payload) => {
+			if (payload.baseline !== null) {
+				preferencesService.set("earCalibration", payload.baseline);
+				sidecar.applyEarCalibration(payload.baseline);
+				windows.sendPreferences();
+			}
+			windows.sendToMain(IPC_CHANNELS.earCalibrationComplete, payload);
+		},
 	},
+	blinkDebugLogger,
 );
 reminders = new ReminderService(preferences, state, windows, sidecar, sound);
 const exercises = new ExerciseService(
@@ -111,6 +126,12 @@ void app.whenReady().then(() => {
 	exercises.resetTimer();
 	if (preferences.eyeExercisesEnabled) exercises.start();
 
+	blinkDebugLogger.announce();
+	blinkDebugLogger.append({
+		source: "main",
+		type: "startup",
+		message: "Blink detector debug logging ready",
+	});
 	console.log("Starting blink detector on app startup...");
 	sidecar.start();
 });

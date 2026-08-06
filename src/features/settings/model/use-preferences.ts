@@ -27,6 +27,7 @@ export function usePreferences() {
 		document.documentElement.classList.toggle("dark", preferences.darkMode);
 		rendererIpc.updateDarkMode(preferences.darkMode);
 		rendererIpc.updateCameraEnabled(preferences.cameraEnabled);
+		rendererIpc.updateCameraQuality(preferences.cameraQuality);
 		rendererIpc.updateEyeExercisesEnabled(preferences.eyeExercisesEnabled);
 		rendererIpc.updateExerciseInterval(preferences.exerciseInterval);
 		rendererIpc.updatePopupColors(preferences.popupColors);

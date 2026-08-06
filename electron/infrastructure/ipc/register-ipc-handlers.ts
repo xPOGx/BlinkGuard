@@ -1,6 +1,9 @@
 import { ipcMain } from "electron";
+import { isValidEarCalibration } from "../../../shared/ear-calibration";
+import { isCameraQuality } from "../../../shared/camera-quality";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import type {
+	CameraQuality,
 	Point,
 	PopupColors,
 	Size,
@@ -27,7 +30,6 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		deps;
 	const current = preferences.current;
 
-	ipcMain.on(IPC_CHANNELS.blinkDetected, () => reminders.onBlink());
 	ipcMain.on(IPC_CHANNELS.startBlinkReminders, (_event, interval: number) => {
 		reminders.start(interval);
 	});
@@ -66,6 +68,43 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		}
 	});
 	ipcMain.on(
+		IPC_CHANNELS.updateCameraQuality,
+		(_event, quality: CameraQuality) => {
+			if (!isCameraQuality(quality)) return;
+			preferences.set("cameraQuality", quality);
+			sidecar.applyCameraQuality(quality);
+		},
+	);
+	ipcMain.on(
+		IPC_CHANNELS.updateEarCalibration,
+		(_event, baseline: number | null) => {
+			if (baseline === null) {
+				preferences.set("earCalibration", null);
+				sidecar.applyEarCalibration(null);
+				return;
+			}
+			if (!isValidEarCalibration(baseline)) return;
+			preferences.set("earCalibration", baseline);
+			sidecar.applyEarCalibration(baseline);
+		},
+	);
+	ipcMain.on(IPC_CHANNELS.startEarCalibration, () => {
+		if (!current.cameraEnabled) {
+			preferences.set("cameraEnabled", true);
+		}
+		reminders.ensureCameraActive();
+		sidecar.startEarCalibration();
+	});
+	ipcMain.on(IPC_CHANNELS.cancelEarCalibration, () => {
+		sidecar.cancelEarCalibration();
+	});
+	ipcMain.on(IPC_CHANNELS.updateUseMediaPipe, (_event, enabled: boolean) => {
+		const next = Boolean(enabled);
+		const changed = current.useMediaPipe !== next;
+		preferences.set("useMediaPipe", next);
+		sidecar.applyDetectorBackend(next, changed && next);
+	});
+	ipcMain.on(
 		IPC_CHANNELS.updateEyeExercisesEnabled,
 		(_event, enabled: boolean) => {
 			preferences.set("eyeExercisesEnabled", enabled);
@@ -102,6 +141,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	ipcMain.on(IPC_CHANNELS.snoozeExercise, () => exercises.snooze());
 	ipcMain.on(IPC_CHANNELS.updateMgdMode, (_event, enabled: boolean) => {
 		preferences.set("mgdMode", enabled);
+		reminders.syncCameraLoopForMgdMode();
 	});
 	ipcMain.on(IPC_CHANNELS.updateSoundEnabled, (_event, enabled: boolean) => {
 		preferences.set("soundEnabled", enabled);
@@ -131,8 +171,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	ipcMain.on(IPC_CHANNELS.resetPreferences, () => {
 		if (current.isTracking) reminders.stop(true);
 		exercises.stop();
+		sidecar.cancelEarCalibration("Preferences reset");
 		preferences.reset(getCenteredPopupPosition(300, 120));
 		shortcuts.register(current.keyboardShortcut);
+		sidecar.applyCameraQuality(current.cameraQuality);
+		sidecar.applyEarCalibration(null);
+		sidecar.applyDetectorBackend(false, false);
 		windows.sendPreferences();
 	});
 }
