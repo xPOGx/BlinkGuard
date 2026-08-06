@@ -34,6 +34,19 @@ def get_eye_landmarks_only(predictor, gray, face, buffers):
     return buffers.left_eye, buffers.right_eye
 
 
+def get_face_landmarks(predictor, gray, face, buffers):
+    """Fill 68-pt buffer plus eye slices; used for EAR + pose gates."""
+    shape = predictor(gray, face)
+    for index in range(68):
+        point = shape.part(index)
+        buffers.landmarks_array[index, 0] = point.x
+        buffers.landmarks_array[index, 1] = point.y
+
+    buffers.left_eye[:, :] = buffers.landmarks_array[36:42]
+    buffers.right_eye[:, :] = buffers.landmarks_array[42:48]
+    return buffers.landmarks_array, buffers.left_eye, buffers.right_eye
+
+
 def encode_frame(frame):
     _, buffer = cv2.imencode(".jpg", frame, ENCODE_PARAMS)
     return base64.b64encode(buffer).decode("utf-8")
