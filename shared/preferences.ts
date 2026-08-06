@@ -34,11 +34,13 @@ export interface PersistedPreferences {
 	keyboardShortcut: string;
 	mgdMode: boolean;
 	soundEnabled: boolean;
-}
-
-export interface AppPreferences extends PersistedPreferences {
+	/** Opt-in: start BlinkGuard at OS login (hidden to tray). */
+	launchAtLogin: boolean;
+	/** Whether blink reminders are active; persisted across restarts. */
 	isTracking: boolean;
 }
+
+export type AppPreferences = PersistedPreferences;
 
 export type RendererPreferences = Omit<AppPreferences, "reminderInterval"> & {
 	reminderInterval: number;
@@ -64,6 +66,8 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	keyboardShortcut: "Ctrl+I",
 	mgdMode: false,
 	soundEnabled: false,
+	launchAtLogin: false,
+	isTracking: false,
 };
 
 export function toRendererPreferences(

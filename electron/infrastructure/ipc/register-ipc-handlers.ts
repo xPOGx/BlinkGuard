@@ -11,6 +11,7 @@ import type {
 import type { ExerciseService } from "../../application/exercise-service";
 import type { PreferencesService } from "../../application/preferences-service";
 import type { ReminderService } from "../../application/reminder-service";
+import { applyLaunchAtLogin } from "../lifecycle/login-item";
 import type { BlinkDetectorSidecar } from "../sidecar/blink-detector-sidecar";
 import type { ShortcutController } from "../shortcuts/shortcut-controller";
 import type { WindowManager } from "../windows/window-manager";
@@ -146,6 +147,10 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	ipcMain.on(IPC_CHANNELS.updateSoundEnabled, (_event, enabled: boolean) => {
 		preferences.set("soundEnabled", enabled);
 	});
+	ipcMain.on(IPC_CHANNELS.updateLaunchAtLogin, (_event, enabled: boolean) => {
+		preferences.set("launchAtLogin", enabled);
+		applyLaunchAtLogin(enabled);
+	});
 	ipcMain.on(IPC_CHANNELS.showCameraWindow, () => {
 		if (!current.cameraEnabled) {
 			preferences.set("cameraEnabled", true);
@@ -173,6 +178,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		exercises.stop();
 		sidecar.cancelEarCalibration("Preferences reset");
 		preferences.reset(getCenteredPopupPosition(300, 120));
+		applyLaunchAtLogin(false);
 		shortcuts.register(current.keyboardShortcut);
 		sidecar.applyCameraQuality(current.cameraQuality);
 		sidecar.applyEarCalibration(null);

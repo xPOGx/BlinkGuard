@@ -31,11 +31,14 @@ export class PreferencesService {
 		if (typeof persisted.useMediaPipe !== "boolean") {
 			persisted.useMediaPipe = DEFAULT_PREFERENCES.useMediaPipe;
 		}
+		if (typeof persisted.launchAtLogin !== "boolean") {
+			persisted.launchAtLogin = DEFAULT_PREFERENCES.launchAtLogin;
+		}
+		if (typeof persisted.isTracking !== "boolean") {
+			persisted.isTracking = DEFAULT_PREFERENCES.isTracking;
+		}
 
-		this.current = {
-			...persisted,
-			isTracking: false,
-		};
+		this.current = { ...persisted };
 	}
 
 	set<K extends keyof PersistedPreferences>(
@@ -50,7 +53,6 @@ export class PreferencesService {
 		this.store.clear();
 		Object.assign(this.current, DEFAULT_PREFERENCES, {
 			popupPosition,
-			isTracking: false,
 		});
 	}
 }

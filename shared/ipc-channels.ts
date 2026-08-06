@@ -46,6 +46,7 @@ export const IPC_CHANNELS = {
 	showSizeEditor: "show-size-editor",
 	sizeSaved: "size-saved",
 	updateSoundEnabled: "update-sound-enabled",
+	updateLaunchAtLogin: "update-launch-at-login",
 	audioFinished: "audio-finished",
 	requestVideoStream: "request-video-stream",
 } as const;
@@ -97,6 +98,7 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.showSizeEditor,
 	IPC_CHANNELS.sizeSaved,
 	IPC_CHANNELS.updateSoundEnabled,
+	IPC_CHANNELS.updateLaunchAtLogin,
 	IPC_CHANNELS.audioFinished,
 	IPC_CHANNELS.requestVideoStream,
 ] as const;

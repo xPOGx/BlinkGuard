@@ -14,6 +14,26 @@ import {
 	DEFAULT_PREFERENCES,
 	type AppPreferences,
 } from "../../../shared/preferences";
+import type { PreferenceStore } from "../../../electron/application/ports/preference-store";
+
+function createStore(): PreferenceStore {
+	const data = new Map<string, unknown>();
+	return {
+		get<T>(key: string, defaultValue?: T): T {
+			if (data.has(key)) return data.get(key) as T;
+			return defaultValue as T;
+		},
+		set<T>(key: string, value: T): void {
+			data.set(key, value);
+		},
+		has(key: string): boolean {
+			return data.has(key);
+		},
+		clear(): void {
+			data.clear();
+		},
+	};
+}
 
 function createPreferences(
 	overrides: Partial<AppPreferences> = {},
@@ -98,6 +118,7 @@ describe("ReminderService credit semantics", () => {
 			windows,
 			createSidecar(),
 			createSound(),
+			createStore(),
 		);
 
 		const blinkBefore = state.lastBlinkTime;
@@ -132,6 +153,7 @@ describe("ReminderService credit semantics", () => {
 			windows,
 			createSidecar(),
 			createSound(),
+			createStore(),
 		);
 
 		service.onBlink();
@@ -164,6 +186,7 @@ describe("ReminderService credit semantics", () => {
 			windows,
 			sidecar,
 			sound,
+			createStore(),
 		);
 
 		// Drive face-aware loop via sync (camera already ready).
@@ -191,6 +214,7 @@ describe("ReminderService credit semantics", () => {
 			windows,
 			createSidecar(),
 			createSound(),
+			createStore(),
 		);
 
 		service.syncCameraLoopForMgdMode();
@@ -212,6 +236,7 @@ describe("ReminderService credit semantics", () => {
 			createWindows(),
 			createSidecar(),
 			createSound(),
+			createStore(),
 		);
 		const blinkBefore = state.lastBlinkTime;
 		vi.advanceTimersByTime(200);

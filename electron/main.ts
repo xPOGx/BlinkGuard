@@ -6,6 +6,7 @@ import { ExerciseService } from "./application/exercise-service";
 import { PreferencesService } from "./application/preferences-service";
 import { ReminderService } from "./application/reminder-service";
 import { AppLifecycle } from "./infrastructure/lifecycle/app-lifecycle";
+import { applyLaunchAtLogin } from "./infrastructure/lifecycle/login-item";
 import { registerIpcHandlers } from "./infrastructure/ipc/register-ipc-handlers";
 import { BlinkDetectorDebugLogger } from "./infrastructure/logging/blink-detector-debug-logger";
 import { configureFileLogging } from "./infrastructure/logging/configure-file-logging";
@@ -16,6 +17,7 @@ import { BlinkDetectorSidecar } from "./infrastructure/sidecar/blink-detector-si
 import { ShortcutController } from "./infrastructure/shortcuts/shortcut-controller";
 import { NotificationSoundPlayer } from "./infrastructure/sound/notification-sound-player";
 import { ElectronPreferenceStore } from "./infrastructure/store/electron-preference-store";
+import { TrayController } from "./infrastructure/tray/tray-controller";
 import { WindowManager } from "./infrastructure/windows/window-manager";
 import { getCenteredPopupPosition } from "./infrastructure/windows/window-position";
 import { IPC_CHANNELS } from "../shared/ipc-channels";
@@ -24,6 +26,11 @@ if (process.platform === "darwin") {
 	process.env.NSWindowSupportsNonactivatingPanel = "true";
 }
 configureFileLogging();
+
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+	app.quit();
+}
 
 const entryDirectory = path.dirname(fileURLToPath(import.meta.url));
 export const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
@@ -77,7 +84,14 @@ const sidecar = new BlinkDetectorSidecar(
 	},
 	blinkDebugLogger,
 );
-reminders = new ReminderService(preferences, state, windows, sidecar, sound);
+reminders = new ReminderService(
+	preferences,
+	state,
+	windows,
+	sidecar,
+	sound,
+	store,
+);
 const exercises = new ExerciseService(
 	preferences,
 	state,
@@ -99,6 +113,8 @@ const lifecycle = new AppLifecycle(
 	windows,
 	new ProcessCleanup(processes),
 );
+const tray = new TrayController(paths, windows, () => lifecycle.quit());
+lifecycle.attachTray(tray);
 
 registerIpcHandlers({
 	preferences: preferencesService,
@@ -109,11 +125,27 @@ registerIpcHandlers({
 	windows,
 });
 
+app.on("second-instance", () => {
+	windows.showMain();
+});
+
 app.on("activate", () => windows.activateMain(lifecycle.handleMainClose));
 
 void app.whenReady().then(() => {
+	if (!gotTheLock) return;
+
 	lifecycle.register();
 	windows.createMain(lifecycle.handleMainClose);
+
+	const startHidden =
+		process.argv.includes("--hidden") ||
+		app.getLoginItemSettings().wasOpenedAtLogin;
+	if (startHidden) {
+		windows.main?.hide();
+	}
+
+	tray.create();
+	applyLaunchAtLogin(preferences.launchAtLogin);
 	shortcuts.register(preferences.keyboardShortcut);
 
 	if (!store.has("popupPosition")) {
@@ -134,4 +166,8 @@ void app.whenReady().then(() => {
 	});
 	console.log("Starting blink detector on app startup...");
 	sidecar.start();
+
+	if (preferences.isTracking) {
+		reminders.start(preferences.reminderInterval);
+	}
 });

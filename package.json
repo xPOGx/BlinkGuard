@@ -73,6 +73,7 @@
 			"dist-electron/**/*",
 			"electron/assets/models/**/*",
 			"electron/resources/**/*",
+			"assets/icons/**/*",
 			"build/**/*",
 			"public/sounds/**/*"
 		],

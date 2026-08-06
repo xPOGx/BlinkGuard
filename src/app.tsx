@@ -8,6 +8,7 @@ import { PopupSettings } from "@/features/popup-appearance/ui/popup-settings";
 import { ReminderControls } from "@/features/reminders/ui/reminder-controls";
 import { usePreferences } from "@/features/settings/model/use-preferences";
 import {
+	LaunchAtLoginSettings,
 	ResetPreferencesButton,
 	SettingsHeader,
 	SoundSettings,
@@ -106,6 +107,10 @@ export default function BlinkGuardHomepage() {
 								setPreferences={setPreferences}
 							/>
 							<SoundSettings
+								preferences={preferences}
+								setPreferences={setPreferences}
+							/>
+							<LaunchAtLoginSettings
 								preferences={preferences}
 								setPreferences={setPreferences}
 							/>

@@ -99,3 +99,10 @@ describe("phase 4 preference defaults", () => {
 		expect(DEFAULT_PREFERENCES.useMediaPipe).toBe(false);
 	});
 });
+
+describe("tray / autostart preference defaults", () => {
+	it("defaults launchAtLogin and isTracking to false", () => {
+		expect(DEFAULT_PREFERENCES.launchAtLogin).toBe(false);
+		expect(DEFAULT_PREFERENCES.isTracking).toBe(false);
+	});
+});

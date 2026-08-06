@@ -83,6 +83,8 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateKeyboardShortcut, shortcut),
 	updateSoundEnabled: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateSoundEnabled, enabled),
+	updateLaunchAtLogin: (enabled: boolean) =>
+		send(IPC_CHANNELS.updateLaunchAtLogin, enabled),
 	updateMgdMode: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateMgdMode, enabled),
 	startCameraTracking: () => send(IPC_CHANNELS.startCameraTracking),

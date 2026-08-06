@@ -35,6 +35,7 @@ describe("PreferencesService", () => {
 			DEFAULT_PREFERENCES.reminderInterval,
 		);
 		expect(service.current.isTracking).toBe(false);
+		expect(service.current.launchAtLogin).toBe(false);
 		expect(service.current.darkMode).toBe(DEFAULT_PREFERENCES.darkMode);
 		expect(service.current.cameraQuality).toBe(
 			DEFAULT_PREFERENCES.cameraQuality,
@@ -48,6 +49,8 @@ describe("PreferencesService", () => {
 		store.set("cameraQuality", "high");
 		store.set("earCalibration", 0.31);
 		store.set("useMediaPipe", true);
+		store.set("launchAtLogin", true);
+		store.set("isTracking", true);
 
 		const service = new PreferencesService(store);
 
@@ -56,6 +59,8 @@ describe("PreferencesService", () => {
 		expect(service.current.cameraQuality).toBe("high");
 		expect(service.current.earCalibration).toBe(0.31);
 		expect(service.current.useMediaPipe).toBe(true);
+		expect(service.current.launchAtLogin).toBe(true);
+		expect(service.current.isTracking).toBe(true);
 		expect(service.current.popupMessage).toBe(DEFAULT_PREFERENCES.popupMessage);
 	});
 
@@ -85,6 +90,8 @@ describe("PreferencesService", () => {
 		service.set("cameraQuality", "performance");
 		service.set("earCalibration", 0.28);
 		service.set("useMediaPipe", true);
+		service.set("launchAtLogin", true);
+		service.set("isTracking", true);
 
 		expect(service.current.keyboardShortcut).toBe("Ctrl+B");
 		expect(store.get("keyboardShortcut")).toBe("Ctrl+B");
@@ -93,6 +100,10 @@ describe("PreferencesService", () => {
 		expect(service.current.earCalibration).toBe(0.28);
 		expect(store.get("earCalibration")).toBe(0.28);
 		expect(service.current.useMediaPipe).toBe(true);
+		expect(service.current.launchAtLogin).toBe(true);
+		expect(store.get("launchAtLogin")).toBe(true);
+		expect(service.current.isTracking).toBe(true);
+		expect(store.get("isTracking")).toBe(true);
 	});
 
 	it("reset clears the store and restores defaults with a popup position", () => {
@@ -102,8 +113,9 @@ describe("PreferencesService", () => {
 		store.set("cameraQuality", "high");
 		store.set("earCalibration", 0.33);
 		store.set("useMediaPipe", true);
+		store.set("launchAtLogin", true);
+		store.set("isTracking", true);
 		const service = new PreferencesService(store);
-		service.current.isTracking = true;
 
 		const popupPosition: PersistedPreferences["popupPosition"] = {
 			x: 40,
@@ -117,6 +129,7 @@ describe("PreferencesService", () => {
 		);
 		expect(service.current.popupPosition).toEqual(popupPosition);
 		expect(service.current.isTracking).toBe(false);
+		expect(service.current.launchAtLogin).toBe(false);
 		expect(service.current.soundEnabled).toBe(DEFAULT_PREFERENCES.soundEnabled);
 		expect(service.current.cameraQuality).toBe(
 			DEFAULT_PREFERENCES.cameraQuality,

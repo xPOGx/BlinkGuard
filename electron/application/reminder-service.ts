@@ -8,6 +8,7 @@ import {
 	shouldShowCameraReminder,
 } from "../domain/reminder-policy";
 import type { AppRuntimeState } from "./app-runtime-state";
+import type { PreferenceStore } from "./ports/preference-store";
 import type {
 	BlinkDetectorPort,
 	NotificationSoundPort,
@@ -23,11 +24,12 @@ export class ReminderService {
 		private readonly windows: ReminderWindowPort,
 		private readonly sidecar: BlinkDetectorPort,
 		private readonly sound: NotificationSoundPort,
+		private readonly store: PreferenceStore,
 	) {}
 
 	start(interval = this.preferences.reminderInterval): void {
 		this.ensureStopped();
-		this.preferences.isTracking = true;
+		this.setTracking(true);
 		this.preferences.reminderInterval = interval;
 		if (this.preferences.cameraEnabled) {
 			this.startCameraMonitoring();
@@ -45,11 +47,16 @@ export class ReminderService {
 	ensureStopped(): void {
 		this.state.clearReminderTimers();
 		this.state.isAutoResuming = false;
-		this.preferences.isTracking = false;
+		this.setTracking(false);
 		this.sidecar.stopCamera();
 		this.resetFaceTracking();
 		this.windows.closeReminder();
 		this.windows.sendToMain("stop-camera");
+	}
+
+	private setTracking(value: boolean): void {
+		this.preferences.isTracking = value;
+		this.store.set("isTracking", value);
 	}
 
 	/** Sidecar-detected blink only. Debounced; closes any open reminder. */
@@ -109,7 +116,7 @@ export class ReminderService {
 	resumeAfterSleep(useCamera: boolean): void {
 		this.state.isAutoResuming = true;
 		this.creditBlink("sleep");
-		this.preferences.isTracking = true;
+		this.setTracking(true);
 		if (useCamera) {
 			this.startCameraMonitoring(false);
 		} else {

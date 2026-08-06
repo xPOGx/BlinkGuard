@@ -11,7 +11,6 @@ export interface SettingsPreferences extends RendererPreferences {
 export const DEFAULT_RENDERER_PREFERENCES: SettingsPreferences = {
 	...DEFAULT_PREFERENCES,
 	reminderInterval: DEFAULT_PREFERENCES.reminderInterval / 1000,
-	isTracking: false,
 	showMgdInfo: false,
 	showPopupColors: false,
 };

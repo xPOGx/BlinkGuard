@@ -35,6 +35,7 @@ export function usePreferences() {
 		rendererIpc.updatePopupMessage(preferences.popupMessage);
 		rendererIpc.updateKeyboardShortcut(preferences.keyboardShortcut);
 		rendererIpc.updateSoundEnabled(preferences.soundEnabled);
+		rendererIpc.updateLaunchAtLogin(preferences.launchAtLogin);
 	}, [preferences]);
 
 	useEffect(() => {

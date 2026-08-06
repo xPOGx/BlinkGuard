@@ -8,6 +8,7 @@ import type { WindowManager } from "../windows/window-manager";
 
 export class AppLifecycle {
 	private isQuitting = false;
+	private trayDestroy: (() => void) | null = null;
 
 	constructor(
 		private readonly preferences: AppPreferences,
@@ -18,17 +19,16 @@ export class AppLifecycle {
 		private readonly cleanup: ProcessCleanup,
 	) {}
 
+	attachTray(tray: { destroy(): void }): void {
+		this.trayDestroy = () => tray.destroy();
+	}
+
 	register(): void {
 		app.on("before-quit", (event) => {
 			if (this.isQuitting) return;
 			event.preventDefault();
 			void this.shutdown().then(() => app.quit());
 		});
-		if (process.platform === "win32") {
-			app.on("window-all-closed", () => {
-				if (!this.isQuitting) void this.shutdown().then(() => app.quit());
-			});
-		}
 		powerMonitor.on("suspend", () => {
 			this.state.wasTrackingBeforeSleep = this.preferences.isTracking;
 			this.state.wasCameraEnabledBeforeSleep = this.preferences.cameraEnabled;
@@ -45,29 +45,24 @@ export class AppLifecycle {
 		this.registerProcessSignals();
 	}
 
+	/** Close button hides the main window; process stays alive (tray / Quit to exit). */
 	handleMainClose = (event: Electron.Event): void => {
-		if (process.platform === "darwin") {
-			event.preventDefault();
-			this.windows.main?.hide();
-			return;
-		}
+		if (this.isQuitting) return;
 		event.preventDefault();
-		const timeout = setTimeout(() => process.exit(0), 5000);
-		void this.shutdown()
-			.then(() => {
-				clearTimeout(timeout);
-				app.quit();
-			})
-			.catch((error) => {
-				console.error("Error during graceful shutdown:", error);
-				clearTimeout(timeout);
-				process.exit(1);
-			});
+		this.windows.main?.hide();
 	};
+
+	/** Explicit quit from tray / OS — runs graceful shutdown then exits. */
+	quit(): void {
+		if (this.isQuitting) return;
+		void this.shutdown().then(() => app.quit());
+	}
 
 	async shutdown(): Promise<void> {
 		if (this.isQuitting) return;
 		this.isQuitting = true;
+		this.trayDestroy?.();
+		this.trayDestroy = null;
 		this.state.clearReminderTimers();
 		this.state.clearExerciseTimers();
 		this.windows.destroyAll();

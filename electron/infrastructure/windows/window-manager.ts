@@ -56,12 +56,19 @@ export class WindowManager {
 	}
 
 	activateMain(onClose: (event: Electron.Event) => void): void {
-		if (process.platform === "darwin" && this.main && !this.main.isDestroyed()) {
+		if (this.main && !this.main.isDestroyed()) {
 			if (!this.main.isVisible()) this.main.show();
 			this.main.focus();
 			return;
 		}
 		if (BrowserWindow.getAllWindows().length === 0) this.createMain(onClose);
+	}
+
+	showMain(): void {
+		if (this.main && !this.main.isDestroyed()) {
+			this.main.show();
+			this.main.focus();
+		}
 	}
 
 	sendToMain(channel: string, ...args: unknown[]): void {

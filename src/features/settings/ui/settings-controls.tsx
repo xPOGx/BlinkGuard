@@ -1,5 +1,5 @@
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
-import { Moon, Settings, Sun, Volume2, VolumeX } from "lucide-react";
+import { LogIn, Moon, Settings, Sun, Volume2, VolumeX } from "lucide-react";
 import type { SettingsPreferences } from "../model/preferences";
 import type { SetPreferences } from "../model/use-preferences";
 
@@ -85,6 +85,53 @@ export function SoundSettings({
 			</div>
 			<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
 				Play sounds for blink reminders and exercise prompts
+			</p>
+		</div>
+	);
+}
+
+interface LaunchAtLoginSettingsProps {
+	preferences: SettingsPreferences;
+	setPreferences: SetPreferences;
+}
+
+export function LaunchAtLoginSettings({
+	preferences,
+	setPreferences,
+}: LaunchAtLoginSettingsProps) {
+	return (
+		<div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 sm:p-6 overflow-hidden">
+			<div className="flex items-center justify-between mb-3">
+				<div className="flex items-center gap-2">
+					<LogIn className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+					<span className="font-medium text-gray-800 dark:text-white text-sm sm:text-base">
+						Launch at login
+					</span>
+				</div>
+				<button
+					type="button"
+					aria-label="Toggle launch at login"
+					onClick={() =>
+						setPreferences((current) => ({
+							...current,
+							launchAtLogin: !current.launchAtLogin,
+						}))
+					}
+					className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+						preferences.launchAtLogin
+							? "bg-blue-600"
+							: "bg-gray-300 dark:bg-gray-600"
+					}`}
+				>
+					<span
+						className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+							preferences.launchAtLogin ? "translate-x-6" : "translate-x-1"
+						}`}
+					/>
+				</button>
+			</div>
+			<p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+				Start BlinkGuard hidden in the system tray when you sign in
 			</p>
 		</div>
 	);
