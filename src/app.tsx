@@ -13,16 +13,16 @@ import {
 	CameraControls,
 	CameraErrorBanner,
 } from "@/features/camera/ui/camera-controls";
-import { EyeCareDisabledNotice } from "@/features/exercises/ui/eye-care-disabled-notice";
 import { ExerciseSettings } from "@/features/exercises/ui/exercise-settings";
+import { EyeCareDisabledNotice } from "@/features/exercises/ui/eye-care-disabled-notice";
 import { LookAwaySettings } from "@/features/look-away/ui/look-away-settings";
 import { PopupSettings } from "@/features/popup-appearance/ui/popup-settings";
 import { ReminderControls } from "@/features/reminders/ui/reminder-controls";
 import { usePreferences } from "@/features/settings/model/use-preferences";
 import {
 	DarkModeToggle,
-	GamingNotice,
 	LaunchAtLoginSettings,
+	QuietHoursFocusSettings,
 	ResetPreferencesButton,
 	SoundSettings,
 } from "@/features/settings/ui/settings-controls";
@@ -244,7 +244,10 @@ export default function BlinkGuardHomepage() {
 									/>
 									<ResetPreferencesButton />
 								</div>
-								<GamingNotice />
+								<QuietHoursFocusSettings
+									preferences={preferences}
+									setPreferences={setPreferences}
+								/>
 							</>
 						)}
 					</div>

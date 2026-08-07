@@ -4,12 +4,16 @@ import { fileURLToPath } from "node:url";
 import { AppRuntimeState } from "./application/app-runtime-state";
 import { BlinkStatsService } from "./application/blink-stats-service";
 import { ExerciseService } from "./application/exercise-service";
+import { FocusPauseService } from "./application/focus-pause-service";
 import { LookAwayService } from "./application/look-away-service";
+import type { NotificationGate } from "./application/ports/notification-gate";
 import { PreferencesService } from "./application/preferences-service";
 import { ReminderService } from "./application/reminder-service";
+import { createFocusEnvironment } from "./infrastructure/focus/create-focus-environment";
+import { FocusEnvironmentMonitor } from "./infrastructure/focus/focus-environment-monitor";
+import { registerIpcHandlers } from "./infrastructure/ipc/register-ipc-handlers";
 import { AppLifecycle } from "./infrastructure/lifecycle/app-lifecycle";
 import { applyLaunchAtLogin } from "./infrastructure/lifecycle/login-item";
-import { registerIpcHandlers } from "./infrastructure/ipc/register-ipc-handlers";
 import { BlinkDetectorDebugLogger } from "./infrastructure/logging/blink-detector-debug-logger";
 import { configureFileLogging } from "./infrastructure/logging/configure-file-logging";
 import { configureAppPaths } from "./infrastructure/paths/app-paths";
@@ -53,9 +57,17 @@ const sound = new NotificationSoundPlayer(paths, preferences, app.isPackaged);
 blinkStats.setPushHandler((snapshot) => {
 	windows.sendToMain(IPC_CHANNELS.loadBlinkStats, snapshot);
 });
-windows.setOnMainLoaded(() => {
-	windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
-});
+
+const gateHolder: { current: NotificationGate } = {
+	current: {
+		notificationsAllowed: () => true,
+		pauseReason: () => null,
+	},
+};
+const notificationGate: NotificationGate = {
+	notificationsAllowed: () => gateHolder.current.notificationsAllowed(),
+	pauseReason: () => gateHolder.current.pauseReason(),
+};
 
 let reminders: ReminderService;
 const blinkDebugLogger = new BlinkDetectorDebugLogger();
@@ -80,7 +92,9 @@ const sidecar = new BlinkDetectorSidecar(
 			windows.sendToMain(IPC_CHANNELS.cameraError, message);
 		},
 		shouldRetryCamera: () =>
-			preferences.isTracking && preferences.cameraEnabled,
+			preferences.isTracking &&
+			preferences.cameraEnabled &&
+			!reminders.isCameraSoftPaused,
 		onCalibrationProgress: (payload) => {
 			windows.sendToMain(IPC_CHANNELS.earCalibrationProgress, payload);
 		},
@@ -103,13 +117,30 @@ reminders = new ReminderService(
 	sound,
 	store,
 	blinkStats,
+	notificationGate,
 );
+const focusEnvironment = createFocusEnvironment();
+const focusPause = new FocusPauseService(
+	preferences,
+	windows,
+	reminders,
+	IPC_CHANNELS.focusPauseState,
+);
+gateHolder.current = focusPause;
+const focusMonitor = new FocusEnvironmentMonitor(
+	focusEnvironment,
+	(isFullscreen) => {
+		focusPause.setFullscreen(isFullscreen);
+	},
+);
+
 const exercises = new ExerciseService(
 	preferences,
 	state,
 	store,
 	windows,
 	sound,
+	notificationGate,
 );
 const lookAway = new LookAwayService(
 	preferences,
@@ -117,6 +148,7 @@ const lookAway = new LookAwayService(
 	store,
 	windows,
 	sound,
+	notificationGate,
 );
 const shortcuts = new ShortcutController(
 	preferences,
@@ -133,6 +165,11 @@ const lifecycle = new AppLifecycle(
 	windows,
 	new ProcessCleanup(processes),
 	blinkStats,
+	() => {
+		focusMonitor.stop();
+		focusPause.stopQuietHoursWatch();
+		focusEnvironment.dispose?.();
+	},
 );
 const tray = new TrayController(paths, windows, () => lifecycle.quit());
 lifecycle.attachTray(tray);
@@ -146,6 +183,7 @@ registerIpcHandlers({
 	shortcuts,
 	windows,
 	blinkStats,
+	focusPause,
 });
 
 app.on("second-instance", () => {
@@ -183,6 +221,13 @@ void app.whenReady().then(() => {
 
 	lookAway.resetTimer();
 	if (preferences.lookAwayEnabled) lookAway.start();
+
+	focusPause.startQuietHoursWatch();
+	focusMonitor.start();
+	windows.setOnMainLoaded(() => {
+		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
+		focusPause.pushState();
+	});
 
 	blinkDebugLogger.announce();
 	blinkDebugLogger.append({

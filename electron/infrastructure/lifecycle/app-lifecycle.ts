@@ -21,6 +21,7 @@ export class AppLifecycle {
 		private readonly windows: WindowManager,
 		private readonly cleanup: ProcessCleanup,
 		private readonly blinkStats: BlinkStatsService,
+		private readonly onShutdown?: () => void,
 	) {}
 
 	attachTray(tray: { destroy(): void }): void {
@@ -68,6 +69,7 @@ export class AppLifecycle {
 		this.isQuitting = true;
 		this.trayDestroy?.();
 		this.trayDestroy = null;
+		this.onShutdown?.();
 		this.blinkStats.dispose();
 		this.state.clearReminderTimers();
 		this.state.clearExerciseTimers();

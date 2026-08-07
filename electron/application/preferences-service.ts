@@ -1,12 +1,15 @@
-import { isValidEarCalibration } from "../../shared/ear-calibration";
-import { isCameraQuality } from "../../shared/camera-quality";
 import {
 	DEFAULT_PREFERENCES,
 	type AppPreferences,
 	type PersistedPreferences,
 } from "../../shared/preferences";
+import { isValidEarCalibration } from "../../shared/ear-calibration";
+import { isCameraQuality } from "../../shared/camera-quality";
+import {
+	isValidQuietHoursTime,
+	normalizeQuietHoursTime,
+} from "../domain/focus-policy";
 import type { PreferenceStore } from "./ports/preference-store";
-
 const PERSISTED_KEYS = Object.keys(
 	DEFAULT_PREFERENCES,
 ) as (keyof PersistedPreferences)[];
@@ -36,6 +39,26 @@ export class PreferencesService {
 		}
 		if (typeof persisted.isTracking !== "boolean") {
 			persisted.isTracking = DEFAULT_PREFERENCES.isTracking;
+		}
+		if (typeof persisted.quietHoursEnabled !== "boolean") {
+			persisted.quietHoursEnabled = DEFAULT_PREFERENCES.quietHoursEnabled;
+		}
+		if (!isValidQuietHoursTime(persisted.quietHoursStart)) {
+			persisted.quietHoursStart = DEFAULT_PREFERENCES.quietHoursStart;
+		} else {
+			persisted.quietHoursStart =
+				normalizeQuietHoursTime(persisted.quietHoursStart) ??
+				DEFAULT_PREFERENCES.quietHoursStart;
+		}
+		if (!isValidQuietHoursTime(persisted.quietHoursEnd)) {
+			persisted.quietHoursEnd = DEFAULT_PREFERENCES.quietHoursEnd;
+		} else {
+			persisted.quietHoursEnd =
+				normalizeQuietHoursTime(persisted.quietHoursEnd) ??
+				DEFAULT_PREFERENCES.quietHoursEnd;
+		}
+		if (typeof persisted.pauseOnFullscreen !== "boolean") {
+			persisted.pauseOnFullscreen = DEFAULT_PREFERENCES.pauseOnFullscreen;
 		}
 
 		this.current = { ...persisted };

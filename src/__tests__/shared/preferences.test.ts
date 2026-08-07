@@ -114,3 +114,12 @@ describe("look-away / 20-20-20 preference defaults", () => {
 		expect(DEFAULT_PREFERENCES.lookAwayDuration).toBe(20);
 	});
 });
+
+describe("quiet hours / focus preference defaults", () => {
+	it("defaults quiet hours overnight and fullscreen pause on", () => {
+		expect(DEFAULT_PREFERENCES.quietHoursEnabled).toBe(true);
+		expect(DEFAULT_PREFERENCES.quietHoursStart).toBe("22:00");
+		expect(DEFAULT_PREFERENCES.quietHoursEnd).toBe("08:00");
+		expect(DEFAULT_PREFERENCES.pauseOnFullscreen).toBe(true);
+	});
+});

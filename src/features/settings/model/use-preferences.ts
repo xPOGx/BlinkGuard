@@ -1,5 +1,5 @@
-import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import { useEffect, useState } from "react";
+import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import type { RendererPreferences } from "../../../../shared/preferences";
 import {
 	DEFAULT_RENDERER_PREFERENCES,
@@ -39,6 +39,10 @@ export function usePreferences() {
 		rendererIpc.updateKeyboardShortcut(preferences.keyboardShortcut);
 		rendererIpc.updateSoundEnabled(preferences.soundEnabled);
 		rendererIpc.updateLaunchAtLogin(preferences.launchAtLogin);
+		rendererIpc.updateQuietHoursEnabled(preferences.quietHoursEnabled);
+		rendererIpc.updateQuietHoursStart(preferences.quietHoursStart);
+		rendererIpc.updateQuietHoursEnd(preferences.quietHoursEnd);
+		rendererIpc.updatePauseOnFullscreen(preferences.pauseOnFullscreen);
 	}, [preferences]);
 
 	useEffect(() => {

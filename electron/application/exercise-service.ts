@@ -1,10 +1,16 @@
 import type { AppPreferences } from "../../shared/preferences";
 import type { AppRuntimeState } from "./app-runtime-state";
 import type { PreferenceStore } from "./ports/preference-store";
+import type { NotificationGate } from "./ports/notification-gate";
 import type {
 	ExerciseWindowPort,
 	NotificationSoundPort,
 } from "./ports/runtime-ports";
+
+const ALLOW_ALL_GATE: NotificationGate = {
+	notificationsAllowed: () => true,
+	pauseReason: () => null,
+};
 
 export class ExerciseService {
 	constructor(
@@ -13,6 +19,7 @@ export class ExerciseService {
 		private readonly store: PreferenceStore,
 		private readonly windows: ExerciseWindowPort,
 		private readonly sound: NotificationSoundPort,
+		private readonly notificationGate: NotificationGate = ALLOW_ALL_GATE,
 	) {}
 
 	start(): void {
@@ -26,7 +33,6 @@ export class ExerciseService {
 				elapsed >= this.preferences.exerciseInterval * 60 * 1000
 			) {
 				this.show();
-				this.store.set("lastExerciseTime", now);
 			}
 		}, 60 * 1000);
 	}
@@ -58,8 +64,10 @@ export class ExerciseService {
 
 	private show(): void {
 		if (this.state.isExerciseShowing) return;
+		if (!this.notificationGate.notificationsAllowed()) return;
 		this.sound.play("exercise");
 		this.state.isExerciseShowing = true;
+		this.store.set("lastExerciseTime", Date.now());
 		const popup = this.windows.showExercise(() => {
 			this.state.isExerciseShowing = false;
 		});

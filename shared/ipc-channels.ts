@@ -57,6 +57,11 @@ export const IPC_CHANNELS = {
 	loadBlinkStats: "load-blink-stats",
 	requestBlinkStats: "request-blink-stats",
 	resetBlinkStats: "reset-blink-stats",
+	updateQuietHoursEnabled: "update-quiet-hours-enabled",
+	updateQuietHoursStart: "update-quiet-hours-start",
+	updateQuietHoursEnd: "update-quiet-hours-end",
+	updatePauseOnFullscreen: "update-pause-on-fullscreen",
+	focusPauseState: "focus-pause-state",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -74,6 +79,7 @@ export const MAIN_RENDERER_RECEIVE_CHANNELS = [
 	IPC_CHANNELS.earCalibrationProgress,
 	IPC_CHANNELS.earCalibrationComplete,
 	IPC_CHANNELS.loadBlinkStats,
+	IPC_CHANNELS.focusPauseState,
 ] as const;
 
 export const MAIN_RENDERER_SEND_CHANNELS = [
@@ -117,4 +123,8 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.requestVideoStream,
 	IPC_CHANNELS.requestBlinkStats,
 	IPC_CHANNELS.resetBlinkStats,
+	IPC_CHANNELS.updateQuietHoursEnabled,
+	IPC_CHANNELS.updateQuietHoursStart,
+	IPC_CHANNELS.updateQuietHoursEnd,
+	IPC_CHANNELS.updatePauseOnFullscreen,
 ] as const;

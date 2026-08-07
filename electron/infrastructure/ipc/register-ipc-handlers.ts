@@ -10,9 +10,11 @@ import type {
 } from "../../../shared/preferences";
 import type { BlinkStatsService } from "../../application/blink-stats-service";
 import type { ExerciseService } from "../../application/exercise-service";
+import type { FocusPauseService } from "../../application/focus-pause-service";
 import type { LookAwayService } from "../../application/look-away-service";
 import type { PreferencesService } from "../../application/preferences-service";
 import type { ReminderService } from "../../application/reminder-service";
+import { normalizeQuietHoursTime } from "../../domain/focus-policy";
 import { applyLaunchAtLogin } from "../lifecycle/login-item";
 import type { BlinkDetectorSidecar } from "../sidecar/blink-detector-sidecar";
 import type { ShortcutController } from "../shortcuts/shortcut-controller";
@@ -28,6 +30,7 @@ interface IpcDependencies {
 	shortcuts: ShortcutController;
 	windows: WindowManager;
 	blinkStats: BlinkStatsService;
+	focusPause: FocusPauseService;
 }
 
 export function registerIpcHandlers(deps: IpcDependencies): void {
@@ -40,6 +43,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		shortcuts,
 		windows,
 		blinkStats,
+		focusPause,
 	} = deps;
 	const current = preferences.current;
 
@@ -189,6 +193,35 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		preferences.set("launchAtLogin", enabled);
 		applyLaunchAtLogin(enabled);
 	});
+	ipcMain.on(
+		IPC_CHANNELS.updateQuietHoursEnabled,
+		(_event, enabled: boolean) => {
+			preferences.set("quietHoursEnabled", Boolean(enabled));
+			focusPause.recompute();
+		},
+	);
+	ipcMain.on(
+		IPC_CHANNELS.updateQuietHoursStart,
+		(_event, value: string) => {
+			const normalized = normalizeQuietHoursTime(value);
+			if (!normalized) return;
+			preferences.set("quietHoursStart", normalized);
+			focusPause.recompute();
+		},
+	);
+	ipcMain.on(IPC_CHANNELS.updateQuietHoursEnd, (_event, value: string) => {
+		const normalized = normalizeQuietHoursTime(value);
+		if (!normalized) return;
+		preferences.set("quietHoursEnd", normalized);
+		focusPause.recompute();
+	});
+	ipcMain.on(
+		IPC_CHANNELS.updatePauseOnFullscreen,
+		(_event, enabled: boolean) => {
+			preferences.set("pauseOnFullscreen", Boolean(enabled));
+			focusPause.recompute();
+		},
+	);
 	ipcMain.on(IPC_CHANNELS.showCameraWindow, () => {
 		if (!current.cameraEnabled) {
 			preferences.set("cameraEnabled", true);
@@ -223,6 +256,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		sidecar.applyEarCalibration(null);
 		sidecar.applyDetectorBackend(false, false);
 		windows.sendPreferences();
+		focusPause.recompute();
 	});
 	ipcMain.on(IPC_CHANNELS.requestBlinkStats, () => {
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());

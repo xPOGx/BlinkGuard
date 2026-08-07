@@ -10,14 +10,21 @@ import {
 import type { AppRuntimeState } from "./app-runtime-state";
 import type { BlinkStatsPort } from "./ports/blink-stats-port";
 import type { PreferenceStore } from "./ports/preference-store";
+import type { NotificationGate } from "./ports/notification-gate";
 import type {
 	BlinkDetectorPort,
 	NotificationSoundPort,
 	ReminderWindowPort,
 } from "./ports/runtime-ports";
 
+const ALLOW_ALL_GATE: NotificationGate = {
+	notificationsAllowed: () => true,
+	pauseReason: () => null,
+};
+
 export class ReminderService {
 	private lastDetectedBlinkAt = 0;
+	private cameraSoftPaused = false;
 
 	constructor(
 		private readonly preferences: AppPreferences,
@@ -27,6 +34,7 @@ export class ReminderService {
 		private readonly sound: NotificationSoundPort,
 		private readonly store: PreferenceStore,
 		private readonly stats: BlinkStatsPort | null = null,
+		private readonly notificationGate: NotificationGate = ALLOW_ALL_GATE,
 	) {}
 
 	start(interval = this.preferences.reminderInterval): void {
@@ -49,6 +57,7 @@ export class ReminderService {
 	ensureStopped(): void {
 		this.state.clearReminderTimers();
 		this.state.isAutoResuming = false;
+		this.cameraSoftPaused = false;
 		this.setTracking(false);
 		this.sidecar.stopCamera();
 		this.resetFaceTracking();
@@ -116,6 +125,7 @@ export class ReminderService {
 			}
 			this.state.isFaceDetected = false;
 			this.windows.closeReminder();
+			if (!this.notificationGate.notificationsAllowed()) return;
 			this.windows.showNoFace();
 		}, 750);
 	}
@@ -166,6 +176,28 @@ export class ReminderService {
 		}
 		if (!this.sidecar.isRunning) this.sidecar.start();
 		if (!this.sidecar.isCameraReady) this.sidecar.startCamera();
+	}
+
+	/** Soft-pause camera during fullscreen without clearing isTracking. */
+	pauseCameraForFocus(): void {
+		this.cameraSoftPaused = true;
+		this.sidecar.stopCamera();
+		this.resetFaceTracking();
+		this.windows.closeReminder();
+	}
+
+	/** Resume camera after fullscreen if the user is still tracking with camera on. */
+	resumeCameraIfNeeded(): void {
+		this.cameraSoftPaused = false;
+		if (!this.preferences.isTracking || !this.preferences.cameraEnabled) {
+			return;
+		}
+		if (this.sidecar.isCameraReady) return;
+		this.startCameraMonitoring(false);
+	}
+
+	get isCameraSoftPaused(): boolean {
+		return this.cameraSoftPaused;
 	}
 
 	private startTimerLoop(): void {
@@ -259,9 +291,10 @@ export class ReminderService {
 		}, CAMERA_POLL_INTERVAL_MS);
 	}
 
-	/** Soft-suppress blink popups while a look-away break is on screen. */
+	/** Soft-suppress blink popups while look-away / quiet hours / fullscreen. */
 	private showBlinkReminder(): unknown | null {
 		if (this.state.isLookAwayShowing) return null;
+		if (!this.notificationGate.notificationsAllowed()) return null;
 		this.sound.play("blink");
 		return this.windows.showReminder("blink");
 	}

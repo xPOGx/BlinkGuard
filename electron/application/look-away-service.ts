@@ -1,10 +1,16 @@
 import type { AppPreferences } from "../../shared/preferences";
 import type { AppRuntimeState } from "./app-runtime-state";
 import type { PreferenceStore } from "./ports/preference-store";
+import type { NotificationGate } from "./ports/notification-gate";
 import type {
 	LookAwayWindowPort,
 	NotificationSoundPort,
 } from "./ports/runtime-ports";
+
+const ALLOW_ALL_GATE: NotificationGate = {
+	notificationsAllowed: () => true,
+	pauseReason: () => null,
+};
 
 export class LookAwayService {
 	constructor(
@@ -13,6 +19,7 @@ export class LookAwayService {
 		private readonly store: PreferenceStore,
 		private readonly windows: LookAwayWindowPort,
 		private readonly sound: NotificationSoundPort,
+		private readonly notificationGate: NotificationGate = ALLOW_ALL_GATE,
 	) {}
 
 	start(): void {
@@ -59,6 +66,7 @@ export class LookAwayService {
 
 	private show(): void {
 		if (this.state.isLookAwayShowing) return;
+		if (!this.notificationGate.notificationsAllowed()) return;
 		this.sound.play("exercise");
 		this.state.isLookAwayShowing = true;
 		this.store.set("lastLookAwayTime", Date.now());

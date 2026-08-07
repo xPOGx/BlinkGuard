@@ -44,6 +44,14 @@ export interface PersistedPreferences {
 	launchAtLogin: boolean;
 	/** Whether blink reminders are active; persisted across restarts. */
 	isTracking: boolean;
+	/** Suppress interruptive popups during a local-time window. */
+	quietHoursEnabled: boolean;
+	/** Quiet-hours start as local HH:mm (24h). */
+	quietHoursStart: string;
+	/** Quiet-hours end as local HH:mm (24h); may be earlier than start (overnight). */
+	quietHoursEnd: string;
+	/** Suppress interruptive popups while another app is fullscreen. */
+	pauseOnFullscreen: boolean;
 }
 
 export type AppPreferences = PersistedPreferences;
@@ -77,6 +85,10 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	soundEnabled: false,
 	launchAtLogin: false,
 	isTracking: false,
+	quietHoursEnabled: true,
+	quietHoursStart: "22:00",
+	quietHoursEnd: "08:00",
+	pauseOnFullscreen: true,
 };
 
 export function toRendererPreferences(

@@ -89,6 +89,19 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateSoundEnabled, enabled),
 	updateLaunchAtLogin: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateLaunchAtLogin, enabled),
+	updateQuietHoursEnabled: (enabled: boolean) =>
+		send(IPC_CHANNELS.updateQuietHoursEnabled, enabled),
+	updateQuietHoursStart: (value: string) =>
+		send(IPC_CHANNELS.updateQuietHoursStart, value),
+	updateQuietHoursEnd: (value: string) =>
+		send(IPC_CHANNELS.updateQuietHoursEnd, value),
+	updatePauseOnFullscreen: (enabled: boolean) =>
+		send(IPC_CHANNELS.updatePauseOnFullscreen, enabled),
+	onFocusPauseState: (
+		listener: (payload: {
+			reason: "quiet-hours" | "fullscreen" | null;
+		}) => void,
+	) => subscribe(IPC_CHANNELS.focusPauseState, listener),
 	updateMgdMode: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateMgdMode, enabled),
 	startCameraTracking: () => send(IPC_CHANNELS.startCameraTracking),

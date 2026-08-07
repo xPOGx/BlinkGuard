@@ -31,6 +31,8 @@ describe("settings shell", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "System" }));
 		expect(screen.getByText("Keyboard Shortcut")).toBeDefined();
+		expect(screen.getByText("Quiet hours")).toBeDefined();
+		expect(screen.getByText("Pause while fullscreen")).toBeDefined();
 
 		fireEvent.click(screen.getByRole("button", { name: "Statistics" }));
 		expect(screen.getByText("Blink chart")).toBeDefined();
