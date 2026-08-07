@@ -27,6 +27,8 @@ export const CAMERA_QUALITY_PRESETS: Readonly<
 	},
 	// High = more pixels/FPS for landmarks — not harsher pose gates
 	// (strict yaw/pitch was killing side-monitor + screen-bottom blinks).
+	// Python uses target_fps for frame-aware duration / short-velocity gates
+	// (min_blink_duration_s, short_frontal_velocity) — no extra quality keys.
 	high: {
 		targetFps: 20,
 		processingResolution: [640, 480],

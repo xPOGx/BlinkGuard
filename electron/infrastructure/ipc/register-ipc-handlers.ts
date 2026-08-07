@@ -114,12 +114,6 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	ipcMain.on(IPC_CHANNELS.cancelEarCalibration, () => {
 		sidecar.cancelEarCalibration();
 	});
-	ipcMain.on(IPC_CHANNELS.updateUseMediaPipe, (_event, enabled: boolean) => {
-		const next = Boolean(enabled);
-		const changed = current.useMediaPipe !== next;
-		preferences.set("useMediaPipe", next);
-		sidecar.applyDetectorBackend(next, changed && next);
-	});
 	ipcMain.on(
 		IPC_CHANNELS.updateEyeExercisesEnabled,
 		(_event, enabled: boolean) => {
@@ -270,7 +264,6 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 			shortcuts.register(current.keyboardShortcut);
 			sidecar.applyCameraQuality(current.cameraQuality);
 			sidecar.applyEarCalibration(null);
-			sidecar.applyDetectorBackend(false, false);
 			windows.sendPreferences();
 			focusPause.recompute();
 		},

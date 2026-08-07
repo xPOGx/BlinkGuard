@@ -77,7 +77,6 @@ describe("PreferencesService", () => {
 		store.set("darkMode", false);
 		store.set("cameraQuality", "high");
 		store.set("earCalibration", 0.31);
-		store.set("useMediaPipe", true);
 		store.set("launchAtLogin", true);
 		store.set("isTracking", true);
 
@@ -87,7 +86,6 @@ describe("PreferencesService", () => {
 		expect(service.current.darkMode).toBe(false);
 		expect(service.current.cameraQuality).toBe("high");
 		expect(service.current.earCalibration).toBe(0.31);
-		expect(service.current.useMediaPipe).toBe(true);
 		expect(service.current.launchAtLogin).toBe(true);
 		expect(service.current.isTracking).toBe(true);
 		expect(service.current.popupMessage).toBe(DEFAULT_PREFERENCES.popupMessage);
@@ -95,7 +93,7 @@ describe("PreferencesService", () => {
 
 	it("falls back to medium when cameraQuality in the store is invalid", () => {
 		const store = new FakePreferenceStore();
-		store.set("cameraQuality", "ultra");
+		store.set("cameraQuality", "turbo");
 
 		const service = new PreferencesService(store);
 
@@ -145,7 +143,6 @@ describe("PreferencesService", () => {
 		service.set("keyboardShortcut", "Ctrl+B");
 		service.set("cameraQuality", "performance");
 		service.set("earCalibration", 0.28);
-		service.set("useMediaPipe", true);
 		service.set("launchAtLogin", true);
 		service.set("isTracking", true);
 
@@ -155,7 +152,6 @@ describe("PreferencesService", () => {
 		expect(store.get("cameraQuality")).toBe("performance");
 		expect(service.current.earCalibration).toBe(0.28);
 		expect(store.get("earCalibration")).toBe(0.28);
-		expect(service.current.useMediaPipe).toBe(true);
 		expect(service.current.launchAtLogin).toBe(true);
 		expect(store.get("launchAtLogin")).toBe(true);
 		expect(service.current.isTracking).toBe(true);
@@ -168,7 +164,6 @@ describe("PreferencesService", () => {
 		store.set("soundEnabled", true);
 		store.set("cameraQuality", "high");
 		store.set("earCalibration", 0.33);
-		store.set("useMediaPipe", true);
 		store.set("launchAtLogin", true);
 		store.set("isTracking", true);
 		const service = new PreferencesService(store);
@@ -193,7 +188,6 @@ describe("PreferencesService", () => {
 			DEFAULT_PREFERENCES.cameraQuality,
 		);
 		expect(service.current.earCalibration).toBeNull();
-		expect(service.current.useMediaPipe).toBe(false);
 	});
 
 	it("reset can clear popupPosition so defaults follow the active display", () => {

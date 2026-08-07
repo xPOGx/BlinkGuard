@@ -55,8 +55,6 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateEarCalibration, baseline),
 	startEarCalibration: () => send(IPC_CHANNELS.startEarCalibration),
 	cancelEarCalibration: () => send(IPC_CHANNELS.cancelEarCalibration),
-	updateUseMediaPipe: (enabled: boolean) =>
-		send(IPC_CHANNELS.updateUseMediaPipe, enabled),
 	onEarCalibrationProgress: (
 		listener: (payload: {
 			elapsedMs: number;

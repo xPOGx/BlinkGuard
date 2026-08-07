@@ -1,4 +1,4 @@
-"""Unit tests for Phase 2 EAR harden — no camera required."""
+"""Unit tests for EAR blink FSM — no camera required."""
 
 from __future__ import annotations
 
@@ -6,8 +6,12 @@ import unittest
 
 from blink_detector_package.domain.blink_detection import (
 	BLINK_MIN_CLOSING_VELOCITY,
+	MIN_CLOSED_FRAMES,
+	MIN_OPENING_VELOCITY,
 	BlinkDetectionState,
 	get_adaptive_ear_drop_threshold,
+	min_blink_duration_s,
+	short_frontal_velocity,
 )
 from blink_detector_package.domain.pose import (
 	estimate_head_pose,
@@ -28,13 +32,60 @@ class _FakeFace:
 		return self._h
 
 
-def _seed_open_eye(state, ear=0.28, t0=1.0, frames=12, dt=0.1):
-	"""Build a stable open-eye baseline."""
+def _seed_open_eye(state, ear=0.28, t0=1.0, frames=15, dt=0.1):
+	"""Build a stable open-eye baseline (enough frames for EAR smooth window)."""
 	for index in range(frames):
-		credited, info = state.detect(ear, t0 + index * dt)
+		credited, _info = state.detect(ear, t0 + index * dt)
 		assert credited is False
 	assert state.current_baseline_ear > 0
 	return t0 + frames * dt
+
+
+def _feed(state, t, steps, pose=None):
+	"""
+	Feed (dt, ear) or ear steps. Optional (dt, ear, left, right).
+	Returns (credited_any, t, last_info, phases).
+	last_info prefers the credited complete payload when present.
+	"""
+	credited_any = False
+	last_info = None
+	credited_info = None
+	phases = []
+	for step in steps:
+		left = right = None
+		if isinstance(step, tuple) and len(step) == 4:
+			dt, ear, left, right = step
+		elif isinstance(step, tuple) and len(step) == 2:
+			dt, ear = step
+		else:
+			dt, ear = 0.1, step
+		t += dt
+		credited, info = state.detect(
+			ear,
+			t,
+			left_ear=left,
+			right_ear=right,
+			pose=pose,
+		)
+		last_info = info
+		if info:
+			phases.append(info.get("phase"))
+		if credited:
+			credited_any = True
+			credited_info = info
+	return credited_any, t, credited_info or last_info, phases
+
+
+# Deep close + hold (≥2 closed) + reopen past smooth recovery lag.
+_CREDIT_STEPS = (
+	(0.1, 0.16),
+	(0.1, 0.10),
+	(0.1, 0.08),
+	(0.1, 0.07),
+	(0.1, 0.22),
+	(0.1, 0.28),
+	(0.1, 0.28),
+)
 
 
 def _frontal_landmarks(yaw_offset=0.0, pitch_shift=0.0):
@@ -43,32 +94,26 @@ def _frontal_landmarks(yaw_offset=0.0, pitch_shift=0.0):
 	pitch_shift moves nose in Y (negative → look-down / smaller nose_ratio).
 	"""
 	points = [(0.0, 0.0)] * 68
-	# Jaw / chin
 	for i in range(17):
 		points[i] = (100.0 + i * 10.0, 200.0)
-	points[8] = (180.0, 260.0)  # chin
+	points[8] = (180.0, 260.0)
 
-	# Brows
 	for i in range(17, 27):
 		points[i] = (120.0 + (i - 17) * 8.0, 120.0)
 
-	# Nose bridge → tip
 	for i in range(27, 31):
 		points[i] = (180.0 + yaw_offset, 140.0 + (i - 27) * 12.0 + pitch_shift)
 	points[30] = (180.0 + yaw_offset, 176.0 + pitch_shift)
 	for i in range(31, 36):
 		points[i] = (160.0 + (i - 31) * 10.0 + yaw_offset, 190.0 + pitch_shift)
 
-	# Left eye 36-41
 	left = [(150, 150), (158, 145), (166, 145), (174, 150), (166, 155), (158, 155)]
 	for i, (x, y) in enumerate(left):
 		points[36 + i] = (float(x), float(y))
-	# Right eye 42-47
 	right = [(186, 150), (194, 145), (202, 145), (210, 150), (202, 155), (194, 155)]
 	for i, (x, y) in enumerate(right):
 		points[42 + i] = (float(x), float(y))
 
-	# Mouth
 	for i in range(48, 68):
 		points[i] = (150.0 + (i - 48) * 3.0, 220.0)
 
@@ -94,7 +139,6 @@ class PoseTests(unittest.TestCase):
 		self.assertGreater(look_down["pitch"], frontal["pitch"])
 
 	def test_extreme_yaw_blocks_credit(self):
-		# yaw_offset=22 → yaw ≈1.22, clearly above normal yaw_extreme 1.10
 		pose = estimate_head_pose(_frontal_landmarks(yaw_offset=22.0))
 		self.assertGreater(abs(pose["yaw"]), 1.15)
 		gate = evaluate_pose_gate(pose, "normal")
@@ -102,7 +146,6 @@ class PoseTests(unittest.TestCase):
 		self.assertFalse(gate["allow_credit"])
 
 	def test_moderate_side_yaw_still_allows_credit(self):
-		"""Dual-monitor glance must not hard-block (yaw ~0.4–0.55)."""
 		pose = estimate_head_pose(_frontal_landmarks(yaw_offset=10.0))
 		gate = evaluate_pose_gate(pose, "normal")
 		self.assertFalse(gate["extreme_yaw"])
@@ -111,7 +154,6 @@ class PoseTests(unittest.TestCase):
 		self.assertLess(abs(pose["yaw"]), 1.10)
 
 	def test_left_monitor_yaw_still_allows_credit(self):
-		"""Left-monitor glances (yaw ≈0.88–1.12) must credit under normal."""
 		pose = estimate_head_pose(_frontal_landmarks(yaw_offset=18.0))
 		self.assertGreater(abs(pose["yaw"]), 0.85)
 		self.assertLess(abs(pose["yaw"]), 1.10)
@@ -121,7 +163,6 @@ class PoseTests(unittest.TestCase):
 
 	def test_look_down_relaxes_drop_threshold(self):
 		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
-		# Absolute pitch alone is not look-down — need resting + delta.
 		resting = pose["pitch"] - 0.10
 		gate = evaluate_pose_gate(pose, "normal", resting_pitch=resting)
 		self.assertTrue(gate["look_down"])
@@ -131,7 +172,6 @@ class PoseTests(unittest.TestCase):
 		self.assertTrue(gate["allow_credit"])
 
 	def test_resting_pitch_avoids_false_look_down(self):
-		"""Webcam-on-top bias (~pitch 0.2) must not always count as look-down."""
 		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-30.0))
 		gate = evaluate_pose_gate(
 			pose,
@@ -150,49 +190,70 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertAlmostEqual(low, 0.20, places=3)
 		self.assertAlmostEqual(high, 0.15, places=3)
 
-	def test_normal_blink_credited(self):
+	def test_short_frontal_velocity_fps_bands(self):
+		self.assertAlmostEqual(short_frontal_velocity(20), 0.40, places=3)
+		self.assertAlmostEqual(short_frontal_velocity(18), 0.40, places=3)
+		self.assertAlmostEqual(short_frontal_velocity(15), 0.45, places=3)
+		self.assertAlmostEqual(short_frontal_velocity(12), 0.45, places=3)
+		self.assertAlmostEqual(short_frontal_velocity(10), 0.50, places=3)
+
+	def test_min_blink_duration_s_scales_with_high_fps(self):
+		# ≤20 FPS keep ~50ms floor; Ultra/Max allow one-frame wall-clock.
+		self.assertAlmostEqual(min_blink_duration_s(20), 0.0475, places=3)
+		self.assertAlmostEqual(min_blink_duration_s(15), 0.05, places=3)
+		self.assertAlmostEqual(min_blink_duration_s(10), 0.05, places=3)
+		self.assertAlmostEqual(min_blink_duration_s(30), 0.0317, places=3)
+		self.assertAlmostEqual(min_blink_duration_s(60), 0.016, places=3)
+
+	def test_ear_smoothing_exposes_raw_and_smooth(self):
 		state = BlinkDetectionState()
 		t = _seed_open_eye(state, ear=0.28)
-		# Fast close + recover (~300ms) with high |dEAR/dt|.
-		series = [
-			(0.22, False),
-			(0.14, False),
-			(0.12, False),
-			(0.24, True),
-		]
-		credited_any = False
-		for ear, expect_complete in series:
-			t += 0.1
-			credited, info = state.detect(ear, t)
-			if expect_complete:
-				self.assertTrue(credited, msg=info)
-				self.assertEqual(info["phase"], "complete")
-				self.assertGreaterEqual(
-					info["velocity"],
-					BLINK_MIN_CLOSING_VELOCITY,
-				)
-				credited_any = True
-			else:
-				self.assertFalse(credited)
+		t += 0.1
+		credited, info = state.detect(0.10, t)
+		self.assertFalse(credited)
+		self.assertIsNotNone(info)
+		self.assertIn("ear_raw", info)
+		self.assertIn("ear_smooth", info)
+		self.assertAlmostEqual(info["ear_raw"], 0.10, places=5)
+		self.assertGreater(info["ear_smooth"], info["ear_raw"])
+		self.assertAlmostEqual(info["ear"], info["ear_smooth"], places=5)
+
+	def test_normal_blink_credited(self):
+		state = BlinkDetectionState(target_fps=15)
+		t = _seed_open_eye(state, ear=0.28)
+		credited_any, _t, info, phases = _feed(state, t, _CREDIT_STEPS)
 		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+		self.assertGreaterEqual(info["peak_velocity"], BLINK_MIN_CLOSING_VELOCITY)
+		self.assertGreaterEqual(info["closed_frames"], MIN_CLOSED_FRAMES)
+
+	def test_shallow_flicker_rejected_by_velocity(self):
+		"""Shallow 1-frame dip must not credit (velocity / drop gates)."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		credited_any, _t, _info, phases = _feed(
+			state,
+			t,
+			((0.05, 0.24), (0.05, 0.27), (0.05, 0.28)),
+		)
+		self.assertFalse(credited_any)
+		self.assertNotIn("complete", phases)
 
 	def test_slow_look_down_rejected_by_velocity(self):
 		state = BlinkDetectionState()
 		t = _seed_open_eye(state, ear=0.28)
-		# Gradual 0.01 EAR / 100ms → closing vel ≈ 0.1 << min.
 		credited_any = False
 		ear = 0.28
 		for _ in range(14):
 			ear -= 0.01
 			t += 0.1
-			credited, info = state.detect(ear, t)
+			credited, _info = state.detect(ear, t)
 			if credited:
 				credited_any = True
-		# Recover slowly
 		for _ in range(8):
 			ear += 0.01
 			t += 0.1
-			credited, info = state.detect(min(ear, 0.28), t)
+			credited, _info = state.detect(min(ear, 0.28), t)
 			if credited:
 				credited_any = True
 		self.assertFalse(credited_any)
@@ -201,13 +262,14 @@ class BlinkDetectionTests(unittest.TestCase):
 		state = BlinkDetectionState()
 		t = _seed_open_eye(state, ear=0.28)
 
-		t += 0.1
-		state.detect(0.18, t)  # start (may append this frame once)
+		for ear in (0.18, 0.12):
+			t += 0.1
+			state.detect(ear, t)
 		self.assertTrue(state.blink_in_progress)
 		frozen_baseline = state.current_baseline_ear
 		len_at_start = len(state.baseline_ear_values)
 
-		for ear in (0.12, 0.11, 0.10):
+		for ear in (0.11, 0.10, 0.09):
 			t += 0.1
 			state.detect(ear, t)
 			self.assertTrue(state.blink_in_progress)
@@ -219,120 +281,186 @@ class BlinkDetectionTests(unittest.TestCase):
 			)
 
 	def test_cooldown_suppresses_second_blink(self):
-		state = BlinkDetectionState()
+		state = BlinkDetectionState(target_fps=15)
 		t = _seed_open_eye(state, ear=0.28)
 
-		def one_blink(start_t, dt=0.05):
-			local_t = start_t
-			result = False
-			for ear in (0.20, 0.12, 0.11, 0.24):
-				local_t += dt
-				credited, _ = state.detect(ear, local_t)
-				if credited:
-					result = True
-			return result, local_t
-
-		first, t = one_blink(t)
+		first, t, _info, _phases = _feed(state, t, _CREDIT_STEPS, pose=None)
 		self.assertTrue(first)
-		# Finish second attempt ~0.12s after first credit (< 0.2s cooldown).
-		second, _ = one_blink(t, dt=0.03)
+		# Second attempt inside cooldown window.
+		fast = tuple((0.04, ear) for _, ear in _CREDIT_STEPS)
+		second, _t, _i, _p = _feed(state, t, fast)
 		self.assertFalse(second)
 
 	def test_extreme_yaw_no_credit(self):
 		state = BlinkDetectionState()
 		t = _seed_open_eye(state, ear=0.28)
-		# yaw_offset=22 → yaw ≈1.22 > normal yaw_extreme 1.10
 		pose = estimate_head_pose(_frontal_landmarks(yaw_offset=22.0))
 		self.assertGreater(abs(pose["yaw"]), 1.15)
 		self.assertTrue(evaluate_pose_gate(pose, "normal")["extreme_yaw"])
-		credited_any = False
-		for ear in (0.20, 0.12, 0.11, 0.24):
-			t += 0.1
-			credited, info = state.detect(ear, t, pose=pose)
-			self.assertFalse(credited)
-			self.assertEqual(info["phase"], "skip_yaw")
-			if credited:
-				credited_any = True
+		credited_any, _t, _info, phases = _feed(
+			state, t, _CREDIT_STEPS, pose=pose
+		)
 		self.assertFalse(credited_any)
+		self.assertTrue(all(p == "skip_yaw" for p in phases))
 
 	def test_moderate_side_yaw_blink_credited(self):
-		state = BlinkDetectionState()
+		state = BlinkDetectionState(target_fps=15)
 		t = _seed_open_eye(state, ear=0.28)
 		pose = estimate_head_pose(_frontal_landmarks(yaw_offset=10.0))
 		self.assertFalse(evaluate_pose_gate(pose, "normal")["extreme_yaw"])
-		series = [0.20, 0.13, 0.11, 0.24]
-		credited_any = False
-		for ear in series:
-			t += 0.1
-			credited, info = state.detect(ear, t, pose=pose)
-			if credited:
-				credited_any = True
-				self.assertEqual(info["phase"], "complete")
-		self.assertTrue(credited_any)
-
-	def test_one_frame_duration_at_15fps_credited(self):
-		"""POG logs: real blinks often complete in ~67ms (1 frame @15fps)."""
-		from blink_detector_package.domain.blink_detection import (
-			BLINK_DURATION_MIN,
-			SHORT_BLINK_MIN_VELOCITY,
+		credited_any, _t, _info, phases = _feed(
+			state, t, _CREDIT_STEPS, pose=pose
 		)
-
-		self.assertLessEqual(BLINK_DURATION_MIN, 0.05)
-		state = BlinkDetectionState()
-		t = _seed_open_eye(state, ear=0.28)
-		# Fast close (strong velocity) then recover one frame later (~0.067s).
-		steps = [
-			(0.067, 0.10),
-			(0.067, 0.26),
-		]
-		credited_any = False
-		for dt, ear in steps:
-			t += dt
-			credited, info = state.detect(ear, t)
-			if credited:
-				credited_any = True
-				self.assertGreaterEqual(info["duration"], BLINK_DURATION_MIN)
-				self.assertLess(info["duration"], 0.08)
-				self.assertGreaterEqual(
-					info["peak_velocity"],
-					SHORT_BLINK_MIN_VELOCITY,
-				)
 		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+
+	def test_one_closed_frame_at_20fps_can_credit(self):
+		"""Real high-FPS blinks often have one trough sample then reopen."""
+		self.assertAlmostEqual(min_blink_duration_s(20), 0.0475, places=3)
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks())
+		# Extra open frames: EAR rolling mean must climb past recovery.
+		steps = (
+			(0.05, 0.08),
+			(0.05, 0.24),
+			(0.05, 0.28),
+			(0.05, 0.28),
+			(0.05, 0.28),
+		)
+		credited_any, _t, info, phases = _feed(state, t, steps, pose=pose)
+		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+		self.assertGreaterEqual(
+			info["duration"], min_blink_duration_s(20) - 1e-6
+		)
+		self.assertGreaterEqual(info["closed_frames"], MIN_CLOSED_FRAMES)
 
 	def test_short_blink_weak_velocity_rejected(self):
-		state = BlinkDetectionState()
+		state = BlinkDetectionState(target_fps=15)
 		t = _seed_open_eye(state, ear=0.28)
-		# Shallow one-frame flicker — duration ok, velocity below short gate.
-		credited_any = False
-		for ear in (0.22, 0.25):
-			t += 0.067
-			credited, info = state.detect(ear, t)
-			if credited:
-				credited_any = True
-			if info and info.get("phase") == "reject_velocity":
-				break
+		credited_any, _t, _info, phases = _feed(
+			state,
+			t,
+			((0.067, 0.23), (0.067, 0.22), (0.067, 0.25), (0.067, 0.28)),
+		)
 		self.assertFalse(credited_any)
+		self.assertNotIn("complete", phases)
+
+	def test_short_frontal_moderate_velocity_credited(self):
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks())
+		steps = (
+			(0.05, 0.10),
+			(0.05, 0.07),
+			(0.05, 0.06),
+			(0.05, 0.05),
+			(0.05, 0.22),
+			(0.05, 0.28),
+			(0.05, 0.28),
+		)
+		credited_any, _t, info, phases = _feed(state, t, steps, pose=pose)
+		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+		self.assertFalse(info.get("look_down"))
+		self.assertGreaterEqual(
+			info["peak_velocity"],
+			short_frontal_velocity(20),
+		)
+
+	def test_pre_blink_close_spike_credits_short_frontal(self):
+		"""Close spike 1 frame before start must count (history), not peak≈0."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks())
+		# Sharp close while still above close-band, then trough + reopen.
+		steps = (
+			(0.05, 0.12),
+			(0.05, 0.08),
+			(0.05, 0.22),
+			(0.05, 0.28),
+			(0.05, 0.28),
+		)
+		credited_any, _t, info, phases = _feed(state, t, steps, pose=pose)
+		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+		self.assertGreaterEqual(
+			info["peak_velocity"],
+			short_frontal_velocity(20),
+		)
+
+	def test_short_look_down_still_needs_strict_velocity(self):
+		state = BlinkDetectionState(target_fps=15)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.12
+		gate = evaluate_pose_gate(
+			pose, "normal", resting_pitch=state.resting_pitch
+		)
+		self.assertTrue(gate["look_down"])
+		# Soft close held below look-down recovery; velocity under 0.50 gate.
+		steps = (
+			(0.12, 0.24),
+			(0.12, 0.21),
+			(0.12, 0.19),
+			(0.12, 0.17),
+			(0.12, 0.16),
+			(0.12, 0.16),
+			(0.12, 0.22),
+			(0.12, 0.26),
+			(0.12, 0.28),
+		)
+		credited_any, _t, _info, phases = _feed(state, t, steps, pose=pose)
+		self.assertFalse(credited_any)
+		self.assertIn("reject_velocity", phases)
+
+	def test_opening_reject_when_shallow_reopen(self):
+		"""V-shape: weak opening with only one closed frame → reject_opening."""
+		state = BlinkDetectionState(target_fps=15)
+		t = _seed_open_eye(state, ear=0.28)
+		state.blink_in_progress = True
+		state.blink_start_time = t - 0.25
+		state.closed_frames = 1
+		# Below frontal strong-close waive (peak >= 1.0).
+		state.peak_closing_velocity = 0.5
+		state.peak_opening_velocity = 0.02
+		state.max_drop_percentage = 0.55
+		state.prev_ear = 0.197
+		state.prev_time = t
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.197)
+		t += 0.2
+		credited, info = state.detect(0.205, t)
+		self.assertFalse(credited)
+		self.assertEqual(info["phase"], "reject_opening")
+		self.assertLess(
+			info.get("peak_opening_velocity", 1.0),
+			MIN_OPENING_VELOCITY,
+		)
+		self.assertLess(info.get("closed_frames", 99), 2)
 
 	def test_await_reopen_blocks_rapid_second_blink(self):
-		state = BlinkDetectionState()
+		state = BlinkDetectionState(target_fps=15)
 		t = _seed_open_eye(state, ear=0.28)
-		# First blink with clear close spike
-		credited_first = False
-		for ear in (0.12, 0.10, 0.26):
-			t += 0.06
-			credited, info = state.detect(ear, t)
-			if credited:
-				credited_first = True
+		credited_first, t, _info, _phases = _feed(state, t, _CREDIT_STEPS)
 		self.assertTrue(credited_first)
-		self.assertTrue(state.awaiting_reopen)
-		# Mid-low (look-down open band was ~0.74; stay clearly below OPEN 0.72)
+		# Completing blink leaves smooth EAR open; re-arm await and pull the
+		# smooth window into the mid band so reopen gate is observable.
+		state.awaiting_reopen = True
+		state.awaiting_reopen_since = t
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.19)
 		t += 0.1
-		credited, info = state.detect(0.19, t)  # 0.19/0.28 ≈ 0.68
+		credited, info = state.detect(0.19, t)
 		self.assertFalse(credited)
 		self.assertEqual(info["phase"], "skip_await_open")
-		# Look-down "open" (~0.74 of baseline) must clear await.
-		t += 0.1
-		state.detect(0.21, t)  # 0.21/0.28 = 0.75 >= 0.72
+		# Clear await with clearly open samples (smooth must reach OPEN ratio).
+		for ear in (0.24, 0.26, 0.28):
+			t += 0.1
+			state.detect(ear, t)
 		self.assertFalse(state.awaiting_reopen)
 
 	def test_await_reopen_expires(self):
@@ -341,28 +469,31 @@ class BlinkDetectionTests(unittest.TestCase):
 		state.awaiting_reopen = True
 		state.awaiting_reopen_since = t
 		t += 0.5
-		state._update_eyes_closed_state(0.18, t)  # still mid-low
+		state._update_eyes_closed_state(0.18, t)
 		self.assertFalse(state.awaiting_reopen)
 
 	def test_sustained_low_ear_marks_eyes_closed(self):
 		state = BlinkDetectionState()
 		t = _seed_open_eye(state, ear=0.28)
+		# Drive smooth EAR into sustained-closed band (smoothing lags).
+		for ear in (0.12, 0.11, 0.10):
+			t += 0.1
+			state.detect(ear, t)
+		# Abort any in-progress blink then mark sustained closed.
 		state.blink_in_progress = False
+		state._reset_blink_tracking()
 		state._low_ear_since = t - 0.2
-		state._update_eyes_closed_state(0.13, t)  # 0.13/0.28 ≈ 0.46 < 0.52
+		state._update_eyes_closed_state(0.10, t)
 		self.assertTrue(state.eyes_closed)
-		credited, info = state.detect(0.13, t + 0.05)
+		credited, info = state.detect(0.10, t + 0.05)
 		self.assertFalse(credited)
 		self.assertEqual(info["phase"], "skip_eyes_closed")
 
 	def test_side_glance_asymmetry_near_half_not_skipped(self):
-		"""Left-monitor logs showed asymmetry ~0.46–0.50 — must not skip."""
 		state = BlinkDetectionState()
 		t = _seed_open_eye(state, ear=0.28)
 		t += 0.1
-		# asymmetry = |0.30-0.155|/0.2275 ≈ 0.64? Need ~0.48
-		# mean=0.25, |L-R|=0.12 → asym=0.48
-		credited, info = state.detect(
+		_credited, info = state.detect(
 			0.20,
 			t,
 			left_ear=0.31,
@@ -374,7 +505,6 @@ class BlinkDetectionTests(unittest.TestCase):
 		state = BlinkDetectionState()
 		t = _seed_open_eye(state, ear=0.28)
 		t += 0.1
-		# Strong asymmetry vs mean.
 		credited, info = state.detect(
 			0.20,
 			t,
@@ -385,74 +515,58 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertEqual(info["phase"], "skip_degraded")
 
 	def test_bilateral_agreement_required_for_credit(self):
-		state = BlinkDetectionState()
+		state = BlinkDetectionState(target_fps=15)
 		t = _seed_open_eye(state, ear=0.28)
-		# Avg drops but only one eye participates → should not complete.
-		credited_any = False
-		steps = [
-			(0.20, 0.28, 0.12),
-			(0.14, 0.28, 0.00),
-			(0.12, 0.28, 0.00),
-			(0.24, 0.28, 0.20),
-		]
-		for avg, left, right in steps:
-			t += 0.1
-			credited, _ = state.detect(
-				avg,
-				t,
-				left_ear=left,
-				right_ear=right,
-			)
-			if credited:
-				credited_any = True
+		steps = (
+			(0.1, 0.16, 0.28, 0.10),
+			(0.1, 0.10, 0.28, 0.00),
+			(0.1, 0.08, 0.28, 0.00),
+			(0.1, 0.07, 0.28, 0.00),
+			(0.1, 0.22, 0.28, 0.16),
+			(0.1, 0.28, 0.28, 0.28),
+			(0.1, 0.28, 0.28, 0.28),
+		)
+		credited_any, _t, _info, _phases = _feed(state, t, steps)
 		self.assertFalse(credited_any)
 
 	def test_bilateral_agreeing_blink_credited(self):
-		state = BlinkDetectionState()
+		state = BlinkDetectionState(target_fps=15)
 		t = _seed_open_eye(state, ear=0.28)
-		steps = [
-			(0.20, 0.21, 0.19),
-			(0.13, 0.14, 0.12),
-			(0.11, 0.12, 0.10),
-			(0.24, 0.24, 0.24),
-		]
-		credited_any = False
-		for avg, left, right in steps:
-			t += 0.1
-			credited, info = state.detect(
-				avg,
-				t,
-				left_ear=left,
-				right_ear=right,
-			)
-			if credited:
-				credited_any = True
-				self.assertEqual(info["phase"], "complete")
+		steps = (
+			(0.1, 0.16, 0.17, 0.15),
+			(0.1, 0.10, 0.11, 0.09),
+			(0.1, 0.08, 0.09, 0.07),
+			(0.1, 0.07, 0.08, 0.06),
+			(0.1, 0.22, 0.22, 0.22),
+			(0.1, 0.28, 0.28, 0.28),
+			(0.1, 0.28, 0.28, 0.28),
+		)
+		credited_any, _t, _info, phases = _feed(state, t, steps)
 		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
 
 	def test_look_down_real_blink_credited(self):
-		"""Screen-bottom gaze must still credit a fast blink (laptop UX)."""
-		state = BlinkDetectionState()
+		state = BlinkDetectionState(target_fps=15)
 		t = _seed_open_eye(state, ear=0.26)
 		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
-		# Session resting pitch below current → look-down delta engages.
 		state.resting_pitch = pose["pitch"] - 0.12
 		self.assertTrue(
 			evaluate_pose_gate(
 				pose, "normal", resting_pitch=state.resting_pitch
 			)["look_down"]
 		)
-
-		# Shallower absolute EAR (look-down foreshortening) but fast close.
-		series = [0.20, 0.14, 0.12, 0.22]
-		credited_any = False
-		for ear in series:
-			t += 0.1
-			credited, info = state.detect(ear, t, pose=pose)
-			if credited:
-				credited_any = True
-				self.assertEqual(info["phase"], "complete")
+		steps = (
+			(0.1, 0.14),
+			(0.1, 0.08),
+			(0.1, 0.06),
+			(0.1, 0.05),
+			(0.1, 0.18),
+			(0.1, 0.24),
+			(0.1, 0.26),
+		)
+		credited_any, _t, _info, phases = _feed(state, t, steps, pose=pose)
 		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
 
 	def test_look_down_rejects_slow_drift(self):
 		state = BlinkDetectionState()
@@ -465,7 +579,6 @@ class BlinkDetectionTests(unittest.TestCase):
 			)["look_down"]
 		)
 
-		# Very slow close: ΔEAR 0.015 / 0.1s = 0.15 << min velocity.
 		credited_any = False
 		ear = 0.28
 		for _ in range(12):
@@ -492,14 +605,8 @@ class BlinkDetectionTests(unittest.TestCase):
 		)
 		self.assertTrue(gate["look_down"])
 
-		# ΔEAR 0.025 / 0.1s = 0.25 — below min 0.35 even with mild look-down.
-		series = [0.255, 0.23, 0.22, 0.26]
-		credited_any = False
-		for ear in series:
-			t += 0.1
-			credited, _ = state.detect(ear, t, pose=pose)
-			if credited:
-				credited_any = True
+		steps = ((0.1, 0.255), (0.1, 0.23), (0.1, 0.22), (0.1, 0.21), (0.1, 0.26), (0.1, 0.28))
+		credited_any, _t, _info, _phases = _feed(state, t, steps, pose=pose)
 		self.assertFalse(credited_any)
 
 	def test_reset_clears_velocity_state(self):
@@ -511,6 +618,14 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertFalse(state.blink_in_progress)
 		self.assertIsNone(state.prev_ear)
 		self.assertEqual(state.peak_closing_velocity, 0.0)
+		self.assertEqual(state.closed_frames, 0)
+
+	def test_set_target_fps(self):
+		state = BlinkDetectionState(target_fps=10)
+		self.assertTrue(state.set_target_fps(20))
+		self.assertEqual(state.target_fps, 20.0)
+		self.assertFalse(state.set_target_fps(0))
+		self.assertFalse(state.set_target_fps("bad"))
 
 	def test_ear_calibration_seeds_baseline(self):
 		state = BlinkDetectionState()
@@ -519,7 +634,6 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertAlmostEqual(state.current_baseline_ear, 0.31, places=5)
 		self.assertEqual(len(state.baseline_ear_values), 15)
 
-		# Immediate detect uses seeded baseline (no long warm-up).
 		credited, info = state.detect(0.31, 1.0)
 		self.assertFalse(credited)
 		self.assertIsNotNone(info)
@@ -530,7 +644,6 @@ class BlinkDetectionTests(unittest.TestCase):
 		state.set_ear_calibration(0.30)
 		state.set_ear_calibration(None)
 		self.assertIsNone(state.ear_calibration)
-		# Live baseline kept after clear.
 		self.assertGreater(state.current_baseline_ear, 0)
 
 	def test_ear_calibration_survives_reset(self):

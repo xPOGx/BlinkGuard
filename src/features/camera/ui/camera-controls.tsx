@@ -167,15 +167,6 @@ export function CameraControls({
 		setCalibrationMessage("Calibration cleared");
 	};
 
-	const toggleMediaPipe = () => {
-		const enabled = !preferences.useMediaPipe;
-		setPreferences((current) => ({
-			...current,
-			useMediaPipe: enabled,
-		}));
-		rendererIpc.updateUseMediaPipe(enabled);
-	};
-
 	const activePreset = CAMERA_QUALITY_PRESETS[preferences.cameraQuality];
 	const progressRatio = calibrating
 		? Math.min(1, calibrationElapsedMs / Math.max(1, calibrationDurationMs))
@@ -342,79 +333,56 @@ export function CameraControls({
 						</SettingRow>
 					</SettingPanel>
 
-					<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-						<SettingPanel>
-							<SettingRow
-								title={
-									<>
-										MediaPipe Backend
-										<span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
-											Experimental
-										</span>
-									</>
-								}
-								description="Architecture flag only — MediaPipe is not bundled yet. When enabled, the detector stays on dlib and reports that fallback."
-								action={
-									<ToggleSwitch
-										aria-label="Toggle MediaPipe backend"
-										checked={preferences.useMediaPipe}
-										onChange={toggleMediaPipe}
+					<SettingPanel>
+						<SettingRow
+							title={
+								<>
+									<Activity
+										className="h-4 w-4 text-muted-foreground"
+										aria-hidden
 									/>
-								}
-							/>
-						</SettingPanel>
-
-						<SettingPanel>
-							<SettingRow
-								title={
-									<>
-										<Activity
-											className="h-4 w-4 text-muted-foreground"
-											aria-hidden
-										/>
-										MGD Mode
-									</>
-								}
-								description="Reminders on a fixed interval regardless of blinks. Popup still closes when a blink is detected."
-								action={
-									<ToggleSwitch
-										aria-label="Toggle MGD mode"
-										checked={preferences.mgdMode}
-										onChange={toggleMgd}
-									/>
-								}
-							>
-								<div className="flex flex-wrap items-center gap-2">
-									<button
-										type="button"
-										onClick={() =>
-											setPreferences((current) => ({
-												...current,
-												showMgdInfo: !current.showMgdInfo,
-											}))
-										}
-										className="text-xs text-primary hover:underline"
-									>
-										{preferences.showMgdInfo ? "Hide Info" : "Learn More"}
-									</button>
-									{preferences.mgdMode ? (
-										<span className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary">
-											MGD mode is active
-										</span>
-									) : null}
-								</div>
-								{preferences.showMgdInfo ? (
-									<div className="mt-2 rounded-md bg-accent/60 p-3 text-xs text-muted-foreground sm:text-sm">
-										MGD is a common condition where the meibomian glands in your
-										eyelids don't produce enough oil, leading to dry eyes. When
-										enabled, reminders appear at regular intervals regardless of
-										detected blinks. The popup still closes when a blink is
-										detected.
-									</div>
+									MGD Mode
+								</>
+							}
+							description="Reminders on a fixed interval regardless of blinks. Popup still closes when a blink is detected."
+							action={
+								<ToggleSwitch
+									aria-label="Toggle MGD mode"
+									checked={preferences.mgdMode}
+									onChange={toggleMgd}
+								/>
+							}
+						>
+							<div className="flex flex-wrap items-center gap-2">
+								<button
+									type="button"
+									onClick={() =>
+										setPreferences((current) => ({
+											...current,
+											showMgdInfo: !current.showMgdInfo,
+										}))
+									}
+									className="text-xs text-primary hover:underline"
+								>
+									{preferences.showMgdInfo ? "Hide Info" : "Learn More"}
+								</button>
+								{preferences.mgdMode ? (
+									<span className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary">
+										MGD mode is active
+									</span>
 								) : null}
-							</SettingRow>
-						</SettingPanel>
-					</div>
+							</div>
+							{preferences.showMgdInfo ? (
+								<div className="mt-2 rounded-md bg-accent/60 p-3 text-xs text-muted-foreground sm:text-sm">
+									MGD is a common condition where the meibomian glands in your
+									eyelids don't produce enough oil, leading to dry eyes. When
+									enabled, reminders appear at regular intervals regardless of
+									detected blinks. The popup still closes when a blink is
+									detected.
+								</div>
+							) : null}
+						</SettingRow>
+					</SettingPanel>
 				</>
 			) : null}
 		</>

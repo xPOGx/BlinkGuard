@@ -38,13 +38,14 @@ class BlinkDetectorApplication:
 	def __init__(self, transport=None):
 		self.transport = transport or NdjsonTransport()
 		self.camera = OpenCVCamera(self.transport)
-		self.detection = BlinkDetectionState()
+		self.detection = BlinkDetectionState(
+			target_fps=self.camera.target_fps,
+		)
 		self.send_video = False
 		self.last_blink_display_time = 0.0
 		# Phase 3 hooks — defaults match Phase 2 / prior every-frame detect.
 		self.face_detect_interval = 1
 		self.pose_strictness = DEFAULT_POSE_STRICTNESS
-		self.detector_backend = "dlib"
 		self._cached_face = None
 		self._frames_since_face_detect = 0
 		self._last_skip_debug_time = 0.0
@@ -62,6 +63,7 @@ class BlinkDetectorApplication:
 				# message can set FPS, resolution, interval, and pose together.
 				if "target_fps" in data:
 					self.camera.update_target_fps(data["target_fps"])
+					self.detection.set_target_fps(self.camera.target_fps)
 					self.transport.send(
 						{
 							"status": (
@@ -148,26 +150,6 @@ class BlinkDetectorApplication:
 								}
 							)
 
-				if "detector_backend" in data:
-					requested = data["detector_backend"]
-					notify = bool(data.get("notify", False))
-					if requested == "mediapipe":
-						# MediaPipe is not packaged yet — keep dlib working.
-						self.detector_backend = "dlib"
-						msg = (
-							"MediaPipe backend not bundled yet; using dlib"
-						)
-						if notify:
-							self.transport.send({"error": msg})
-						else:
-							self.transport.send({"status": msg})
-						self.transport.send({"debug": msg})
-					else:
-						self.detector_backend = "dlib"
-						self.transport.send(
-							{"status": "Using dlib detector backend"}
-						)
-
 				if "request_video" in data:
 					self.send_video = True
 					self.transport.send(
@@ -237,12 +219,18 @@ class BlinkDetectorApplication:
 			except Exception:
 				face_area = None
 
+		def _opt_float(key):
+			value = blink_info.get(key)
+			return float(value) if value is not None else None
+
 		payload = {
 			"credited": bool(credited),
 			"phase": blink_info.get("phase"),
 			"ear": float(blink_info["ear"])
 			if blink_info.get("ear") is not None
 			else None,
+			"ear_raw": _opt_float("ear_raw"),
+			"ear_smooth": _opt_float("ear_smooth"),
 			"baseline": baseline,
 			"drop": drop,
 			"drop_pct": drop * 100.0,
@@ -265,6 +253,10 @@ class BlinkDetectorApplication:
 				or blink_info.get("velocity")
 				or 0.0
 			),
+			"peak_opening_velocity": float(
+				blink_info.get("peak_opening_velocity") or 0.0
+			),
+			"closed_frames": int(blink_info.get("closed_frames") or 0),
 			"min_velocity": float(blink_info.get("min_velocity") or 0.0),
 			"duration": float(blink_info.get("duration") or 0.0),
 			"cooldown_remaining": float(
@@ -278,6 +270,7 @@ class BlinkDetectorApplication:
 			"target_fps": int(self.camera.target_fps),
 			"face_detect_interval": int(self.face_detect_interval),
 			"processing_resolution": list(self.camera.processing_resolution),
+			"detector_backend": "dlib",
 		}
 
 		phase = payload["phase"] or "?"
@@ -302,16 +295,30 @@ class BlinkDetectorApplication:
 			if payload["asymmetry"] is not None
 			else "n/a"
 		)
+		ear_raw_s = (
+			f"{payload['ear_raw']:.3f}"
+			if payload["ear_raw"] is not None
+			else "n/a"
+		)
+		ear_smooth_s = (
+			f"{payload['ear_smooth']:.3f}"
+			if payload["ear_smooth"] is not None
+			else "n/a"
+		)
 		line = (
 			f"{prefix}: EAR={max_drop_ear:.3f}, baseline={baseline:.3f}, "
 			f"drop={drop:.1%}, abs={absolute_drop:.3f}, "
 			f"dur={payload['duration']:.3f}s, "
 			f"vel={payload['peak_velocity']:.2f}/{payload['min_velocity']:.2f}, "
+			f"openVel={payload['peak_opening_velocity']:.2f}, "
+			f"closed={payload['closed_frames']}, "
+			f"raw/smooth={ear_raw_s}/{ear_smooth_s}, "
 			f"L/R={left_s}/{right_s} asym={asym_s}, "
 			f"yaw={payload['yaw']:.2f}, pitch={payload['pitch']:.2f}, "
 			f"dPitch={payload['pitch_delta']:.2f}, restPitch={resting_s}, "
 			f"lookDown={payload['look_down']}, "
 			f"strict={payload['pose_strictness']}, "
+			f"backend={payload['detector_backend']}, "
 			f"cdLeft={payload['cooldown_remaining']:.3f}s, "
 			f"fps={payload['target_fps']}, "
 			f"fInt={payload['face_detect_interval']}, "
@@ -327,6 +334,122 @@ class BlinkDetectorApplication:
 		self.transport.send({"debug": line})
 		self.transport.send({"blinkDebug": payload})
 		return payload
+
+	def _fill_eye_landmarks_ui(self, face_data, left_eye, right_eye, buffers, frame_width, frame_height):
+		buffers.concatenated_eyes[:6] = left_eye
+		buffers.concatenated_eyes[6:] = right_eye
+		for index in range(12):
+			buffers.normalized_landmarks[index]["x"] = float(
+				buffers.concatenated_eyes[index, 0] / frame_width
+			)
+			buffers.normalized_landmarks[index]["y"] = float(
+				buffers.concatenated_eyes[index, 1] / frame_height
+			)
+		face_data["eyeLandmarks"] = buffers.normalized_landmarks.copy()
+
+	def _handle_detection(
+		self,
+		face_data,
+		avg_ear,
+		current_time,
+		left_ear,
+		right_ear,
+		pose,
+		face,
+	):
+		blink_detected, blink_info = self.detection.detect(
+			avg_ear,
+			current_time,
+			left_ear=left_ear,
+			right_ear=right_ear,
+			pose=pose,
+		)
+		phase = (blink_info or {}).get("phase")
+		if blink_detected and blink_info:
+			self.last_blink_display_time = current_time
+			face_data["blink"] = True
+			max_drop_ear = blink_info.get(
+				"max_drop_ear",
+				avg_ear,
+			)
+			self.transport.send(
+				{
+					"blink": True,
+					"ear": float(max_drop_ear),
+					"baseline": float(blink_info["baseline"]),
+					"drop_percentage": float(blink_info["drop"]),
+					"duration": float(blink_info["duration"]),
+					"time": float(current_time),
+				}
+			)
+			debug_payload = self._emit_blink_outcome(
+				blink_info,
+				face=face,
+				credited=True,
+			)
+			face_data["blinkDebug"] = debug_payload
+		elif phase and str(phase).startswith("reject_"):
+			debug_payload = self._emit_blink_outcome(
+				blink_info,
+				face=face,
+				credited=False,
+			)
+			face_data["blinkDebug"] = debug_payload
+		elif phase in (
+			"skip_yaw",
+			"skip_degraded",
+			"skip_eyes_closed",
+			"skip_await_open",
+		):
+			# Rate-limit continuous skip spam while pose is bad.
+			if current_time - self._last_skip_debug_time >= 0.5:
+				self._last_skip_debug_time = current_time
+				debug_payload = self._emit_blink_outcome(
+					{
+						**blink_info,
+						"ear": avg_ear,
+						"left_ear": left_ear,
+						"right_ear": right_ear,
+						"pose_strictness": self.pose_strictness,
+						"resting_pitch": self.detection.resting_pitch,
+						"look_down": False,
+						"min_velocity": 0.0,
+						"duration": 0.0,
+						"cooldown_remaining": 0.0,
+						"absolute_drop": 0.0,
+					},
+					face=face,
+					credited=False,
+				)
+				face_data["blinkDebug"] = debug_payload
+		elif (
+			current_time - self.last_blink_display_time
+		) < BLINK_DISPLAY_DURATION:
+			face_data["blink"] = True
+
+		if blink_info and self.detection.current_baseline_ear > 0:
+			face_data["baseline"] = float(
+				self.detection.current_baseline_ear
+			)
+			face_data["blink_phase"] = blink_info.get(
+				"phase",
+				"monitoring",
+			)
+			if blink_info.get("phase") == "monitoring":
+				smooth = blink_info.get("ear_smooth", avg_ear)
+				current_ear_drop_absolute = (
+					self.detection.current_baseline_ear - smooth
+				)
+				if current_ear_drop_absolute > 0:
+					face_data["ear_drop_absolute"] = float(
+						current_ear_drop_absolute
+					)
+					face_data["ear_drop_percentage"] = float(
+						current_ear_drop_absolute
+						/ self.detection.current_baseline_ear
+					)
+		elif self.detection.current_baseline_ear == 0:
+			face_data["blink_phase"] = "initializing"
 
 	def run(self):
 		self.transport.send(
@@ -356,7 +479,7 @@ class BlinkDetectorApplication:
 			{
 				"debug": (
 					"Advanced blink detection with dynamic baseline, "
-					"velocity, bilateral, and pose gates is active"
+					"EAR smooth, velocity, bilateral, and pose gates is active"
 				)
 			}
 		)
@@ -408,10 +531,17 @@ class BlinkDetectorApplication:
 						frame,
 						self.camera.processing_resolution,
 					)
+
+				face_data = default_face_data.copy()
+				frame_width = frame.shape[1]
+				frame_height = frame.shape[0]
+				face = None
+				left_eye = None
+				right_eye = None
+				landmarks = None
+
 				gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 				face = self._resolve_face(detector, gray)
-				face_data = default_face_data.copy()
-
 				if face is not None:
 					landmarks, left_eye, right_eye = get_face_landmarks(
 						predictor,
@@ -419,12 +549,12 @@ class BlinkDetectorApplication:
 						face,
 						buffers,
 					)
+
+				if face is not None and left_eye is not None:
 					left_ear = calculate_ear_fast(left_eye, buffers)
 					right_ear = calculate_ear_fast(right_eye, buffers)
 					avg_ear = (left_ear + right_ear) * 0.5
 					pose = estimate_head_pose(landmarks)
-					frame_width = frame.shape[1]
-					frame_height = frame.shape[0]
 					face_data["faceDetected"] = True
 					face_data["ear"] = float(avg_ear)
 					face_data["faceRect"] = {
@@ -433,115 +563,23 @@ class BlinkDetectorApplication:
 						"width": float(face.width() / frame_width),
 						"height": float(face.height() / frame_height),
 					}
-
-					buffers.concatenated_eyes[:6] = left_eye
-					buffers.concatenated_eyes[6:] = right_eye
-					for index in range(12):
-						buffers.normalized_landmarks[index]["x"] = float(
-							buffers.concatenated_eyes[index, 0] / frame_width
-						)
-						buffers.normalized_landmarks[index]["y"] = float(
-							buffers.concatenated_eyes[index, 1] / frame_height
-						)
-					face_data["eyeLandmarks"] = (
-						buffers.normalized_landmarks.copy()
+					self._fill_eye_landmarks_ui(
+						face_data,
+						left_eye,
+						right_eye,
+						buffers,
+						frame_width,
+						frame_height,
 					)
-
-					blink_detected, blink_info = self.detection.detect(
+					self._handle_detection(
+						face_data,
 						avg_ear,
 						current_time,
-						left_ear=left_ear,
-						right_ear=right_ear,
-						pose=pose,
+						left_ear,
+						right_ear,
+						pose,
+						face,
 					)
-					phase = (blink_info or {}).get("phase")
-					if blink_detected and blink_info:
-						self.last_blink_display_time = current_time
-						face_data["blink"] = True
-						max_drop_ear = blink_info.get(
-							"max_drop_ear",
-							avg_ear,
-						)
-						self.transport.send(
-							{
-								"blink": True,
-								"ear": float(max_drop_ear),
-								"baseline": float(blink_info["baseline"]),
-								"drop_percentage": float(blink_info["drop"]),
-								"duration": float(blink_info["duration"]),
-								"time": float(current_time),
-							}
-						)
-						debug_payload = self._emit_blink_outcome(
-							blink_info,
-							face=face,
-							credited=True,
-						)
-						face_data["blinkDebug"] = debug_payload
-					elif phase and str(phase).startswith("reject_"):
-						debug_payload = self._emit_blink_outcome(
-							blink_info,
-							face=face,
-							credited=False,
-						)
-						face_data["blinkDebug"] = debug_payload
-					elif phase in (
-						"skip_yaw",
-						"skip_degraded",
-						"skip_eyes_closed",
-						"skip_await_open",
-					):
-						# Rate-limit continuous skip spam while pose is bad.
-						if current_time - self._last_skip_debug_time >= 0.5:
-							self._last_skip_debug_time = current_time
-							debug_payload = self._emit_blink_outcome(
-								{
-									**blink_info,
-									"ear": avg_ear,
-									"left_ear": left_ear,
-									"right_ear": right_ear,
-									"pose_strictness": self.pose_strictness,
-									"resting_pitch": self.detection.resting_pitch,
-									"look_down": False,
-									"min_velocity": 0.0,
-									"duration": 0.0,
-									"cooldown_remaining": 0.0,
-									"absolute_drop": 0.0,
-								},
-								face=face,
-								credited=False,
-							)
-							face_data["blinkDebug"] = debug_payload
-					elif (
-						current_time - self.last_blink_display_time
-					) < BLINK_DISPLAY_DURATION:
-						face_data["blink"] = True
-
-					if (
-						blink_info
-						and self.detection.current_baseline_ear > 0
-					):
-						face_data["baseline"] = float(
-							self.detection.current_baseline_ear
-						)
-						face_data["blink_phase"] = blink_info.get(
-							"phase",
-							"monitoring",
-						)
-						if blink_info.get("phase") == "monitoring":
-							current_ear_drop_absolute = (
-								self.detection.current_baseline_ear - avg_ear
-							)
-							if current_ear_drop_absolute > 0:
-								face_data["ear_drop_absolute"] = float(
-									current_ear_drop_absolute
-								)
-								face_data["ear_drop_percentage"] = float(
-									current_ear_drop_absolute
-									/ self.detection.current_baseline_ear
-								)
-					elif self.detection.current_baseline_ear == 0:
-						face_data["blink_phase"] = "initializing"
 				else:
 					self._cached_face = None
 
@@ -569,6 +607,8 @@ class BlinkDetectorApplication:
 			)
 		finally:
 			self.camera.stop()
+			self.transport.send({"status": "Blink detector stopped"})
+			self.transport.stop()
 
 
 def run():

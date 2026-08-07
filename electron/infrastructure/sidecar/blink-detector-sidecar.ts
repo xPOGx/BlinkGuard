@@ -185,26 +185,10 @@ export class BlinkDetectorSidecar {
 		this.write({ ear_calibration: resolved });
 	}
 
-	/**
-	 * Request detector backend. MediaPipe is architecture-ready but falls
-	 * back to dlib until packaged; set notify to surface that in the UI.
-	 */
-	applyDetectorBackend(useMediaPipe?: boolean, notify = false): void {
-		const resolved =
-			useMediaPipe === undefined
-				? this.preferences.useMediaPipe
-				: useMediaPipe;
-		this.write({
-			detector_backend: resolved ? "mediapipe" : "dlib",
-			notify,
-		});
-	}
-
-	/** Apply quality + calibration + backend after models are ready. */
+	/** Apply quality + calibration after models are ready. */
 	applySessionConfig(): void {
 		this.applyCameraQuality();
 		this.applyEarCalibration();
-		this.applyDetectorBackend(undefined, false);
 	}
 
 	startEarCalibration(durationMs = EAR_CALIBRATION_DURATION_MS): boolean {
@@ -346,10 +330,6 @@ export class BlinkDetectorSidecar {
 		console.error("Blink detector error:", message);
 		this.callbacks.onError(message);
 		const lower = message.toLowerCase();
-		// Soft / experimental notices must not tear down a working camera session.
-		if (lower.includes("mediapipe backend not bundled")) {
-			return;
-		}
 		this.cameraReady = false;
 		const isCameraError = ["camera", "permission", "access"].some((term) =>
 			lower.includes(term),

@@ -23,8 +23,6 @@ export interface PersistedPreferences {
 	cameraQuality: CameraQuality;
 	/** Personal open-eye EAR baseline; null when unset. */
 	earCalibration: number | null;
-	/** Experimental: request MediaPipe backend (falls back to dlib if unbundled). */
-	useMediaPipe: boolean;
 	eyeExercisesEnabled: boolean;
 	exerciseInterval: number;
 	/** Rotating eye-exercise instruction texts shown in the exercise popup. */
@@ -89,7 +87,6 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	cameraEnabled: false,
 	cameraQuality: "medium",
 	earCalibration: null,
-	useMediaPipe: false,
 	eyeExercisesEnabled: true,
 	exerciseInterval: 20,
 	exercisePrompts: [...DEFAULT_EXERCISE_PROMPTS],

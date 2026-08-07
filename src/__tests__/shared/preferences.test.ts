@@ -31,12 +31,11 @@ describe("toRendererPreferences", () => {
 		expect(renderer.popupMessage).toBe(DEFAULT_PREFERENCES.popupMessage);
 		expect(renderer.cameraQuality).toBe("medium");
 		expect(renderer.earCalibration).toBeNull();
-		expect(renderer.useMediaPipe).toBe(false);
 	});
 });
 
 describe("camera quality presets", () => {
-	it("maps performance / medium / high to the Phase 3 table", () => {
+	it("maps performance / medium / high to the quality table", () => {
 		expect(CAMERA_QUALITY_PRESETS.performance).toEqual({
 			targetFps: 10,
 			processingResolution: [320, 240],
@@ -73,6 +72,7 @@ describe("camera quality presets", () => {
 	it("validates camera quality values", () => {
 		expect(isCameraQuality("medium")).toBe(true);
 		expect(isCameraQuality("ultra")).toBe(false);
+		expect(isCameraQuality("max")).toBe(false);
 	});
 });
 
@@ -96,9 +96,8 @@ describe("ear calibration helpers", () => {
 });
 
 describe("phase 4 preference defaults", () => {
-	it("defaults earCalibration null and useMediaPipe false", () => {
+	it("defaults earCalibration to null", () => {
 		expect(DEFAULT_PREFERENCES.earCalibration).toBeNull();
-		expect(DEFAULT_PREFERENCES.useMediaPipe).toBe(false);
 	});
 });
 

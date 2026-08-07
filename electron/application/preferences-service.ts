@@ -32,9 +32,6 @@ export class PreferencesService {
 		) {
 			persisted.earCalibration = DEFAULT_PREFERENCES.earCalibration;
 		}
-		if (typeof persisted.useMediaPipe !== "boolean") {
-			persisted.useMediaPipe = DEFAULT_PREFERENCES.useMediaPipe;
-		}
 		if (typeof persisted.launchAtLogin !== "boolean") {
 			persisted.launchAtLogin = DEFAULT_PREFERENCES.launchAtLogin;
 		}
