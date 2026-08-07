@@ -2,6 +2,7 @@ import { app, powerMonitor } from "electron";
 import type { AppRuntimeState } from "../../application/app-runtime-state";
 import type { BlinkStatsService } from "../../application/blink-stats-service";
 import type { ExerciseService } from "../../application/exercise-service";
+import type { LookAwayService } from "../../application/look-away-service";
 import type { ReminderService } from "../../application/reminder-service";
 import type { AppPreferences } from "../../../shared/preferences";
 import type { ProcessCleanup } from "../process/process-cleanup";
@@ -16,6 +17,7 @@ export class AppLifecycle {
 		private readonly state: AppRuntimeState,
 		private readonly reminders: ReminderService,
 		private readonly exercises: ExerciseService,
+		private readonly lookAway: LookAwayService,
 		private readonly windows: WindowManager,
 		private readonly cleanup: ProcessCleanup,
 		private readonly blinkStats: BlinkStatsService,
@@ -38,6 +40,7 @@ export class AppLifecycle {
 		});
 		powerMonitor.on("resume", () => {
 			this.exercises.resetTimer();
+			this.lookAway.resetTimer();
 			if (this.state.wasTrackingBeforeSleep) {
 				this.reminders.resumeAfterSleep(
 					this.state.wasCameraEnabledBeforeSleep,
@@ -68,6 +71,7 @@ export class AppLifecycle {
 		this.blinkStats.dispose();
 		this.state.clearReminderTimers();
 		this.state.clearExerciseTimers();
+		this.state.clearLookAwayTimers();
 		this.windows.destroyAll();
 		await this.cleanup.run();
 	}

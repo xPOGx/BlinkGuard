@@ -14,6 +14,7 @@ import {
 	CameraErrorBanner,
 } from "@/features/camera/ui/camera-controls";
 import { ExerciseSettings } from "@/features/exercises/ui/exercise-settings";
+import { LookAwaySettings } from "@/features/look-away/ui/look-away-settings";
 import { PopupSettings } from "@/features/popup-appearance/ui/popup-settings";
 import { ReminderControls } from "@/features/reminders/ui/reminder-controls";
 import { usePreferences } from "@/features/settings/model/use-preferences";
@@ -57,8 +58,8 @@ const SECTIONS: {
 	},
 	{
 		id: "exercises",
-		label: "Exercises",
-		description: "Periodic eye-exercise prompts and interval.",
+		label: "Eye care",
+		description: "Exercises and 20-20-20 look-away breaks.",
 		icon: Dumbbell,
 	},
 	{
@@ -193,10 +194,16 @@ export default function BlinkGuardHomepage() {
 						)}
 
 						{section === "exercises" && (
-							<ExerciseSettings
-								preferences={preferences}
-								setPreferences={setPreferences}
-							/>
+							<>
+								<ExerciseSettings
+									preferences={preferences}
+									setPreferences={setPreferences}
+								/>
+								<LookAwaySettings
+									preferences={preferences}
+									setPreferences={setPreferences}
+								/>
+							</>
 						)}
 
 						{section === "appearance" && (

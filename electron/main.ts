@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { AppRuntimeState } from "./application/app-runtime-state";
 import { BlinkStatsService } from "./application/blink-stats-service";
 import { ExerciseService } from "./application/exercise-service";
+import { LookAwayService } from "./application/look-away-service";
 import { PreferencesService } from "./application/preferences-service";
 import { ReminderService } from "./application/reminder-service";
 import { AppLifecycle } from "./infrastructure/lifecycle/app-lifecycle";
@@ -110,6 +111,13 @@ const exercises = new ExerciseService(
 	windows,
 	sound,
 );
+const lookAway = new LookAwayService(
+	preferences,
+	state,
+	store,
+	windows,
+	sound,
+);
 const shortcuts = new ShortcutController(
 	preferences,
 	state,
@@ -121,6 +129,7 @@ const lifecycle = new AppLifecycle(
 	state,
 	reminders,
 	exercises,
+	lookAway,
 	windows,
 	new ProcessCleanup(processes),
 	blinkStats,
@@ -132,6 +141,7 @@ registerIpcHandlers({
 	preferences: preferencesService,
 	reminders,
 	exercises,
+	lookAway,
 	sidecar,
 	shortcuts,
 	windows,
@@ -170,6 +180,9 @@ void app.whenReady().then(() => {
 
 	exercises.resetTimer();
 	if (preferences.eyeExercisesEnabled) exercises.start();
+
+	lookAway.resetTimer();
+	if (preferences.lookAwayEnabled) lookAway.start();
 
 	blinkDebugLogger.announce();
 	blinkDebugLogger.append({

@@ -47,4 +47,18 @@ describe("AppRuntimeState", () => {
 		expect(state.exerciseSnoozeTimeout).toBeNull();
 		expect(state.isExerciseShowing).toBe(false);
 	});
+
+	it("clearLookAwayTimers clears look-away timers and showing flag", () => {
+		vi.useFakeTimers();
+		const state = new AppRuntimeState();
+		state.isLookAwayShowing = true;
+		state.lookAwayInterval = setInterval(() => {}, 60_000);
+		state.lookAwaySnoozeTimeout = setTimeout(() => {}, 5_000);
+
+		state.clearLookAwayTimers();
+
+		expect(state.lookAwayInterval).toBeNull();
+		expect(state.lookAwaySnoozeTimeout).toBeNull();
+		expect(state.isLookAwayShowing).toBe(false);
+	});
 });

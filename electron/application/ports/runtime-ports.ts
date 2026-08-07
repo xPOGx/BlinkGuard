@@ -26,6 +26,12 @@ export interface ExerciseWindowPort {
 	closeExerciseIfCurrent(token: unknown): boolean;
 }
 
+export interface LookAwayWindowPort {
+	showLookAway(onClosed: () => void): unknown | null;
+	closeLookAway(): void;
+	closeLookAwayIfCurrent(token: unknown): boolean;
+}
+
 export interface NotificationSoundPort {
 	play(kind: "blink" | "exercise" | "stopped"): void;
 }

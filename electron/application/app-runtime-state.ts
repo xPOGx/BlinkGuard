@@ -3,12 +3,15 @@ export class AppRuntimeState {
 	cameraMonitoringInterval: ReturnType<typeof setInterval> | null = null;
 	exerciseInterval: ReturnType<typeof setInterval> | null = null;
 	exerciseSnoozeTimeout: ReturnType<typeof setTimeout> | null = null;
+	lookAwayInterval: ReturnType<typeof setInterval> | null = null;
+	lookAwaySnoozeTimeout: ReturnType<typeof setTimeout> | null = null;
 	cameraThresholdUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
 	noFaceDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	blinkReminderActive = false;
 	mgdReminderLoopActive = false;
 	isExerciseShowing = false;
+	isLookAwayShowing = false;
 	isFaceDetected = false;
 	isAutoResuming = false;
 	wasTrackingBeforeSleep = false;
@@ -37,5 +40,13 @@ export class AppRuntimeState {
 		this.exerciseInterval = null;
 		this.exerciseSnoozeTimeout = null;
 		this.isExerciseShowing = false;
+	}
+
+	clearLookAwayTimers(): void {
+		if (this.lookAwayInterval) clearInterval(this.lookAwayInterval);
+		if (this.lookAwaySnoozeTimeout) clearTimeout(this.lookAwaySnoozeTimeout);
+		this.lookAwayInterval = null;
+		this.lookAwaySnoozeTimeout = null;
+		this.isLookAwayShowing = false;
 	}
 }

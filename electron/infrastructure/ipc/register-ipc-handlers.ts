@@ -10,6 +10,7 @@ import type {
 } from "../../../shared/preferences";
 import type { BlinkStatsService } from "../../application/blink-stats-service";
 import type { ExerciseService } from "../../application/exercise-service";
+import type { LookAwayService } from "../../application/look-away-service";
 import type { PreferencesService } from "../../application/preferences-service";
 import type { ReminderService } from "../../application/reminder-service";
 import { applyLaunchAtLogin } from "../lifecycle/login-item";
@@ -22,6 +23,7 @@ interface IpcDependencies {
 	preferences: PreferencesService;
 	reminders: ReminderService;
 	exercises: ExerciseService;
+	lookAway: LookAwayService;
 	sidecar: BlinkDetectorSidecar;
 	shortcuts: ShortcutController;
 	windows: WindowManager;
@@ -33,6 +35,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		preferences,
 		reminders,
 		exercises,
+		lookAway,
 		sidecar,
 		shortcuts,
 		windows,
@@ -133,6 +136,30 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		},
 	);
 	ipcMain.on(
+		IPC_CHANNELS.updateLookAwayEnabled,
+		(_event, enabled: boolean) => {
+			preferences.set("lookAwayEnabled", enabled);
+			if (enabled) lookAway.start();
+			else lookAway.stop();
+		},
+	);
+	ipcMain.on(
+		IPC_CHANNELS.updateLookAwayInterval,
+		(_event, interval: number) => {
+			preferences.set("lookAwayInterval", interval);
+			if (current.lookAwayEnabled) {
+				lookAway.stop();
+				lookAway.start();
+			}
+		},
+	);
+	ipcMain.on(
+		IPC_CHANNELS.updateLookAwayDuration,
+		(_event, duration: number) => {
+			preferences.set("lookAwayDuration", duration);
+		},
+	);
+	ipcMain.on(
 		IPC_CHANNELS.updateKeyboardShortcut,
 		(_event, shortcut: string) => {
 			preferences.set("keyboardShortcut", shortcut);
@@ -149,6 +176,8 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	});
 	ipcMain.on(IPC_CHANNELS.skipExercise, () => exercises.skip());
 	ipcMain.on(IPC_CHANNELS.snoozeExercise, () => exercises.snooze());
+	ipcMain.on(IPC_CHANNELS.skipLookAway, () => lookAway.skip());
+	ipcMain.on(IPC_CHANNELS.snoozeLookAway, () => lookAway.snooze());
 	ipcMain.on(IPC_CHANNELS.updateMgdMode, (_event, enabled: boolean) => {
 		preferences.set("mgdMode", enabled);
 		reminders.syncCameraLoopForMgdMode();
@@ -185,6 +214,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	ipcMain.on(IPC_CHANNELS.resetPreferences, () => {
 		if (current.isTracking) reminders.stop(true);
 		exercises.stop();
+		lookAway.stop();
 		sidecar.cancelEarCalibration("Preferences reset");
 		preferences.reset(getCenteredPopupPosition(300, 120));
 		applyLaunchAtLogin(false);

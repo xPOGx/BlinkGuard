@@ -106,3 +106,11 @@ describe("tray / autostart preference defaults", () => {
 		expect(DEFAULT_PREFERENCES.isTracking).toBe(false);
 	});
 });
+
+describe("look-away / 20-20-20 preference defaults", () => {
+	it("defaults to classic 20-20-20 values and enabled", () => {
+		expect(DEFAULT_PREFERENCES.lookAwayEnabled).toBe(true);
+		expect(DEFAULT_PREFERENCES.lookAwayInterval).toBe(20);
+		expect(DEFAULT_PREFERENCES.lookAwayDuration).toBe(20);
+	});
+});

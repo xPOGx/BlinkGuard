@@ -15,6 +15,7 @@ export class WindowManager {
 	main: BrowserWindow | null = null;
 	reminder: BrowserWindow | null = null;
 	exercise: BrowserWindow | null = null;
+	lookAway: BrowserWindow | null = null;
 	camera: BrowserWindow | null = null;
 	editor: BrowserWindow | null = null;
 	noFace: BrowserWindow | null = null;
@@ -215,6 +216,42 @@ export class WindowManager {
 		return true;
 	}
 
+	showLookAway(onClosed: () => void): BrowserWindow | null {
+		if (this.lookAway && !this.lookAway.isDestroyed()) return null;
+		const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+		const popupWidth = 340;
+		const popupHeight = 220;
+		const popup = createPanelWindow({
+			width: popupWidth,
+			height: popupHeight,
+			x: Math.floor((width - popupWidth) / 2),
+			y: Math.floor((height - popupHeight) / 2),
+			focusable: true,
+		}, this.paths.preload);
+		this.lookAway = popup;
+		void popup.loadFile(path.join(this.paths.publicDir, "look-away.html"), {
+			query: {
+				duration: String(Math.max(1, this.preferences.lookAwayDuration)),
+			},
+		});
+		popup.once("ready-to-show", () => popup.show());
+		popup.on("closed", () => {
+			if (this.lookAway === popup) this.lookAway = null;
+			onClosed();
+		});
+		return popup;
+	}
+
+	closeLookAway(): void {
+		this.closeWindow("lookAway");
+	}
+
+	closeLookAwayIfCurrent(token: unknown): boolean {
+		if (this.lookAway !== token) return false;
+		this.closeLookAway();
+		return true;
+	}
+
 	showCamera(onClosed: () => void): BrowserWindow {
 		if (this.camera && !this.camera.isDestroyed()) {
 			this.camera.focus();
@@ -309,6 +346,7 @@ export class WindowManager {
 		this.main = null;
 		this.reminder = null;
 		this.exercise = null;
+		this.lookAway = null;
 		this.camera = null;
 		this.editor = null;
 		this.noFace = null;
@@ -322,7 +360,7 @@ export class WindowManager {
 	}
 
 	private closeWindow(
-		key: "reminder" | "exercise" | "camera" | "editor" | "noFace",
+		key: "reminder" | "exercise" | "lookAway" | "camera" | "editor" | "noFace",
 	): void {
 		const window = this[key];
 		if (window && !window.isDestroyed()) window.close();

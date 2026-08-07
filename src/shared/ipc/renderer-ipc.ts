@@ -71,6 +71,12 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateEyeExercisesEnabled, enabled),
 	updateExerciseInterval: (minutes: number) =>
 		send(IPC_CHANNELS.updateExerciseInterval, minutes),
+	updateLookAwayEnabled: (enabled: boolean) =>
+		send(IPC_CHANNELS.updateLookAwayEnabled, enabled),
+	updateLookAwayInterval: (minutes: number) =>
+		send(IPC_CHANNELS.updateLookAwayInterval, minutes),
+	updateLookAwayDuration: (seconds: number) =>
+		send(IPC_CHANNELS.updateLookAwayDuration, seconds),
 	updatePopupColors: (colors: PopupColors) =>
 		send(IPC_CHANNELS.updatePopupColors, colors),
 	updatePopupTransparency: (transparency: number) =>

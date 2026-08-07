@@ -1,0 +1,207 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AppRuntimeState } from "../../../electron/application/app-runtime-state";
+import { LookAwayService } from "../../../electron/application/look-away-service";
+import type { PreferenceStore } from "../../../electron/application/ports/preference-store";
+import type {
+	LookAwayWindowPort,
+	NotificationSoundPort,
+} from "../../../electron/application/ports/runtime-ports";
+import {
+	DEFAULT_PREFERENCES,
+	type AppPreferences,
+} from "../../../shared/preferences";
+
+function createStore(): PreferenceStore {
+	const data = new Map<string, unknown>();
+	return {
+		get<T>(key: string, defaultValue?: T): T {
+			if (data.has(key)) return data.get(key) as T;
+			return defaultValue as T;
+		},
+		set<T>(key: string, value: T): void {
+			data.set(key, value);
+		},
+		has(key: string): boolean {
+			return data.has(key);
+		},
+		clear(): void {
+			data.clear();
+		},
+	};
+}
+
+function createPreferences(
+	overrides: Partial<AppPreferences> = {},
+): AppPreferences {
+	return {
+		...DEFAULT_PREFERENCES,
+		lookAwayEnabled: true,
+		lookAwayInterval: 20,
+		lookAwayDuration: 20,
+		...overrides,
+	};
+}
+
+function createWindows(): LookAwayWindowPort & {
+	open: boolean;
+	lastPopup: unknown;
+} {
+	const api = {
+		open: false,
+		lastPopup: null as unknown,
+		showLookAway: vi.fn((_onClosed: () => void) => {
+			api.open = true;
+			api.lastPopup = { id: Math.random() };
+			return api.lastPopup;
+		}),
+		closeLookAway: vi.fn(() => {
+			api.open = false;
+		}),
+		closeLookAwayIfCurrent: vi.fn((token: unknown) => {
+			if (token === api.lastPopup) {
+				api.open = false;
+				return true;
+			}
+			return false;
+		}),
+	};
+	return api;
+}
+
+function createSound(): NotificationSoundPort {
+	return { play: vi.fn() };
+}
+
+describe("LookAwayService", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it("shows a look-away popup when the interval elapses", () => {
+		const preferences = createPreferences({ lookAwayInterval: 1 });
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const sound = createSound();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			sound,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(sound.play).toHaveBeenCalledWith("exercise");
+		expect(windows.showLookAway).toHaveBeenCalledTimes(1);
+		expect(state.isLookAwayShowing).toBe(true);
+	});
+
+	it("does not show when look-away is disabled", () => {
+		const preferences = createPreferences({
+			lookAwayEnabled: false,
+			lookAwayInterval: 1,
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			createSound(),
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(windows.showLookAway).not.toHaveBeenCalled();
+	});
+
+	it("auto-closes after lookAwayDuration seconds", () => {
+		const preferences = createPreferences({
+			lookAwayInterval: 1,
+			lookAwayDuration: 5,
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			createSound(),
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+		expect(state.isLookAwayShowing).toBe(true);
+
+		vi.advanceTimersByTime(5_000);
+		expect(windows.closeLookAwayIfCurrent).toHaveBeenCalled();
+		expect(state.isLookAwayShowing).toBe(false);
+	});
+
+	it("skip closes the popup and resets the timer", () => {
+		const preferences = createPreferences({ lookAwayInterval: 1 });
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			createSound(),
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+		const beforeSkip = store.get("lastLookAwayTime", 0);
+
+		vi.setSystemTime(Date.now() + 1_000);
+		service.skip();
+
+		expect(windows.closeLookAway).toHaveBeenCalled();
+		expect(state.isLookAwayShowing).toBe(false);
+		expect(store.get("lastLookAwayTime", 0)).toBeGreaterThanOrEqual(beforeSkip);
+	});
+
+	it("snooze closes and re-shows after 5 minutes", () => {
+		const preferences = createPreferences({ lookAwayInterval: 20 });
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 21 * 60 * 1000);
+		const windows = createWindows();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			createSound(),
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+		expect(windows.showLookAway).toHaveBeenCalledTimes(1);
+
+		service.snooze();
+		expect(windows.closeLookAway).toHaveBeenCalled();
+		expect(state.isLookAwayShowing).toBe(false);
+
+		vi.advanceTimersByTime(5 * 60 * 1000);
+		expect(windows.showLookAway).toHaveBeenCalledTimes(2);
+	});
+});

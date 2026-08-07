@@ -39,6 +39,14 @@ describe("settings shell", () => {
 		).toBeDefined();
 	});
 
+	it("renders eye-care controls for exercises and look-away", () => {
+		render(<App />);
+
+		fireEvent.click(screen.getByRole("button", { name: "Eye care" }));
+		expect(screen.getByText("Eye Exercises")).toBeDefined();
+		expect(screen.getByText("20-20-20 Look Away")).toBeDefined();
+	});
+
 	it("starts reminders with the renderer interval converted to milliseconds", () => {
 		render(<App />);
 

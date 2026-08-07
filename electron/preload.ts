@@ -72,6 +72,14 @@ contextBridge.exposeInMainWorld('popupAPI', {
   snoozeExercise: () => {
     ipcRenderer.send(IPC_CHANNELS.snoozeExercise);
   },
+
+  // For look-away / 20-20-20 popups
+  skipLookAway: () => {
+    ipcRenderer.send(IPC_CHANNELS.skipLookAway);
+  },
+  snoozeLookAway: () => {
+    ipcRenderer.send(IPC_CHANNELS.snoozeLookAway);
+  },
   
   // For popup editor
   onPopupEditorUpdate: (callback: (data: any) => void) => {
@@ -104,6 +112,8 @@ declare global {
       requestVideoStream: () => void;
       skipExercise: () => void;
       snoozeExercise: () => void;
+      skipLookAway: () => void;
+      snoozeLookAway: () => void;
       onPopupEditorUpdate: (callback: (data: any) => void) => void;
       savePopupEditor: (data: any) => void;
       removeAllListeners: (channel: string) => void;

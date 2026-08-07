@@ -170,12 +170,10 @@ export class ReminderService {
 
 	private startTimerLoop(): void {
 		this.state.blinkReminderActive = true;
-		this.sound.play("blink");
-		this.windows.showReminder("blink");
+		this.showBlinkReminder();
 		this.state.blinkInterval = setInterval(() => {
 			if (this.state.blinkReminderActive && this.preferences.isTracking) {
-				this.sound.play("blink");
-				this.windows.showReminder("blink");
+				this.showBlinkReminder();
 			} else {
 				this.state.clearReminderTimers();
 			}
@@ -224,8 +222,7 @@ export class ReminderService {
 				this.sidecar.isRunning
 			) {
 				if (this.state.isFaceDetected) {
-					this.sound.play("blink");
-					this.windows.showReminder("blink");
+					this.showBlinkReminder();
 				}
 			} else {
 				this.state.clearReminderTimers();
@@ -251,8 +248,8 @@ export class ReminderService {
 					reminderIntervalMs: this.preferences.reminderInterval,
 				})
 			) {
-				this.sound.play("blink");
-				const popup = this.windows.showReminder("blink");
+				const popup = this.showBlinkReminder();
+				if (!popup) return;
 				setTimeout(() => {
 					if (this.windows.closeReminderIfCurrent(popup)) {
 						this.markReminderShown();
@@ -260,6 +257,13 @@ export class ReminderService {
 				}, REMINDER_POPUP_VISIBLE_MS);
 			}
 		}, CAMERA_POLL_INTERVAL_MS);
+	}
+
+	/** Soft-suppress blink popups while a look-away break is on screen. */
+	private showBlinkReminder(): unknown | null {
+		if (this.state.isLookAwayShowing) return null;
+		this.sound.play("blink");
+		return this.windows.showReminder("blink");
 	}
 
 	private resetFaceTracking(): void {

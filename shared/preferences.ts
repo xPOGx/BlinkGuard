@@ -27,6 +27,12 @@ export interface PersistedPreferences {
 	useMediaPipe: boolean;
 	eyeExercisesEnabled: boolean;
 	exerciseInterval: number;
+	/** Periodic 20-20-20 style look-away breaks (independent of blink tracking). */
+	lookAwayEnabled: boolean;
+	/** Minutes between look-away prompts. */
+	lookAwayInterval: number;
+	/** Seconds to look away (countdown in popup). */
+	lookAwayDuration: number;
 	popupPosition: Point | null;
 	popupSize: Size;
 	popupColors: PopupColors;
@@ -55,6 +61,9 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	useMediaPipe: false,
 	eyeExercisesEnabled: true,
 	exerciseInterval: 20,
+	lookAwayEnabled: true,
+	lookAwayInterval: 20,
+	lookAwayDuration: 20,
 	popupPosition: null,
 	popupSize: { width: 300, height: 120 },
 	popupColors: {
