@@ -1,6 +1,7 @@
 import type { AppPreferences } from "../../shared/preferences";
 import {
 	BLINK_CREDIT_DEBOUNCE_MS,
+	BLINK_SNOOZE_MS,
 	CAMERA_POLL_INTERVAL_MS,
 	REMINDER_POPUP_VISIBLE_MS,
 	type BlinkCreditSource,
@@ -100,6 +101,23 @@ export class ReminderService {
 	/** Auto-dismiss / show cooldown — does not forge blink credit. */
 	markReminderShown(): void {
 		this.state.lastReminderShownAt = Date.now();
+	}
+
+	/**
+	 * Suppress blink popups for {@link BLINK_SNOOZE_MS}. Does not forge blink credit.
+	 * Loops keep running; shows resume naturally after the snooze window.
+	 */
+	snooze(): void {
+		this.windows.closeReminder();
+		if (this.state.blinkSnoozeTimeout) {
+			clearTimeout(this.state.blinkSnoozeTimeout);
+		}
+		this.state.blinkSnoozeUntil = Date.now() + BLINK_SNOOZE_MS;
+		this.markReminderShown();
+		this.state.blinkSnoozeTimeout = setTimeout(() => {
+			this.state.blinkSnoozeUntil = 0;
+			this.state.blinkSnoozeTimeout = null;
+		}, BLINK_SNOOZE_MS);
 	}
 
 	onFaceDetection(faceDetected: boolean): void {
@@ -291,9 +309,10 @@ export class ReminderService {
 		}, CAMERA_POLL_INTERVAL_MS);
 	}
 
-	/** Soft-suppress blink popups while look-away / quiet hours / fullscreen. */
+	/** Soft-suppress blink popups while look-away / quiet hours / fullscreen / snooze. */
 	private showBlinkReminder(): unknown | null {
 		if (this.state.isLookAwayShowing) return null;
+		if (Date.now() < this.state.blinkSnoozeUntil) return null;
 		if (!this.notificationGate.notificationsAllowed()) return null;
 		this.sound.play("blink");
 		return this.windows.showReminder("blink");

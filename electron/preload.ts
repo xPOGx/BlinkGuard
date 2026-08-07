@@ -80,6 +80,11 @@ contextBridge.exposeInMainWorld('popupAPI', {
   snoozeLookAway: () => {
     ipcRenderer.send(IPC_CHANNELS.snoozeLookAway);
   },
+
+  // For blink reminder popups
+  snoozeBlink: () => {
+    ipcRenderer.send(IPC_CHANNELS.snoozeBlink);
+  },
   
   // For popup editor
   onPopupEditorUpdate: (callback: (data: any) => void) => {
@@ -114,6 +119,7 @@ declare global {
       snoozeExercise: () => void;
       skipLookAway: () => void;
       snoozeLookAway: () => void;
+      snoozeBlink: () => void;
       onPopupEditorUpdate: (callback: (data: any) => void) => void;
       savePopupEditor: (data: any) => void;
       removeAllListeners: (channel: string) => void;

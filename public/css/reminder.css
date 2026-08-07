@@ -33,6 +33,16 @@ body:has(.reminder-card) {
 	min-width: 0;
 }
 
+.reminder-body {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: center;
+	gap: 0.35rem;
+	min-width: 0;
+	max-width: 100%;
+}
+
 .reminder-card.camera-mode {
 	animation: fadeIn 0.5s forwards;
 }
@@ -64,6 +74,31 @@ body:has(.reminder-card) {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.reminder-snooze {
+	padding: 0.25rem 0.6rem;
+	border: none;
+	border-radius: var(--popup-radius-sm);
+	background: var(--popup-accent-color, var(--popup-accent));
+	color: #fff;
+	font-family: inherit;
+	font-size: clamp(0.7rem, 8vmin, 0.85rem);
+	font-weight: 550;
+	line-height: 1.2;
+	cursor: pointer;
+	white-space: nowrap;
+	transition:
+		background 0.15s ease,
+		transform 0.1s ease;
+}
+
+.reminder-snooze:hover {
+	background: #0d9488;
+}
+
+.reminder-snooze:active {
+	transform: translateY(1px);
 }
 
 .reminder-card[data-kind="starting"] .reminder-icon {

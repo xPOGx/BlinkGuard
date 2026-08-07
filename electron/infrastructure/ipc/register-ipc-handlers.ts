@@ -182,6 +182,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	ipcMain.on(IPC_CHANNELS.snoozeExercise, () => exercises.snooze());
 	ipcMain.on(IPC_CHANNELS.skipLookAway, () => lookAway.skip());
 	ipcMain.on(IPC_CHANNELS.snoozeLookAway, () => lookAway.snooze());
+	ipcMain.on(IPC_CHANNELS.snoozeBlink, () => reminders.snooze());
 	ipcMain.on(IPC_CHANNELS.updateMgdMode, (_event, enabled: boolean) => {
 		preferences.set("mgdMode", enabled);
 		reminders.syncCameraLoopForMgdMode();

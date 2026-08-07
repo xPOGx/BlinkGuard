@@ -5,6 +5,7 @@ export class AppRuntimeState {
 	exerciseSnoozeTimeout: ReturnType<typeof setTimeout> | null = null;
 	lookAwayInterval: ReturnType<typeof setInterval> | null = null;
 	lookAwaySnoozeTimeout: ReturnType<typeof setTimeout> | null = null;
+	blinkSnoozeTimeout: ReturnType<typeof setTimeout> | null = null;
 	cameraThresholdUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
 	noFaceDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -20,6 +21,8 @@ export class AppRuntimeState {
 	lastBlinkTime = Date.now();
 	/** Last reminder show/auto-dismiss; used to avoid spam without forging blink credit. */
 	lastReminderShownAt = Date.now();
+	/** Epoch ms until which blink popups are suppressed (0 = not snoozed). */
+	blinkSnoozeUntil = 0;
 
 	clearReminderTimers(): void {
 		if (this.blinkInterval) clearInterval(this.blinkInterval);
@@ -27,9 +30,12 @@ export class AppRuntimeState {
 		if (this.cameraThresholdUpdateTimeout) {
 			clearTimeout(this.cameraThresholdUpdateTimeout);
 		}
+		if (this.blinkSnoozeTimeout) clearTimeout(this.blinkSnoozeTimeout);
 		this.blinkInterval = null;
 		this.cameraMonitoringInterval = null;
 		this.cameraThresholdUpdateTimeout = null;
+		this.blinkSnoozeTimeout = null;
+		this.blinkSnoozeUntil = 0;
 		this.blinkReminderActive = false;
 		this.mgdReminderLoopActive = false;
 	}

@@ -8,7 +8,9 @@ import type {
 } from "../../../electron/application/ports/runtime-ports";
 import {
 	BLINK_CREDIT_DEBOUNCE_MS,
+	BLINK_SNOOZE_MS,
 	REMINDER_POPUP_VISIBLE_MS,
+	nextTimerReminderDelay,
 } from "../../../electron/domain/reminder-policy";
 import {
 	DEFAULT_PREFERENCES,
@@ -282,5 +284,76 @@ describe("ReminderService credit semantics", () => {
 		service.markReminderShown();
 		expect(state.lastBlinkTime).toBe(blinkBefore);
 		expect(state.lastReminderShownAt).toBeGreaterThan(blinkBefore);
+	});
+
+	it("snooze suppresses blink popups for 5 minutes then resumes", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: false,
+			reminderInterval: 3000,
+		});
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar({ isRunning: false, isCameraReady: false }),
+			createSound(),
+			createStore(),
+		);
+
+		service.start(3000);
+		expect(windows.showReminder).toHaveBeenCalledWith("blink");
+		expect(windows.showReminder).toHaveBeenCalledTimes(1);
+
+		service.snooze();
+		expect(windows.closeReminder).toHaveBeenCalled();
+		expect(state.blinkSnoozeUntil).toBeGreaterThan(Date.now());
+		windows.showReminder.mockClear();
+
+		vi.advanceTimersByTime(BLINK_SNOOZE_MS - 1);
+		expect(windows.showReminder).not.toHaveBeenCalled();
+
+		vi.advanceTimersByTime(1 + nextTimerReminderDelay(3000));
+		expect(windows.showReminder).toHaveBeenCalledWith("blink");
+		expect(state.blinkSnoozeUntil).toBe(0);
+	});
+
+	it("snooze does not forge blink credit; onBlink still works", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: false,
+		});
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const stats = {
+			recordBlink: vi.fn(),
+			onTrackingStart: vi.fn(),
+			onTrackingStop: vi.fn(),
+		};
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar({ isRunning: false, isCameraReady: false }),
+			createSound(),
+			createStore(),
+			stats,
+		);
+
+		service.start(3000);
+		const blinkBefore = state.lastBlinkTime;
+		vi.advanceTimersByTime(200);
+
+		service.snooze();
+		expect(stats.recordBlink).not.toHaveBeenCalled();
+		expect(state.lastBlinkTime).toBe(blinkBefore);
+		expect(state.lastReminderShownAt).toBeGreaterThan(blinkBefore);
+
+		expect(service.onBlink()).toBe(true);
+		expect(stats.recordBlink).toHaveBeenCalledTimes(1);
+		expect(state.lastBlinkTime).toBeGreaterThan(blinkBefore);
+		expect(windows.closeReminder).toHaveBeenCalled();
 	});
 });

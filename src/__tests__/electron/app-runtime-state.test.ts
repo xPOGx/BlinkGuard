@@ -21,15 +21,19 @@ describe("AppRuntimeState", () => {
 		const state = new AppRuntimeState();
 		state.blinkReminderActive = true;
 		state.mgdReminderLoopActive = true;
+		state.blinkSnoozeUntil = Date.now() + 60_000;
 		state.blinkInterval = setInterval(() => {}, 1000);
 		state.cameraMonitoringInterval = setInterval(() => {}, 100);
 		state.cameraThresholdUpdateTimeout = setTimeout(() => {}, 500);
+		state.blinkSnoozeTimeout = setTimeout(() => {}, 5_000);
 
 		state.clearReminderTimers();
 
 		expect(state.blinkInterval).toBeNull();
 		expect(state.cameraMonitoringInterval).toBeNull();
 		expect(state.cameraThresholdUpdateTimeout).toBeNull();
+		expect(state.blinkSnoozeTimeout).toBeNull();
+		expect(state.blinkSnoozeUntil).toBe(0);
 		expect(state.blinkReminderActive).toBe(false);
 		expect(state.mgdReminderLoopActive).toBe(false);
 	});

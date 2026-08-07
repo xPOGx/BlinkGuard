@@ -97,12 +97,13 @@ export class WindowManager {
 		if (kind !== "stopped" && !this.preferences.isTracking) return null;
 		this.closeReminder();
 		const position = this.ensurePopupPosition();
+		const interactive = kind === "blink";
 		const popup = createPanelWindow({
 			width: this.preferences.popupSize.width,
 			height: this.preferences.popupSize.height,
 			x: position.x,
 			y: position.y,
-			focusable: false,
+			focusable: interactive,
 		}, this.paths.preload);
 		popup.setOpacity(1 - this.preferences.popupColors.transparency);
 		this.reminder = popup;
@@ -122,7 +123,9 @@ export class WindowManager {
 					this.preferences.cameraEnabled,
 				);
 			}
-			popup.setIgnoreMouseEvents(true);
+			if (!interactive) {
+				popup.setIgnoreMouseEvents(true);
+			}
 		});
 		popup.once("ready-to-show", () => popup.showInactive());
 		popup.on("closed", () => {
