@@ -1,3 +1,4 @@
+import type { BlinkStatsSnapshot } from "../../../shared/blink-stats";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import type {
 	CameraQuality,
@@ -64,10 +65,7 @@ export const rendererIpc = {
 		}) => void,
 	) => subscribe(IPC_CHANNELS.earCalibrationProgress, listener),
 	onEarCalibrationComplete: (
-		listener: (payload: {
-			baseline: number | null;
-			error?: string;
-		}) => void,
+		listener: (payload: { baseline: number | null; error?: string }) => void,
 	) => subscribe(IPC_CHANNELS.earCalibrationComplete, listener),
 	updateEyeExercisesEnabled: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateEyeExercisesEnabled, enabled),
@@ -93,4 +91,8 @@ export const rendererIpc = {
 	closeCameraWindow: () => send(IPC_CHANNELS.closeCameraWindow),
 	showPopupEditor: () => send(IPC_CHANNELS.showPopupEditor),
 	resetPreferences: () => send(IPC_CHANNELS.resetPreferences),
+	onBlinkStats: (listener: (snapshot: BlinkStatsSnapshot) => void) =>
+		subscribe(IPC_CHANNELS.loadBlinkStats, listener),
+	requestBlinkStats: () => send(IPC_CHANNELS.requestBlinkStats),
+	resetBlinkStats: () => send(IPC_CHANNELS.resetBlinkStats),
 };

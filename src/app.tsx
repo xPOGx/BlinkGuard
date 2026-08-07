@@ -1,4 +1,12 @@
-import { Camera, Dumbbell, Eye, Keyboard, Palette, Timer } from "lucide-react";
+import {
+	BarChart3,
+	Camera,
+	Dumbbell,
+	Eye,
+	Keyboard,
+	Palette,
+	Timer,
+} from "lucide-react";
 import { useState } from "react";
 import { useCameraStatus } from "@/features/camera/model/use-camera-status";
 import {
@@ -18,9 +26,16 @@ import {
 } from "@/features/settings/ui/settings-controls";
 import { useShortcutControls } from "@/features/shortcuts/model/use-shortcut-controls";
 import { ShortcutSettings } from "@/features/shortcuts/ui/shortcut-settings";
+import { StatisticsPanel } from "@/features/statistics/ui/statistics-panel";
 import { cn } from "@/lib/utils";
 
-type SectionId = "reminders" | "camera" | "exercises" | "appearance" | "system";
+type SectionId =
+	| "reminders"
+	| "camera"
+	| "exercises"
+	| "appearance"
+	| "statistics"
+	| "system";
 
 const SECTIONS: {
 	id: SectionId;
@@ -51,6 +66,12 @@ const SECTIONS: {
 		label: "Appearance",
 		description: "Popup message, colors, size, and notification sound.",
 		icon: Palette,
+	},
+	{
+		id: "statistics",
+		label: "Statistics",
+		description: "Local blink counts, tracking time, and day/week charts.",
+		icon: BarChart3,
 	},
 	{
 		id: "system",
@@ -190,6 +211,8 @@ export default function BlinkGuardHomepage() {
 								/>
 							</>
 						)}
+
+						{section === "statistics" && <StatisticsPanel />}
 
 						{section === "system" && (
 							<>

@@ -8,6 +8,7 @@ import type {
 	PopupColors,
 	Size,
 } from "../../../shared/preferences";
+import type { BlinkStatsService } from "../../application/blink-stats-service";
 import type { ExerciseService } from "../../application/exercise-service";
 import type { PreferencesService } from "../../application/preferences-service";
 import type { ReminderService } from "../../application/reminder-service";
@@ -24,11 +25,19 @@ interface IpcDependencies {
 	sidecar: BlinkDetectorSidecar;
 	shortcuts: ShortcutController;
 	windows: WindowManager;
+	blinkStats: BlinkStatsService;
 }
 
 export function registerIpcHandlers(deps: IpcDependencies): void {
-	const { preferences, reminders, exercises, sidecar, shortcuts, windows } =
-		deps;
+	const {
+		preferences,
+		reminders,
+		exercises,
+		sidecar,
+		shortcuts,
+		windows,
+		blinkStats,
+	} = deps;
 	const current = preferences.current;
 
 	ipcMain.on(IPC_CHANNELS.startBlinkReminders, (_event, interval: number) => {
@@ -184,5 +193,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		sidecar.applyEarCalibration(null);
 		sidecar.applyDetectorBackend(false, false);
 		windows.sendPreferences();
+	});
+	ipcMain.on(IPC_CHANNELS.requestBlinkStats, () => {
+		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
+	});
+	ipcMain.on(IPC_CHANNELS.resetBlinkStats, () => {
+		blinkStats.reset();
+		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
 	});
 }

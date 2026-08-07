@@ -49,6 +49,9 @@ export const IPC_CHANNELS = {
 	updateLaunchAtLogin: "update-launch-at-login",
 	audioFinished: "audio-finished",
 	requestVideoStream: "request-video-stream",
+	loadBlinkStats: "load-blink-stats",
+	requestBlinkStats: "request-blink-stats",
+	resetBlinkStats: "reset-blink-stats",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -65,6 +68,7 @@ export const MAIN_RENDERER_RECEIVE_CHANNELS = [
 	IPC_CHANNELS.thresholdUpdated,
 	IPC_CHANNELS.earCalibrationProgress,
 	IPC_CHANNELS.earCalibrationComplete,
+	IPC_CHANNELS.loadBlinkStats,
 ] as const;
 
 export const MAIN_RENDERER_SEND_CHANNELS = [
@@ -101,4 +105,6 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.updateLaunchAtLogin,
 	IPC_CHANNELS.audioFinished,
 	IPC_CHANNELS.requestVideoStream,
+	IPC_CHANNELS.requestBlinkStats,
+	IPC_CHANNELS.resetBlinkStats,
 ] as const;

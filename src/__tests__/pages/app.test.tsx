@@ -31,6 +31,12 @@ describe("settings shell", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "System" }));
 		expect(screen.getByText("Keyboard Shortcut")).toBeDefined();
+
+		fireEvent.click(screen.getByRole("button", { name: "Statistics" }));
+		expect(screen.getByText("Blink chart")).toBeDefined();
+		expect(
+			screen.getByRole("button", { name: "Clear statistics" }),
+		).toBeDefined();
 	});
 
 	it("starts reminders with the renderer interval converted to milliseconds", () => {

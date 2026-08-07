@@ -1,5 +1,6 @@
 import { app, powerMonitor } from "electron";
 import type { AppRuntimeState } from "../../application/app-runtime-state";
+import type { BlinkStatsService } from "../../application/blink-stats-service";
 import type { ExerciseService } from "../../application/exercise-service";
 import type { ReminderService } from "../../application/reminder-service";
 import type { AppPreferences } from "../../../shared/preferences";
@@ -17,6 +18,7 @@ export class AppLifecycle {
 		private readonly exercises: ExerciseService,
 		private readonly windows: WindowManager,
 		private readonly cleanup: ProcessCleanup,
+		private readonly blinkStats: BlinkStatsService,
 	) {}
 
 	attachTray(tray: { destroy(): void }): void {
@@ -63,6 +65,7 @@ export class AppLifecycle {
 		this.isQuitting = true;
 		this.trayDestroy?.();
 		this.trayDestroy = null;
+		this.blinkStats.dispose();
 		this.state.clearReminderTimers();
 		this.state.clearExerciseTimers();
 		this.windows.destroyAll();

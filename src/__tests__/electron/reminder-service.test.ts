@@ -147,6 +147,11 @@ describe("ReminderService credit semantics", () => {
 		const state = new AppRuntimeState();
 		const windows = createWindows();
 		windows.reminderOpen = true;
+		const stats = {
+			recordBlink: vi.fn(),
+			onTrackingStart: vi.fn(),
+			onTrackingStop: vi.fn(),
+		};
 		const service = new ReminderService(
 			preferences,
 			state,
@@ -154,21 +159,55 @@ describe("ReminderService credit semantics", () => {
 			createSidecar(),
 			createSound(),
 			createStore(),
+			stats,
 		);
 
-		service.onBlink();
+		expect(service.onBlink()).toBe(true);
 		const first = state.lastBlinkTime;
 		expect(windows.closeReminder).toHaveBeenCalledTimes(1);
+		expect(stats.recordBlink).toHaveBeenCalledTimes(1);
 
 		vi.advanceTimersByTime(BLINK_CREDIT_DEBOUNCE_MS - 1);
-		service.onBlink();
+		expect(service.onBlink()).toBe(false);
 		expect(state.lastBlinkTime).toBe(first);
 		expect(windows.closeReminder).toHaveBeenCalledTimes(1);
+		expect(stats.recordBlink).toHaveBeenCalledTimes(1);
 
 		vi.advanceTimersByTime(1);
-		service.onBlink();
+		expect(service.onBlink()).toBe(true);
 		expect(state.lastBlinkTime).toBeGreaterThan(first);
 		expect(windows.closeReminder).toHaveBeenCalledTimes(2);
+		expect(stats.recordBlink).toHaveBeenCalledTimes(2);
+	});
+
+	it("start and stop notify blink stats for tracking sessions", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: false,
+		});
+		const state = new AppRuntimeState();
+		const stats = {
+			recordBlink: vi.fn(),
+			onTrackingStart: vi.fn(),
+			onTrackingStop: vi.fn(),
+		};
+		const service = new ReminderService(
+			preferences,
+			state,
+			createWindows(),
+			createSidecar({ isRunning: false, isCameraReady: false }),
+			createSound(),
+			createStore(),
+			stats,
+		);
+
+		service.start(3000);
+		expect(stats.onTrackingStart).toHaveBeenCalledTimes(1);
+		expect(preferences.isTracking).toBe(true);
+
+		service.ensureStopped();
+		expect(stats.onTrackingStop).toHaveBeenCalledTimes(1);
+		expect(preferences.isTracking).toBe(false);
 	});
 
 	it("auto-dismiss updates lastReminderShownAt only", () => {

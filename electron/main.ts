@@ -2,6 +2,7 @@ import { app } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AppRuntimeState } from "./application/app-runtime-state";
+import { BlinkStatsService } from "./application/blink-stats-service";
 import { ExerciseService } from "./application/exercise-service";
 import { PreferencesService } from "./application/preferences-service";
 import { ReminderService } from "./application/reminder-service";
@@ -39,12 +40,21 @@ export const MAIN_DIST = paths.mainDist;
 export const RENDERER_DIST = paths.rendererDist;
 
 const store = new ElectronPreferenceStore();
+const statsStore = new ElectronPreferenceStore({ name: "blinkguard-stats" });
 const preferencesService = new PreferencesService(store);
 const preferences = preferencesService.current;
+const blinkStats = new BlinkStatsService(statsStore);
 const state = new AppRuntimeState();
 const processes = new ChildProcessRegistry();
 const windows = new WindowManager(paths, preferences, VITE_DEV_SERVER_URL);
 const sound = new NotificationSoundPlayer(paths, preferences, app.isPackaged);
+
+blinkStats.setPushHandler((snapshot) => {
+	windows.sendToMain(IPC_CHANNELS.loadBlinkStats, snapshot);
+});
+windows.setOnMainLoaded(() => {
+	windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
+});
 
 let reminders: ReminderService;
 const blinkDebugLogger = new BlinkDetectorDebugLogger();
@@ -91,6 +101,7 @@ reminders = new ReminderService(
 	sidecar,
 	sound,
 	store,
+	blinkStats,
 );
 const exercises = new ExerciseService(
 	preferences,
@@ -112,6 +123,7 @@ const lifecycle = new AppLifecycle(
 	exercises,
 	windows,
 	new ProcessCleanup(processes),
+	blinkStats,
 );
 const tray = new TrayController(paths, windows, () => lifecycle.quit());
 lifecycle.attachTray(tray);
@@ -123,6 +135,7 @@ registerIpcHandlers({
 	sidecar,
 	shortcuts,
 	windows,
+	blinkStats,
 });
 
 app.on("second-instance", () => {

@@ -8,6 +8,7 @@ import {
 	shouldShowCameraReminder,
 } from "../domain/reminder-policy";
 import type { AppRuntimeState } from "./app-runtime-state";
+import type { BlinkStatsPort } from "./ports/blink-stats-port";
 import type { PreferenceStore } from "./ports/preference-store";
 import type {
 	BlinkDetectorPort,
@@ -25,6 +26,7 @@ export class ReminderService {
 		private readonly sidecar: BlinkDetectorPort,
 		private readonly sound: NotificationSoundPort,
 		private readonly store: PreferenceStore,
+		private readonly stats: BlinkStatsPort | null = null,
 	) {}
 
 	start(interval = this.preferences.reminderInterval): void {
@@ -55,14 +57,19 @@ export class ReminderService {
 	}
 
 	private setTracking(value: boolean): void {
+		const wasTracking = this.preferences.isTracking;
 		this.preferences.isTracking = value;
 		this.store.set("isTracking", value);
+		if (value && !wasTracking) this.stats?.onTrackingStart();
+		if (!value && wasTracking) this.stats?.onTrackingStop();
 	}
 
 	/** Sidecar-detected blink only. Debounced; closes any open reminder. */
-	onBlink(): void {
-		if (!this.creditBlink("detected")) return;
+	onBlink(): boolean {
+		if (!this.creditBlink("detected")) return false;
+		this.stats?.recordBlink();
 		this.windows.closeReminder();
+		return true;
 	}
 
 	/**

@@ -18,12 +18,17 @@ export class WindowManager {
 	camera: BrowserWindow | null = null;
 	editor: BrowserWindow | null = null;
 	noFace: BrowserWindow | null = null;
+	private onMainLoaded: (() => void) | null = null;
 
 	constructor(
 		private readonly paths: AppPaths,
 		private readonly preferences: AppPreferences,
 		private readonly devServerUrl: string | undefined,
 	) {}
+
+	setOnMainLoaded(handler: (() => void) | null): void {
+		this.onMainLoaded = handler;
+	}
 
 	createMain(onClose: (event: Electron.Event) => void): BrowserWindow {
 		const window = new BrowserWindow({
@@ -48,6 +53,7 @@ export class WindowManager {
 				new Date().toLocaleString(),
 			);
 			this.sendPreferences();
+			this.onMainLoaded?.();
 		});
 		if (this.devServerUrl) {
 			void window.loadURL(this.devServerUrl);

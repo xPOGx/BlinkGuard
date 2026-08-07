@@ -1,8 +1,12 @@
-import Store from "electron-store";
+import Store, { type Options as ElectronStoreOptions } from "electron-store";
 import type { PreferenceStore } from "../../application/ports/preference-store";
 
 export class ElectronPreferenceStore implements PreferenceStore {
-	private readonly store = new Store();
+	private readonly store: Store;
+
+	constructor(options?: ElectronStoreOptions<Record<string, unknown>>) {
+		this.store = new Store(options);
+	}
 
 	get<T>(key: string, defaultValue?: T): T {
 		return defaultValue === undefined
