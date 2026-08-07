@@ -272,11 +272,14 @@ export type BlinkStatsSnapshot = {
 	weekChart: ChartBucket[];
 	monthChart: ChartBucket[];
 	yearChart: ChartBucket[];
+	/** Live credited blinks/min over the last rolling minute (ephemeral). */
+	blinksPerMinute: number;
 };
 
 export function toBlinkStatsSnapshot(
 	state: BlinkStatsState,
 	now: Date = new Date(),
+	blinksPerMinute = 0,
 ): BlinkStatsSnapshot {
 	const today = localDateKey(now);
 	return {
@@ -286,6 +289,7 @@ export function toBlinkStatsSnapshot(
 		weekChart: toWeekChart(state, today),
 		monthChart: toMonthChart(state, today),
 		yearChart: toYearChart(state, today),
+		blinksPerMinute,
 	};
 }
 

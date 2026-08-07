@@ -113,6 +113,37 @@ describe("BlinkStatsService", () => {
 			spent: 0,
 			available: 0,
 		});
+		expect(service.getSnapshot().blinksPerMinute).toBe(0);
+		service.dispose();
+	});
+
+	it("exposes live blinksPerMinute from a rolling window", () => {
+		const store = createStore();
+		const service = new BlinkStatsService(store);
+		const push = vi.fn();
+		service.setPushHandler(push);
+
+		expect(service.getSnapshot().blinksPerMinute).toBe(0);
+
+		service.recordBlink();
+		expect(service.getSnapshot().blinksPerMinute).toBe(1);
+
+		service.recordBlink();
+		service.recordBlink();
+		expect(service.getSnapshot().blinksPerMinute).toBe(3);
+
+		vi.advanceTimersByTime(60_001);
+		expect(service.getSnapshot().blinksPerMinute).toBe(0);
+
+		service.onTrackingStart();
+		service.recordBlink();
+		push.mockClear();
+		vi.advanceTimersByTime(1_000);
+		expect(push).toHaveBeenCalled();
+		expect(service.getSnapshot().blinksPerMinute).toBe(1);
+
+		service.reset();
+		expect(service.getSnapshot().blinksPerMinute).toBe(0);
 		service.dispose();
 	});
 });

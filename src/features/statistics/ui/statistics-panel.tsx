@@ -7,6 +7,7 @@ import {
 	formatTrackingDuration,
 } from "../../../../shared/blink-stats";
 import { useBlinkStats } from "../model/use-blink-stats";
+import { LiveBlinkRate } from "./live-blink-rate";
 import { StatsBarChart } from "./stats-bar-chart";
 
 type ChartRange = "today" | "week" | "month" | "year";
@@ -68,6 +69,15 @@ export function StatisticsPanel() {
 						Spending is not enabled yet — balance is tracked so rewards can
 						deduct from Available later.
 					</p>
+				</SettingRow>
+			</SettingPanel>
+
+			<SettingPanel>
+				<SettingRow
+					title="Live blink rate"
+					description="Credited blinks over the last minute while tracking is active."
+				>
+					<LiveBlinkRate blinksPerMinute={snapshot.blinksPerMinute} />
 				</SettingRow>
 			</SettingPanel>
 

@@ -1,4 +1,8 @@
 import {
+	computeBlinksPerMinute,
+	pruneBlinkTimestamps,
+} from "../../shared/blink-rate";
+import {
 	BLINK_STATS_STORE_KEY,
 	DEFAULT_BLINK_STATS,
 	type BlinkStatsSnapshot,
@@ -14,13 +18,17 @@ import type { PreferenceStore } from "./ports/preference-store";
 
 const TRACKING_FLUSH_MS = 15_000;
 const PUSH_THROTTLE_MS = 1_000;
+const RATE_TICK_MS = 1_000;
 
 export class BlinkStatsService {
 	private state: BlinkStatsState;
 	private trackingStartedAt: number | null = null;
 	private flushTimer: ReturnType<typeof setInterval> | null = null;
+	private rateTickTimer: ReturnType<typeof setInterval> | null = null;
 	private pushTimer: ReturnType<typeof setTimeout> | null = null;
 	private onPush: ((snapshot: BlinkStatsSnapshot) => void) | null = null;
+	/** Ephemeral credited-blink timestamps for live BPM (not persisted). */
+	private blinkTimestamps: number[] = [];
 
 	constructor(private readonly store: PreferenceStore) {
 		this.state = normalizeBlinkStatsState(
@@ -34,11 +42,22 @@ export class BlinkStatsService {
 	}
 
 	getSnapshot(now: Date = new Date()): BlinkStatsSnapshot {
-		return toBlinkStatsSnapshot(this.state, now);
+		const nowMs = now.getTime();
+		this.blinkTimestamps = pruneBlinkTimestamps(this.blinkTimestamps, nowMs);
+		return toBlinkStatsSnapshot(
+			this.state,
+			now,
+			computeBlinksPerMinute(this.blinkTimestamps, nowMs),
+		);
 	}
 
 	recordBlink(now: Date = new Date()): void {
+		const nowMs = now.getTime();
 		this.state = recordBlink(this.state, now);
+		this.blinkTimestamps = pruneBlinkTimestamps(
+			[...this.blinkTimestamps, nowMs],
+			nowMs,
+		);
 		this.persist();
 		this.schedulePush();
 	}
@@ -62,18 +81,22 @@ export class BlinkStatsService {
 		this.trackingStartedAt = now.getTime();
 		this.persist();
 		this.startFlushTimer();
+		this.startRateTick();
 		this.schedulePush();
 	}
 
 	onTrackingStop(now: Date = new Date()): void {
 		this.flushTracking(now);
 		this.stopFlushTimer();
+		this.stopRateTick();
 		this.trackingStartedAt = null;
 		this.schedulePush(true);
 	}
 
 	reset(): void {
 		this.stopFlushTimer();
+		this.stopRateTick();
+		this.blinkTimestamps = [];
 		const wasTracking = this.trackingStartedAt !== null;
 		this.trackingStartedAt = null;
 		this.state = { ...DEFAULT_BLINK_STATS, days: [] };
@@ -89,6 +112,7 @@ export class BlinkStatsService {
 	dispose(): void {
 		this.flushTracking();
 		this.stopFlushTimer();
+		this.stopRateTick();
 		if (this.pushTimer) {
 			clearTimeout(this.pushTimer);
 			this.pushTimer = null;
@@ -116,6 +140,20 @@ export class BlinkStatsService {
 		if (this.flushTimer) {
 			clearInterval(this.flushTimer);
 			this.flushTimer = null;
+		}
+	}
+
+	private startRateTick(): void {
+		this.stopRateTick();
+		this.rateTickTimer = setInterval(() => {
+			this.schedulePush();
+		}, RATE_TICK_MS);
+	}
+
+	private stopRateTick(): void {
+		if (this.rateTickTimer) {
+			clearInterval(this.rateTickTimer);
+			this.rateTickTimer = null;
 		}
 	}
 
