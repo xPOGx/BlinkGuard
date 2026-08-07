@@ -3,6 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/app";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 
+vi.mock("lottie-react", () => ({
+	default: {
+		useLottie: () => ({
+			View: null,
+			goToAndPlay: vi.fn(),
+			goToAndStop: vi.fn(),
+			setSpeed: vi.fn(),
+			animationLoaded: false,
+		}),
+	},
+}));
+
 const send = vi.fn();
 const listeners = new Map<string, (...args: unknown[]) => void>();
 
@@ -71,6 +83,16 @@ describe("settings shell", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Start Reminders" }));
 
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.startBlinkReminders, 3000);
+	});
+
+	it("toggles tracking from the sidebar eye button", () => {
+		render(<App />);
+
+		fireEvent.click(screen.getByRole("button", { name: "Start reminders" }));
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.startBlinkReminders, 3000);
+
+		fireEvent.click(screen.getByRole("button", { name: "Stop reminders" }));
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.stopBlinkReminders);
 	});
 
 	it("records and sends a keyboard shortcut", () => {

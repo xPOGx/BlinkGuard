@@ -2,7 +2,6 @@ import {
 	BarChart3,
 	Camera,
 	Dumbbell,
-	Eye,
 	Keyboard,
 	Palette,
 	Timer,
@@ -26,6 +25,7 @@ import {
 	ResetPreferencesButton,
 	SoundSettings,
 } from "@/features/settings/ui/settings-controls";
+import { TrackingEyeButton } from "@/features/settings/ui/tracking-eye-button";
 import { useShortcutControls } from "@/features/shortcuts/model/use-shortcut-controls";
 import { ShortcutSettings } from "@/features/shortcuts/ui/shortcut-settings";
 import { StatisticsPanel } from "@/features/statistics/ui/statistics-panel";
@@ -103,11 +103,12 @@ export default function BlinkGuardHomepage() {
 		<div className="flex h-screen flex-col bg-background text-foreground min-[721px]:flex-row">
 			<aside className="flex shrink-0 flex-col border-b border-border bg-sidebar min-[721px]:w-56 min-[721px]:border-r min-[721px]:border-b-0">
 				<div className="flex items-center gap-2.5 px-4 py-3 min-[721px]:px-5 min-[721px]:py-5">
-					<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-						<Eye className="h-4 w-4" aria-hidden />
-					</div>
+					<TrackingEyeButton
+						isTracking={preferences.isTracking}
+						onToggle={toggleTracking}
+					/>
 					<div className="min-w-0">
-						<h1 className="truncate text-base font-semibold tracking-tight">
+						<h1 className="text-base font-semibold tracking-tight">
 							BlinkGuard
 						</h1>
 						<p className="hidden text-xs text-muted-foreground min-[721px]:block">
