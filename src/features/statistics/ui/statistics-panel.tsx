@@ -75,9 +75,13 @@ export function StatisticsPanel() {
 			<SettingPanel>
 				<SettingRow
 					title="Live blink rate"
-					description="Credited blinks over the last minute while tracking is active."
+					description="Credited blinks over the last minute while tracking is active. The first minute is a warmup."
 				>
-					<LiveBlinkRate blinksPerMinute={snapshot.blinksPerMinute} />
+					<LiveBlinkRate
+						blinksPerMinute={snapshot.blinksPerMinute}
+						blinkRateReady={snapshot.blinkRateReady}
+						blinkRateWarmupMs={snapshot.blinkRateWarmupMs}
+					/>
 				</SettingRow>
 			</SettingPanel>
 

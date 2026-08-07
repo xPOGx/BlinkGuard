@@ -2,31 +2,61 @@ import { Activity, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import {
+	BLINK_RATE_WINDOW_MS,
 	type BlinkRateQuality,
 	classifyBlinkRate,
 	formatBlinksPerMinute,
 } from "../../../../shared/blink-rate";
 
 const METER_CAP = 20;
-const TREND_HOLD_MS = 400;
+const TREND_HOLD_MS = 450;
+const VALUE_TWEEN_MS = 550;
 
 type Trend = "up" | "down" | null;
 
 type LiveBlinkRateProps = {
 	blinksPerMinute: number;
+	blinkRateReady: boolean;
+	blinkRateWarmupMs: number;
 };
 
-export function LiveBlinkRate({ blinksPerMinute }: LiveBlinkRateProps) {
-	const previousRef = useRef(blinksPerMinute);
+export function LiveBlinkRate({
+	blinksPerMinute,
+	blinkRateReady,
+	blinkRateWarmupMs,
+}: LiveBlinkRateProps) {
+	const previousTargetRef = useRef(blinksPerMinute);
 	const [trend, setTrend] = useState<Trend>(null);
-	const guidance = classifyBlinkRate(blinksPerMinute);
-	const display = formatBlinksPerMinute(blinksPerMinute);
-	const idle = blinksPerMinute <= 0;
-	const meterPct = Math.min(100, (blinksPerMinute / METER_CAP) * 100);
+	const warming = !blinkRateReady;
+	const animatedBpm = useAnimatedNumber(
+		warming ? 0 : blinksPerMinute,
+		!warming,
+		VALUE_TWEEN_MS,
+	);
+	const guidance = classifyBlinkRate(animatedBpm);
+	const targetGuidance = classifyBlinkRate(blinksPerMinute);
+	const display = formatBlinksPerMinute(animatedBpm);
+	const idle = blinkRateReady && blinksPerMinute <= 0 && animatedBpm < 0.05;
+	const warmupPct = Math.min(
+		100,
+		(blinkRateWarmupMs / BLINK_RATE_WINDOW_MS) * 100,
+	);
+	const meterPct = warming
+		? warmupPct
+		: Math.min(100, (animatedBpm / METER_CAP) * 100);
+	const remainingSec = Math.max(
+		0,
+		Math.ceil((BLINK_RATE_WINDOW_MS - blinkRateWarmupMs) / 1000),
+	);
 
 	useEffect(() => {
-		const previous = previousRef.current;
-		previousRef.current = blinksPerMinute;
+		if (warming) {
+			previousTargetRef.current = blinksPerMinute;
+			setTrend(null);
+			return;
+		}
+		const previous = previousTargetRef.current;
+		previousTargetRef.current = blinksPerMinute;
 		if (blinksPerMinute === previous) return;
 
 		const nextTrend: Trend =
@@ -40,7 +70,7 @@ export function LiveBlinkRate({ blinksPerMinute }: LiveBlinkRateProps) {
 		setTrend(nextTrend);
 		const timeout = window.setTimeout(() => setTrend(null), TREND_HOLD_MS);
 		return () => window.clearTimeout(timeout);
-	}, [blinksPerMinute]);
+	}, [blinksPerMinute, warming]);
 
 	return (
 		<div className="flex flex-col gap-3">
@@ -53,61 +83,150 @@ export function LiveBlinkRate({ blinksPerMinute }: LiveBlinkRateProps) {
 					<div className="mt-1 flex items-baseline gap-2">
 						<p
 							className={cn(
-								"text-3xl font-semibold tabular-nums tracking-tight transition-[color,transform] duration-300",
-								qualityValueClass(guidance.quality, idle),
-								trend === "up" && "-translate-y-0.5 scale-105",
-								trend === "down" && "translate-y-0.5 scale-95",
+								"text-3xl font-semibold tabular-nums tracking-tight transition-[color,transform] duration-500 ease-out",
+								warming || idle
+									? "text-muted-foreground"
+									: qualityValueClass(guidance.quality),
+								!warming && trend === "up" && "-translate-y-0.5 scale-105",
+								!warming && trend === "down" && "translate-y-0.5 scale-95",
 							)}
 							aria-live="polite"
+							aria-atomic="true"
 						>
-							{display}
+							<span className="inline-block min-w-[2.5ch] text-left">
+								{warming ? "—" : display}
+							</span>
 							<span className="ml-1 text-base font-medium text-muted-foreground">
 								/min
 							</span>
 						</p>
-						{trend === "up" ? (
-							<TrendingUp
-								className="h-4 w-4 text-primary transition-opacity"
-								aria-label="Rate rising"
-							/>
-						) : null}
-						{trend === "down" ? (
-							<TrendingDown
-								className="h-4 w-4 text-muted-foreground transition-opacity"
-								aria-label="Rate falling"
-							/>
-						) : null}
+						<span
+							className={cn(
+								"inline-flex h-4 w-4 items-center justify-center transition-opacity duration-300",
+								trend ? "opacity-100" : "opacity-0",
+							)}
+							aria-hidden={!trend}
+						>
+							{trend === "up" ? (
+								<TrendingUp
+									className="h-4 w-4 text-primary"
+									aria-label="Rate rising"
+								/>
+							) : (
+								<TrendingDown
+									className="h-4 w-4 text-muted-foreground"
+									aria-label="Rate falling"
+								/>
+							)}
+						</span>
 					</div>
 				</div>
 				<span
 					className={cn(
-						"shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors duration-300",
-						qualityBadgeClass(guidance.quality, idle),
+						"shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors duration-500 ease-out",
+						warming || idle
+							? "bg-muted text-muted-foreground"
+							: qualityBadgeClass(targetGuidance.quality),
 					)}
 				>
-					{idle ? "—" : guidance.label}
+					{warming ? "Warming up" : idle ? "—" : targetGuidance.label}
 				</span>
 			</div>
 
 			<div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
 				<div
 					className={cn(
-						"h-full rounded-full transition-[width,background-color] duration-500 ease-out",
-						meterBarClass(guidance.quality, idle),
+						"h-full rounded-full transition-[background-color] duration-500 ease-out",
+						warming
+							? "bg-muted-foreground/40"
+							: idle
+								? "bg-muted-foreground/30"
+								: meterBarClass(guidance.quality),
 					)}
-					style={{ width: `${meterPct}%` }}
+					style={{
+						width: `${meterPct}%`,
+						transition: warming
+							? "width 500ms ease-out, background-color 500ms ease-out"
+							: "background-color 500ms ease-out",
+					}}
 				/>
 			</div>
 
-			<p className="text-xs text-muted-foreground sm:text-sm">
-				{idle ? "Waiting for credited blinks…" : guidance.description}
+			<p
+				className={cn(
+					"text-xs text-muted-foreground transition-opacity duration-300 sm:text-sm",
+				)}
+			>
+				{warming
+					? blinkRateWarmupMs > 0
+						? `Collecting the first minute… ${remainingSec}s left`
+						: "Start tracking to measure blink rate. The first minute is a warmup."
+					: idle
+						? "Waiting for credited blinks…"
+						: targetGuidance.description}
 			</p>
 		</div>
 	);
 }
 
-function qualityValueClass(quality: BlinkRateQuality, idle: boolean): string {
-	if (idle) return "text-muted-foreground";
+/** Ease-out cubic tween between successive BPM targets (no extra deps). */
+function useAnimatedNumber(
+	target: number,
+	enabled: boolean,
+	durationMs: number,
+): number {
+	const [value, setValue] = useState(target);
+	const valueRef = useRef(target);
+	const rafRef = useRef<number | null>(null);
+
+	useEffect(() => {
+		if (!enabled) {
+			if (rafRef.current !== null) {
+				cancelAnimationFrame(rafRef.current);
+				rafRef.current = null;
+			}
+			valueRef.current = target;
+			setValue(target);
+			return;
+		}
+
+		const from = valueRef.current;
+		const to = target;
+		if (Math.abs(from - to) < 0.001) {
+			valueRef.current = to;
+			setValue(to);
+			return;
+		}
+
+		const start = performance.now();
+		const tick = (now: number) => {
+			const t = Math.min(1, (now - start) / durationMs);
+			const eased = 1 - (1 - t) ** 3;
+			const next = from + (to - from) * eased;
+			valueRef.current = next;
+			setValue(next);
+			if (t < 1) {
+				rafRef.current = requestAnimationFrame(tick);
+			} else {
+				rafRef.current = null;
+				valueRef.current = to;
+				setValue(to);
+			}
+		};
+
+		rafRef.current = requestAnimationFrame(tick);
+		return () => {
+			if (rafRef.current !== null) {
+				cancelAnimationFrame(rafRef.current);
+				rafRef.current = null;
+			}
+		};
+	}, [target, enabled, durationMs]);
+
+	return value;
+}
+
+function qualityValueClass(quality: BlinkRateQuality): string {
 	switch (quality) {
 		case "low":
 			return "text-destructive";
@@ -118,8 +237,7 @@ function qualityValueClass(quality: BlinkRateQuality, idle: boolean): string {
 	}
 }
 
-function qualityBadgeClass(quality: BlinkRateQuality, idle: boolean): string {
-	if (idle) return "bg-muted text-muted-foreground";
+function qualityBadgeClass(quality: BlinkRateQuality): string {
 	switch (quality) {
 		case "low":
 			return "bg-destructive/15 text-destructive";
@@ -130,8 +248,7 @@ function qualityBadgeClass(quality: BlinkRateQuality, idle: boolean): string {
 	}
 }
 
-function meterBarClass(quality: BlinkRateQuality, idle: boolean): string {
-	if (idle) return "bg-muted-foreground/30";
+function meterBarClass(quality: BlinkRateQuality): string {
 	switch (quality) {
 		case "low":
 			return "bg-destructive";

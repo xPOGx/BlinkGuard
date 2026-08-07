@@ -274,12 +274,18 @@ export type BlinkStatsSnapshot = {
 	yearChart: ChartBucket[];
 	/** Live credited blinks/min over the last rolling minute (ephemeral). */
 	blinksPerMinute: number;
+	/** False until the current tracking session has run for a full minute. */
+	blinkRateReady: boolean;
+	/** Elapsed ms in the current tracking session toward the rate warmup (0…window). */
+	blinkRateWarmupMs: number;
 };
 
 export function toBlinkStatsSnapshot(
 	state: BlinkStatsState,
 	now: Date = new Date(),
 	blinksPerMinute = 0,
+	blinkRateReady = false,
+	blinkRateWarmupMs = 0,
 ): BlinkStatsSnapshot {
 	const today = localDateKey(now);
 	return {
@@ -290,6 +296,8 @@ export function toBlinkStatsSnapshot(
 		monthChart: toMonthChart(state, today),
 		yearChart: toYearChart(state, today),
 		blinksPerMinute,
+		blinkRateReady,
+		blinkRateWarmupMs,
 	};
 }
 

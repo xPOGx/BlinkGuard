@@ -142,7 +142,7 @@ describe("BlinkStatsService", () => {
 		service.dispose();
 	});
 
-	it("exposes live blinksPerMinute from a rolling window", () => {
+	it("exposes live blinksPerMinute only after a one-minute warmup", () => {
 		const store = createStore();
 		const service = new BlinkStatsService(store);
 		const push = vi.fn();
@@ -150,33 +150,36 @@ describe("BlinkStatsService", () => {
 		service.setLivePushEnabled(true);
 		push.mockClear();
 
+		service.onTrackingStart();
+		expect(service.getSnapshot().blinkRateReady).toBe(false);
 		expect(service.getSnapshot().blinksPerMinute).toBe(0);
 
+		vi.advanceTimersByTime(50_000);
 		service.recordBlink();
-		expect(service.getSnapshot().blinksPerMinute).toBe(1);
+		service.recordBlink();
+		service.recordBlink();
+		expect(service.getSnapshot().blinkRateReady).toBe(false);
+		expect(service.getSnapshot().blinksPerMinute).toBe(0);
+		expect(service.getSnapshot().blinkRateWarmupMs).toBe(50_000);
 
-		service.recordBlink();
-		service.recordBlink();
+		vi.advanceTimersByTime(10_000);
+		expect(service.getSnapshot().blinkRateReady).toBe(true);
 		expect(service.getSnapshot().blinksPerMinute).toBe(3);
 
-		vi.advanceTimersByTime(60_001);
-		expect(service.getSnapshot().blinksPerMinute).toBe(0);
-
-		service.onTrackingStart();
-		service.recordBlink();
+		// Let any pending throttle from the ready transition settle.
 		vi.advanceTimersByTime(1_000);
 		push.mockClear();
 		// Stable BPM must not spam full snapshot IPC every tick.
 		vi.advanceTimersByTime(5_000);
 		expect(push).not.toHaveBeenCalled();
-		expect(service.getSnapshot().blinksPerMinute).toBe(1);
+		expect(service.getSnapshot().blinksPerMinute).toBe(3);
 
-		// When a blink ages out of the window, BPM changes → one push.
+		// Rolling window ages out the blinks recorded at t=50s once now >= 110s.
 		vi.advanceTimersByTime(55_000);
-		expect(push).toHaveBeenCalled();
 		expect(service.getSnapshot().blinksPerMinute).toBe(0);
 
-		service.reset();
+		service.onTrackingStop();
+		expect(service.getSnapshot().blinkRateReady).toBe(false);
 		expect(service.getSnapshot().blinksPerMinute).toBe(0);
 		service.dispose();
 	});
