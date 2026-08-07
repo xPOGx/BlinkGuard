@@ -137,4 +137,14 @@ describe("PreferencesService", () => {
 		expect(service.current.earCalibration).toBeNull();
 		expect(service.current.useMediaPipe).toBe(false);
 	});
+
+	it("reset can clear popupPosition so defaults follow the active display", () => {
+		const store = new FakePreferenceStore();
+		store.set("popupPosition", { x: 40, y: 80 });
+		const service = new PreferencesService(store);
+
+		service.reset(null);
+
+		expect(service.current.popupPosition).toBeNull();
+	});
 });

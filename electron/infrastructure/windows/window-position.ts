@@ -1,20 +1,22 @@
-import { screen } from "electron";
+import { screen, type Display } from "electron";
+
+export function getActiveDisplay(): Display {
+	return screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+}
 
 export function getCenteredPopupPosition(
 	popupWidth: number,
 	popupHeight: number,
 ) {
-	const display = screen.getPrimaryDisplay();
-	const { width, height } = display.workAreaSize;
+	const { x, y, width, height } = getActiveDisplay().workArea;
 	return {
-		x: Math.floor((width - popupWidth) / 2),
-		y: Math.floor((height - popupHeight) / 2),
+		x: Math.floor(x + (width - popupWidth) / 2),
+		y: Math.floor(y + (height - popupHeight) / 2),
 	};
 }
 
 export function getTopCenterPopupPosition(popupWidth: number) {
-	const display = screen.getPrimaryDisplay();
-	const { x, y, width } = display.workArea;
+	const { x, y, width } = getActiveDisplay().workArea;
 	return {
 		x: Math.floor(x + (width - popupWidth) / 2),
 		y: Math.floor(y + 4),

@@ -28,7 +28,6 @@ import { NotificationSoundPlayer } from "./infrastructure/sound/notification-sou
 import { ElectronPreferenceStore } from "./infrastructure/store/electron-preference-store";
 import { TrayController } from "./infrastructure/tray/tray-controller";
 import { WindowManager } from "./infrastructure/windows/window-manager";
-import { getCenteredPopupPosition } from "./infrastructure/windows/window-position";
 import { IPC_CHANNELS } from "../shared/ipc-channels";
 
 if (process.platform === "darwin") {
@@ -220,12 +219,9 @@ function bootstrap(): void {
 		applyLaunchAtLogin(preferences.launchAtLogin);
 		shortcuts.register(preferences.keyboardShortcut);
 
-		if (!store.has("popupPosition")) {
-			preferences.popupPosition = getCenteredPopupPosition(300, 120);
-			store.set("popupPosition", preferences.popupPosition);
-		} else {
-			preferences.popupPosition = store.get("popupPosition");
-		}
+		preferences.popupPosition = store.has("popupPosition")
+			? store.get("popupPosition")
+			: null;
 
 		exercises.resetTimer();
 		if (preferences.eyeExercisesEnabled) exercises.start();

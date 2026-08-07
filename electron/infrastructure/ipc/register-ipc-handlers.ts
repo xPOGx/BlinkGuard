@@ -19,7 +19,6 @@ import { applyLaunchAtLogin } from "../lifecycle/login-item";
 import type { BlinkDetectorSidecar } from "../sidecar/blink-detector-sidecar";
 import type { ShortcutController } from "../shortcuts/shortcut-controller";
 import type { WindowManager } from "../windows/window-manager";
-import { getCenteredPopupPosition } from "../windows/window-position";
 
 interface IpcDependencies {
 	preferences: PreferencesService;
@@ -250,7 +249,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		exercises.stop();
 		lookAway.stop();
 		sidecar.cancelEarCalibration("Preferences reset");
-		preferences.reset(getCenteredPopupPosition(300, 120));
+		preferences.reset(null);
 		applyLaunchAtLogin(false);
 		shortcuts.register(current.keyboardShortcut);
 		sidecar.applyCameraQuality(current.cameraQuality);

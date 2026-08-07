@@ -189,14 +189,14 @@ export class WindowManager {
 
 	showExercise(onClosed: () => void): BrowserWindow | null {
 		if (this.exercise && !this.exercise.isDestroyed()) return null;
-		const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 		const popupWidth = 340;
 		const popupHeight = 200;
+		const { x, y } = getCenteredPopupPosition(popupWidth, popupHeight);
 		const popup = createPanelWindow({
 			width: popupWidth,
 			height: popupHeight,
-			x: Math.floor((width - popupWidth) / 2),
-			y: Math.floor((height - popupHeight) / 2),
+			x,
+			y,
 			focusable: true,
 		}, this.paths.preload);
 		this.exercise = popup;
@@ -221,14 +221,14 @@ export class WindowManager {
 
 	showLookAway(onClosed: () => void): BrowserWindow | null {
 		if (this.lookAway && !this.lookAway.isDestroyed()) return null;
-		const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 		const popupWidth = 340;
 		const popupHeight = 220;
+		const { x, y } = getCenteredPopupPosition(popupWidth, popupHeight);
 		const popup = createPanelWindow({
 			width: popupWidth,
 			height: popupHeight,
-			x: Math.floor((width - popupWidth) / 2),
-			y: Math.floor((height - popupHeight) / 2),
+			x,
+			y,
 			focusable: true,
 		}, this.paths.preload);
 		this.lookAway = popup;
@@ -356,10 +356,11 @@ export class WindowManager {
 	}
 
 	private ensurePopupPosition(): Point {
-		if (!this.preferences.popupPosition) {
-			this.preferences.popupPosition = getCenteredPopupPosition(300, 120);
+		if (this.preferences.popupPosition) {
+			return this.preferences.popupPosition;
 		}
-		return this.preferences.popupPosition;
+		const { width, height } = this.preferences.popupSize;
+		return getCenteredPopupPosition(width, height);
 	}
 
 	private closeWindow(
