@@ -10,6 +10,18 @@ function execute(command: string): Promise<void> {
 	});
 }
 
+/** Kill leftover sidecar binaries (HMR / crash orphans). Safe before spawn. */
+export async function killOrphanedSidecarProcesses(): Promise<void> {
+	if (process.platform === "win32") {
+		await execute("taskkill /im blink_detector.exe /f /t");
+	} else if (process.platform === "darwin") {
+		await execute("pkill -x blink_detector");
+		await execute("killall -9 blink_detector");
+	} else {
+		await execute("pkill -x blink_detector");
+	}
+}
+
 export class ProcessCleanup {
 	constructor(private readonly processes: ChildProcessRegistry) {}
 
@@ -30,15 +42,6 @@ export class ProcessCleanup {
 			}),
 		);
 		this.processes.clear();
-
-		// Orphaned sidecar only — never kill system python/conhost by image name.
-		if (process.platform === "win32") {
-			await execute("taskkill /im blink_detector.exe /f /t");
-		} else if (process.platform === "darwin") {
-			await execute("pkill -x blink_detector");
-			await execute("killall -9 blink_detector");
-		} else {
-			await execute("pkill -x blink_detector");
-		}
+		await killOrphanedSidecarProcesses();
 	}
 }
