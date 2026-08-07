@@ -45,6 +45,22 @@ describe("settings shell", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Eye care" }));
 		expect(screen.getByText("Eye Exercises")).toBeDefined();
 		expect(screen.getByText("20-20-20 Look Away")).toBeDefined();
+		expect(screen.queryByText("Eye strain risk")).toBeNull();
+	});
+
+	it("warns about eye strain when all eye-care prompts are disabled", () => {
+		render(<App />);
+
+		fireEvent.click(screen.getByRole("button", { name: "Eye care" }));
+		fireEvent.click(screen.getByRole("switch", { name: "Toggle eye exercises" }));
+		fireEvent.click(
+			screen.getByRole("switch", { name: "Toggle look-away breaks" }),
+		);
+
+		expect(screen.getByText("Eye strain risk")).toBeDefined();
+		expect(
+			screen.getByText(/both turned off/i),
+		).toBeDefined();
 	});
 
 	it("starts reminders with the renderer interval converted to milliseconds", () => {

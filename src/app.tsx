@@ -13,6 +13,7 @@ import {
 	CameraControls,
 	CameraErrorBanner,
 } from "@/features/camera/ui/camera-controls";
+import { EyeCareDisabledNotice } from "@/features/exercises/ui/eye-care-disabled-notice";
 import { ExerciseSettings } from "@/features/exercises/ui/exercise-settings";
 import { LookAwaySettings } from "@/features/look-away/ui/look-away-settings";
 import { PopupSettings } from "@/features/popup-appearance/ui/popup-settings";
@@ -195,6 +196,10 @@ export default function BlinkGuardHomepage() {
 
 						{section === "exercises" && (
 							<>
+								<EyeCareDisabledNotice
+									eyeExercisesEnabled={preferences.eyeExercisesEnabled}
+									lookAwayEnabled={preferences.lookAwayEnabled}
+								/>
 								<ExerciseSettings
 									preferences={preferences}
 									setPreferences={setPreferences}
