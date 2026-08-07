@@ -24,6 +24,16 @@ body:has(.reminder-card) {
 	animation: fadeInOut 2.5s forwards;
 }
 
+.reminder-stack {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4rem;
+	max-width: 100%;
+	min-width: 0;
+}
+
 .reminder-content {
 	display: flex;
 	align-items: center;
@@ -31,16 +41,6 @@ body:has(.reminder-card) {
 	gap: clamp(0.5rem, 4%, 1rem);
 	max-width: 100%;
 	min-width: 0;
-}
-
-.reminder-body {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
-	justify-content: center;
-	gap: 0.35rem;
-	min-width: 0;
-	max-width: 100%;
 }
 
 .reminder-card.camera-mode {
