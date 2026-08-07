@@ -14,8 +14,11 @@ export function useBlinkStats() {
 
 	useEffect(() => {
 		const unsubscribe = rendererIpc.onBlinkStats(setSnapshot);
-		rendererIpc.requestBlinkStats();
-		return unsubscribe;
+		rendererIpc.subscribeBlinkStats();
+		return () => {
+			unsubscribe();
+			rendererIpc.unsubscribeBlinkStats();
+		};
 	}, []);
 
 	const clearStatistics = () => {

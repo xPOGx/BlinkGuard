@@ -232,7 +232,6 @@ function bootstrap(): void {
 		focusPause.startQuietHoursWatch();
 		focusMonitor.start();
 		windows.setOnMainLoaded(() => {
-			windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
 			focusPause.pushState();
 		});
 

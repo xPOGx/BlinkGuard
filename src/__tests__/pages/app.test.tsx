@@ -68,9 +68,7 @@ describe("settings shell", () => {
 		render(<App />);
 
 		expect(screen.getByRole("heading", { name: "BlinkGuard" })).toBeDefined();
-		expect(
-			screen.getByRole("button", { name: "Start Reminders" }),
-		).toBeDefined();
+		expect(screen.getByRole("button", { name: "Start" })).toBeDefined();
 
 		fireEvent.click(screen.getByRole("button", { name: "System" }));
 		expect(screen.getByText("Keyboard Shortcut")).toBeDefined();
@@ -82,6 +80,10 @@ describe("settings shell", () => {
 		expect(
 			screen.getByRole("button", { name: "Clear statistics" }),
 		).toBeDefined();
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.subscribeBlinkStats);
+
+		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.unsubscribeBlinkStats);
 	});
 
 	it("shows first-run onboarding after prefs hydrate incomplete", () => {
@@ -161,7 +163,7 @@ describe("settings shell", () => {
 	it("starts reminders with the renderer interval converted to milliseconds", () => {
 		render(<App />);
 
-		fireEvent.click(screen.getByRole("button", { name: "Start Reminders" }));
+		fireEvent.click(screen.getByRole("button", { name: "Start" }));
 
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.startBlinkReminders, 3000);
 	});

@@ -36,11 +36,13 @@ describe("BlinkStatsService", () => {
 		vi.useRealTimers();
 	});
 
-	it("persists credited blinks and pushes snapshots", () => {
+	it("persists credited blinks and pushes snapshots when live UI is open", () => {
 		const store = createStore();
 		const service = new BlinkStatsService(store);
 		const push = vi.fn();
 		service.setPushHandler(push);
+		service.setLivePushEnabled(true);
+		push.mockClear();
 
 		service.recordBlink();
 		vi.advanceTimersByTime(1000);
@@ -59,6 +61,29 @@ describe("BlinkStatsService", () => {
 		expect(persisted.days[0]?.date).toBe(localDateKey());
 		expect(persisted.days[0]?.blinks).toBe(1);
 		expect(persisted.totalBlinks).toBe(1);
+		service.dispose();
+	});
+
+	it("does not push while Statistics is closed", () => {
+		const store = createStore();
+		const service = new BlinkStatsService(store);
+		const push = vi.fn();
+		service.setPushHandler(push);
+
+		service.onTrackingStart();
+		service.recordBlink();
+		vi.advanceTimersByTime(20_000);
+		expect(push).not.toHaveBeenCalled();
+		expect(service.getSnapshot().today.blinks).toBe(1);
+
+		service.setLivePushEnabled(true);
+		expect(push).toHaveBeenCalledTimes(1);
+
+		push.mockClear();
+		service.setLivePushEnabled(false);
+		service.recordBlink();
+		vi.advanceTimersByTime(5_000);
+		expect(push).not.toHaveBeenCalled();
 		service.dispose();
 	});
 
@@ -122,6 +147,8 @@ describe("BlinkStatsService", () => {
 		const service = new BlinkStatsService(store);
 		const push = vi.fn();
 		service.setPushHandler(push);
+		service.setLivePushEnabled(true);
+		push.mockClear();
 
 		expect(service.getSnapshot().blinksPerMinute).toBe(0);
 
@@ -137,10 +164,17 @@ describe("BlinkStatsService", () => {
 
 		service.onTrackingStart();
 		service.recordBlink();
-		push.mockClear();
 		vi.advanceTimersByTime(1_000);
-		expect(push).toHaveBeenCalled();
+		push.mockClear();
+		// Stable BPM must not spam full snapshot IPC every tick.
+		vi.advanceTimersByTime(5_000);
+		expect(push).not.toHaveBeenCalled();
 		expect(service.getSnapshot().blinksPerMinute).toBe(1);
+
+		// When a blink ages out of the window, BPM changes → one push.
+		vi.advanceTimersByTime(55_000);
+		expect(push).toHaveBeenCalled();
+		expect(service.getSnapshot().blinksPerMinute).toBe(0);
 
 		service.reset();
 		expect(service.getSnapshot().blinksPerMinute).toBe(0);

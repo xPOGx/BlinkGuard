@@ -8,11 +8,14 @@ import {
 	type BlinkStatsSnapshot,
 	type BlinkStatsState,
 	addTrackingMs,
+	localDateKey,
 	normalizeBlinkStatsState,
 	recordBlink,
 	recordSessionStart,
 	spendBlinks,
+	todaySummary,
 	toBlinkStatsSnapshot,
+	totalsSummary,
 } from "../../shared/blink-stats";
 import type { PreferenceStore } from "./ports/preference-store";
 
@@ -29,6 +32,16 @@ export class BlinkStatsService {
 	private onPush: ((snapshot: BlinkStatsSnapshot) => void) | null = null;
 	/** Ephemeral credited-blink timestamps for live BPM (not persisted). */
 	private blinkTimestamps: number[] = [];
+	/** Last BPM included in a pushed snapshot — skip redundant rate ticks. */
+	private lastPushedBpm: number | null = null;
+	/** True while the Statistics settings panel is mounted. */
+	private livePushEnabled = false;
+	/** Cached charts; rebuilt only when blink/session totals change. */
+	private chartsDirty = true;
+	private cachedCharts: Pick<
+		BlinkStatsSnapshot,
+		"dayChart" | "weekChart" | "monthChart" | "yearChart"
+	> | null = null;
 
 	constructor(private readonly store: PreferenceStore) {
 		this.state = normalizeBlinkStatsState(
@@ -41,14 +54,56 @@ export class BlinkStatsService {
 		this.onPush = handler;
 	}
 
+	/** Enable/disable IPC pushes + rate tick (Statistics panel visibility). */
+	setLivePushEnabled(enabled: boolean): void {
+		if (this.livePushEnabled === enabled) {
+			if (enabled) this.pushSnapshot();
+			return;
+		}
+		this.livePushEnabled = enabled;
+		if (enabled) {
+			if (this.trackingStartedAt !== null) this.startRateTick();
+			this.pushSnapshot();
+			return;
+		}
+		this.stopRateTick();
+		if (this.pushTimer) {
+			clearTimeout(this.pushTimer);
+			this.pushTimer = null;
+		}
+	}
+
+	isLivePushEnabled(): boolean {
+		return this.livePushEnabled;
+	}
+
 	getSnapshot(now: Date = new Date()): BlinkStatsSnapshot {
 		const nowMs = now.getTime();
 		this.blinkTimestamps = pruneBlinkTimestamps(this.blinkTimestamps, nowMs);
-		return toBlinkStatsSnapshot(
-			this.state,
-			now,
-			computeBlinksPerMinute(this.blinkTimestamps, nowMs),
+		const blinksPerMinute = computeBlinksPerMinute(
+			this.blinkTimestamps,
+			nowMs,
 		);
+		const today = localDateKey(now);
+
+		if (this.chartsDirty || !this.cachedCharts) {
+			const full = toBlinkStatsSnapshot(this.state, now, blinksPerMinute);
+			this.cachedCharts = {
+				dayChart: full.dayChart,
+				weekChart: full.weekChart,
+				monthChart: full.monthChart,
+				yearChart: full.yearChart,
+			};
+			this.chartsDirty = false;
+			return full;
+		}
+
+		return {
+			today: todaySummary(this.state, today),
+			totals: totalsSummary(this.state),
+			...this.cachedCharts,
+			blinksPerMinute,
+		};
 	}
 
 	recordBlink(now: Date = new Date()): void {
@@ -58,6 +113,7 @@ export class BlinkStatsService {
 			[...this.blinkTimestamps, nowMs],
 			nowMs,
 		);
+		this.markChartsDirty();
 		this.persist();
 		this.schedulePush();
 	}
@@ -70,6 +126,7 @@ export class BlinkStatsService {
 		const next = spendBlinks(this.state, amount);
 		if (!next) return false;
 		this.state = next;
+		this.markChartsDirty();
 		this.persist();
 		this.schedulePush(true);
 		return true;
@@ -79,9 +136,10 @@ export class BlinkStatsService {
 		if (this.trackingStartedAt !== null) return;
 		this.state = recordSessionStart(this.state, now);
 		this.trackingStartedAt = now.getTime();
+		this.markChartsDirty();
 		this.persist();
 		this.startFlushTimer();
-		this.startRateTick();
+		if (this.livePushEnabled) this.startRateTick();
 		this.schedulePush();
 	}
 
@@ -97,6 +155,8 @@ export class BlinkStatsService {
 		this.stopFlushTimer();
 		this.stopRateTick();
 		this.blinkTimestamps = [];
+		this.lastPushedBpm = null;
+		this.markChartsDirty();
 		const wasTracking = this.trackingStartedAt !== null;
 		this.trackingStartedAt = null;
 		this.state = { ...DEFAULT_BLINK_STATS, days: [] };
@@ -113,10 +173,15 @@ export class BlinkStatsService {
 		this.flushTracking();
 		this.stopFlushTimer();
 		this.stopRateTick();
+		this.livePushEnabled = false;
 		if (this.pushTimer) {
 			clearTimeout(this.pushTimer);
 			this.pushTimer = null;
 		}
+	}
+
+	private markChartsDirty(): void {
+		this.chartsDirty = true;
 	}
 
 	private flushTracking(now: Date = new Date()): void {
@@ -146,7 +211,7 @@ export class BlinkStatsService {
 	private startRateTick(): void {
 		this.stopRateTick();
 		this.rateTickTimer = setInterval(() => {
-			this.schedulePush();
+			this.tickLiveRate();
 		}, RATE_TICK_MS);
 	}
 
@@ -157,24 +222,43 @@ export class BlinkStatsService {
 		}
 	}
 
+	/**
+	 * Decay live BPM without a full IPC storm: only push when the rate changes.
+	 * Empty window → no work (avoids 1Hz snapshot rebuilds while tracking idle).
+	 */
+	private tickLiveRate(nowMs: number = Date.now()): void {
+		if (!this.livePushEnabled || this.blinkTimestamps.length === 0) return;
+		this.blinkTimestamps = pruneBlinkTimestamps(this.blinkTimestamps, nowMs);
+		const bpm = computeBlinksPerMinute(this.blinkTimestamps, nowMs);
+		if (bpm === this.lastPushedBpm) return;
+		this.schedulePush();
+	}
+
 	private persist(): void {
 		this.store.set(BLINK_STATS_STORE_KEY, this.state);
 	}
 
+	private pushSnapshot(now: Date = new Date()): void {
+		if (!this.onPush || !this.livePushEnabled) return;
+		const snapshot = this.getSnapshot(now);
+		this.lastPushedBpm = snapshot.blinksPerMinute;
+		this.onPush(snapshot);
+	}
+
 	private schedulePush(immediate = false): void {
-		if (!this.onPush) return;
+		if (!this.onPush || !this.livePushEnabled) return;
 		if (immediate) {
 			if (this.pushTimer) {
 				clearTimeout(this.pushTimer);
 				this.pushTimer = null;
 			}
-			this.onPush(this.getSnapshot());
+			this.pushSnapshot();
 			return;
 		}
 		if (this.pushTimer) return;
 		this.pushTimer = setTimeout(() => {
 			this.pushTimer = null;
-			this.onPush?.(this.getSnapshot());
+			this.pushSnapshot();
 		}, PUSH_THROTTLE_MS);
 	}
 }

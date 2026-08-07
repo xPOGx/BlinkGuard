@@ -116,5 +116,7 @@ export const rendererIpc = {
 	onBlinkStats: (listener: (snapshot: BlinkStatsSnapshot) => void) =>
 		subscribe(IPC_CHANNELS.loadBlinkStats, listener),
 	requestBlinkStats: () => send(IPC_CHANNELS.requestBlinkStats),
+	subscribeBlinkStats: () => send(IPC_CHANNELS.subscribeBlinkStats),
+	unsubscribeBlinkStats: () => send(IPC_CHANNELS.unsubscribeBlinkStats),
 	resetBlinkStats: () => send(IPC_CHANNELS.resetBlinkStats),
 };

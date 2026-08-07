@@ -271,6 +271,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	ipcMain.on(IPC_CHANNELS.requestBlinkStats, () => {
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
 	});
+	ipcMain.on(IPC_CHANNELS.subscribeBlinkStats, () => {
+		blinkStats.setLivePushEnabled(true);
+	});
+	ipcMain.on(IPC_CHANNELS.unsubscribeBlinkStats, () => {
+		blinkStats.setLivePushEnabled(false);
+	});
 	ipcMain.on(IPC_CHANNELS.resetBlinkStats, () => {
 		blinkStats.reset();
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
