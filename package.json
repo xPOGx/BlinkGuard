@@ -11,7 +11,7 @@
 		"dev": "vite",
 		"build": "tsc && vite build && electron-builder",
 		"build:electron": "tsc && vite build",
-		"build:mac": "npm run build:electron && node scripts/remove-quarantine.js && electron-builder --mac",
+		"build:mac": "npm run build:electron && electron-builder --mac && node scripts/remove-quarantine.js",
 		"build:mac:clean": "npm run build:mac && node scripts/remove-quarantine.js --clean-dmg",
 		"build:windows": "node scripts/prepare-python-windows.js && tsc && vite build && electron-builder --win nsis --config.win.signAndEditExecutable=false",
 		"remove-quarantine": "node scripts/remove-quarantine.js",

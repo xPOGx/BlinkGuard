@@ -37,7 +37,7 @@ Cursor rules under `.cursor/rules/` and the blink-detector skill under `.cursor/
 - Lint: `npm run lint` runs `biome check --write src`, which **mutates source files**. For a read-only check use `npx @biomejs/biome check src`. Biome currently reports pre-existing lint errors (e.g. missing button `type`); these are not caused by env setup. Biome scopes **`src` only** — `electron/` and `shared/` are not Biome-gated.
 - Tests: `npm test` (watch) or `npm run coverage` (one-shot). Vitest uses `happy-dom` (`vitest.config.ts`). `src/__tests__/pages/app.test.tsx` is a settings-shell smoke suite (render controls + IPC send for start reminders / shortcut), not the old Electron+React template.
 - Note: `coverage/` is committed to the repo and gets overwritten/cleaned by `npm run coverage` — avoid committing regenerated coverage output.
-- Build (compile only): `npm run build:electron` (`tsc && vite build`). Do NOT use `npm run build:mac` / `npm run build:windows` here — they reference a `scripts/` directory that does not exist in the repo, and they cross-compile for macOS/Windows only.
+- Build (compile only): `npm run build:electron` (`tsc && vite build`). Do NOT use `npm run build:mac` / `npm run build:windows` here — they are local packaging helpers (`scripts/prepare-python-windows.js`, `scripts/remove-quarantine.js`) and need a matching OS host / Python sidecar toolchain; quarantine removal is macOS-only and no-ops elsewhere.
 
 ### Optional service: Python blink-detector sidecar
 

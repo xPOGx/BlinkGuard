@@ -358,22 +358,22 @@ jobs:
           Write-Host "🔍 Verifying Windows app artifacts..."
           
           # Check if EXE was created
-          if (!(Test-Path "dist/ScreenBlink.Setup.exe")) {
+          if (!(Test-Path "dist/BlinkGuard.Setup.exe")) {
             Write-Error "EXE file not found"
             Get-ChildItem "dist/" -ErrorAction SilentlyContinue
             exit 1
           }
           
           # Check if ZIP was created
-          if (!(Test-Path "dist/ScreenBlink-x64.zip")) {
+          if (!(Test-Path "dist/BlinkGuard-x64.zip")) {
             Write-Error "ZIP file not found"
             Get-ChildItem "dist/" -ErrorAction SilentlyContinue
             exit 1
           }
           
           # Check file sizes
-          $EXE_SIZE = (Get-Item "dist/ScreenBlink.Setup.exe").Length
-          $ZIP_SIZE = (Get-Item "dist/ScreenBlink-x64.zip").Length
+          $EXE_SIZE = (Get-Item "dist/BlinkGuard.Setup.exe").Length
+          $ZIP_SIZE = (Get-Item "dist/BlinkGuard-x64.zip").Length
           
           Write-Host "📦 EXE size: $EXE_SIZE bytes ($([math]::Round($EXE_SIZE / 1MB, 2))MB)"
           Write-Host "📦 ZIP size: $ZIP_SIZE bytes ($([math]::Round($ZIP_SIZE / 1MB, 2))MB)"
@@ -388,13 +388,13 @@ jobs:
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ScreenBlink-Windows
+          name: BlinkGuard-Windows
           path: |
-            dist/ScreenBlink.Setup.exe
-            dist/ScreenBlink-x64.zip
+            dist/BlinkGuard.Setup.exe
+            dist/BlinkGuard-x64.zip
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ScreenBlink.Setup.exe
-          path: dist/ScreenBlink.Setup.exe 
+          name: BlinkGuard.Setup.exe
+          path: dist/BlinkGuard.Setup.exe 
