@@ -14,11 +14,13 @@ export function usePreferences() {
 	const [preferences, setPreferences] = useState<SettingsPreferences>(
 		DEFAULT_RENDERER_PREFERENCES,
 	);
+	const [prefsHydrated, setPrefsHydrated] = useState(false);
 
 	useEffect(
 		() =>
 			rendererIpc.onPreferences((saved: RendererPreferences) => {
 				setPreferences((current) => ({ ...current, ...saved }));
+				setPrefsHydrated(true);
 			}),
 		[],
 	);
@@ -43,6 +45,9 @@ export function usePreferences() {
 		rendererIpc.updateQuietHoursStart(preferences.quietHoursStart);
 		rendererIpc.updateQuietHoursEnd(preferences.quietHoursEnd);
 		rendererIpc.updatePauseOnFullscreen(preferences.pauseOnFullscreen);
+		rendererIpc.updateHasCompletedOnboarding(
+			preferences.hasCompletedOnboarding,
+		);
 	}, [preferences]);
 
 	useEffect(() => {
@@ -77,6 +82,7 @@ export function usePreferences() {
 	return {
 		preferences,
 		setPreferences,
+		prefsHydrated,
 		toggleTracking,
 		changeReminderInterval,
 	};

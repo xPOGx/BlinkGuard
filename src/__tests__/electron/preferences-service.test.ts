@@ -36,10 +36,39 @@ describe("PreferencesService", () => {
 		);
 		expect(service.current.isTracking).toBe(false);
 		expect(service.current.launchAtLogin).toBe(false);
+		expect(service.current.hasCompletedOnboarding).toBe(false);
 		expect(service.current.darkMode).toBe(DEFAULT_PREFERENCES.darkMode);
 		expect(service.current.cameraQuality).toBe(
 			DEFAULT_PREFERENCES.cameraQuality,
 		);
+	});
+
+	it("migrates upgrades to hasCompletedOnboarding when other prefs exist", () => {
+		const store = new FakePreferenceStore();
+		store.set("keyboardShortcut", "Ctrl+B");
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.hasCompletedOnboarding).toBe(true);
+		expect(store.get("hasCompletedOnboarding")).toBe(true);
+	});
+
+	it("keeps first-run onboarding when the store is empty", () => {
+		const store = new FakePreferenceStore();
+		const service = new PreferencesService(store);
+
+		expect(service.current.hasCompletedOnboarding).toBe(false);
+		expect(store.has("hasCompletedOnboarding")).toBe(false);
+	});
+
+	it("respects an explicit hasCompletedOnboarding false on upgrade-shaped stores", () => {
+		const store = new FakePreferenceStore();
+		store.set("keyboardShortcut", "Ctrl+B");
+		store.set("hasCompletedOnboarding", false);
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.hasCompletedOnboarding).toBe(false);
 	});
 
 	it("hydrates persisted values from the store", () => {
@@ -130,6 +159,8 @@ describe("PreferencesService", () => {
 		expect(service.current.popupPosition).toEqual(popupPosition);
 		expect(service.current.isTracking).toBe(false);
 		expect(service.current.launchAtLogin).toBe(false);
+		expect(service.current.hasCompletedOnboarding).toBe(true);
+		expect(store.get("hasCompletedOnboarding")).toBe(true);
 		expect(service.current.soundEnabled).toBe(DEFAULT_PREFERENCES.soundEnabled);
 		expect(service.current.cameraQuality).toBe(
 			DEFAULT_PREFERENCES.cameraQuality,
@@ -146,5 +177,16 @@ describe("PreferencesService", () => {
 		service.reset(null);
 
 		expect(service.current.popupPosition).toBeNull();
+	});
+
+	it("reset with replayOnboarding leaves first-run incomplete", () => {
+		const store = new FakePreferenceStore();
+		store.set("hasCompletedOnboarding", true);
+		const service = new PreferencesService(store);
+
+		service.reset(null, { replayOnboarding: true });
+
+		expect(service.current.hasCompletedOnboarding).toBe(false);
+		expect(store.has("hasCompletedOnboarding")).toBe(false);
 	});
 });

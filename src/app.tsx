@@ -15,6 +15,7 @@ import {
 import { ExerciseSettings } from "@/features/exercises/ui/exercise-settings";
 import { EyeCareDisabledNotice } from "@/features/exercises/ui/eye-care-disabled-notice";
 import { LookAwaySettings } from "@/features/look-away/ui/look-away-settings";
+import { OnboardingWizard } from "@/features/onboarding/ui/onboarding-wizard";
 import { PopupSettings } from "@/features/popup-appearance/ui/popup-settings";
 import { ReminderControls } from "@/features/reminders/ui/reminder-controls";
 import { usePreferences } from "@/features/settings/model/use-preferences";
@@ -23,6 +24,7 @@ import {
 	LaunchAtLoginSettings,
 	QuietHoursFocusSettings,
 	ResetPreferencesButton,
+	ShowOnboardingButton,
 	SoundSettings,
 } from "@/features/settings/ui/settings-controls";
 import { TrackingEyeButton } from "@/features/settings/ui/tracking-eye-button";
@@ -87,6 +89,7 @@ export default function BlinkGuardHomepage() {
 	const {
 		preferences,
 		setPreferences,
+		prefsHydrated,
 		toggleTracking,
 		changeReminderInterval,
 	} = usePreferences();
@@ -98,9 +101,17 @@ export default function BlinkGuardHomepage() {
 	});
 	const [section, setSection] = useState<SectionId>("reminders");
 	const active = SECTIONS.find((item) => item.id === section) ?? SECTIONS[0];
+	const showOnboarding = prefsHydrated && !preferences.hasCompletedOnboarding;
 
 	return (
 		<div className="flex h-screen flex-col bg-background text-foreground min-[721px]:flex-row">
+			{showOnboarding ? (
+				<OnboardingWizard
+					preferences={preferences}
+					setPreferences={setPreferences}
+					shortcut={shortcuts}
+				/>
+			) : null}
 			<aside className="flex shrink-0 flex-col border-b border-border bg-sidebar min-[721px]:w-56 min-[721px]:border-r min-[721px]:border-b-0">
 				<div className="flex items-center gap-2.5 px-4 py-3 min-[721px]:px-5 min-[721px]:py-5">
 					<TrackingEyeButton
@@ -244,6 +255,9 @@ export default function BlinkGuardHomepage() {
 										setPreferences={setPreferences}
 									/>
 									<ResetPreferencesButton />
+									{import.meta.env.DEV ? (
+										<ShowOnboardingButton setPreferences={setPreferences} />
+									) : null}
 								</div>
 								<QuietHoursFocusSettings
 									preferences={preferences}

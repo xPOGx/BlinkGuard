@@ -123,3 +123,9 @@ describe("quiet hours / focus preference defaults", () => {
 		expect(DEFAULT_PREFERENCES.pauseOnFullscreen).toBe(true);
 	});
 });
+
+describe("onboarding preference defaults", () => {
+	it("defaults hasCompletedOnboarding to false for first-run", () => {
+		expect(DEFAULT_PREFERENCES.hasCompletedOnboarding).toBe(false);
+	});
+});

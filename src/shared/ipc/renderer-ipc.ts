@@ -89,6 +89,8 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateSoundEnabled, enabled),
 	updateLaunchAtLogin: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateLaunchAtLogin, enabled),
+	updateHasCompletedOnboarding: (completed: boolean) =>
+		send(IPC_CHANNELS.updateHasCompletedOnboarding, completed),
 	updateQuietHoursEnabled: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateQuietHoursEnabled, enabled),
 	updateQuietHoursStart: (value: string) =>
@@ -109,7 +111,8 @@ export const rendererIpc = {
 	showCameraWindow: () => send(IPC_CHANNELS.showCameraWindow),
 	closeCameraWindow: () => send(IPC_CHANNELS.closeCameraWindow),
 	showPopupEditor: () => send(IPC_CHANNELS.showPopupEditor),
-	resetPreferences: () => send(IPC_CHANNELS.resetPreferences),
+	resetPreferences: (replayOnboarding = false) =>
+		send(IPC_CHANNELS.resetPreferences, replayOnboarding),
 	onBlinkStats: (listener: (snapshot: BlinkStatsSnapshot) => void) =>
 		subscribe(IPC_CHANNELS.loadBlinkStats, listener),
 	requestBlinkStats: () => send(IPC_CHANNELS.requestBlinkStats),

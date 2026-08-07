@@ -60,6 +60,22 @@ export class PreferencesService {
 		if (typeof persisted.pauseOnFullscreen !== "boolean") {
 			persisted.pauseOnFullscreen = DEFAULT_PREFERENCES.pauseOnFullscreen;
 		}
+		if (typeof persisted.hasCompletedOnboarding !== "boolean") {
+			persisted.hasCompletedOnboarding =
+				DEFAULT_PREFERENCES.hasCompletedOnboarding;
+		}
+
+		// Upgrade: existing installs without the flag should skip first-run.
+		if (!this.store.has("hasCompletedOnboarding")) {
+			const looksLikeExistingUser = PERSISTED_KEYS.some(
+				(key) =>
+					key !== "hasCompletedOnboarding" && this.store.has(key),
+			);
+			if (looksLikeExistingUser) {
+				persisted.hasCompletedOnboarding = true;
+				this.store.set("hasCompletedOnboarding", true);
+			}
+		}
 
 		this.current = { ...persisted };
 	}
@@ -72,10 +88,16 @@ export class PreferencesService {
 		this.store.set(key, value);
 	}
 
-	reset(popupPosition: PersistedPreferences["popupPosition"]): void {
+	reset(
+		popupPosition: PersistedPreferences["popupPosition"],
+		options?: { replayOnboarding?: boolean },
+	): void {
 		this.store.clear();
 		Object.assign(this.current, DEFAULT_PREFERENCES, {
 			popupPosition,
 		});
+		if (!options?.replayOnboarding) {
+			this.set("hasCompletedOnboarding", true);
+		}
 	}
 }

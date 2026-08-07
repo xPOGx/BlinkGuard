@@ -194,6 +194,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		applyLaunchAtLogin(enabled);
 	});
 	ipcMain.on(
+		IPC_CHANNELS.updateHasCompletedOnboarding,
+		(_event, completed: boolean) => {
+			preferences.set("hasCompletedOnboarding", Boolean(completed));
+		},
+	);
+	ipcMain.on(
 		IPC_CHANNELS.updateQuietHoursEnabled,
 		(_event, enabled: boolean) => {
 			preferences.set("quietHoursEnabled", Boolean(enabled));
@@ -244,20 +250,25 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 			windows.sendPreferences();
 		},
 	);
-	ipcMain.on(IPC_CHANNELS.resetPreferences, () => {
-		if (current.isTracking) reminders.stop(true);
-		exercises.stop();
-		lookAway.stop();
-		sidecar.cancelEarCalibration("Preferences reset");
-		preferences.reset(null);
-		applyLaunchAtLogin(false);
-		shortcuts.register(current.keyboardShortcut);
-		sidecar.applyCameraQuality(current.cameraQuality);
-		sidecar.applyEarCalibration(null);
-		sidecar.applyDetectorBackend(false, false);
-		windows.sendPreferences();
-		focusPause.recompute();
-	});
+	ipcMain.on(
+		IPC_CHANNELS.resetPreferences,
+		(_event, replayOnboarding?: boolean) => {
+			if (current.isTracking) reminders.stop(true);
+			exercises.stop();
+			lookAway.stop();
+			sidecar.cancelEarCalibration("Preferences reset");
+			preferences.reset(null, {
+				replayOnboarding: Boolean(replayOnboarding),
+			});
+			applyLaunchAtLogin(false);
+			shortcuts.register(current.keyboardShortcut);
+			sidecar.applyCameraQuality(current.cameraQuality);
+			sidecar.applyEarCalibration(null);
+			sidecar.applyDetectorBackend(false, false);
+			windows.sendPreferences();
+			focusPause.recompute();
+		},
+	);
 	ipcMain.on(IPC_CHANNELS.requestBlinkStats, () => {
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
 	});

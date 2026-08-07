@@ -52,6 +52,8 @@ export interface PersistedPreferences {
 	quietHoursEnd: string;
 	/** Suppress interruptive popups while another app is fullscreen. */
 	pauseOnFullscreen: boolean;
+	/** First-run setup completed or skipped; false until Finish/Skip. */
+	hasCompletedOnboarding: boolean;
 }
 
 export type AppPreferences = PersistedPreferences;
@@ -89,6 +91,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	quietHoursStart: "22:00",
 	quietHoursEnd: "08:00",
 	pauseOnFullscreen: true,
+	hasCompletedOnboarding: false,
 };
 
 export function toRendererPreferences(

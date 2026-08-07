@@ -136,20 +136,85 @@ export function LaunchAtLoginSettings({
 }
 
 export function ResetPreferencesButton() {
-	const reset = () => {
-		if (
-			window.confirm(
-				"Are you sure you want to reset all preferences to default values?",
-			)
-		) {
-			rendererIpc.resetPreferences();
-		}
+	const [confirming, setConfirming] = useState(false);
+	const [replayOnboarding, setReplayOnboarding] = useState(false);
+
+	const confirmReset = () => {
+		rendererIpc.resetPreferences(replayOnboarding);
+		setConfirming(false);
+		setReplayOnboarding(false);
 	};
+
+	if (confirming) {
+		return (
+			<SettingPanel className="space-y-3">
+				<p className="text-sm text-foreground">
+					Reset all preferences to default values?
+				</p>
+				<label className="flex items-start gap-2 text-sm text-muted-foreground">
+					<input
+						type="checkbox"
+						checked={replayOnboarding}
+						onChange={(event) => setReplayOnboarding(event.target.checked)}
+						className="mt-0.5"
+					/>
+					<span>Show first-run setup again</span>
+				</label>
+				<div className="flex flex-wrap gap-2">
+					<Button
+						type="button"
+						variant="secondary"
+						onClick={() => {
+							setConfirming(false);
+							setReplayOnboarding(false);
+						}}
+					>
+						Cancel
+					</Button>
+					<Button type="button" variant="destructive" onClick={confirmReset}>
+						Reset
+					</Button>
+				</div>
+			</SettingPanel>
+		);
+	}
 
 	return (
 		<SettingPanel className="flex items-center justify-center">
-			<Button type="button" variant="destructive" onClick={reset}>
+			<Button
+				type="button"
+				variant="destructive"
+				onClick={() => setConfirming(true)}
+			>
 				Reset Preferences
+			</Button>
+		</SettingPanel>
+	);
+}
+
+interface ShowOnboardingButtonProps {
+	setPreferences: SetPreferences;
+}
+
+/** Dev-only: reopen the first-run wizard without resetting other prefs. */
+export function ShowOnboardingButton({
+	setPreferences,
+}: ShowOnboardingButtonProps) {
+	if (!import.meta.env.DEV) return null;
+
+	return (
+		<SettingPanel className="flex items-center justify-center">
+			<Button
+				type="button"
+				variant="secondary"
+				onClick={() =>
+					setPreferences((current) => ({
+						...current,
+						hasCompletedOnboarding: false,
+					}))
+				}
+			>
+				Show onboarding
 			</Button>
 		</SettingPanel>
 	);

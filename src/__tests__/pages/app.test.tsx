@@ -1,7 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/app";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
+import {
+	DEFAULT_PREFERENCES,
+	type RendererPreferences,
+	toRendererPreferences,
+} from "../../../shared/preferences";
 
 vi.mock("lottie-web", () => ({
 	default: {
@@ -22,18 +27,38 @@ vi.mock("lottie-web", () => ({
 }));
 
 const send = vi.fn();
-const listeners = new Map<string, (...args: unknown[]) => void>();
+const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+
+function hydratePreferences(
+	overrides: Partial<RendererPreferences> = {},
+): void {
+	const channelListeners = listeners.get(IPC_CHANNELS.loadPreferences);
+	expect(channelListeners?.size).toBeGreaterThan(0);
+	act(() => {
+		for (const listener of channelListeners ?? []) {
+			listener({
+				...toRendererPreferences(DEFAULT_PREFERENCES),
+				...overrides,
+			});
+		}
+	});
+}
 
 beforeEach(() => {
 	listeners.clear();
+	send.mockClear();
 	Object.defineProperty(window, "ipcRenderer", {
 		configurable: true,
 		value: {
 			send,
 			on: vi.fn((channel: string, listener: (...args: unknown[]) => void) => {
-				listeners.set(channel, listener);
+				const set = listeners.get(channel) ?? new Set();
+				set.add(listener);
+				listeners.set(channel, set);
 			}),
-			off: vi.fn(),
+			off: vi.fn((channel: string, listener: (...args: unknown[]) => void) => {
+				listeners.get(channel)?.delete(listener);
+			}),
 		},
 	});
 });
@@ -59,6 +84,56 @@ describe("settings shell", () => {
 		).toBeDefined();
 	});
 
+	it("shows first-run onboarding after prefs hydrate incomplete", () => {
+		render(<App />);
+		expect(screen.queryByRole("dialog")).toBeNull();
+
+		hydratePreferences({ hasCompletedOnboarding: false });
+
+		expect(screen.getByRole("dialog")).toBeDefined();
+		expect(screen.getByText("Welcome to BlinkGuard")).toBeDefined();
+		expect(
+			screen.getByRole("heading", { name: "Reminder mode" }),
+		).toBeDefined();
+	});
+
+	it("hides onboarding when prefs hydrate as completed", () => {
+		render(<App />);
+		hydratePreferences({ hasCompletedOnboarding: true });
+
+		expect(screen.queryByRole("dialog")).toBeNull();
+		expect(screen.queryByText("Welcome to BlinkGuard")).toBeNull();
+	});
+
+	it("dismisses onboarding when Skip is pressed", () => {
+		render(<App />);
+		hydratePreferences({ hasCompletedOnboarding: false });
+
+		fireEvent.click(screen.getByRole("button", { name: "Skip" }));
+
+		expect(screen.queryByRole("dialog")).toBeNull();
+		expect(send).toHaveBeenCalledWith(
+			IPC_CHANNELS.updateHasCompletedOnboarding,
+			true,
+		);
+	});
+
+	it("dismisses onboarding when Finish is pressed", () => {
+		render(<App />);
+		hydratePreferences({ hasCompletedOnboarding: false });
+
+		fireEvent.click(screen.getByRole("button", { name: "Next" }));
+		fireEvent.click(screen.getByRole("button", { name: "Next" }));
+		fireEvent.click(screen.getByRole("button", { name: "Next" }));
+		fireEvent.click(screen.getByRole("button", { name: "Finish" }));
+
+		expect(screen.queryByRole("dialog")).toBeNull();
+		expect(send).toHaveBeenCalledWith(
+			IPC_CHANNELS.updateHasCompletedOnboarding,
+			true,
+		);
+	});
+
 	it("renders eye-care controls for exercises and look-away", () => {
 		render(<App />);
 
@@ -72,15 +147,15 @@ describe("settings shell", () => {
 		render(<App />);
 
 		fireEvent.click(screen.getByRole("button", { name: "Eye care" }));
-		fireEvent.click(screen.getByRole("switch", { name: "Toggle eye exercises" }));
+		fireEvent.click(
+			screen.getByRole("switch", { name: "Toggle eye exercises" }),
+		);
 		fireEvent.click(
 			screen.getByRole("switch", { name: "Toggle look-away breaks" }),
 		);
 
 		expect(screen.getByText("Eye strain risk")).toBeDefined();
-		expect(
-			screen.getByText(/both turned off/i),
-		).toBeDefined();
+		expect(screen.getByText(/both turned off/i)).toBeDefined();
 	});
 
 	it("starts reminders with the renderer interval converted to milliseconds", () => {
