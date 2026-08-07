@@ -1,46 +1,132 @@
-import lottieReact from "lottie-react";
-import { useEffect } from "react";
+import lottieWeb, { type AnimationItem } from "lottie-web";
+import { useEffect, useRef } from "react";
 import eyeAnimation from "@/assets/eye.json";
 import { cn } from "@/lib/utils";
 
-/** Vite CJS interop: prebundle exports the module namespace as default. */
-const { useLottie } = (
-	"useLottie" in lottieReact
-		? lottieReact
-		: (lottieReact as unknown as { default: typeof lottieReact }).default
-) as typeof import("lottie-react");
+type LottiePlayer = {
+	loadAnimation: typeof lottieWeb.loadAnimation;
+};
 
-/** Fully open eye keyframe (blinks close at 4 / 24 / 51). */
-const IDLE_EYE_FRAME = 0;
+const lottiePlayer = (
+	"loadAnimation" in lottieWeb
+		? lottieWeb
+		: (lottieWeb as unknown as { default: LottiePlayer }).default
+) as LottiePlayer;
+
+/** Fully open eye keyframes (blinks close at 4 / 24 / 51). */
+const OPEN_EYE_FRAMES = [0, 8, 20, 28, 47] as const;
+const IDLE_EYE_FRAME = OPEN_EYE_FRAMES[0];
 
 interface TrackingEyeButtonProps {
 	isTracking: boolean;
 	onToggle: () => void;
 }
 
+function openFrameTarget(current: number): {
+	frame: number;
+	forward: boolean;
+} {
+	const next = OPEN_EYE_FRAMES.find((frame) => frame > current + 0.25);
+	if (next != null) return { frame: next, forward: true };
+
+	const previous = [...OPEN_EYE_FRAMES]
+		.reverse()
+		.find((frame) => frame < current - 0.25);
+	if (previous != null) return { frame: previous, forward: false };
+
+	return { frame: IDLE_EYE_FRAME, forward: true };
+}
+
+function clearSettleListener(
+	anim: AnimationItem,
+	settleRef: { current: (() => void) | null },
+) {
+	if (!settleRef.current) return;
+	anim.removeEventListener("complete", settleRef.current);
+	settleRef.current = null;
+}
+
+function settleOnOpen(anim: AnimationItem, frame: number) {
+	anim.loop = false;
+	anim.setDirection(1);
+	anim.resetSegments(true);
+	anim.goToAndStop(frame, true);
+}
+
 export function TrackingEyeButton({
 	isTracking,
 	onToggle,
 }: TrackingEyeButtonProps) {
-	const { View, goToAndPlay, goToAndStop, setSpeed, animationLoaded } =
-		useLottie({
-			animationData: eyeAnimation,
-			loop: true,
-			autoplay: false,
-			style: { width: 28, height: 28, pointerEvents: "none" },
-		});
+	const containerRef = useRef<HTMLSpanElement>(null);
+	const animRef = useRef<AnimationItem | null>(null);
+	const settleRef = useRef<(() => void) | null>(null);
+	const wasTrackingRef = useRef(false);
 
 	useEffect(() => {
-		if (!animationLoaded) return;
+		const container = containerRef.current;
+		if (!container) return;
+
+		const anim = lottiePlayer.loadAnimation({
+			container,
+			renderer: "svg",
+			loop: true,
+			autoplay: false,
+			animationData: structuredClone(eyeAnimation),
+		});
+		animRef.current = anim;
+		settleOnOpen(anim, IDLE_EYE_FRAME);
+
+		return () => {
+			clearSettleListener(anim, settleRef);
+			anim.destroy();
+			animRef.current = null;
+		};
+	}, []);
+
+	useEffect(() => {
+		const anim = animRef.current;
+		if (!anim) return;
+
+		clearSettleListener(anim, settleRef);
 
 		if (isTracking) {
-			setSpeed(1);
-			goToAndPlay(0, true);
+			const resumeFrame = anim.currentFrame;
+			wasTrackingRef.current = true;
+			anim.loop = true;
+			anim.setDirection(1);
+			anim.resetSegments(true);
+			anim.setSpeed(1);
+			anim.goToAndPlay(resumeFrame, true);
 			return;
 		}
 
-		goToAndStop(IDLE_EYE_FRAME, true);
-	}, [animationLoaded, goToAndPlay, goToAndStop, isTracking, setSpeed]);
+		if (!wasTrackingRef.current) {
+			settleOnOpen(anim, IDLE_EYE_FRAME);
+			return;
+		}
+
+		wasTrackingRef.current = false;
+		const current = anim.currentFrame;
+		const { frame: target, forward } = openFrameTarget(current);
+
+		if (Math.abs(current - target) < 0.5) {
+			settleOnOpen(anim, target);
+			return;
+		}
+
+		const settle = () => {
+			clearSettleListener(anim, settleRef);
+			settleOnOpen(anim, target);
+		};
+		settleRef.current = settle;
+		anim.addEventListener("complete", settle);
+		anim.loop = false;
+		anim.setDirection(forward ? 1 : -1);
+		anim.playSegments(
+			forward ? [Math.floor(current), target] : [target, Math.ceil(current)],
+			true,
+		);
+	}, [isTracking]);
 
 	return (
 		<button
@@ -63,9 +149,11 @@ export function TrackingEyeButton({
 					className="pointer-events-none absolute inset-0 z-0 animate-tracking-pulse rounded-lg bg-primary/40"
 				/>
 			) : null}
-			<span aria-hidden className="relative z-10 pointer-events-none">
-				{View}
-			</span>
+			<span
+				ref={containerRef}
+				aria-hidden
+				className="relative z-10 pointer-events-none h-7 w-7 [&>svg]:h-full [&>svg]:w-full"
+			/>
 		</button>
 	);
 }

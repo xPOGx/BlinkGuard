@@ -3,14 +3,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/app";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 
-vi.mock("lottie-react", () => ({
+vi.mock("lottie-web", () => ({
 	default: {
-		useLottie: () => ({
-			View: null,
-			goToAndPlay: vi.fn(),
+		loadAnimation: () => ({
 			goToAndStop: vi.fn(),
+			goToAndPlay: vi.fn(),
+			playSegments: vi.fn(),
+			resetSegments: vi.fn(),
 			setSpeed: vi.fn(),
-			animationLoaded: false,
+			setDirection: vi.fn(),
+			addEventListener: vi.fn(),
+			removeEventListener: vi.fn(),
+			destroy: vi.fn(),
+			currentFrame: 0,
+			loop: true,
 		}),
 	},
 }));
