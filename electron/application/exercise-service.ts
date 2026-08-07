@@ -1,4 +1,7 @@
-import type { AppPreferences } from "../../shared/preferences";
+import {
+	sanitizeExercisePrompts,
+	type AppPreferences,
+} from "../../shared/preferences";
 import type { AppRuntimeState } from "./app-runtime-state";
 import type { PreferenceStore } from "./ports/preference-store";
 import type { NotificationGate } from "./ports/notification-gate";
@@ -68,7 +71,17 @@ export class ExerciseService {
 		this.sound.play("exercise");
 		this.state.isExerciseShowing = true;
 		this.store.set("lastExerciseTime", Date.now());
-		const popup = this.windows.showExercise(() => {
+
+		const prompts = sanitizeExercisePrompts(this.preferences.exercisePrompts);
+		const rawIndex = this.store.get("exercisePromptIndex", 0);
+		const index =
+			(typeof rawIndex === "number" && Number.isFinite(rawIndex)
+				? Math.floor(rawIndex)
+				: 0) % prompts.length;
+		const prompt = prompts[index];
+		this.store.set("exercisePromptIndex", (index + 1) % prompts.length);
+
+		const popup = this.windows.showExercise(prompt, () => {
 			this.state.isExerciseShowing = false;
 		});
 		if (!popup) {

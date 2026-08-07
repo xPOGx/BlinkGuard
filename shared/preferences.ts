@@ -27,6 +27,8 @@ export interface PersistedPreferences {
 	useMediaPipe: boolean;
 	eyeExercisesEnabled: boolean;
 	exerciseInterval: number;
+	/** Rotating eye-exercise instruction texts shown in the exercise popup. */
+	exercisePrompts: string[];
 	/** Periodic 20-20-20 style look-away breaks (independent of blink tracking). */
 	lookAwayEnabled: boolean;
 	/** Minutes between look-away prompts. */
@@ -62,6 +64,25 @@ export type RendererPreferences = Omit<AppPreferences, "reminderInterval"> & {
 	reminderInterval: number;
 };
 
+export const DEFAULT_EXERCISE_PROMPTS: readonly string[] = [
+	"Close your eyes and gently roll them in a circular motion for 10 seconds. Then reverse direction.",
+	"Close your eyes and look up and down slowly 5 times, then left and right 5 times.",
+	"Take a deep breath and yawn naturally a few times to help lubricate your eyes.",
+	"Take a break and look at something 20 feet away for 20 seconds.",
+];
+
+/** Coerce stored/IPC exercise prompts; never returns an empty list. */
+export function sanitizeExercisePrompts(input: unknown): string[] {
+	if (!Array.isArray(input)) {
+		return [...DEFAULT_EXERCISE_PROMPTS];
+	}
+	const cleaned = input
+		.filter((item): item is string => typeof item === "string")
+		.map((item) => item.trim())
+		.filter((item) => item.length > 0);
+	return cleaned.length > 0 ? cleaned : [...DEFAULT_EXERCISE_PROMPTS];
+}
+
 export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	darkMode: true,
 	reminderInterval: 3000,
@@ -71,6 +92,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	useMediaPipe: false,
 	eyeExercisesEnabled: true,
 	exerciseInterval: 20,
+	exercisePrompts: [...DEFAULT_EXERCISE_PROMPTS],
 	lookAwayEnabled: true,
 	lookAwayInterval: 20,
 	lookAwayDuration: 20,

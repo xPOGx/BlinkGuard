@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PreferencesService } from "../../../electron/application/preferences-service";
 import type { PreferenceStore } from "../../../electron/application/ports/preference-store";
+import { PreferencesService } from "../../../electron/application/preferences-service";
 import {
 	DEFAULT_PREFERENCES,
 	type PersistedPreferences,
@@ -100,6 +100,33 @@ describe("PreferencesService", () => {
 		const service = new PreferencesService(store);
 
 		expect(service.current.cameraQuality).toBe("medium");
+	});
+
+	it("sanitizes empty or invalid exercisePrompts on load", () => {
+		const store = new FakePreferenceStore();
+		store.set("exercisePrompts", []);
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.exercisePrompts).toEqual(
+			DEFAULT_PREFERENCES.exercisePrompts,
+		);
+		expect(service.current.exercisePrompts).toHaveLength(4);
+	});
+
+	it("sanitizes exercisePrompts on set()", () => {
+		const store = new FakePreferenceStore();
+		const service = new PreferencesService(store);
+
+		service.set("exercisePrompts", ["  Custom stretch  ", ""]);
+
+		expect(service.current.exercisePrompts).toEqual(["Custom stretch"]);
+		expect(store.get("exercisePrompts")).toEqual(["Custom stretch"]);
+
+		service.set("exercisePrompts", []);
+		expect(service.current.exercisePrompts).toEqual(
+			DEFAULT_PREFERENCES.exercisePrompts,
+		);
 	});
 
 	it("clears invalid earCalibration from the store", () => {

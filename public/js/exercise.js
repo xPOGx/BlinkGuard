@@ -11,23 +11,12 @@ function snoozeExercise() {
 }
 
 function initExercisePopup() {
-	const exercises = [
-		"Close your eyes and gently roll them in a circular motion for 10 seconds. Then reverse direction.",
-		"Close your eyes and look up and down slowly 5 times, then left and right 5 times.",
-		"Take a deep breath and yawn naturally a few times to help lubricate your eyes.",
-		"Take a break and look at something 20 feet away for 20 seconds.",
-	];
-
-	let currentExerciseIndex = parseInt(localStorage.getItem("currentExerciseIndex") || "0");
-
-	let currentExercise = exercises[currentExerciseIndex];
 	const exerciseElement = document.getElementById("exercise");
-	if (exerciseElement) {
-		exerciseElement.textContent = currentExercise;
-	}
-
-	currentExerciseIndex = (currentExerciseIndex + 1) % exercises.length;
-	localStorage.setItem("currentExerciseIndex", currentExerciseIndex.toString());
+	window.popupAPI.onUpdateExercisePrompt((prompt) => {
+		if (exerciseElement) {
+			exerciseElement.textContent = prompt;
+		}
+	});
 
 	const skipBtn = document.querySelector(".exercise-button.skip");
 	const snoozeBtn = document.querySelector(".exercise-button.snooze");

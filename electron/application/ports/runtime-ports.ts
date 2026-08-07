@@ -21,7 +21,7 @@ export interface BlinkDetectorPort {
 }
 
 export interface ExerciseWindowPort {
-	showExercise(onClosed: () => void): unknown | null;
+	showExercise(prompt: string, onClosed: () => void): unknown | null;
 	closeExercise(): void;
 	closeExerciseIfCurrent(token: unknown): boolean;
 }

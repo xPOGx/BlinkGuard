@@ -32,6 +32,7 @@ export function usePreferences() {
 		rendererIpc.updateCameraQuality(preferences.cameraQuality);
 		rendererIpc.updateEyeExercisesEnabled(preferences.eyeExercisesEnabled);
 		rendererIpc.updateExerciseInterval(preferences.exerciseInterval);
+		rendererIpc.updateExercisePrompts(preferences.exercisePrompts);
 		rendererIpc.updateLookAwayEnabled(preferences.lookAwayEnabled);
 		rendererIpc.updateLookAwayInterval(preferences.lookAwayInterval);
 		rendererIpc.updateLookAwayDuration(preferences.lookAwayDuration);

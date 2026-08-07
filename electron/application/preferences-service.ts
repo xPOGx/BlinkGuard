@@ -1,5 +1,6 @@
 import {
 	DEFAULT_PREFERENCES,
+	sanitizeExercisePrompts,
 	type AppPreferences,
 	type PersistedPreferences,
 } from "../../shared/preferences";
@@ -64,6 +65,9 @@ export class PreferencesService {
 			persisted.hasCompletedOnboarding =
 				DEFAULT_PREFERENCES.hasCompletedOnboarding;
 		}
+		persisted.exercisePrompts = sanitizeExercisePrompts(
+			persisted.exercisePrompts,
+		);
 
 		// Upgrade: existing installs without the flag should skip first-run.
 		if (!this.store.has("hasCompletedOnboarding")) {
@@ -84,8 +88,12 @@ export class PreferencesService {
 		key: K,
 		value: PersistedPreferences[K],
 	): void {
-		this.current[key] = value as never;
-		this.store.set(key, value);
+		const next =
+			key === "exercisePrompts"
+				? (sanitizeExercisePrompts(value) as PersistedPreferences[K])
+				: value;
+		this.current[key] = next as never;
+		this.store.set(key, next);
 	}
 
 	reset(

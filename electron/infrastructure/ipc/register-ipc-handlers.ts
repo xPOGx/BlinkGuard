@@ -139,6 +139,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		},
 	);
 	ipcMain.on(
+		IPC_CHANNELS.updateExercisePrompts,
+		(_event, prompts: unknown) => {
+			preferences.set("exercisePrompts", prompts as string[]);
+		},
+	);
+	ipcMain.on(
 		IPC_CHANNELS.updateLookAwayEnabled,
 		(_event, enabled: boolean) => {
 			preferences.set("lookAwayEnabled", enabled);

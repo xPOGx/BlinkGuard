@@ -187,7 +187,7 @@ export class WindowManager {
 		return !!this.noFace && !this.noFace.isDestroyed();
 	}
 
-	showExercise(onClosed: () => void): BrowserWindow | null {
+	showExercise(prompt: string, onClosed: () => void): BrowserWindow | null {
 		if (this.exercise && !this.exercise.isDestroyed()) return null;
 		const popupWidth = 340;
 		const popupHeight = 200;
@@ -201,6 +201,9 @@ export class WindowManager {
 		}, this.paths.preload);
 		this.exercise = popup;
 		void popup.loadFile(path.join(this.paths.publicDir, "exercise.html"));
+		popup.webContents.on("did-finish-load", () => {
+			popup.webContents.send(IPC_CHANNELS.updateExercisePrompt, prompt);
+		});
 		popup.once("ready-to-show", () => popup.show());
 		popup.on("closed", () => {
 			if (this.exercise === popup) this.exercise = null;

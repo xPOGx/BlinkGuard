@@ -9,8 +9,10 @@ import {
 	medianEarCalibration,
 } from "../../../shared/ear-calibration";
 import {
-	DEFAULT_PREFERENCES,
 	type AppPreferences,
+	DEFAULT_EXERCISE_PROMPTS,
+	DEFAULT_PREFERENCES,
+	sanitizeExercisePrompts,
 	toRendererPreferences,
 } from "../../../shared/preferences";
 
@@ -127,5 +129,30 @@ describe("quiet hours / focus preference defaults", () => {
 describe("onboarding preference defaults", () => {
 	it("defaults hasCompletedOnboarding to false for first-run", () => {
 		expect(DEFAULT_PREFERENCES.hasCompletedOnboarding).toBe(false);
+	});
+});
+
+describe("sanitizeExercisePrompts", () => {
+	it("defaults to the built-in four prompts", () => {
+		expect(DEFAULT_PREFERENCES.exercisePrompts).toEqual([
+			...DEFAULT_EXERCISE_PROMPTS,
+		]);
+		expect(DEFAULT_PREFERENCES.exercisePrompts).toHaveLength(4);
+	});
+
+	it("returns defaults for non-arrays, empty arrays, and whitespace-only", () => {
+		expect(sanitizeExercisePrompts(null)).toEqual([
+			...DEFAULT_EXERCISE_PROMPTS,
+		]);
+		expect(sanitizeExercisePrompts([])).toEqual([...DEFAULT_EXERCISE_PROMPTS]);
+		expect(sanitizeExercisePrompts(["  ", ""])).toEqual([
+			...DEFAULT_EXERCISE_PROMPTS,
+		]);
+	});
+
+	it("trims and keeps valid lines", () => {
+		expect(
+			sanitizeExercisePrompts(["  Blink slowly  ", "", 42, "Look far"]),
+		).toEqual(["Blink slowly", "Look far"]);
 	});
 });
