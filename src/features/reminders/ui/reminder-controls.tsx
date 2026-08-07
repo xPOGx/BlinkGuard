@@ -64,7 +64,13 @@ export function ReminderControls({
 							<div className="min-w-[4.5rem] rounded-md bg-accent px-3 py-1 text-center text-sm font-semibold text-accent-foreground">
 								{preferences.reminderInterval}s
 							</div>
-							<div className="flex flex-col items-stretch gap-1">
+							<div className="relative">
+								{preferences.isTracking ? (
+									<div className="absolute bottom-full left-0 right-0 mb-1 flex items-center justify-center gap-1 text-xs font-medium text-primary">
+										<Activity className="h-3 w-3" aria-hidden />
+										<span>Active</span>
+									</div>
+								) : null}
 								<Button
 									type="button"
 									size="default"
@@ -72,7 +78,7 @@ export function ReminderControls({
 										preferences.isTracking ? "destructive" : "default"
 									}
 									onClick={onToggleTracking}
-									className="gap-2 whitespace-nowrap"
+									className="w-[5.75rem] gap-2 whitespace-nowrap"
 								>
 									{preferences.isTracking ? (
 										<>
@@ -86,12 +92,6 @@ export function ReminderControls({
 										</>
 									)}
 								</Button>
-								{preferences.isTracking ? (
-									<div className="flex items-center justify-center gap-1 text-xs font-medium text-primary">
-										<Activity className="h-3 w-3" aria-hidden />
-										<span>Active</span>
-									</div>
-								) : null}
 							</div>
 						</div>
 					</div>
