@@ -334,6 +334,8 @@ export const uk: MessageCatalog = {
 	"stats.month": "Місяць",
 	"stats.year": "Рік",
 	"stats.clear": "Очистити статистику",
+	"stats.clearConfirm":
+		"Очистити всю статистику моргань і сесій? Цю дію не можна скасувати.",
 	"stats.duration.minutes": "{m}хв",
 	"stats.duration.hoursMinutes": "{h}год {m}хв",
 	"stats.chart.today.desc": "Моргання за годину за сьогодні.",

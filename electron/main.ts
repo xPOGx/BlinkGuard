@@ -8,6 +8,7 @@ import { ExerciseService } from "./application/exercise-service";
 import { FocusPauseService } from "./application/focus-pause-service";
 import { LookAwayService } from "./application/look-away-service";
 import type { NotificationGate } from "./application/ports/notification-gate";
+import { PreferenceActions } from "./application/preference-actions";
 import { PreferencesService } from "./application/preferences-service";
 import { ReminderService } from "./application/reminder-service";
 import { createFocusEnvironment } from "./infrastructure/focus/create-focus-environment";
@@ -206,8 +207,23 @@ function bootstrap(): void {
 	);
 	lifecycle.attachTray(tray);
 
+	const preferenceActions = new PreferenceActions(
+		preferencesService,
+		reminders,
+		exercises,
+		lookAway,
+		focusPause,
+		blinkStats,
+		windows,
+		sidecar,
+		shortcuts,
+		applyLaunchAtLogin,
+		tray,
+	);
+
 	registerIpcHandlers({
 		preferences: preferencesService,
+		preferenceActions,
 		reminders,
 		exercises,
 		lookAway,
@@ -217,7 +233,6 @@ function bootstrap(): void {
 		blinkStats,
 		focusPause,
 		sound,
-		tray,
 	});
 
 	app.on("second-instance", () => {

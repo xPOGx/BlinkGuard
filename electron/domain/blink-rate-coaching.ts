@@ -1,5 +1,7 @@
 /** Minimum gap between soft blink-rate coach toasts. */
 export const BLINK_RATE_COACH_COOLDOWN_MS = 15 * 60_000;
+/** Auto-dismiss for the soft blink-rate coach toast. */
+export const BLINK_RATE_COACH_DISMISS_MS = 5_000;
 
 export type BlinkRateCoachInput = {
 	enabled: boolean;

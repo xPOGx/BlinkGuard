@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/button";
-import { SettingPanel, SettingRow } from "@/features/settings/ui/setting-panel";
+import { SettingPanel, SettingRow } from "@/components/setting-panel";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import {

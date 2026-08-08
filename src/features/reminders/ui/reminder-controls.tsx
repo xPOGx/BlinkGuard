@@ -1,7 +1,7 @@
 import { Activity, Clock, Play, Square } from "lucide-react";
 import { Button } from "@/components/button";
+import { SettingPanel, SettingRow } from "@/components/setting-panel";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
-import { SettingPanel, SettingRow } from "@/features/settings/ui/setting-panel";
 import { useI18n } from "@/i18n";
 import { pluralKey } from "../../../../shared/i18n";
 

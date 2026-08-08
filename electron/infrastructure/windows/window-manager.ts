@@ -13,7 +13,11 @@ import {
 	sanitizeExercisePrompts,
 	toRendererPreferences,
 } from "../../../shared/preferences";
-import { REMINDER_POPUP_VISIBLE_MS } from "../../domain/reminder-policy";
+import { BLINK_RATE_COACH_DISMISS_MS } from "../../domain/blink-rate-coaching";
+import {
+	EXERCISE_POPUP_VISIBLE_MS,
+	REMINDER_POPUP_VISIBLE_MS,
+} from "../../domain/reminder-policy";
 import type { AppPaths } from "../paths/app-paths";
 import { createPanelWindow } from "./panel-window";
 import {
@@ -291,7 +295,7 @@ export class WindowManager {
 		this.blinkRateCoachDismissTimer = setTimeout(() => {
 			this.blinkRateCoachDismissTimer = null;
 			if (this.blinkRateCoach === popup) this.hideBlinkRateCoach();
-		}, 5_000);
+		}, BLINK_RATE_COACH_DISMISS_MS);
 	}
 
 	hideBlinkRateCoach(): void {
@@ -387,7 +391,10 @@ export class WindowManager {
 					() => {},
 				);
 				if (popup) {
-					setTimeout(() => this.closeExerciseIfCurrent(popup), 30_000);
+					setTimeout(
+						() => this.closeExerciseIfCurrent(popup),
+						EXERCISE_POPUP_VISIBLE_MS,
+					);
 				}
 				return;
 			}

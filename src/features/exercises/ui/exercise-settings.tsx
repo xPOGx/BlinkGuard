@@ -1,16 +1,13 @@
 import { Clock, Dumbbell, Plus, RotateCcw, Trash2 } from "lucide-react";
-import type { SettingsPreferences } from "@/features/settings/model/preferences";
-import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import {
 	SettingPanel,
 	SettingRow,
 	ToggleSwitch,
-} from "@/features/settings/ui/setting-panel";
+} from "@/components/setting-panel";
+import type { SettingsPreferences } from "@/features/settings/model/preferences";
+import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { useI18n } from "@/i18n";
-import {
-	defaultExercisePrompts,
-	pluralKey,
-} from "../../../../shared/i18n";
+import { defaultExercisePrompts, pluralKey } from "../../../../shared/i18n";
 
 interface ExerciseSettingsProps {
 	preferences: SettingsPreferences;

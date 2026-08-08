@@ -1,4 +1,5 @@
 import type { AppPreferences } from "../../shared/preferences";
+import { PROMPT_SNOOZE_MS } from "../domain/reminder-policy";
 import type { AppRuntimeState } from "./app-runtime-state";
 import type { PreferenceStore } from "./ports/preference-store";
 import type { NotificationGate } from "./ports/notification-gate";
@@ -56,7 +57,7 @@ export class LookAwayService {
 		}
 		this.state.lookAwaySnoozeTimeout = setTimeout(
 			() => this.show(),
-			5 * 60 * 1000,
+			PROMPT_SNOOZE_MS,
 		);
 	}
 

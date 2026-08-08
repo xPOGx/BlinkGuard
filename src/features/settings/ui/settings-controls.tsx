@@ -1,6 +1,19 @@
-import { Gamepad2, LogIn, Moon, Play, Sun, Volume2, VolumeX } from "lucide-react";
+import {
+	Gamepad2,
+	LogIn,
+	Moon,
+	Play,
+	Sun,
+	Volume2,
+	VolumeX,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/button";
+import {
+	SettingPanel,
+	SettingRow,
+	ToggleSwitch,
+} from "@/components/setting-panel";
 import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import {
@@ -12,7 +25,6 @@ import {
 } from "../../../../shared/i18n";
 import type { SettingsPreferences } from "../model/preferences";
 import type { SetPreferences } from "../model/use-preferences";
-import { SettingPanel, SettingRow, ToggleSwitch } from "./setting-panel";
 
 interface DarkModeToggleProps {
 	darkMode: boolean;

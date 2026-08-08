@@ -1,12 +1,9 @@
 import { Camera, Keyboard, LogIn, Moon, Timer } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/button";
+import { SettingPanel, ToggleSwitch } from "@/components/setting-panel";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
-import {
-	SettingPanel,
-	ToggleSwitch,
-} from "@/features/settings/ui/setting-panel";
 import { ShortcutSettings } from "@/features/shortcuts/ui/shortcut-settings";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/utils";

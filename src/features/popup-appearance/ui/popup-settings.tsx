@@ -1,9 +1,9 @@
 import { Palette, Settings } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "@/components/button";
+import { SettingPanel, SettingRow } from "@/components/setting-panel";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
-import { SettingPanel, SettingRow } from "@/features/settings/ui/setting-panel";
 import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 

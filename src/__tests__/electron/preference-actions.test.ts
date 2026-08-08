@@ -1,0 +1,160 @@
+import { describe, expect, it, vi } from "vitest";
+import type { PreferenceStore } from "../../../electron/application/ports/preference-store";
+import { PreferenceActions } from "../../../electron/application/preference-actions";
+import { PreferencesService } from "../../../electron/application/preferences-service";
+import { IPC_CHANNELS } from "../../../shared/ipc-channels";
+
+function createStore(): PreferenceStore {
+	const data = new Map<string, unknown>();
+	return {
+		get<T>(key: string, defaultValue?: T): T {
+			if (data.has(key)) return data.get(key) as T;
+			return defaultValue as T;
+		},
+		set<T>(key: string, value: T): void {
+			data.set(key, value);
+		},
+		has(key: string): boolean {
+			return data.has(key);
+		},
+		clear(): void {
+			data.clear();
+		},
+	};
+}
+
+function createActions(
+	preferences: PreferencesService,
+	overrides: {
+		reminders?: object;
+		exercises?: object;
+		lookAway?: object;
+		focusPause?: object;
+		blinkStats?: object;
+		windows?: object;
+		sidecar?: object;
+		shortcuts?: object;
+		applyLaunchAtLogin?: (enabled: boolean) => void;
+		tray?: object;
+	} = {},
+) {
+	return new PreferenceActions(
+		preferences,
+		(overrides.reminders ?? {}) as never,
+		(overrides.exercises ?? { stop: vi.fn() }) as never,
+		(overrides.lookAway ?? { stop: vi.fn() }) as never,
+		(overrides.focusPause ?? { recompute: vi.fn() }) as never,
+		(overrides.blinkStats ?? {
+			invalidateCharts: vi.fn(),
+			isLivePushEnabled: () => false,
+			getSnapshot: vi.fn(),
+		}) as never,
+		(overrides.windows ?? {
+			sendPreferences: vi.fn(),
+			sendToMain: vi.fn(),
+			showCamera: vi.fn(),
+		}) as never,
+		(overrides.sidecar ?? {
+			startEarCalibration: vi.fn(),
+			cancelEarCalibration: vi.fn(),
+			applyCameraQuality: vi.fn(),
+			applyEarCalibration: vi.fn(),
+		}) as never,
+		(overrides.shortcuts ?? { register: vi.fn() }) as never,
+		overrides.applyLaunchAtLogin ?? vi.fn(),
+		overrides.tray as never,
+	);
+}
+
+describe("PreferenceActions", () => {
+	it("startEarCalibration enables camera and starts sidecar calibration", () => {
+		const preferences = new PreferencesService(createStore());
+		preferences.set("cameraEnabled", false);
+		const reminders = { ensureCameraActive: vi.fn() };
+		const sidecar = {
+			startEarCalibration: vi.fn(),
+			cancelEarCalibration: vi.fn(),
+			applyCameraQuality: vi.fn(),
+			applyEarCalibration: vi.fn(),
+		};
+		const actions = createActions(preferences, { reminders, sidecar });
+
+		actions.startEarCalibration();
+
+		expect(preferences.current.cameraEnabled).toBe(true);
+		expect(reminders.ensureCameraActive).toHaveBeenCalledOnce();
+		expect(sidecar.startEarCalibration).toHaveBeenCalledOnce();
+	});
+
+	it("updateLocale is a no-op for the same locale", () => {
+		const preferences = new PreferencesService(createStore());
+		const tray = { rebuildMenu: vi.fn() };
+		const windows = {
+			sendPreferences: vi.fn(),
+			sendToMain: vi.fn(),
+			showCamera: vi.fn(),
+		};
+		const actions = createActions(preferences, { tray, windows });
+
+		actions.updateLocale("en");
+
+		expect(tray.rebuildMenu).not.toHaveBeenCalled();
+		expect(windows.sendPreferences).not.toHaveBeenCalled();
+	});
+
+	it("updateLocale rebuilds tray and echoes preferences", () => {
+		const preferences = new PreferencesService(createStore());
+		const tray = { rebuildMenu: vi.fn() };
+		const snapshot = { totalBlinks: 0 };
+		const blinkStats = {
+			invalidateCharts: vi.fn(),
+			isLivePushEnabled: () => true,
+			getSnapshot: vi.fn(() => snapshot),
+		};
+		const windows = {
+			sendPreferences: vi.fn(),
+			sendToMain: vi.fn(),
+			showCamera: vi.fn(),
+		};
+		const actions = createActions(preferences, {
+			tray,
+			blinkStats,
+			windows,
+		});
+
+		actions.updateLocale("uk");
+
+		expect(preferences.current.locale).toBe("uk");
+		expect(tray.rebuildMenu).toHaveBeenCalledWith("uk");
+		expect(blinkStats.invalidateCharts).toHaveBeenCalledOnce();
+		expect(windows.sendPreferences).toHaveBeenCalledOnce();
+		expect(windows.sendToMain).toHaveBeenCalledWith(
+			IPC_CHANNELS.loadBlinkStats,
+			snapshot,
+		);
+	});
+
+	it("showCameraWindow enables camera only when it was off", () => {
+		const preferences = new PreferencesService(createStore());
+		preferences.set("cameraEnabled", false);
+		const reminders = { ensureCameraActive: vi.fn() };
+		const windows = {
+			sendPreferences: vi.fn(),
+			sendToMain: vi.fn(),
+			showCamera: vi.fn((onClosed: () => void) => {
+				onClosed();
+			}),
+		};
+		const actions = createActions(preferences, { reminders, windows });
+
+		actions.showCameraWindow();
+
+		expect(preferences.current.cameraEnabled).toBe(true);
+		expect(reminders.ensureCameraActive).toHaveBeenCalledOnce();
+		expect(windows.sendPreferences).toHaveBeenCalledOnce();
+		expect(windows.showCamera).toHaveBeenCalledOnce();
+		expect(windows.sendToMain).toHaveBeenCalledWith(
+			IPC_CHANNELS.cameraWindowClosed,
+		);
+	});
+});

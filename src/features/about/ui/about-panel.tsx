@@ -1,6 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/button";
-import { SettingPanel, SettingRow } from "@/features/settings/ui/setting-panel";
+import { SettingPanel, SettingRow } from "@/components/setting-panel";
 import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import { author, version } from "../../../../package.json";

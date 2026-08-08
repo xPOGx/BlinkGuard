@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import {
 	type BlinkStatsSnapshot,
@@ -10,6 +11,7 @@ const emptySnapshot = (): BlinkStatsSnapshot =>
 	toBlinkStatsSnapshot(DEFAULT_BLINK_STATS);
 
 export function useBlinkStats() {
+	const t = useT();
 	const [snapshot, setSnapshot] = useState<BlinkStatsSnapshot>(emptySnapshot);
 
 	useEffect(() => {
@@ -22,11 +24,7 @@ export function useBlinkStats() {
 	}, []);
 
 	const clearStatistics = () => {
-		if (
-			window.confirm(
-				"Clear all blink and session statistics? This cannot be undone.",
-			)
-		) {
+		if (window.confirm(t("stats.clearConfirm"))) {
 			rendererIpc.resetBlinkStats();
 		}
 	};

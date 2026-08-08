@@ -1,13 +1,13 @@
 import { Activity, Camera, Crosshair, Gauge, UserRoundX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/button";
-import type { SettingsPreferences } from "@/features/settings/model/preferences";
-import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import {
 	SettingPanel,
 	SettingRow,
 	ToggleSwitch,
-} from "@/features/settings/ui/setting-panel";
+} from "@/components/setting-panel";
+import type { SettingsPreferences } from "@/features/settings/model/preferences";
+import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { useI18n, useT } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";

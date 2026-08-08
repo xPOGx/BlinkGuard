@@ -5,16 +5,32 @@ import {
   MAIN_RENDERER_SEND_CHANNELS,
 } from "../shared/ipc-channels";
 
+// Map renderer listener → wrapper that strips IpcRendererEvent, so off() can detach.
+const receiveListenerWrappers = new WeakMap<
+  (...args: any[]) => void,
+  (event: Electron.IpcRendererEvent, ...args: any[]) => void
+>();
+
 // Expose API to the Renderer process (main window)
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on: (channel: string, func: (...args: any[]) => void) => {
     if ((MAIN_RENDERER_RECEIVE_CHANNELS as readonly string[]).includes(channel)) {
-      ipcRenderer.on(channel, (_event, ...args) => func(...args));
+      const wrapper = (_event: Electron.IpcRendererEvent, ...args: any[]) =>
+        func(...args);
+      receiveListenerWrappers.set(func, wrapper);
+      ipcRenderer.on(channel, wrapper);
     }
   },
   off(...args: Parameters<typeof ipcRenderer.off>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.off(channel, ...omit)
+    const [channel, listener] = args
+    if (typeof listener === "function") {
+      const wrapper = receiveListenerWrappers.get(listener)
+      if (wrapper) {
+        receiveListenerWrappers.delete(listener)
+        return ipcRenderer.off(channel, wrapper)
+      }
+    }
+    return ipcRenderer.off(channel, listener)
   },
   send: (channel: string, ...args: any[]) => {
     if ((MAIN_RENDERER_SEND_CHANNELS as readonly string[]).includes(channel)) {

@@ -326,6 +326,8 @@ export const en: MessageCatalog = {
 	"stats.month": "Month",
 	"stats.year": "Year",
 	"stats.clear": "Clear statistics",
+	"stats.clearConfirm":
+		"Clear all blink and session statistics? This cannot be undone.",
 	"stats.duration.minutes": "{m}m",
 	"stats.duration.hoursMinutes": "{h}h {m}m",
 	"stats.chart.today.desc": "Blinks per hour for today.",

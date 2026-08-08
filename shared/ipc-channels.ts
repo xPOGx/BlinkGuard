@@ -4,7 +4,6 @@ export const IPC_CHANNELS = {
 	cameraError: "camera-error",
 	videoStream: "video-stream",
 	cameraWindowClosed: "camera-window-closed",
-	stopCamera: "stop-camera",
 	shortcutError: "shortcut-error",
 	updateMessage: "update-message",
 	updateExercisePrompt: "update-exercise-prompt",
@@ -95,6 +94,7 @@ export const MAIN_RENDERER_RECEIVE_CHANNELS = [
 	IPC_CHANNELS.earCalibrationComplete,
 	IPC_CHANNELS.loadBlinkStats,
 	IPC_CHANNELS.focusPauseState,
+	IPC_CHANNELS.shortcutError,
 ] as const;
 
 export const MAIN_RENDERER_SEND_CHANNELS = [

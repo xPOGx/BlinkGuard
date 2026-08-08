@@ -3,7 +3,6 @@ import { isValidEarCalibration } from "../../../shared/ear-calibration";
 import { isCameraQuality } from "../../../shared/camera-quality";
 import { isDebugOverlayKind, isDebugSoundKind } from "../../../shared/debug-preview";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
-import { sanitizeLocale } from "../../../shared/i18n";
 import type {
 	CameraQuality,
 	Point,
@@ -14,6 +13,7 @@ import type { BlinkStatsService } from "../../application/blink-stats-service";
 import type { ExerciseService } from "../../application/exercise-service";
 import type { FocusPauseService } from "../../application/focus-pause-service";
 import type { LookAwayService } from "../../application/look-away-service";
+import type { PreferenceActions } from "../../application/preference-actions";
 import type { PreferencesService } from "../../application/preferences-service";
 import type { ReminderService } from "../../application/reminder-service";
 import type { NotificationSoundPort } from "../../application/ports/runtime-ports";
@@ -21,11 +21,11 @@ import { normalizeQuietHoursTime } from "../../domain/focus-policy";
 import { applyLaunchAtLogin } from "../lifecycle/login-item";
 import type { BlinkDetectorSidecar } from "../sidecar/blink-detector-sidecar";
 import type { ShortcutController } from "../shortcuts/shortcut-controller";
-import type { TrayController } from "../tray/tray-controller";
 import type { WindowManager } from "../windows/window-manager";
 
 interface IpcDependencies {
 	preferences: PreferencesService;
+	preferenceActions: PreferenceActions;
 	reminders: ReminderService;
 	exercises: ExerciseService;
 	lookAway: LookAwayService;
@@ -35,12 +35,12 @@ interface IpcDependencies {
 	blinkStats: BlinkStatsService;
 	focusPause: FocusPauseService;
 	sound: NotificationSoundPort;
-	tray?: TrayController;
 }
 
 export function registerIpcHandlers(deps: IpcDependencies): void {
 	const {
 		preferences,
+		preferenceActions,
 		reminders,
 		exercises,
 		lookAway,
@@ -50,7 +50,6 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		blinkStats,
 		focusPause,
 		sound,
-		tray,
 	} = deps;
 	const current = preferences.current;
 
@@ -125,11 +124,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		},
 	);
 	ipcMain.on(IPC_CHANNELS.startEarCalibration, () => {
-		if (!current.cameraEnabled) {
-			preferences.set("cameraEnabled", true);
-		}
-		reminders.ensureCameraActive();
-		sidecar.startEarCalibration();
+		preferenceActions.startEarCalibration();
 	});
 	ipcMain.on(IPC_CHANNELS.cancelEarCalibration, () => {
 		sidecar.cancelEarCalibration();
@@ -264,33 +259,10 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		},
 	);
 	ipcMain.on(IPC_CHANNELS.updateLocale, (_event, value: string) => {
-		const locale = sanitizeLocale(value);
-		// Same locale is a no-op. Never rewrite popup/exercise content here —
-		// React LanguageSettings owns built-in prompt updates; sendPreferences
-		// + prompt rewrite used to bounce the settings sync forever.
-		if (locale === current.locale) return;
-		preferences.set("locale", locale);
-		tray?.rebuildMenu(locale);
-		blinkStats.invalidateCharts();
-		windows.sendPreferences();
-		if (blinkStats.isLivePushEnabled()) {
-			windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
-		}
+		preferenceActions.updateLocale(value);
 	});
 	ipcMain.on(IPC_CHANNELS.showCameraWindow, () => {
-		const enabledCamera = !current.cameraEnabled;
-		if (enabledCamera) {
-			preferences.set("cameraEnabled", true);
-		}
-		reminders.ensureCameraActive();
-		// Only echo when main mutated prefs; unconditional sendPreferences
-		// is a bounce vector for the React sync effect.
-		if (enabledCamera) {
-			windows.sendPreferences();
-		}
-		windows.showCamera(() => {
-			windows.sendToMain(IPC_CHANNELS.cameraWindowClosed);
-		});
+		preferenceActions.showCameraWindow();
 	});
 	ipcMain.on(IPC_CHANNELS.closeCameraWindow, () => windows.closeCamera());
 	ipcMain.on(IPC_CHANNELS.requestVideoStream, () => sidecar.requestVideo());
@@ -325,19 +297,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	ipcMain.on(
 		IPC_CHANNELS.resetPreferences,
 		(_event, replayOnboarding?: boolean) => {
-			if (current.isTracking) reminders.stop(true);
-			exercises.stop();
-			lookAway.stop();
-			sidecar.cancelEarCalibration("Preferences reset");
-			preferences.reset(null, {
-				replayOnboarding: Boolean(replayOnboarding),
-			});
-			applyLaunchAtLogin(false);
-			shortcuts.register(current.keyboardShortcut);
-			sidecar.applyCameraQuality(current.cameraQuality);
-			sidecar.applyEarCalibration(null);
-			windows.sendPreferences();
-			focusPause.recompute();
+			preferenceActions.resetPreferences(replayOnboarding);
 		},
 	);
 	ipcMain.on(IPC_CHANNELS.requestBlinkStats, () => {

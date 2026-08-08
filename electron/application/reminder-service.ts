@@ -71,7 +71,6 @@ export class ReminderService {
 		this.sidecar.stopCamera();
 		this.resetFaceTracking();
 		this.windows.closeReminder();
-		this.windows.sendToMain("stop-camera");
 	}
 
 	private setTracking(value: boolean): void {

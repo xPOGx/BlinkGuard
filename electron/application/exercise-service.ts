@@ -3,6 +3,10 @@ import {
 	sanitizeExercisePrompts,
 	type AppPreferences,
 } from "../../shared/preferences";
+import {
+	EXERCISE_POPUP_VISIBLE_MS,
+	PROMPT_SNOOZE_MS,
+} from "../domain/reminder-policy";
 import type { AppRuntimeState } from "./app-runtime-state";
 import type { PreferenceStore } from "./ports/preference-store";
 import type { NotificationGate } from "./ports/notification-gate";
@@ -58,7 +62,7 @@ export class ExerciseService {
 		}
 		this.state.exerciseSnoozeTimeout = setTimeout(
 			() => this.show(),
-			5 * 60 * 1000,
+			PROMPT_SNOOZE_MS,
 		);
 	}
 
@@ -97,7 +101,7 @@ export class ExerciseService {
 			if (this.windows.closeExerciseIfCurrent(popup)) {
 				this.state.isExerciseShowing = false;
 			}
-		}, 30_000);
+		}, EXERCISE_POPUP_VISIBLE_MS);
 	}
 
 	private closePopup(): void {
