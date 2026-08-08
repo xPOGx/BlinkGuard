@@ -1,5 +1,6 @@
 import { app, dialog } from "electron";
 import electronUpdater from "electron-updater";
+import type { AutoUpdateStatus } from "../../../shared/auto-update";
 import { t, type Locale } from "../../../shared/i18n";
 import { hasUpdateFeed, isAutoUpdatePlatform } from "./update-feed";
 
@@ -7,8 +8,14 @@ import { hasUpdateFeed, isAutoUpdatePlatform } from "./update-feed";
 const { autoUpdater } = electronUpdater;
 
 export type CheckForUpdatesOptions = {
-	/** When true, show dialogs for up-to-date / errors (tray / About). */
+	/** When true, surface checking / up-to-date / errors (tray / About). */
 	interactive?: boolean;
+};
+
+export type AutoUpdateUiPort = {
+	emit(status: AutoUpdateStatus): void;
+	ensureVisible(): void;
+	canHostInAppUi(): boolean;
 };
 
 /**
@@ -20,10 +27,14 @@ export class AutoUpdateService {
 	private enabled = false;
 	private checking = false;
 	private downloadedVersion: string | null = null;
-	/** Prefer interactive dialogs once the user asked via tray / About. */
+	private availableVersion: string | null = null;
+	/** Prefer interactive UI once the user asked via tray / About. */
 	private interactivePending = false;
 
-	constructor(private readonly getLocale: () => Locale) {}
+	constructor(
+		private readonly getLocale: () => Locale,
+		private readonly ui: AutoUpdateUiPort,
+	) {}
 
 	/** Call once after `app.whenReady`. Safe if updater cannot start. */
 	start(): void {
@@ -37,31 +48,52 @@ export class AutoUpdateService {
 
 			autoUpdater.on("error", (error) => {
 				console.error("Auto-update error:", error);
+				this.checking = false;
 				if (this.interactivePending) {
 					this.interactivePending = false;
-					this.showError();
+					this.present({ state: "error" });
 				}
-				this.checking = false;
 			});
 
 			autoUpdater.on("update-not-available", () => {
 				this.checking = false;
 				if (this.interactivePending) {
 					this.interactivePending = false;
-					this.showUpToDate();
+					this.present({ state: "upToDate" });
 				}
 			});
 
-			autoUpdater.on("update-available", () => {
+			autoUpdater.on("update-available", (info) => {
 				this.checking = false;
-				// Quiet download; restart prompt comes on update-downloaded.
+				const version =
+					typeof info?.version === "string" && info.version.length > 0
+						? info.version
+						: "…";
+				this.availableVersion = version;
+				if (this.interactivePending) {
+					this.present({ state: "available", version });
+				}
+			});
+
+			autoUpdater.on("download-progress", (progress) => {
+				if (!this.interactivePending) return;
+				const version = this.availableVersion ?? "…";
+				const raw =
+					typeof progress?.percent === "number" ? progress.percent : 0;
+				const percent = Math.max(0, Math.min(100, Math.round(raw)));
+				this.present({ state: "downloading", version, percent });
 			});
 
 			autoUpdater.on("update-downloaded", (info) => {
 				this.checking = false;
 				this.interactivePending = false;
-				this.downloadedVersion = info.version;
-				this.promptRestart(info.version);
+				const version =
+					typeof info?.version === "string" && info.version.length > 0
+						? info.version
+						: (this.availableVersion ?? "…");
+				this.downloadedVersion = version;
+				this.availableVersion = version;
+				this.present({ state: "ready", version });
 			});
 
 			this.enabled = true;
@@ -76,18 +108,19 @@ export class AutoUpdateService {
 		try {
 			if (!this.enabled) {
 				if (options.interactive) {
-					this.showError();
+					this.present({ state: "unavailable" });
 				}
 				return;
 			}
 
 			if (options.interactive) {
 				this.interactivePending = true;
+				this.present({ state: "checking" });
 			}
 
 			if (this.downloadedVersion) {
 				this.interactivePending = false;
-				this.promptRestart(this.downloadedVersion);
+				this.present({ state: "ready", version: this.downloadedVersion });
 				return;
 			}
 
@@ -99,7 +132,7 @@ export class AutoUpdateService {
 				this.checking = false;
 				if (this.interactivePending) {
 					this.interactivePending = false;
-					this.showError();
+					this.present({ state: "error" });
 				}
 			});
 		} catch (error) {
@@ -107,61 +140,92 @@ export class AutoUpdateService {
 			this.checking = false;
 			if (options.interactive) {
 				this.interactivePending = false;
-				this.showError();
+				this.present({ state: "error" });
 			}
 		}
 	}
 
-	private showUpToDate(): void {
-		const locale = this.getLocale();
-		void dialog.showMessageBox({
-			type: "info",
-			title: t(locale, "updates.upToDate.title"),
-			message: t(locale, "updates.upToDate.message"),
-			buttons: [t(locale, "updates.ok")],
-			defaultId: 0,
-			noLink: true,
-		});
+	/** Install a previously downloaded update (About / in-app Restart). */
+	installUpdate(): void {
+		if (!this.downloadedVersion) return;
+		try {
+			autoUpdater.quitAndInstall(false, true);
+		} catch (error) {
+			console.error("Auto-update install failed:", error);
+			this.present({ state: "error" });
+		}
 	}
 
-	private showError(): void {
-		const locale = this.getLocale();
-		void dialog.showMessageBox({
-			type: "warning",
-			title: t(locale, "updates.error.title"),
-			message: t(locale, "updates.error.message"),
-			buttons: [t(locale, "updates.ok")],
-			defaultId: 0,
-			noLink: true,
-		});
+	private present(status: AutoUpdateStatus): void {
+		if (this.ui.canHostInAppUi()) {
+			this.ui.ensureVisible();
+			this.ui.emit(status);
+			return;
+		}
+		this.showNativeFallback(status);
 	}
 
-	private promptRestart(version: string): void {
+	private showNativeFallback(status: AutoUpdateStatus): void {
 		const locale = this.getLocale();
-		void dialog
-			.showMessageBox({
-				type: "info",
-				title: t(locale, "updates.ready.title"),
-				message: t(locale, "updates.ready.message", { version }),
-				buttons: [
-					t(locale, "updates.ready.restart"),
-					t(locale, "updates.ready.later"),
-				],
-				defaultId: 0,
-				cancelId: 1,
-				noLink: true,
-			})
-			.then(({ response }) => {
-				if (response === 0) {
-					try {
-						autoUpdater.quitAndInstall(false, true);
-					} catch (error) {
-						console.error("Auto-update install failed:", error);
-					}
-				}
-			})
-			.catch((error) => {
-				console.error("Auto-update restart dialog failed:", error);
-			});
+		switch (status.state) {
+			case "upToDate":
+				void dialog.showMessageBox({
+					type: "info",
+					title: t(locale, "updates.upToDate.title"),
+					message: t(locale, "updates.upToDate.message"),
+					buttons: [t(locale, "updates.ok")],
+					defaultId: 0,
+					noLink: true,
+				});
+				return;
+			case "error":
+				void dialog.showMessageBox({
+					type: "warning",
+					title: t(locale, "updates.error.title"),
+					message: t(locale, "updates.error.message"),
+					buttons: [t(locale, "updates.ok")],
+					defaultId: 0,
+					noLink: true,
+				});
+				return;
+			case "unavailable":
+				void dialog.showMessageBox({
+					type: "info",
+					title: t(locale, "updates.unavailable.title"),
+					message: t(locale, "updates.unavailable.message"),
+					buttons: [t(locale, "updates.ok")],
+					defaultId: 0,
+					noLink: true,
+				});
+				return;
+			case "ready":
+				void dialog
+					.showMessageBox({
+						type: "info",
+						title: t(locale, "updates.ready.title"),
+						message: t(locale, "updates.ready.message", {
+							version: status.version,
+						}),
+						buttons: [
+							t(locale, "updates.ready.restart"),
+							t(locale, "updates.ready.later"),
+						],
+						defaultId: 0,
+						cancelId: 1,
+						noLink: true,
+					})
+					.then(({ response }) => {
+						if (response === 0) {
+							this.installUpdate();
+						}
+					})
+					.catch((error) => {
+						console.error("Auto-update restart dialog failed:", error);
+					});
+				return;
+			default:
+				// checking / available / downloading need the in-app UI; skip if no host.
+				return;
+		}
 	}
 }

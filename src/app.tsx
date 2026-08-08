@@ -11,7 +11,9 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { dismissBootSplash } from "@/boot-splash";
+import { useAutoUpdate } from "@/features/about/model/use-auto-update";
 import { AboutPanel } from "@/features/about/ui/about-panel";
+import { UpdateDialog } from "@/features/about/ui/update-dialog";
 import { useCameraStatus } from "@/features/camera/model/use-camera-status";
 import {
 	CameraControls,
@@ -101,6 +103,7 @@ function SettingsShell({
 	shortcuts: ReturnType<typeof useShortcutControls>;
 }) {
 	const t = useT();
+	const autoUpdate = useAutoUpdate();
 	const [section, setSection] = useState<SectionId>("reminders");
 	const sections: {
 		id: SectionId;
@@ -185,6 +188,7 @@ function SettingsShell({
 					shortcut={shortcuts}
 				/>
 			) : null}
+			<UpdateDialog {...autoUpdate} />
 			<aside className="flex shrink-0 flex-col border-b border-border bg-sidebar min-[721px]:w-56 min-[721px]:border-r min-[721px]:border-b-0">
 				<div className="flex items-center gap-2.5 px-4 py-3 min-[721px]:px-5 min-[721px]:py-5">
 					<TrackingEyeButton
@@ -346,7 +350,7 @@ function SettingsShell({
 							</>
 						)}
 
-						{section === "about" && <AboutPanel />}
+						{section === "about" && <AboutPanel autoUpdate={autoUpdate} />}
 
 						{section === "debug" && import.meta.env.DEV ? (
 							<DebugPanel setPreferences={setPreferences} />

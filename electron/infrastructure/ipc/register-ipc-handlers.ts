@@ -35,6 +35,7 @@ interface IpcDependencies {
 	focusPause: FocusPauseService;
 	sound: NotificationSoundPort;
 	checkForUpdates: () => void;
+	installUpdate: () => void;
 	interactions: InteractionLogger;
 }
 
@@ -52,6 +53,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		focusPause,
 		sound,
 		checkForUpdates,
+		installUpdate,
 		interactions,
 	} = deps;
 	const current = preferences.current;
@@ -246,6 +248,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	});
 	on(IPC_CHANNELS.checkForUpdates, () => {
 		checkForUpdates();
+	});
+	on(IPC_CHANNELS.installUpdate, () => {
+		installUpdate();
 	});
 	on(IPC_CHANNELS.popupEditorSaved, (_event, value: unknown) => {
 		const payload = value as { size: Size; position: Point };

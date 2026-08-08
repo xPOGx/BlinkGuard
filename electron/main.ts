@@ -216,13 +216,25 @@ function bootstrap(): void {
 			blinkRateCoaching.dispose();
 		},
 	);
-	const autoUpdates = new AutoUpdateService(() => preferences.locale);
+	const autoUpdates = new AutoUpdateService(
+		() => preferences.locale,
+		{
+			emit: (status) =>
+				windows.sendToMain(IPC_CHANNELS.autoUpdateStatus, status),
+			ensureVisible: () => windows.showMain(),
+			canHostInAppUi: () =>
+				Boolean(windows.main && !windows.main.isDestroyed()),
+		},
+	);
 	const tray = new TrayController(
 		paths,
 		windows,
 		() => lifecycle.quit(),
 		() => preferences.locale,
-		() => autoUpdates.checkForUpdates({ interactive: true }),
+		() => {
+			windows.showMain();
+			autoUpdates.checkForUpdates({ interactive: true });
+		},
 		interactionLogger,
 	);
 	lifecycle.attachTray(tray);
@@ -254,6 +266,7 @@ function bootstrap(): void {
 		focusPause,
 		sound,
 		checkForUpdates: () => autoUpdates.checkForUpdates({ interactive: true }),
+		installUpdate: () => autoUpdates.installUpdate(),
 		interactions: interactionLogger,
 	});
 

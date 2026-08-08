@@ -461,11 +461,22 @@ export const uk: MessageCatalog = {
 
 	// Auto-update dialogs
 	"updates.ok": "OK",
+	"updates.checking.title": "Перевірка оновлень",
+	"updates.checking.message": "Шукаємо новішу версію BlinkGuard…",
+	"updates.available.title": "Доступне оновлення",
+	"updates.available.message":
+		"Доступна версія BlinkGuard {version}. Завантаження…",
+	"updates.downloading.title": "Завантаження оновлення",
+	"updates.downloading.message":
+		"Завантаження BlinkGuard {version}… {percent}%",
 	"updates.upToDate.title": "BlinkGuard",
 	"updates.upToDate.message": "У вас остання версія.",
 	"updates.error.title": "Не вдалося перевірити оновлення",
 	"updates.error.message":
 		"Не вдалося перевірити оновлення. BlinkGuard продовжить роботу — спробуйте пізніше.",
+	"updates.unavailable.title": "Оновлення недоступні",
+	"updates.unavailable.message":
+		"Автоматичні оновлення доступні лише в зібраних додатках для Windows і macOS.",
 	"updates.ready.title": "Оновлення готове",
 	"updates.ready.message":
 		"BlinkGuard {version} завантажено. Перезапустіть, щоб встановити.",

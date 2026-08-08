@@ -452,11 +452,22 @@ export const en: MessageCatalog = {
 
 	// Auto-update dialogs
 	"updates.ok": "OK",
+	"updates.checking.title": "Checking for updates",
+	"updates.checking.message": "Looking for a newer BlinkGuard version…",
+	"updates.available.title": "Update available",
+	"updates.available.message":
+		"BlinkGuard {version} is available. Downloading…",
+	"updates.downloading.title": "Downloading update",
+	"updates.downloading.message":
+		"Downloading BlinkGuard {version}… {percent}%",
 	"updates.upToDate.title": "BlinkGuard",
 	"updates.upToDate.message": "You're up to date.",
 	"updates.error.title": "Update check failed",
 	"updates.error.message":
 		"Could not check for updates. BlinkGuard will keep running — try again later.",
+	"updates.unavailable.title": "Updates unavailable",
+	"updates.unavailable.message":
+		"Automatic updates are only available in the packaged Windows and macOS apps.",
 	"updates.ready.title": "Update ready",
 	"updates.ready.message":
 		"BlinkGuard {version} has been downloaded. Restart to install.",

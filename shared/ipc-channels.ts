@@ -77,6 +77,8 @@ export const IPC_CHANNELS = {
 	debugPreviewSound: "debug-preview-sound",
 	openGithubRepo: "open-github-repo",
 	checkForUpdates: "check-for-updates",
+	autoUpdateStatus: "auto-update-status",
+	installUpdate: "install-update",
 	exportDiagnostics: "export-diagnostics",
 	updateGoalsConfig: "update-goals-config",
 	spendBlinkReward: "spend-blink-reward",
@@ -99,6 +101,7 @@ export const MAIN_RENDERER_RECEIVE_CHANNELS = [
 	IPC_CHANNELS.loadBlinkStats,
 	IPC_CHANNELS.focusPauseState,
 	IPC_CHANNELS.shortcutError,
+	IPC_CHANNELS.autoUpdateStatus,
 ] as const;
 
 export const MAIN_RENDERER_SEND_CHANNELS = [
@@ -160,6 +163,7 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.debugPreviewSound,
 	IPC_CHANNELS.openGithubRepo,
 	IPC_CHANNELS.checkForUpdates,
+	IPC_CHANNELS.installUpdate,
 	IPC_CHANNELS.updateGoalsConfig,
 	IPC_CHANNELS.spendBlinkReward,
 ] as const;

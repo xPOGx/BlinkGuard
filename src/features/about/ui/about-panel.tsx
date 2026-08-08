@@ -2,13 +2,18 @@ import { Download, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/button";
 import { SettingPanel, SettingRow } from "@/components/setting-panel";
+import type { useAutoUpdate } from "@/features/about/model/use-auto-update";
 import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import { author, version } from "../../../../package.json";
 
 const AUTHOR_NAME = author.name;
 
-export function AboutPanel() {
+type AboutPanelProps = {
+	autoUpdate: Pick<ReturnType<typeof useAutoUpdate>, "busy" | "check">;
+};
+
+export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 	const t = useT();
 	const [exportBusy, setExportBusy] = useState(false);
 	const [exportStatus, setExportStatus] = useState<string | null>(null);
@@ -127,7 +132,8 @@ export function AboutPanel() {
 						<Button
 							type="button"
 							variant="secondary"
-							onClick={() => rendererIpc.checkForUpdates()}
+							disabled={autoUpdate.busy}
+							onClick={() => autoUpdate.check()}
 						>
 							{t("about.checkForUpdates")}
 						</Button>

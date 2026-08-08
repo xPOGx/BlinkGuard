@@ -1,3 +1,4 @@
+import type { AutoUpdateStatus } from "../../../shared/auto-update";
 import type { BlinkStatsSnapshot } from "../../../shared/blink-stats";
 import type {
 	DebugOverlayKind,
@@ -152,6 +153,9 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.debugPreviewSound, kind, volume),
 	openGithubRepo: () => send(IPC_CHANNELS.openGithubRepo),
 	checkForUpdates: () => send(IPC_CHANNELS.checkForUpdates),
+	installUpdate: () => send(IPC_CHANNELS.installUpdate),
+	onAutoUpdateStatus: (listener: (status: AutoUpdateStatus) => void) =>
+		subscribe(IPC_CHANNELS.autoUpdateStatus, listener),
 	exportDiagnostics: async (): Promise<ExportDiagnosticsResult> => {
 		const result = await bridge()?.invoke(IPC_CHANNELS.exportDiagnostics);
 		if (
