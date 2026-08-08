@@ -135,6 +135,15 @@ export const rendererIpc = {
 	subscribeBlinkStats: () => send(IPC_CHANNELS.subscribeBlinkStats),
 	unsubscribeBlinkStats: () => send(IPC_CHANNELS.unsubscribeBlinkStats),
 	resetBlinkStats: () => send(IPC_CHANNELS.resetBlinkStats),
+	spendBlinkReward: (rewardId: string) =>
+		send(IPC_CHANNELS.spendBlinkReward, rewardId),
+	updateGoalsConfig: (config: {
+		goalsEnabled: boolean;
+		dailyBlinkGoal: number;
+		dailyTrackingMinutesGoal: number;
+		weeklyBlinkGoal: number;
+		weeklyTrackingMinutesGoal: number;
+	}) => send(IPC_CHANNELS.updateGoalsConfig, config),
 	debugPreviewOverlay: (kind: DebugOverlayKind) =>
 		send(IPC_CHANNELS.debugPreviewOverlay, kind),
 	debugPreviewSound: (kind: DebugSoundKind, volume?: number) =>

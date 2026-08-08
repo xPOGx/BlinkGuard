@@ -1,6 +1,7 @@
 import { ipcMain, shell } from "electron";
 import { isValidEarCalibration } from "../../../shared/ear-calibration";
 import { isCameraQuality } from "../../../shared/camera-quality";
+import { isBlinkRewardId } from "../../../shared/blink-rewards";
 import { isDebugOverlayKind, isDebugSoundKind } from "../../../shared/debug-preview";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import type {
@@ -9,6 +10,7 @@ import type {
 	PopupColors,
 	Size,
 } from "../../../shared/preferences";
+import { sanitizeGoalsConfig } from "../../../shared/preferences";
 import type { BlinkStatsService } from "../../application/blink-stats-service";
 import type { ExerciseService } from "../../application/exercise-service";
 import type { FocusPauseService } from "../../application/focus-pause-service";
@@ -317,5 +319,24 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	ipcMain.on(IPC_CHANNELS.resetBlinkStats, () => {
 		blinkStats.reset();
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
+	});
+	ipcMain.on(IPC_CHANNELS.spendBlinkReward, (_event, rewardId: unknown) => {
+		if (!isBlinkRewardId(rewardId)) return;
+		blinkStats.purchaseReward(rewardId);
+		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
+	});
+	ipcMain.on(IPC_CHANNELS.updateGoalsConfig, (_event, raw: unknown) => {
+		const goals = sanitizeGoalsConfig(raw);
+		preferences.set("goalsEnabled", goals.goalsEnabled);
+		preferences.set("dailyBlinkGoal", goals.dailyBlinkGoal);
+		preferences.set("dailyTrackingMinutesGoal", goals.dailyTrackingMinutesGoal);
+		preferences.set("weeklyBlinkGoal", goals.weeklyBlinkGoal);
+		preferences.set(
+			"weeklyTrackingMinutesGoal",
+			goals.weeklyTrackingMinutesGoal,
+		);
+		if (blinkStats.isLivePushEnabled()) {
+			windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
+		}
 	});
 }

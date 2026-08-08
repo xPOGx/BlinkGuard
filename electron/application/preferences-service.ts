@@ -3,6 +3,7 @@ import {
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
+	sanitizeGoalsConfig,
 	sanitizeSoundVolume,
 	type AppPreferences,
 	type PersistedPreferences,
@@ -129,6 +130,18 @@ export class PreferencesService {
 			persisted.exercisePrompts,
 			persisted.locale,
 		);
+		const goals = sanitizeGoalsConfig({
+			goalsEnabled: persisted.goalsEnabled,
+			dailyBlinkGoal: persisted.dailyBlinkGoal,
+			dailyTrackingMinutesGoal: persisted.dailyTrackingMinutesGoal,
+			weeklyBlinkGoal: persisted.weeklyBlinkGoal,
+			weeklyTrackingMinutesGoal: persisted.weeklyTrackingMinutesGoal,
+		});
+		persisted.goalsEnabled = goals.goalsEnabled;
+		persisted.dailyBlinkGoal = goals.dailyBlinkGoal;
+		persisted.dailyTrackingMinutesGoal = goals.dailyTrackingMinutesGoal;
+		persisted.weeklyBlinkGoal = goals.weeklyBlinkGoal;
+		persisted.weeklyTrackingMinutesGoal = goals.weeklyTrackingMinutesGoal;
 
 		// Upgrade: existing installs without the flag should skip first-run.
 		if (!this.store.has("hasCompletedOnboarding")) {

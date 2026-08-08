@@ -460,3 +460,114 @@ export function QuietHoursFocusSettings({
 		</SettingPanel>
 	);
 }
+
+interface GoalsSettingsProps {
+	preferences: SettingsPreferences;
+	setPreferences: SetPreferences;
+}
+
+function GoalNumberInput({
+	id,
+	label,
+	value,
+	onChange,
+}: {
+	id: string;
+	label: string;
+	value: number;
+	onChange: (value: number) => void;
+}) {
+	return (
+		<label className="flex flex-col gap-1 text-sm">
+			<span className="text-muted-foreground">{label}</span>
+			<input
+				id={id}
+				type="number"
+				min={0}
+				max={100000}
+				value={value}
+				onChange={(event) => {
+					const next = Number.parseInt(event.target.value, 10);
+					onChange(Number.isFinite(next) ? Math.max(0, next) : 0);
+				}}
+				className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-foreground tabular-nums"
+			/>
+		</label>
+	);
+}
+
+export function GoalsSettings({
+	preferences,
+	setPreferences,
+}: GoalsSettingsProps) {
+	const t = useT();
+	return (
+		<SettingPanel>
+			<SettingRow
+				title={t("goals.title")}
+				description={t("goals.description")}
+				action={
+					<ToggleSwitch
+						aria-label={t("goals.enabledAria")}
+						checked={preferences.goalsEnabled}
+						onChange={() =>
+							setPreferences((current) => ({
+								...current,
+								goalsEnabled: !current.goalsEnabled,
+							}))
+						}
+					/>
+				}
+			>
+				{preferences.goalsEnabled ? (
+					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+						<GoalNumberInput
+							id="daily-blink-goal"
+							label={t("goals.dailyBlinks")}
+							value={preferences.dailyBlinkGoal}
+							onChange={(dailyBlinkGoal) =>
+								setPreferences((current) => ({
+									...current,
+									dailyBlinkGoal,
+								}))
+							}
+						/>
+						<GoalNumberInput
+							id="daily-tracking-goal"
+							label={t("goals.dailyTracking")}
+							value={preferences.dailyTrackingMinutesGoal}
+							onChange={(dailyTrackingMinutesGoal) =>
+								setPreferences((current) => ({
+									...current,
+									dailyTrackingMinutesGoal,
+								}))
+							}
+						/>
+						<GoalNumberInput
+							id="weekly-blink-goal"
+							label={t("goals.weeklyBlinks")}
+							value={preferences.weeklyBlinkGoal}
+							onChange={(weeklyBlinkGoal) =>
+								setPreferences((current) => ({
+									...current,
+									weeklyBlinkGoal,
+								}))
+							}
+						/>
+						<GoalNumberInput
+							id="weekly-tracking-goal"
+							label={t("goals.weeklyTracking")}
+							value={preferences.weeklyTrackingMinutesGoal}
+							onChange={(weeklyTrackingMinutesGoal) =>
+								setPreferences((current) => ({
+									...current,
+									weeklyTrackingMinutesGoal,
+								}))
+							}
+						/>
+					</div>
+				) : null}
+			</SettingRow>
+		</SettingPanel>
+	);
+}

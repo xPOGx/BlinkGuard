@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BlinkStatsService } from "../../../electron/application/blink-stats-service";
 import type { PreferenceStore } from "../../../electron/application/ports/preference-store";
+import { BLINK_REWARDS } from "../../../shared/blink-rewards";
 import {
 	BLINK_STATS_STORE_KEY,
 	localDateKey,
@@ -99,6 +100,64 @@ describe("BlinkStatsService", () => {
 			available: 1,
 		});
 		expect(service.spend(5)).toBe(false);
+		service.dispose();
+	});
+
+	it("purchaseReward persists spent unlocks and clears them on reset", () => {
+		const store = createStore();
+		const onCheer = vi.fn();
+		const service = new BlinkStatsService(store, () => "en", () => ({
+			goalsEnabled: true,
+			dailyBlinkGoal: 10,
+			dailyTrackingMinutesGoal: 0,
+			weeklyBlinkGoal: 0,
+			weeklyTrackingMinutesGoal: 0,
+		}));
+		service.setCheerEffects({ onCheer });
+		const need =
+			BLINK_REWARDS.statsFlair.cost + BLINK_REWARDS.cheer.cost;
+		for (let i = 0; i < need; i += 1) service.recordBlink();
+
+		expect(service.purchaseReward("statsFlair")).toBe(true);
+		expect(service.getSnapshot().hasStatsFlair).toBe(true);
+		expect(service.getSnapshot().totals.spent).toBe(
+			BLINK_REWARDS.statsFlair.cost,
+		);
+		expect(service.purchaseReward("cheer")).toBe(true);
+		expect(onCheer).toHaveBeenCalledTimes(1);
+
+		const persisted = store.get(BLINK_STATS_STORE_KEY) as {
+			spentBlinks: number;
+			unlockedRewardIds: string[];
+		};
+		expect(persisted.spentBlinks).toBe(need);
+		expect(persisted.unlockedRewardIds).toContain("statsFlair");
+
+		service.reset();
+		expect(service.getSnapshot().hasStatsFlair).toBe(false);
+		expect(service.getSnapshot().totals.spent).toBe(0);
+		expect(service.getSnapshot().streak.current).toBe(0);
+		service.dispose();
+	});
+
+	it("exposes goal progress from injected prefs", () => {
+		const store = createStore();
+		const service = new BlinkStatsService(
+			store,
+			() => "en",
+			() => ({
+				goalsEnabled: true,
+				dailyBlinkGoal: 5,
+				dailyTrackingMinutesGoal: 0,
+				weeklyBlinkGoal: 0,
+				weeklyTrackingMinutesGoal: 0,
+			}),
+		);
+		for (let i = 0; i < 5; i += 1) service.recordBlink();
+		const snapshot = service.getSnapshot();
+		expect(snapshot.goals.dailyBlinks.met).toBe(true);
+		expect(snapshot.goals.dailyMet).toBe(true);
+		expect(snapshot.streak.current).toBe(1);
 		service.dispose();
 	});
 

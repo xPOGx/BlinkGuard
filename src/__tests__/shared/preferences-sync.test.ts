@@ -36,6 +36,7 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updateBlinkRateThreshold: vi.fn(),
 		updateLocale: vi.fn(),
 		updateHasCompletedOnboarding: vi.fn(),
+		updateGoalsConfig: vi.fn(),
 	},
 }));
 
@@ -158,5 +159,37 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateSoundVolume).toHaveBeenCalledWith(55);
 		expect(rendererIpc.updateSoundEnabled).not.toHaveBeenCalled();
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+	});
+
+	it("pushes goals config once when any goal field changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = { ...previous, dailyBlinkGoal: 300 };
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateGoalsConfig).toHaveBeenCalledWith({
+			goalsEnabled: next.goalsEnabled,
+			dailyBlinkGoal: 300,
+			dailyTrackingMinutesGoal: next.dailyTrackingMinutesGoal,
+			weeklyBlinkGoal: next.weeklyBlinkGoal,
+			weeklyTrackingMinutesGoal: next.weeklyTrackingMinutesGoal,
+		});
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+	});
+
+	it("detects goals preference changes", () => {
+		const base = { ...DEFAULT_RENDERER_PREFERENCES };
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				goalsEnabled: false,
+			}),
+		).toBe(false);
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				weeklyTrackingMinutesGoal: 120,
+			}),
+		).toBe(false);
 	});
 });

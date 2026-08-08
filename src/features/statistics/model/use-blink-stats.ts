@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
+import type { BlinkRewardId } from "../../../../shared/blink-rewards";
 import {
 	type BlinkStatsSnapshot,
 	DEFAULT_BLINK_STATS,
@@ -29,5 +30,9 @@ export function useBlinkStats() {
 		}
 	};
 
-	return { snapshot, clearStatistics };
+	const purchaseReward = (rewardId: BlinkRewardId) => {
+		rendererIpc.spendBlinkReward(rewardId);
+	};
+
+	return { snapshot, clearStatistics, purchaseReward };
 }

@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { BLINK_REWARDS } from "../../../shared/blink-rewards";
 import {
 	addTrackingMs,
+	applyRewardPurchase,
 	availableBlinks,
+	computeStreak,
 	DEFAULT_BLINK_STATS,
 	emptyDayStats,
 	formatTrackingDuration,
+	goalProgress,
 	localDateKey,
 	localHour,
 	normalizeBlinkStatsState,
@@ -234,5 +238,102 @@ describe("blink-stats helpers", () => {
 		expect(normalized.days[0]?.hourlyBlinks[1]).toBe(0);
 		expect(normalized.totalBlinks).toBe(2);
 		expect(normalized.spentBlinks).toBe(0);
+		expect(normalized.unlockedRewardIds).toEqual([]);
+		expect(normalized.streakShieldCharges).toBe(0);
+	});
+
+	it("computes daily and weekly goal progress", () => {
+		const today = new Date(2026, 7, 7, 12, 0, 0); // Fri
+		const state = withDays([
+			{
+				...emptyDayStats("2026-08-07"),
+				blinks: 100,
+				trackingMs: 30 * 60_000,
+			},
+			{ ...emptyDayStats("2026-08-03"), blinks: 50, trackingMs: 10 * 60_000 },
+		]);
+		const goals = {
+			goalsEnabled: true,
+			dailyBlinkGoal: 240,
+			dailyTrackingMinutesGoal: 60,
+			weeklyBlinkGoal: 140,
+			weeklyTrackingMinutesGoal: 30,
+		};
+		const progress = goalProgress(state, goals, today);
+		expect(progress.dailyBlinks).toMatchObject({
+			current: 100,
+			target: 240,
+			enabled: true,
+			met: false,
+		});
+		expect(progress.dailyTrackingMinutes).toMatchObject({
+			current: 30,
+			target: 60,
+			met: false,
+		});
+		expect(progress.weeklyBlinks.current).toBe(150);
+		expect(progress.weeklyBlinks.met).toBe(true);
+		expect(progress.weeklyTrackingMinutes.met).toBe(true);
+		expect(progress.dailyMet).toBe(false);
+	});
+
+	it("computes streak across midnight and consumes a shield once", () => {
+		const goals = {
+			goalsEnabled: true,
+			dailyBlinkGoal: 10,
+			dailyTrackingMinutesGoal: 0,
+			weeklyBlinkGoal: 0,
+			weeklyTrackingMinutesGoal: 0,
+		};
+		const state = withDays(
+			[
+				{ ...emptyDayStats("2026-08-05"), blinks: 10 },
+				{ ...emptyDayStats("2026-08-06"), blinks: 2 },
+				{ ...emptyDayStats("2026-08-07"), blinks: 10 },
+			],
+			{ totalBlinks: 22 },
+		);
+		state.streakShieldCharges = 1;
+
+		const friday = new Date(2026, 7, 7, 10, 0, 0);
+		const result = computeStreak(state, goals, friday);
+		expect(result.streak.current).toBe(3);
+		expect(result.streak.shieldCharges).toBe(0);
+		expect(result.state.streakShieldUsedDates).toContain("2026-08-06");
+
+		const again = computeStreak(result.state, goals, friday);
+		expect(again.streak.current).toBe(3);
+		expect(again.streak.shieldCharges).toBe(0);
+		expect(again.state.streakShieldUsedDates).toEqual(
+			result.state.streakShieldUsedDates,
+		);
+
+		const saturday = new Date(2026, 7, 8, 1, 0, 0);
+		const afterMidnight = computeStreak(result.state, goals, saturday);
+		// Saturday incomplete; streak from Fri+Thu(shield)+Wed
+		expect(afterMidnight.streak.current).toBe(3);
+	});
+
+	it("applies reward purchases and rejects invalid buys", () => {
+		const flairCost = BLINK_REWARDS.statsFlair.cost;
+		const shieldCost = BLINK_REWARDS.streakShield.cost;
+		const cheerCost = BLINK_REWARDS.cheer.cost;
+		const total = flairCost + shieldCost + cheerCost;
+		const state = withDays(
+			[{ ...emptyDayStats("2026-08-07"), blinks: total }],
+			{ totalBlinks: total },
+		);
+		const flair = applyRewardPurchase(state, "statsFlair");
+		expect(flair?.spentBlinks).toBe(flairCost);
+		expect(flair?.unlockedRewardIds).toContain("statsFlair");
+		expect(applyRewardPurchase(flair ?? state, "statsFlair")).toBeNull();
+
+		const shield = applyRewardPurchase(flair ?? state, "streakShield");
+		expect(shield?.streakShieldCharges).toBe(1);
+		expect(applyRewardPurchase(shield ?? state, "streakShield")).toBeNull();
+
+		const cheer = applyRewardPurchase(shield ?? state, "cheer");
+		expect(cheer?.spentBlinks).toBe(total);
+		expect(availableBlinks(cheer ?? state)).toBe(0);
 	});
 });

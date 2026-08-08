@@ -66,7 +66,12 @@ export function sameRendererPrefs(
 		a.quietHoursEnd === b.quietHoursEnd &&
 		a.pauseOnFullscreen === b.pauseOnFullscreen &&
 		a.hasCompletedOnboarding === b.hasCompletedOnboarding &&
-		a.locale === b.locale
+		a.locale === b.locale &&
+		a.goalsEnabled === b.goalsEnabled &&
+		a.dailyBlinkGoal === b.dailyBlinkGoal &&
+		a.dailyTrackingMinutesGoal === b.dailyTrackingMinutesGoal &&
+		a.weeklyBlinkGoal === b.weeklyBlinkGoal &&
+		a.weeklyTrackingMinutesGoal === b.weeklyTrackingMinutesGoal
 	);
 }
 
@@ -174,5 +179,21 @@ export function pushPreferenceDiff(
 		previous.hasCompletedOnboarding !== next.hasCompletedOnboarding
 	) {
 		rendererIpc.updateHasCompletedOnboarding(next.hasCompletedOnboarding);
+	}
+	if (
+		!previous ||
+		previous.goalsEnabled !== next.goalsEnabled ||
+		previous.dailyBlinkGoal !== next.dailyBlinkGoal ||
+		previous.dailyTrackingMinutesGoal !== next.dailyTrackingMinutesGoal ||
+		previous.weeklyBlinkGoal !== next.weeklyBlinkGoal ||
+		previous.weeklyTrackingMinutesGoal !== next.weeklyTrackingMinutesGoal
+	) {
+		rendererIpc.updateGoalsConfig({
+			goalsEnabled: next.goalsEnabled,
+			dailyBlinkGoal: next.dailyBlinkGoal,
+			dailyTrackingMinutesGoal: next.dailyTrackingMinutesGoal,
+			weeklyBlinkGoal: next.weeklyBlinkGoal,
+			weeklyTrackingMinutesGoal: next.weeklyTrackingMinutesGoal,
+		});
 	}
 }

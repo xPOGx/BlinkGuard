@@ -18,7 +18,10 @@ export const uk: MessageCatalog = {
 		"Текст спливаючого вікна, кольори, розмір і звук сповіщень.",
 	"app.section.statistics": "Статистика",
 	"app.section.statistics.desc":
-		"Локальні моргання, час відстеження та графіки за день і тиждень.",
+		"Локальні моргання, час відстеження, цілі, серії та графіки.",
+	"app.section.rewards": "Нагороди",
+	"app.section.rewards.desc":
+		"Витрачайте доступні моргання на «ура», значок і щит серії.",
 	"app.section.system": "Система",
 	"app.section.system.desc":
 		"Гаряча клавіша, мова, автозапуск і скидання.",
@@ -259,6 +262,15 @@ export const uk: MessageCatalog = {
 	"launch.description":
 		"Запускати BlinkGuard у системному треї під час входу в систему",
 	"launch.toggleAria": "Перемкнути запуск під час входу",
+	"goals.title": "Цілі",
+	"goals.description":
+		"Типові цілі — здоровіші звички біля екрана (~12+ моргань/хв за робочий день і кілька годин відстеження). 0 вимикає метрику.",
+	"goals.enabled": "Увімкнути цілі",
+	"goals.enabledAria": "Перемкнути цілі",
+	"goals.dailyBlinks": "Моргання за день",
+	"goals.dailyTracking": "Відстеження за день (хвилини)",
+	"goals.weeklyBlinks": "Моргання за тиждень",
+	"goals.weeklyTracking": "Відстеження за тиждень (хвилини)",
 	"reset.title": "Скинути налаштування",
 	"reset.confirm":
 		"Скинути всі налаштування до значень за замовчуванням?",
@@ -317,12 +329,44 @@ export const uk: MessageCatalog = {
 	// Statistics
 	"stats.totals": "Підсумки",
 	"stats.totalsDesc":
-		"Усі зараховані моргання. Доступний баланс зарезервовано для майбутніх нагород.",
+		"Усі зараховані моргання. Витрачайте «Доступно» в розділі «Нагороди».",
 	"stats.total": "Усього",
 	"stats.available": "Доступно",
 	"stats.spent": "Витрачено",
 	"stats.spendingNote":
-		"Витрати ще не увімкнено — баланс зберігається, щоб нагороди могли списувати з «Доступно» пізніше.",
+		"Покупки списують з «Доступно» і зберігаються разом зі статистикою.",
+	"stats.goals": "Цілі",
+	"stats.goalsDesc": "Прогрес до сьогоднішніх і тижневих цілей.",
+	"stats.goals.dailyBlinks": "Моргання за день",
+	"stats.goals.dailyTracking": "Відстеження за день",
+	"stats.goals.weeklyBlinks": "Моргання за тиждень",
+	"stats.goals.weeklyTracking": "Відстеження за тиждень",
+	"stats.goals.met": "Досягнуто",
+	"stats.goals.off": "Цілі вимкнено — увімкніть їх у системних налаштуваннях.",
+	"stats.streak": "Серія",
+	"stats.streakDesc":
+		"Поспіль локальні дні з виконаними денними цілями. Щит серії покриває один пропуск.",
+	"stats.streak.days": "{n} день",
+	"stats.streak.days_few": "{n} дні",
+	"stats.streak.days_plural": "{n} днів",
+	"stats.streak.shieldReady": "Щит готовий",
+	"stats.streak.shieldEmpty": "Без щита",
+	"stats.flair.badge": "Стійкі очі",
+	"rewards.balance": "Баланс моргань",
+	"rewards.balanceDesc":
+		"«Доступно» — це всі зараховані моргання мінус покупки.",
+	"rewards.shop": "Магазин",
+	"rewards.shopDesc":
+		"Ціни розраховані на повний робочий день з камерою — не дріб’язок.",
+	"rewards.buy": "Купити ({cost})",
+	"rewards.owned": "Відкрито",
+	"rewards.cheer": "Ура",
+	"rewards.cheerDesc": "Коротке святкове сповіщення і звук.",
+	"rewards.statsFlair": "Значок статистики",
+	"rewards.statsFlairDesc": "Косметичний бейдж на сторінці статистики.",
+	"rewards.streakShield": "Щит серії",
+	"rewards.streakShieldDesc":
+		"Захищає серію на один пропущений день (макс. 1 заряд).",
 	"stats.liveRate": "Жива частота моргання",
 	"stats.liveRateDesc":
 		"Зараховані моргання за останню хвилину під час відстеження. Перша хвилина — розігрів.",
@@ -432,6 +476,7 @@ export const uk: MessageCatalog = {
 	"popup.lookAway.snooze": "Відкласти (5 хв)",
 	"popup.noFace.message": "Обличчя не виявлено",
 	"popup.coach.message": "Моргайте трохи частіше — частота низька",
+	"popup.cheer.message": "Класні моргання — так тримати!",
 	"popup.editor.title": "РЕДАГУВАННЯ",
 	"popup.editor.drag": "Клацніть і перетягніть",
 	"popup.editor.instructions":

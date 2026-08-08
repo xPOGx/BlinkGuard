@@ -6,6 +6,7 @@ import {
 	Info,
 	Keyboard,
 	Palette,
+	ShoppingBag,
 	Timer,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -23,9 +24,11 @@ import { LookAwaySettings } from "@/features/look-away/ui/look-away-settings";
 import { OnboardingWizard } from "@/features/onboarding/ui/onboarding-wizard";
 import { PopupSettings } from "@/features/popup-appearance/ui/popup-settings";
 import { ReminderControls } from "@/features/reminders/ui/reminder-controls";
+import { RewardsShopPanel } from "@/features/rewards/ui/rewards-shop-panel";
 import { usePreferences } from "@/features/settings/model/use-preferences";
 import {
 	DarkModeToggle,
+	GoalsSettings,
 	LanguageSettings,
 	LaunchAtLoginSettings,
 	QuietHoursFocusSettings,
@@ -45,6 +48,7 @@ type SectionId =
 	| "exercises"
 	| "appearance"
 	| "statistics"
+	| "rewards"
 	| "system"
 	| "about"
 	| "debug";
@@ -133,6 +137,12 @@ function SettingsShell({
 			label: t("app.section.statistics"),
 			description: t("app.section.statistics.desc"),
 			icon: BarChart3,
+		},
+		{
+			id: "rewards",
+			label: t("app.section.rewards"),
+			description: t("app.section.rewards.desc"),
+			icon: ShoppingBag,
 		},
 		{
 			id: "system",
@@ -301,6 +311,8 @@ function SettingsShell({
 
 						{section === "statistics" && <StatisticsPanel />}
 
+						{section === "rewards" && <RewardsShopPanel />}
+
 						{section === "system" && (
 							<>
 								<ShortcutSettings
@@ -311,6 +323,10 @@ function SettingsShell({
 									onStartRecording={shortcuts.startRecording}
 									onSave={shortcuts.save}
 									onCancel={shortcuts.cancel}
+								/>
+								<GoalsSettings
+									preferences={preferences}
+									setPreferences={setPreferences}
 								/>
 								<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 									<LanguageSettings

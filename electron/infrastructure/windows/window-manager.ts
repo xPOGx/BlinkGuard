@@ -38,8 +38,10 @@ export class WindowManager {
 	editor: BrowserWindow | null = null;
 	noFace: BrowserWindow | null = null;
 	blinkRateCoach: BrowserWindow | null = null;
+	cheerToast: BrowserWindow | null = null;
 	private blinkRateCoachDismissTimer: ReturnType<typeof setTimeout> | null =
 		null;
+	private cheerToastDismissTimer: ReturnType<typeof setTimeout> | null = null;
 	private onMainLoaded: (() => void) | null = null;
 
 	constructor(
@@ -310,6 +312,54 @@ export class WindowManager {
 		return !!this.blinkRateCoach && !this.blinkRateCoach.isDestroyed();
 	}
 
+	/** Short celebration toast after spending blinks on Cheer. */
+	showCheerToast(): void {
+		if (this.cheerToast && !this.cheerToast.isDestroyed()) {
+			this.hideCheerToast();
+		}
+		const width = 280;
+		const { x, y } = getTopCenterPopupPosition(width);
+		const popup = createPanelWindow(
+			{
+				width,
+				height: 48,
+				x,
+				y,
+				focusable: false,
+			},
+			this.paths.preload,
+		);
+		this.cheerToast = popup;
+		void popup.loadFile(path.join(this.paths.publicDir, "cheer.html"));
+		popup.webContents.on("did-finish-load", () => {
+			this.sendI18n(popup);
+			popup.setIgnoreMouseEvents(true);
+		});
+		popup.once("ready-to-show", () => popup.showInactive());
+		popup.on("closed", () => {
+			if (this.cheerToast === popup) this.cheerToast = null;
+			if (this.cheerToastDismissTimer) {
+				clearTimeout(this.cheerToastDismissTimer);
+				this.cheerToastDismissTimer = null;
+			}
+		});
+		if (this.cheerToastDismissTimer) {
+			clearTimeout(this.cheerToastDismissTimer);
+		}
+		this.cheerToastDismissTimer = setTimeout(() => {
+			this.cheerToastDismissTimer = null;
+			if (this.cheerToast === popup) this.hideCheerToast();
+		}, BLINK_RATE_COACH_DISMISS_MS);
+	}
+
+	hideCheerToast(): void {
+		if (this.cheerToastDismissTimer) {
+			clearTimeout(this.cheerToastDismissTimer);
+			this.cheerToastDismissTimer = null;
+		}
+		this.closeWindow("cheerToast");
+	}
+
 	showExercise(prompt: string, onClosed: () => void): BrowserWindow | null {
 		if (this.exercise && !this.exercise.isDestroyed()) return null;
 		const popupWidth = 340;
@@ -554,6 +604,7 @@ export class WindowManager {
 		this.editor = null;
 		this.noFace = null;
 		this.blinkRateCoach = null;
+		this.cheerToast = null;
 	}
 
 	private ensurePopupPosition(): Point {
@@ -572,7 +623,8 @@ export class WindowManager {
 			| "camera"
 			| "editor"
 			| "noFace"
-			| "blinkRateCoach",
+			| "blinkRateCoach"
+			| "cheerToast",
 	): void {
 		const window = this[key];
 		if (window && !window.isDestroyed()) window.close();

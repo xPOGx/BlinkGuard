@@ -37,6 +37,99 @@ const SOUND_VOLUME_MIN = 0;
 const SOUND_VOLUME_MAX = 100;
 const SOUND_VOLUME_DEFAULT = 100;
 
+/** Headroom for ambitious weekly blink targets (workday-scale). */
+const GOAL_BLINKS_MAX = 100_000;
+const GOAL_TRACKING_MINUTES_MAX = 24 * 7 * 60;
+
+export type GoalsConfig = {
+	goalsEnabled: boolean;
+	dailyBlinkGoal: number;
+	dailyTrackingMinutesGoal: number;
+	weeklyBlinkGoal: number;
+	weeklyTrackingMinutesGoal: number;
+};
+
+/**
+ * Defaults aim at healthier screen-time habits with camera tracking:
+ * ~12–15 blinks/min (better than typical CVS drop to ~5) over a workday,
+ * plus several hours of monitoring Mon–Fri.
+ */
+export const DEFAULT_GOALS_CONFIG: Readonly<GoalsConfig> = {
+	goalsEnabled: true,
+	/** ~12.5 blinks/min × 6h focused screen time. */
+	dailyBlinkGoal: 4500,
+	/** Cover a typical core workday with tracking on. */
+	dailyTrackingMinutesGoal: 300,
+	/** ~4–5 solid workdays in a Mon–Sun week. */
+	weeklyBlinkGoal: 20_000,
+	/** ~5 × 5h monitored days. */
+	weeklyTrackingMinutesGoal: 1500,
+};
+
+function sanitizeGoalBlinks(input: unknown, fallback: number): number {
+	if (input === null || input === undefined || input === "") return fallback;
+	const n = typeof input === "number" ? input : Number(input);
+	if (!Number.isFinite(n)) return fallback;
+	return Math.min(GOAL_BLINKS_MAX, Math.max(0, Math.round(n)));
+}
+
+function sanitizeGoalMinutes(input: unknown, fallback: number): number {
+	if (input === null || input === undefined || input === "") return fallback;
+	const n = typeof input === "number" ? input : Number(input);
+	if (!Number.isFinite(n)) return fallback;
+	return Math.min(GOAL_TRACKING_MINUTES_MAX, Math.max(0, Math.round(n)));
+}
+
+/** Coerce stored/IPC goals config; 0 disables that metric. */
+export function sanitizeGoalsConfig(input: unknown): GoalsConfig {
+	const defaults = DEFAULT_GOALS_CONFIG;
+	if (!input || typeof input !== "object") {
+		return { ...defaults };
+	}
+	const record = input as Record<string, unknown>;
+	return {
+		goalsEnabled:
+			typeof record.goalsEnabled === "boolean"
+				? record.goalsEnabled
+				: defaults.goalsEnabled,
+		dailyBlinkGoal: sanitizeGoalBlinks(
+			record.dailyBlinkGoal,
+			defaults.dailyBlinkGoal,
+		),
+		dailyTrackingMinutesGoal: sanitizeGoalMinutes(
+			record.dailyTrackingMinutesGoal,
+			defaults.dailyTrackingMinutesGoal,
+		),
+		weeklyBlinkGoal: sanitizeGoalBlinks(
+			record.weeklyBlinkGoal,
+			defaults.weeklyBlinkGoal,
+		),
+		weeklyTrackingMinutesGoal: sanitizeGoalMinutes(
+			record.weeklyTrackingMinutesGoal,
+			defaults.weeklyTrackingMinutesGoal,
+		),
+	};
+}
+
+export function goalsConfigFromPreferences(
+	preferences: Pick<
+		PersistedPreferences,
+		| "goalsEnabled"
+		| "dailyBlinkGoal"
+		| "dailyTrackingMinutesGoal"
+		| "weeklyBlinkGoal"
+		| "weeklyTrackingMinutesGoal"
+	>,
+): GoalsConfig {
+	return {
+		goalsEnabled: preferences.goalsEnabled,
+		dailyBlinkGoal: preferences.dailyBlinkGoal,
+		dailyTrackingMinutesGoal: preferences.dailyTrackingMinutesGoal,
+		weeklyBlinkGoal: preferences.weeklyBlinkGoal,
+		weeklyTrackingMinutesGoal: preferences.weeklyTrackingMinutesGoal,
+	};
+}
+
 /** Coerce stored/IPC blink-rate coaching threshold to 1…60. */
 export function sanitizeBlinkRateThresholdPerMin(input: unknown): number {
 	if (input === null || input === undefined || input === "") {
@@ -126,6 +219,16 @@ export interface PersistedPreferences {
 	hasCompletedOnboarding: boolean;
 	/** UI language for settings and popups. */
 	locale: Locale;
+	/** Master switch for daily/weekly blink and tracking goals. */
+	goalsEnabled: boolean;
+	/** Daily blink target (0 = off). */
+	dailyBlinkGoal: number;
+	/** Daily tracking minutes target (0 = off). */
+	dailyTrackingMinutesGoal: number;
+	/** Weekly blink target Mon–Sun (0 = off). */
+	weeklyBlinkGoal: number;
+	/** Weekly tracking minutes target Mon–Sun (0 = off). */
+	weeklyTrackingMinutesGoal: number;
 }
 
 export type AppPreferences = PersistedPreferences;
@@ -189,6 +292,11 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	pauseOnFullscreen: true,
 	hasCompletedOnboarding: false,
 	locale: "en",
+	goalsEnabled: DEFAULT_GOALS_CONFIG.goalsEnabled,
+	dailyBlinkGoal: DEFAULT_GOALS_CONFIG.dailyBlinkGoal,
+	dailyTrackingMinutesGoal: DEFAULT_GOALS_CONFIG.dailyTrackingMinutesGoal,
+	weeklyBlinkGoal: DEFAULT_GOALS_CONFIG.weeklyBlinkGoal,
+	weeklyTrackingMinutesGoal: DEFAULT_GOALS_CONFIG.weeklyTrackingMinutesGoal,
 };
 
 export function toRendererPreferences(

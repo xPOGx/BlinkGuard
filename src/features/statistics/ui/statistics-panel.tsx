@@ -6,7 +6,9 @@ import { cn } from "@/lib/utils";
 import {
 	type BlinkStatsSnapshot,
 	formatTrackingDuration,
+	type GoalMetricProgress,
 } from "../../../../shared/blink-stats";
+import { pluralKey } from "../../../../shared/i18n";
 import { useBlinkStats } from "../model/use-blink-stats";
 import { LiveBlinkRate } from "./live-blink-rate";
 import { StatsBarChart } from "./stats-bar-chart";
@@ -30,7 +32,7 @@ export function StatisticsPanel() {
 	const { t, locale } = useI18n();
 	const { snapshot, clearStatistics } = useBlinkStats();
 	const [range, setRange] = useState<ChartRange>("today");
-	const { today, totals } = snapshot;
+	const { today, totals, goals, streak, hasStatsFlair } = snapshot;
 	const buckets = chartBuckets(range, snapshot);
 	const chartCopy: Record<
 		ChartRange,
@@ -54,11 +56,30 @@ export function StatisticsPanel() {
 		},
 	};
 
+	const streakKey = pluralKey("stats.streak.days", locale, streak.current);
+	const dailyGoals = [
+		{ key: "dailyBlinks", metric: goals.dailyBlinks },
+		{ key: "dailyTracking", metric: goals.dailyTrackingMinutes },
+	] as const;
+	const weeklyGoals = [
+		{ key: "weeklyBlinks", metric: goals.weeklyBlinks },
+		{ key: "weeklyTracking", metric: goals.weeklyTrackingMinutes },
+	] as const;
+
 	return (
 		<>
 			<SettingPanel>
 				<SettingRow
-					title={t("stats.totals")}
+					title={
+						<span className="inline-flex items-center gap-2">
+							{t("stats.totals")}
+							{hasStatsFlair ? (
+								<span className="rounded border border-teal-600/40 bg-teal-600/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">
+									{t("stats.flair.badge")}
+								</span>
+							) : null}
+						</span>
+					}
 					description={t("stats.totalsDesc")}
 				>
 					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -78,6 +99,64 @@ export function StatisticsPanel() {
 					<p className="mt-3 text-xs text-muted-foreground">
 						{t("stats.spendingNote")}
 					</p>
+				</SettingRow>
+			</SettingPanel>
+
+			<SettingPanel>
+				<SettingRow title={t("stats.goals")} description={t("stats.goalsDesc")}>
+					{!goals.enabled ? (
+						<p className="text-sm text-muted-foreground">
+							{t("stats.goals.off")}
+						</p>
+					) : (
+						<div className="space-y-3">
+							{dailyGoals.map(({ key, metric }) =>
+								metric.enabled ? (
+									<GoalProgressRow
+										key={key}
+										label={t(`stats.goals.${key}`)}
+										metric={metric}
+										metLabel={t("stats.goals.met")}
+									/>
+								) : null,
+							)}
+							{weeklyGoals.map(({ key, metric }) =>
+								metric.enabled ? (
+									<GoalProgressRow
+										key={key}
+										label={t(`stats.goals.${key}`)}
+										metric={metric}
+										metLabel={t("stats.goals.met")}
+									/>
+								) : null,
+							)}
+						</div>
+					)}
+				</SettingRow>
+			</SettingPanel>
+
+			<SettingPanel>
+				<SettingRow
+					title={t("stats.streak")}
+					description={t("stats.streakDesc")}
+				>
+					<div className="flex flex-wrap items-center gap-3">
+						<p className="text-lg font-semibold tabular-nums tracking-tight">
+							{t(streakKey, { n: streak.current })}
+						</p>
+						<span
+							className={cn(
+								"rounded-md border px-2 py-1 text-xs font-medium",
+								streak.shieldCharges > 0
+									? "border-teal-600/40 bg-teal-600/10 text-teal-800 dark:text-teal-200"
+									: "border-border text-muted-foreground",
+							)}
+						>
+							{streak.shieldCharges > 0
+								? t("stats.streak.shieldReady")
+								: t("stats.streak.shieldEmpty")}
+						</span>
+					</div>
 				</SettingRow>
 			</SettingPanel>
 
@@ -154,6 +233,39 @@ export function StatisticsPanel() {
 				</Button>
 			</SettingPanel>
 		</>
+	);
+}
+
+function GoalProgressRow({
+	label,
+	metric,
+	metLabel,
+}: {
+	label: string;
+	metric: GoalMetricProgress;
+	metLabel: string;
+}) {
+	const ratio =
+		metric.target > 0 ? Math.min(1, metric.current / metric.target) : 0;
+	return (
+		<div>
+			<div className="mb-1 flex items-center justify-between gap-2 text-xs">
+				<span className="text-muted-foreground">{label}</span>
+				<span className="tabular-nums text-foreground">
+					{metric.current}/{metric.target}
+					{metric.met ? ` · ${metLabel}` : ""}
+				</span>
+			</div>
+			<div className="h-1.5 overflow-hidden rounded-full bg-muted">
+				<div
+					className={cn(
+						"h-full rounded-full transition-[width]",
+						metric.met ? "bg-teal-600" : "bg-primary",
+					)}
+					style={{ width: `${ratio * 100}%` }}
+				/>
+			</div>
+		</div>
 	);
 }
 

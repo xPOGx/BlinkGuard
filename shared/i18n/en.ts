@@ -18,7 +18,10 @@ export const en: MessageCatalog = {
 		"Popup message, colors, size, and notification sound.",
 	"app.section.statistics": "Statistics",
 	"app.section.statistics.desc":
-		"Local blink counts, tracking time, and day/week charts.",
+		"Local blink counts, tracking time, goals, streaks, and charts.",
+	"app.section.rewards": "Rewards",
+	"app.section.rewards.desc":
+		"Spend Available blinks on cheers, flair, and streak shields.",
 	"app.section.system": "System",
 	"app.section.system.desc": "Shortcut, language, launch at login, and reset.",
 	"app.section.about": "About",
@@ -252,6 +255,15 @@ export const en: MessageCatalog = {
 	"launch.description":
 		"Start BlinkGuard hidden in the system tray when you sign in",
 	"launch.toggleAria": "Toggle launch at login",
+	"goals.title": "Goals",
+	"goals.description":
+		"Defaults target healthier screen habits (~12+ blinks/min over a workday and several hours of tracking). Set a target to 0 to turn that metric off.",
+	"goals.enabled": "Enable goals",
+	"goals.enabledAria": "Toggle goals",
+	"goals.dailyBlinks": "Daily blinks",
+	"goals.dailyTracking": "Daily tracking (minutes)",
+	"goals.weeklyBlinks": "Weekly blinks",
+	"goals.weeklyTracking": "Weekly tracking (minutes)",
 	"reset.title": "Reset Preferences",
 	"reset.confirm": "Reset all preferences to default values?",
 	"reset.replayOnboarding": "Show first-run setup again",
@@ -309,12 +321,44 @@ export const en: MessageCatalog = {
 	// Statistics
 	"stats.totals": "Totals",
 	"stats.totalsDesc":
-		"Lifetime credited blinks. Available balance is reserved for future rewards.",
+		"Lifetime credited blinks. Spend Available in the Rewards section.",
 	"stats.total": "Total",
 	"stats.available": "Available",
 	"stats.spent": "Spent",
 	"stats.spendingNote":
-		"Spending is not enabled yet — balance is tracked so rewards can deduct from Available later.",
+		"Purchases deduct from Available and are saved with your statistics.",
+	"stats.goals": "Goals",
+	"stats.goalsDesc": "Progress toward today’s and this week’s targets.",
+	"stats.goals.dailyBlinks": "Daily blinks",
+	"stats.goals.dailyTracking": "Daily tracking",
+	"stats.goals.weeklyBlinks": "Weekly blinks",
+	"stats.goals.weeklyTracking": "Weekly tracking",
+	"stats.goals.met": "Met",
+	"stats.goals.off": "Goals are off — enable them in System settings.",
+	"stats.streak": "Streak",
+	"stats.streakDesc":
+		"Consecutive local days meeting all enabled daily goals. A streak shield covers one miss.",
+	"stats.streak.days": "{n} days",
+	"stats.streak.days_few": "{n} days",
+	"stats.streak.days_plural": "{n} days",
+	"stats.streak.shieldReady": "Shield ready",
+	"stats.streak.shieldEmpty": "No shield",
+	"stats.flair.badge": "Steady Eyes",
+	"rewards.balance": "Blink balance",
+	"rewards.balanceDesc":
+		"Available blinks come from lifetime credited blinks minus purchases.",
+	"rewards.shop": "Shop",
+	"rewards.shopDesc":
+		"Costs are sized for a full workday of camera tracking — not pocket change.",
+	"rewards.buy": "Buy ({cost})",
+	"rewards.owned": "Unlocked",
+	"rewards.cheer": "Cheer",
+	"rewards.cheerDesc": "Play a short celebration toast and sound.",
+	"rewards.statsFlair": "Stats flair",
+	"rewards.statsFlairDesc": "Cosmetic badge on the Statistics page.",
+	"rewards.streakShield": "Streak shield",
+	"rewards.streakShieldDesc":
+		"Protect your streak for one missed day (max 1 charge).",
 	"stats.liveRate": "Live blink rate",
 	"stats.liveRateDesc":
 		"Credited blinks over the last minute while tracking is active. The first minute is a warmup.",
@@ -424,6 +468,7 @@ export const en: MessageCatalog = {
 	"popup.lookAway.snooze": "Snooze (5 min)",
 	"popup.noFace.message": "No face detected",
 	"popup.coach.message": "Blink a bit more — rate is low",
+	"popup.cheer.message": "Nice blinks — keep it up!",
 	"popup.editor.title": "EDIT POPUP",
 	"popup.editor.drag": "Click & Drag to Move",
 	"popup.editor.instructions":

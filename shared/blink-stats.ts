@@ -1,9 +1,21 @@
 import {
+	BLINK_REWARDS,
+	isBlinkRewardId,
+	type BlinkRewardId,
+} from "./blink-rewards";
+import {
 	monthLabels,
 	t,
 	weekdayLabels,
 	type Locale,
 } from "./i18n";
+import {
+	DEFAULT_GOALS_CONFIG,
+	type GoalsConfig,
+} from "./preferences";
+
+export type { GoalsConfig };
+export { DEFAULT_GOALS_CONFIG };
 
 export const BLINK_STATS_RETENTION_DAYS = 366;
 export const BLINK_STATS_STORE_KEY = "state";
@@ -20,8 +32,44 @@ export type BlinkStatsState = {
 	days: DayBlinkStats[];
 	/** Lifetime credited blinks (survives day retention prune). */
 	totalBlinks: number;
-	/** Blinks spent on future rewards/features. */
+	/** Blinks spent on rewards. */
 	spentBlinks: number;
+	/** One-time reward unlocks (e.g. statsFlair). */
+	unlockedRewardIds: BlinkRewardId[];
+	/** Purchased streak-shield charges (0 or 1). */
+	streakShieldCharges: number;
+	/** Local dates where a streak shield already covered a miss. */
+	streakShieldUsedDates: string[];
+};
+
+export type GoalMetricProgress = {
+	current: number;
+	target: number;
+	enabled: boolean;
+	met: boolean;
+};
+
+export type GoalsProgressSummary = {
+	enabled: boolean;
+	dailyBlinks: GoalMetricProgress;
+	dailyTrackingMinutes: GoalMetricProgress;
+	weeklyBlinks: GoalMetricProgress;
+	weeklyTrackingMinutes: GoalMetricProgress;
+	/** All enabled daily metrics met (false when no daily goals active). */
+	dailyMet: boolean;
+};
+
+export type StreakSummary = {
+	current: number;
+	shieldCharges: number;
+};
+
+export type RewardOffer = {
+	id: BlinkRewardId;
+	cost: number;
+	owned: boolean;
+	charges: number;
+	canBuy: boolean;
 };
 
 export type ChartBucket = {
@@ -49,6 +97,9 @@ export const DEFAULT_BLINK_STATS: BlinkStatsState = {
 	days: [],
 	totalBlinks: 0,
 	spentBlinks: 0,
+	unlockedRewardIds: [],
+	streakShieldCharges: 0,
+	streakShieldUsedDates: [],
 };
 
 export function emptyHourlyBlinks(): number[] {
@@ -89,6 +140,9 @@ function cloneState(state: BlinkStatsState): BlinkStatsState {
 		days: state.days.map(cloneDay),
 		totalBlinks: state.totalBlinks,
 		spentBlinks: state.spentBlinks,
+		unlockedRewardIds: [...state.unlockedRewardIds],
+		streakShieldCharges: state.streakShieldCharges,
+		streakShieldUsedDates: [...state.streakShieldUsedDates],
 	};
 }
 
@@ -117,6 +171,11 @@ export function pruneDays(
 			.sort((a, b) => a.date.localeCompare(b.date)),
 		totalBlinks: state.totalBlinks,
 		spentBlinks: state.spentBlinks,
+		unlockedRewardIds: state.unlockedRewardIds,
+		streakShieldCharges: state.streakShieldCharges,
+		streakShieldUsedDates: state.streakShieldUsedDates.filter(
+			(date) => date >= cutoff,
+		),
 	};
 }
 
@@ -179,7 +238,7 @@ export function totalsSummary(state: BlinkStatsState): BlinkTotalsSummary {
 }
 
 /**
- * Stub for future rewards: deduct from the spendable balance.
+ * Deduct from the spendable blink balance.
  * Returns null when amount is invalid or exceeds available.
  */
 export function spendBlinks(
@@ -191,6 +250,244 @@ export function spendBlinks(
 	if (spend > availableBlinks(state)) return null;
 	const next = cloneState(state);
 	next.spentBlinks += spend;
+	return next;
+}
+
+export function trackingMinutes(ms: number): number {
+	return Math.floor(Math.max(0, ms) / 60_000);
+}
+
+function metricProgress(
+	current: number,
+	target: number,
+): GoalMetricProgress {
+	const enabled = target > 0;
+	return {
+		current,
+		target,
+		enabled,
+		met: enabled && current >= target,
+	};
+}
+
+function dayByDate(
+	state: BlinkStatsState,
+	date: string,
+): DayBlinkStats | undefined {
+	return state.days.find((day) => day.date === date);
+}
+
+/** Sum blinks / tracking for the local Mon–Sun week containing `today`. */
+export function weekTotals(
+	state: BlinkStatsState,
+	today: string = localDateKey(),
+): { blinks: number; trackingMs: number } {
+	const monday = startOfWeekMonday(today);
+	let blinks = 0;
+	let trackingMs = 0;
+	for (let offset = 0; offset < 7; offset += 1) {
+		const date = shiftDateKey(monday, offset);
+		const day = dayByDate(state, date);
+		if (!day) continue;
+		blinks += day.blinks;
+		trackingMs += day.trackingMs;
+	}
+	return { blinks, trackingMs };
+}
+
+/** True when every enabled daily goal is met for that local date. */
+export function dayMeetsDailyGoals(
+	state: BlinkStatsState,
+	date: string,
+	goals: GoalsConfig,
+): boolean {
+	if (!goals.goalsEnabled) return false;
+	const blinkTarget = goals.dailyBlinkGoal;
+	const trackTarget = goals.dailyTrackingMinutesGoal;
+	if (blinkTarget <= 0 && trackTarget <= 0) return false;
+	const day = dayByDate(state, date);
+	if (blinkTarget > 0 && (day?.blinks ?? 0) < blinkTarget) return false;
+	if (
+		trackTarget > 0 &&
+		trackingMinutes(day?.trackingMs ?? 0) < trackTarget
+	) {
+		return false;
+	}
+	return true;
+}
+
+export function goalProgress(
+	state: BlinkStatsState,
+	goals: GoalsConfig,
+	now: Date = new Date(),
+): GoalsProgressSummary {
+	const today = localDateKey(now);
+	const day = dayByDate(state, today);
+	const week = weekTotals(state, today);
+	const dailyBlinks = metricProgress(day?.blinks ?? 0, goals.dailyBlinkGoal);
+	const dailyTrackingMinutes = metricProgress(
+		trackingMinutes(day?.trackingMs ?? 0),
+		goals.dailyTrackingMinutesGoal,
+	);
+	const weeklyBlinks = metricProgress(week.blinks, goals.weeklyBlinkGoal);
+	const weeklyTrackingMinutes = metricProgress(
+		trackingMinutes(week.trackingMs),
+		goals.weeklyTrackingMinutesGoal,
+	);
+	const enabled = goals.goalsEnabled;
+	const dailyActive =
+		enabled && (dailyBlinks.enabled || dailyTrackingMinutes.enabled);
+	const dailyMet =
+		dailyActive &&
+		(!dailyBlinks.enabled || dailyBlinks.met) &&
+		(!dailyTrackingMinutes.enabled || dailyTrackingMinutes.met);
+
+	return {
+		enabled,
+		dailyBlinks: enabled
+			? dailyBlinks
+			: { ...dailyBlinks, enabled: false, met: false },
+		dailyTrackingMinutes: enabled
+			? dailyTrackingMinutes
+			: { ...dailyTrackingMinutes, enabled: false, met: false },
+		weeklyBlinks: enabled
+			? weeklyBlinks
+			: { ...weeklyBlinks, enabled: false, met: false },
+		weeklyTrackingMinutes: enabled
+			? weeklyTrackingMinutes
+			: { ...weeklyTrackingMinutes, enabled: false, met: false },
+		dailyMet,
+	};
+}
+
+export type StreakComputeResult = {
+	streak: StreakSummary;
+	/** State after applying any new shield consumptions (may equal input). */
+	state: BlinkStatsState;
+};
+
+/**
+ * Consecutive local days meeting all enabled daily goals.
+ * Incomplete today does not count; shields cover past misses only (once each).
+ */
+export function computeStreak(
+	state: BlinkStatsState,
+	goals: GoalsConfig,
+	now: Date = new Date(),
+): StreakComputeResult {
+	const today = localDateKey(now);
+	if (
+		!goals.goalsEnabled ||
+		(goals.dailyBlinkGoal <= 0 && goals.dailyTrackingMinutesGoal <= 0)
+	) {
+		return {
+			streak: { current: 0, shieldCharges: state.streakShieldCharges },
+			state,
+		};
+	}
+
+	let charges = state.streakShieldCharges;
+	const used = new Set(state.streakShieldUsedDates);
+	const newlyUsed: string[] = [];
+
+	const covers = (date: string, allowShield: boolean): boolean => {
+		if (dayMeetsDailyGoals(state, date, goals)) return true;
+		if (!allowShield) return false;
+		if (used.has(date) || newlyUsed.includes(date)) return true;
+		if (charges <= 0) return false;
+		charges -= 1;
+		newlyUsed.push(date);
+		return true;
+	};
+
+	let cursor = today;
+	if (!covers(today, false)) {
+		cursor = shiftDateKey(today, -1);
+	}
+
+	let current = 0;
+	// Cap walk to retention window.
+	for (let i = 0; i < BLINK_STATS_RETENTION_DAYS; i += 1) {
+		const allowShield = cursor < today;
+		if (!covers(cursor, allowShield)) break;
+		current += 1;
+		cursor = shiftDateKey(cursor, -1);
+	}
+
+	if (newlyUsed.length === 0 && charges === state.streakShieldCharges) {
+		return {
+			streak: { current, shieldCharges: state.streakShieldCharges },
+			state,
+		};
+	}
+
+	const next = cloneState(state);
+	next.streakShieldCharges = charges;
+	next.streakShieldUsedDates = [
+		...new Set([...next.streakShieldUsedDates, ...newlyUsed]),
+	].sort();
+	return {
+		streak: { current, shieldCharges: charges },
+		state: pruneDays(next, BLINK_STATS_RETENTION_DAYS, today),
+	};
+}
+
+export function rewardOffers(
+	state: BlinkStatsState,
+): RewardOffer[] {
+	const available = availableBlinks(state);
+	return (Object.keys(BLINK_REWARDS) as BlinkRewardId[]).map((id) => {
+		const def = BLINK_REWARDS[id];
+		const owned =
+			def.oneTime && state.unlockedRewardIds.includes(id);
+		const charges =
+			id === "streakShield" ? state.streakShieldCharges : 0;
+		const atMaxCharges =
+			id === "streakShield" &&
+			charges >= (def.maxCharges ?? 1);
+		const canBuy =
+			!owned && !atMaxCharges && available >= def.cost;
+		return {
+			id,
+			cost: def.cost,
+			owned,
+			charges,
+			canBuy,
+		};
+	});
+}
+
+/**
+ * Spend blinks and apply reward side effects (unlock / shield charge).
+ * Cheer only deducts balance. Returns null when purchase is invalid.
+ */
+export function applyRewardPurchase(
+	state: BlinkStatsState,
+	rewardId: BlinkRewardId,
+): BlinkStatsState | null {
+	const def = BLINK_REWARDS[rewardId];
+	if (!def) return null;
+	if (def.oneTime && state.unlockedRewardIds.includes(rewardId)) {
+		return null;
+	}
+	if (
+		rewardId === "streakShield" &&
+		state.streakShieldCharges >= (def.maxCharges ?? 1)
+	) {
+		return null;
+	}
+	const spent = spendBlinks(state, def.cost);
+	if (!spent) return null;
+	const next = cloneState(spent);
+	if (def.oneTime) {
+		next.unlockedRewardIds = [...next.unlockedRewardIds, rewardId];
+	}
+	if (rewardId === "streakShield") {
+		next.streakShieldCharges = Math.min(
+			def.maxCharges ?? 1,
+			next.streakShieldCharges + 1,
+		);
+	}
 	return next;
 }
 
@@ -289,6 +586,11 @@ export type BlinkStatsSnapshot = {
 	blinkRateReady: boolean;
 	/** Elapsed ms in the current tracking session toward the rate warmup (0…window). */
 	blinkRateWarmupMs: number;
+	goals: GoalsProgressSummary;
+	streak: StreakSummary;
+	rewards: RewardOffer[];
+	/** True when stats-flair cosmetic is unlocked. */
+	hasStatsFlair: boolean;
 };
 
 export function toBlinkStatsSnapshot(
@@ -298,6 +600,11 @@ export function toBlinkStatsSnapshot(
 	blinkRateReady = false,
 	blinkRateWarmupMs = 0,
 	locale: Locale = "en",
+	goals: GoalsConfig = DEFAULT_GOALS_CONFIG,
+	streak: StreakSummary = {
+		current: 0,
+		shieldCharges: state.streakShieldCharges,
+	},
 ): BlinkStatsSnapshot {
 	const today = localDateKey(now);
 	return {
@@ -310,6 +617,10 @@ export function toBlinkStatsSnapshot(
 		blinksPerMinute,
 		blinkRateReady,
 		blinkRateWarmupMs,
+		goals: goalProgress(state, goals, now),
+		streak,
+		rewards: rewardOffers(state),
+		hasStatsFlair: state.unlockedRewardIds.includes("statsFlair"),
 	};
 }
 
@@ -387,9 +698,38 @@ export function normalizeBlinkStatsState(raw: unknown): BlinkStatsState {
 	let spentBlinks = nonNegativeInt(record.spentBlinks) ?? 0;
 	if (spentBlinks > totalBlinks) spentBlinks = totalBlinks;
 
+	const unlockedRewardIds: BlinkRewardId[] = [];
+	if (Array.isArray(record.unlockedRewardIds)) {
+		for (const id of record.unlockedRewardIds) {
+			if (isBlinkRewardId(id) && !unlockedRewardIds.includes(id)) {
+				unlockedRewardIds.push(id);
+			}
+		}
+	}
+
+	let streakShieldCharges = nonNegativeInt(record.streakShieldCharges) ?? 0;
+	streakShieldCharges = Math.min(1, streakShieldCharges);
+
+	const streakShieldUsedDates: string[] = [];
+	if (Array.isArray(record.streakShieldUsedDates)) {
+		for (const date of record.streakShieldUsedDates) {
+			if (
+				typeof date === "string" &&
+				/^\d{4}-\d{2}-\d{2}$/.test(date) &&
+				!streakShieldUsedDates.includes(date)
+			) {
+				streakShieldUsedDates.push(date);
+			}
+		}
+		streakShieldUsedDates.sort();
+	}
+
 	return pruneDays({
 		days,
 		totalBlinks: Math.max(totalBlinks, daysSum),
 		spentBlinks,
+		unlockedRewardIds,
+		streakShieldCharges,
+		streakShieldUsedDates,
 	});
 }

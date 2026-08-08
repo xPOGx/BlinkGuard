@@ -32,6 +32,7 @@ import { TrayController } from "./infrastructure/tray/tray-controller";
 import { AutoUpdateService } from "./infrastructure/updates/auto-update-service";
 import { WindowManager } from "./infrastructure/windows/window-manager";
 import { IPC_CHANNELS } from "../shared/ipc-channels";
+import { goalsConfigFromPreferences } from "../shared/preferences";
 
 if (process.platform === "darwin") {
 	process.env.NSWindowSupportsNonactivatingPanel = "true";
@@ -66,6 +67,14 @@ function bootstrap(): void {
 	const blinkStats = new BlinkStatsService(
 		statsStore,
 		() => preferences.locale,
+		() =>
+			goalsConfigFromPreferences({
+				goalsEnabled: preferences.goalsEnabled,
+				dailyBlinkGoal: preferences.dailyBlinkGoal,
+				dailyTrackingMinutesGoal: preferences.dailyTrackingMinutesGoal,
+				weeklyBlinkGoal: preferences.weeklyBlinkGoal,
+				weeklyTrackingMinutesGoal: preferences.weeklyTrackingMinutesGoal,
+			}),
 	);
 	const state = new AppRuntimeState();
 	const processes = new ChildProcessRegistry();
@@ -74,6 +83,12 @@ function bootstrap(): void {
 
 	blinkStats.setPushHandler((snapshot) => {
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, snapshot);
+	});
+	blinkStats.setCheerEffects({
+		onCheer: () => {
+			sound.play("blink", { force: true });
+			windows.showCheerToast();
+		},
 	});
 
 	const gateHolder: { current: NotificationGate } = {

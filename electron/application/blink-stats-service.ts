@@ -3,12 +3,16 @@ import {
 	computeBlinksPerMinute,
 	pruneBlinkTimestamps,
 } from "../../shared/blink-rate";
+import type { BlinkRewardId } from "../../shared/blink-rewards";
 import {
 	BLINK_STATS_STORE_KEY,
 	DEFAULT_BLINK_STATS,
 	type BlinkStatsSnapshot,
 	type BlinkStatsState,
+	type GoalsConfig,
 	addTrackingMs,
+	applyRewardPurchase,
+	computeStreak,
 	localDateKey,
 	normalizeBlinkStatsState,
 	recordBlink,
@@ -17,13 +21,22 @@ import {
 	todaySummary,
 	toBlinkStatsSnapshot,
 	totalsSummary,
+	goalProgress,
+	rewardOffers,
 } from "../../shared/blink-stats";
 import type { Locale } from "../../shared/i18n";
+import {
+	DEFAULT_GOALS_CONFIG,
+} from "../../shared/preferences";
 import type { PreferenceStore } from "./ports/preference-store";
 
 const TRACKING_FLUSH_MS = 15_000;
 const PUSH_THROTTLE_MS = 1_000;
 const RATE_TICK_MS = 1_000;
+
+export type CheerRewardEffects = {
+	onCheer?: () => void;
+};
 
 export class BlinkStatsService {
 	private state: BlinkStatsState;
@@ -49,15 +62,23 @@ export class BlinkStatsService {
 		"dayChart" | "weekChart" | "monthChart" | "yearChart"
 	> | null = null;
 	private cachedLocale: Locale | null = null;
+	private cheerEffects: CheerRewardEffects = {};
 
 	constructor(
 		private readonly store: PreferenceStore,
 		private readonly getLocale: () => Locale = () => "en",
+		private readonly getGoals: () => GoalsConfig = () => ({
+			...DEFAULT_GOALS_CONFIG,
+		}),
 	) {
 		this.state = normalizeBlinkStatsState(
 			this.store.get(BLINK_STATS_STORE_KEY, DEFAULT_BLINK_STATS),
 		);
 		this.persist();
+	}
+
+	setCheerEffects(effects: CheerRewardEffects): void {
+		this.cheerEffects = effects;
 	}
 
 	invalidateCharts(): void {
@@ -94,6 +115,7 @@ export class BlinkStatsService {
 	}
 
 	getSnapshot(now: Date = new Date()): BlinkStatsSnapshot {
+		this.reconcileStreak(now);
 		const nowMs = now.getTime();
 		this.blinkTimestamps = pruneBlinkTimestamps(this.blinkTimestamps, nowMs);
 		const { ready, warmupMs } = this.rateWarmup(nowMs);
@@ -102,6 +124,8 @@ export class BlinkStatsService {
 			: 0;
 		const today = localDateKey(now);
 		const locale = this.getLocale();
+		const goals = this.getGoals();
+		const streakResult = computeStreak(this.state, goals, now);
 
 		if (
 			this.chartsDirty ||
@@ -115,6 +139,8 @@ export class BlinkStatsService {
 				ready,
 				warmupMs,
 				locale,
+				goals,
+				streakResult.streak,
 			);
 			this.cachedCharts = {
 				dayChart: full.dayChart,
@@ -134,6 +160,10 @@ export class BlinkStatsService {
 			blinksPerMinute,
 			blinkRateReady: ready,
 			blinkRateWarmupMs: warmupMs,
+			goals: goalProgress(this.state, goals, now),
+			streak: streakResult.streak,
+			rewards: rewardOffers(this.state),
+			hasStatsFlair: this.state.unlockedRewardIds.includes("statsFlair"),
 		};
 	}
 
@@ -149,16 +179,30 @@ export class BlinkStatsService {
 		this.schedulePush();
 	}
 
-	/**
-	 * Stub for future rewards — deducts from the spendable blink balance.
-	 * Not wired to IPC yet.
-	 */
+	/** Deduct from the spendable blink balance (low-level). */
 	spend(amount: number): boolean {
 		const next = spendBlinks(this.state, amount);
 		if (!next) return false;
 		this.state = next;
 		this.markChartsDirty();
 		this.persist();
+		this.schedulePush(true);
+		return true;
+	}
+
+	/**
+	 * Purchase a catalog reward; persists spent balance + unlock/shield.
+	 * Cheer triggers optional sound/toast side effects.
+	 */
+	purchaseReward(rewardId: BlinkRewardId): boolean {
+		const next = applyRewardPurchase(this.state, rewardId);
+		if (!next) return false;
+		this.state = next;
+		this.markChartsDirty();
+		this.persist();
+		if (rewardId === "cheer") {
+			this.cheerEffects.onCheer?.();
+		}
 		this.schedulePush(true);
 		return true;
 	}
@@ -198,7 +242,12 @@ export class BlinkStatsService {
 		const wasTracking = this.trackingStartedAt !== null;
 		this.trackingStartedAt = null;
 		this.rateSessionStartedAt = null;
-		this.state = { ...DEFAULT_BLINK_STATS, days: [] };
+		this.state = {
+			...DEFAULT_BLINK_STATS,
+			days: [],
+			unlockedRewardIds: [],
+			streakShieldUsedDates: [],
+		};
 		this.persist();
 		if (wasTracking) {
 			this.onTrackingStart();
@@ -216,6 +265,21 @@ export class BlinkStatsService {
 		if (this.pushTimer) {
 			clearTimeout(this.pushTimer);
 			this.pushTimer = null;
+		}
+	}
+
+	/** Apply shield consumption for past misses and persist if changed. */
+	private reconcileStreak(now: Date): void {
+		const result = computeStreak(this.state, this.getGoals(), now);
+		if (result.state === this.state) return;
+		const before = this.state;
+		this.state = result.state;
+		if (
+			before.streakShieldCharges !== this.state.streakShieldCharges ||
+			before.streakShieldUsedDates.length !==
+				this.state.streakShieldUsedDates.length
+		) {
+			this.persist();
 		}
 	}
 
