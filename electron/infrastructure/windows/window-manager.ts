@@ -75,7 +75,7 @@ export class WindowManager {
 			show: false,
 			// Match renderer boot splash / light shell background.
 			backgroundColor: "#F4F7F9",
-			icon: path.join(this.paths.publicDir, "electron-vite.svg"),
+			icon: path.join(this.paths.root, "assets", "icons", "icon.png"),
 			autoHideMenuBar: true,
 			webPreferences: {
 				preload: this.paths.preload,
