@@ -12,9 +12,9 @@ Pragmatic Clean Architecture with a thin `electron/main.ts` composition root. Fe
 |---|---|
 | `shared/` | IPC channel constants/whitelists + preference types/defaults, backup envelope (`backup.ts`), diagnostics export result, auto-update status (`auto-update.ts`), camera quality / EAR, blink-rate / blink-stats / blink-rewards, `i18n/` (no Electron imports) |
 | `electron/domain/` | Pure policies (`reminder-policy`, `focus-policy`, `blink-rate-coaching`) |
-| `electron/application/` | Runtime state + preferences / reminder / exercise / look-away / blink-stats / blink-rate-coaching / focus-pause / preference-actions and ports |
+| `electron/application/` | Runtime state + preferences / reminder / exercise / look-away / blink-stats / blink-rate-coaching / focus-pause / preference-actions / deferred-tracking-restore and ports |
 | `electron/infrastructure/` | IPC, windows, lifecycle/power, sidecar, shortcuts, sound, store, process cleanup, paths/logging, focus (Win+Mac fullscreen detectors; stub elsewhere) |
-| `electron/main.ts` | Vite entry/composition root only: constructs collaborators, connects callbacks, starts lifecycle |
+| `electron/main.ts` | Vite entry/composition root only: constructs collaborators, connects callbacks, starts lifecycle; cold-start tracking restore waits for renderer `shellReady` (after boot splash) |
 | `electron/preload.ts` | `contextBridge`; whitelists from `shared/ipc-channels` |
 | `src/app.tsx` | Settings shell (`BlinkGuardHomepage`) |
 | `src/features/*` | Feature `model/` + `ui/` (reminders, camera, exercises, look-away, popup-appearance, statistics, rewards, settings, onboarding, about, shortcuts, debug) |

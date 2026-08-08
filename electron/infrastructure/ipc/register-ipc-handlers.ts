@@ -42,6 +42,8 @@ interface IpcDependencies {
 	checkForUpdates: () => void;
 	installUpdate: () => void;
 	interactions: InteractionLogger;
+	/** Cold-start gate: settings shell hydrated + boot splash dismissed. */
+	onShellReady?: () => void;
 }
 
 export function registerIpcHandlers(deps: IpcDependencies): void {
@@ -60,6 +62,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		checkForUpdates,
 		installUpdate,
 		interactions,
+		onShellReady,
 	} = deps;
 	const current = preferences.current;
 
@@ -77,6 +80,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		reminders.start(interval as number);
 	});
 	on(IPC_CHANNELS.stopBlinkReminders, () => reminders.stop(true));
+	on(IPC_CHANNELS.shellReady, () => {
+		onShellReady?.();
+	});
 	on(IPC_CHANNELS.updatePopupPosition, (_event, position: unknown) => {
 		preferences.set("popupPosition", position as Point);
 	});

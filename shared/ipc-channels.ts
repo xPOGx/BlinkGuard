@@ -84,6 +84,7 @@ export const IPC_CHANNELS = {
 	importBackup: "import-backup",
 	updateGoalsConfig: "update-goals-config",
 	spendBlinkReward: "spend-blink-reward",
+	shellReady: "shell-ready",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -168,4 +169,5 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.installUpdate,
 	IPC_CHANNELS.updateGoalsConfig,
 	IPC_CHANNELS.spendBlinkReward,
+	IPC_CHANNELS.shellReady,
 ] as const;

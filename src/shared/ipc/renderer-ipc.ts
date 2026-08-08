@@ -55,6 +55,8 @@ export const rendererIpc = {
 	startReminders: (intervalSeconds: number) =>
 		send(IPC_CHANNELS.startBlinkReminders, intervalSeconds * 1000),
 	stopReminders: () => send(IPC_CHANNELS.stopBlinkReminders),
+	/** Settings shell hydrated + boot splash dismissed — main may restore tracking. */
+	notifyShellReady: () => send(IPC_CHANNELS.shellReady),
 	updateReminderInterval: (intervalSeconds: number) =>
 		send(IPC_CHANNELS.updateInterval, intervalSeconds * 1000),
 	updateDarkMode: (enabled: boolean) =>

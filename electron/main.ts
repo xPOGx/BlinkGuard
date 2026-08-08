@@ -10,6 +10,7 @@ import { LookAwayService } from "./application/look-away-service";
 import type { NotificationGate } from "./application/ports/notification-gate";
 import { PreferenceActions } from "./application/preference-actions";
 import { PreferencesService } from "./application/preferences-service";
+import { DeferredTrackingRestore } from "./application/deferred-tracking-restore";
 import { ReminderService } from "./application/reminder-service";
 import { createFocusEnvironment } from "./infrastructure/focus/create-focus-environment";
 import { FocusEnvironmentMonitor } from "./infrastructure/focus/focus-environment-monitor";
@@ -253,6 +254,12 @@ function bootstrap(): void {
 		tray,
 	);
 
+	const trackingRestore = new DeferredTrackingRestore({
+		pending: preferences.isTracking,
+		isTracking: () => preferences.isTracking,
+		start: () => reminders.start(preferences.reminderInterval),
+	});
+
 	registerIpcHandlers({
 		preferences: preferencesService,
 		preferenceActions,
@@ -268,6 +275,7 @@ function bootstrap(): void {
 		checkForUpdates: () => autoUpdates.checkForUpdates({ interactive: true }),
 		installUpdate: () => autoUpdates.installUpdate(),
 		interactions: interactionLogger,
+		onShellReady: () => trackingRestore.onShellReady(),
 	});
 
 	app.on("second-instance", () => {
@@ -318,9 +326,7 @@ function bootstrap(): void {
 		await killOrphanedSidecarProcesses();
 		console.log("Starting blink detector on app startup...");
 		sidecar.start();
-
-		if (preferences.isTracking) {
-			reminders.start(preferences.reminderInterval);
-		}
+		// Defer Start popup / camera until settings shell is ready (shellReady IPC).
+		trackingRestore.armFallback();
 	});
 }

@@ -266,12 +266,18 @@ describe("settings shell", () => {
 		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
 	});
 
-	it("does not echo-write prefs on hydrate", () => {
+	it("does not echo-write prefs on hydrate", async () => {
 		render(<App />);
 		send.mockClear();
 		hydratePreferences({ hasCompletedOnboarding: true });
+		await act(async () => {});
 
-		expect(send).not.toHaveBeenCalled();
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.shellReady);
+		expect(
+			send.mock.calls.filter(
+				([channel]) => channel !== IPC_CHANNELS.shellReady,
+			),
+		).toHaveLength(0);
 	});
 
 	it("pushes only the changed field for common interactive toggles", () => {

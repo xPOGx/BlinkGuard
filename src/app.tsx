@@ -44,6 +44,7 @@ import { ShortcutSettings } from "@/features/shortcuts/ui/shortcut-settings";
 import { StatisticsPanel } from "@/features/statistics/ui/statistics-panel";
 import { I18nProvider, useT } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 
 type SectionId =
 	| "reminders"
@@ -177,7 +178,11 @@ function SettingsShell({
 
 	useEffect(() => {
 		if (!prefsHydrated) return;
-		void dismissBootSplash();
+		void (async () => {
+			await dismissBootSplash();
+			// Main DeferredTrackingRestore is one-shot; duplicates (Strict Mode) are fine.
+			rendererIpc.notifyShellReady();
+		})();
 	}, [prefsHydrated]);
 
 	return (
