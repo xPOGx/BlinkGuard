@@ -27,6 +27,7 @@ import {
 	isBuiltInPopupMessage,
 	type Locale,
 } from "../../../../shared/i18n";
+import { DEFAULT_GOALS_CONFIG } from "../../../../shared/preferences";
 import type { SettingsPreferences } from "../model/preferences";
 import type { SetPreferences } from "../model/use-preferences";
 
@@ -687,6 +688,21 @@ export function GoalsSettings({
 	setPreferences,
 }: GoalsSettingsProps) {
 	const t = useT();
+	const atDefaults =
+		preferences.goalsEnabled === DEFAULT_GOALS_CONFIG.goalsEnabled &&
+		preferences.dailyBlinkGoal === DEFAULT_GOALS_CONFIG.dailyBlinkGoal &&
+		preferences.dailyTrackingMinutesGoal ===
+			DEFAULT_GOALS_CONFIG.dailyTrackingMinutesGoal &&
+		preferences.weeklyBlinkGoal === DEFAULT_GOALS_CONFIG.weeklyBlinkGoal &&
+		preferences.weeklyTrackingMinutesGoal ===
+			DEFAULT_GOALS_CONFIG.weeklyTrackingMinutesGoal;
+
+	const resetGoals = () =>
+		setPreferences((current) => ({
+			...current,
+			...DEFAULT_GOALS_CONFIG,
+		}));
+
 	return (
 		<SettingPanel>
 			<SettingRow
@@ -753,6 +769,17 @@ export function GoalsSettings({
 						/>
 					</div>
 				) : null}
+				<div className={preferences.goalsEnabled ? "mt-3" : undefined}>
+					<Button
+						type="button"
+						size="sm"
+						variant="secondary"
+						disabled={atDefaults}
+						onClick={resetGoals}
+					>
+						{t("common.reset")}
+					</Button>
+				</div>
 			</SettingRow>
 		</SettingPanel>
 	);
