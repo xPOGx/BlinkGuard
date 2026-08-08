@@ -32,6 +32,17 @@ body {
 	font-family: var(--popup-font);
 }
 
+button:not(:disabled),
+a[href],
+[role="button"]:not([aria-disabled="true"]) {
+	cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+	cursor: not-allowed;
+}
+
 @keyframes fadeInOut {
 	0% {
 		opacity: 0;

@@ -143,6 +143,30 @@
 		@apply bg-background text-foreground font-sans antialiased;
 	}
 
+	button:not(:disabled):not([aria-disabled="true"]),
+	[role="button"]:not([aria-disabled="true"]),
+	[role="switch"]:not(:disabled):not([aria-disabled="true"]),
+	select:not(:disabled),
+	summary,
+	label[for],
+	input[type="checkbox"]:not(:disabled),
+	input[type="radio"]:not(:disabled),
+	input[type="range"]:not(:disabled),
+	input[type="color"]:not(:disabled),
+	input[type="file"]:not(:disabled) {
+		cursor: pointer;
+	}
+
+	button:disabled,
+	button[aria-disabled="true"],
+	[role="button"][aria-disabled="true"],
+	[role="switch"]:disabled,
+	[role="switch"][aria-disabled="true"],
+	select:disabled,
+	input:disabled {
+		cursor: not-allowed;
+	}
+
 	::-webkit-scrollbar {
 		display: none;
 	}
