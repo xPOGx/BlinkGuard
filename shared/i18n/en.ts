@@ -366,8 +366,22 @@ export const en: MessageCatalog = {
 
 	// Tray / window titles
 	"tray.show": "Show BlinkGuard",
+	"tray.checkForUpdates": "Check for updates",
 	"tray.quit": "Quit",
 	"window.cameraTitle": "Camera Visualization",
+
+	// Auto-update dialogs
+	"updates.ok": "OK",
+	"updates.upToDate.title": "BlinkGuard",
+	"updates.upToDate.message": "You're up to date.",
+	"updates.error.title": "Update check failed",
+	"updates.error.message":
+		"Could not check for updates. BlinkGuard will keep running — try again later.",
+	"updates.ready.title": "Update ready",
+	"updates.ready.message":
+		"BlinkGuard {version} has been downloaded. Restart to install.",
+	"updates.ready.restart": "Restart",
+	"updates.ready.later": "Later",
 
 	// Popup chrome
 	"popup.blink.title": "Blink Reminder",

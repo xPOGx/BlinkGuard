@@ -1,4 +1,4 @@
-import { Menu, Tray, nativeImage } from "electron";
+import { Menu, Tray, nativeImage, type MenuItemConstructorOptions } from "electron";
 import path from "node:path";
 import { t, type Locale } from "../../../shared/i18n";
 import type { AppPaths } from "../paths/app-paths";
@@ -12,6 +12,7 @@ export class TrayController {
 		private readonly windows: WindowManager,
 		private readonly onQuit: () => void,
 		private readonly getLocale: () => Locale = () => "en",
+		private readonly onCheckForUpdates: (() => void) | null = null,
 	) {}
 
 	create(): void {
@@ -26,19 +27,26 @@ export class TrayController {
 
 	rebuildMenu(locale: Locale = this.getLocale()): void {
 		if (!this.tray) return;
-		this.tray.setContextMenu(
-			Menu.buildFromTemplate([
-				{
-					label: t(locale, "tray.show"),
-					click: () => this.windows.showMain(),
-				},
-				{ type: "separator" },
-				{
-					label: t(locale, "tray.quit"),
-					click: () => this.onQuit(),
-				},
-			]),
+		const items: MenuItemConstructorOptions[] = [
+			{
+				label: t(locale, "tray.show"),
+				click: () => this.windows.showMain(),
+			},
+		];
+		if (this.onCheckForUpdates) {
+			items.push({
+				label: t(locale, "tray.checkForUpdates"),
+				click: () => this.onCheckForUpdates?.(),
+			});
+		}
+		items.push(
+			{ type: "separator" },
+			{
+				label: t(locale, "tray.quit"),
+				click: () => this.onQuit(),
+			},
 		);
+		this.tray.setContextMenu(Menu.buildFromTemplate(items));
 	}
 
 	destroy(): void {

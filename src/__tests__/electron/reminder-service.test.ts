@@ -4,7 +4,6 @@ import type { PreferenceStore } from "../../../electron/application/ports/prefer
 import type {
 	BlinkDetectorPort,
 	NotificationSoundPort,
-	ReminderWindowPort,
 } from "../../../electron/application/ports/runtime-ports";
 import { ReminderService } from "../../../electron/application/reminder-service";
 import {
@@ -51,10 +50,7 @@ function createPreferences(
 	};
 }
 
-function createWindows(): ReminderWindowPort & {
-	reminderOpen: boolean;
-	lastPopup: unknown;
-} {
+function createWindows() {
 	const api = {
 		reminderOpen: false,
 		lastPopup: null as unknown,

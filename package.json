@@ -1,7 +1,7 @@
 {
 	"name": "blinkguard",
 	"private": true,
-	"version": "1.0.1",
+	"version": "2.0.0",
 	"type": "module",
 	"description": "A desktop application to help prevent dry eyes by reminding you to blink regularly",
 	"author": {
@@ -9,11 +9,12 @@
 	},
 	"scripts": {
 		"dev": "vite",
-		"build": "tsc && vite build && electron-builder",
+		"build": "tsc && vite build && electron-builder --publish never",
 		"build:electron": "tsc && vite build",
-		"build:mac": "npm run build:electron && electron-builder --mac && node scripts/remove-quarantine.js",
+		"build:mac": "npm run build:electron && electron-builder --mac --publish never && node scripts/remove-quarantine.js",
 		"build:mac:clean": "npm run build:mac && node scripts/remove-quarantine.js --clean-dmg",
-		"build:windows": "node scripts/prepare-python-windows.js && tsc && vite build && electron-builder --win nsis --config.win.signAndEditExecutable=false",
+		"build:windows": "node scripts/prepare-python-windows.js && tsc && vite build && electron-builder --win nsis --config.win.signAndEditExecutable=false --publish never",
+		"build:windows:publish": "tsc && vite build && electron-builder --win --config.win.signAndEditExecutable=false --publish always -c.publish.provider=github -c.publish.owner=xPOGx -c.publish.repo=BlinkGuard -c.publish.releaseType=release",
 		"remove-quarantine": "node scripts/remove-quarantine.js",
 		"remove-quarantine:dmg": "node scripts/remove-quarantine.js --clean-dmg",
 		"lint": "npx @biomejs/biome check --write src",
@@ -28,6 +29,7 @@
 		"class-variance-authority": "^0.7.0",
 		"clsx": "^2.1.1",
 		"electron-store": "^11.0.2",
+		"electron-updater": "^6.8.9",
 		"lottie-web": "^5.13.0",
 		"lucide-react": "^1.29.0",
 		"react": "^19.2.8",

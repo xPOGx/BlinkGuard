@@ -12,6 +12,17 @@ export default defineConfig({
 			main: {
 				// Shortcut of `build.lib.entry`.
 				entry: "electron/main.ts",
+				vite: {
+					build: {
+						rollupOptions: {
+							// Keep updater out of the bundle (native/optional deps).
+							external: ["electron-updater"],
+						},
+						rolldownOptions: {
+							external: ["electron-updater"],
+						},
+					},
+				},
 			},
 			preload: {
 				// Shortcut of `build.rollupOptions.input`.

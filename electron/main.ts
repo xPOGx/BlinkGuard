@@ -28,6 +28,7 @@ import { ShortcutController } from "./infrastructure/shortcuts/shortcut-controll
 import { NotificationSoundPlayer } from "./infrastructure/sound/notification-sound-player";
 import { ElectronPreferenceStore } from "./infrastructure/store/electron-preference-store";
 import { TrayController } from "./infrastructure/tray/tray-controller";
+import { AutoUpdateService } from "./infrastructure/updates/auto-update-service";
 import { WindowManager } from "./infrastructure/windows/window-manager";
 import { IPC_CHANNELS } from "../shared/ipc-channels";
 
@@ -195,11 +196,13 @@ function bootstrap(): void {
 			blinkRateCoaching.dispose();
 		},
 	);
+	const autoUpdates = new AutoUpdateService(() => preferences.locale);
 	const tray = new TrayController(
 		paths,
 		windows,
 		() => lifecycle.quit(),
 		() => preferences.locale,
+		() => autoUpdates.checkForUpdates({ interactive: true }),
 	);
 	lifecycle.attachTray(tray);
 
@@ -234,6 +237,8 @@ function bootstrap(): void {
 		});
 
 		tray.create();
+		autoUpdates.start();
+		autoUpdates.checkForUpdates();
 		applyLaunchAtLogin(preferences.launchAtLogin);
 		shortcuts.register(preferences.keyboardShortcut);
 

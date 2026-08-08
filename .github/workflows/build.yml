@@ -3,6 +3,11 @@ name: Build and Release
 on:
   push:
     branches: [ main ]
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
 
 jobs:
 
@@ -351,50 +356,82 @@ jobs:
           Write-Host "✅ Binary functionality test passed!"
 
       - name: Build Windows app
-        run: npm run build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          if ("${{ startsWith(github.ref, 'refs/tags/v') }}" -eq "true") {
+            Write-Host "Tag release build: publishing to GitHub Releases (latest.yml + Setup.exe + blockmap)"
+            npm run build:windows:publish
+          } else {
+            Write-Host "Branch build: package only (--publish never)"
+            npm run build
+          }
 
       - name: Verify Windows app artifacts
         run: |
-          Write-Host "🔍 Verifying Windows app artifacts..."
-          
-          # Check if EXE was created
+          Write-Host "Verifying Windows app artifacts..."
+
           if (!(Test-Path "dist/BlinkGuard.Setup.exe")) {
             Write-Error "EXE file not found"
             Get-ChildItem "dist/" -ErrorAction SilentlyContinue
             exit 1
           }
-          
-          # Check if ZIP was created
+
           if (!(Test-Path "dist/BlinkGuard-x64.zip")) {
             Write-Error "ZIP file not found"
             Get-ChildItem "dist/" -ErrorAction SilentlyContinue
             exit 1
           }
-          
-          # Check file sizes
+
+          if ("${{ startsWith(github.ref, 'refs/tags/v') }}" -eq "true") {
+            if (!(Test-Path "dist/latest.yml")) {
+              Write-Error "latest.yml not found (required for electron-updater)"
+              Get-ChildItem "dist/" -ErrorAction SilentlyContinue
+              exit 1
+            }
+            $blockmaps = Get-ChildItem "dist/*.blockmap" -ErrorAction SilentlyContinue
+            if (-not $blockmaps) {
+              Write-Error "No .blockmap files found (required for electron-updater)"
+              Get-ChildItem "dist/" -ErrorAction SilentlyContinue
+              exit 1
+            }
+            Write-Host "OK: updater metadata present (latest.yml + blockmap)"
+          }
+
           $EXE_SIZE = (Get-Item "dist/BlinkGuard.Setup.exe").Length
           $ZIP_SIZE = (Get-Item "dist/BlinkGuard-x64.zip").Length
-          
-          Write-Host "📦 EXE size: $EXE_SIZE bytes ($([math]::Round($EXE_SIZE / 1MB, 2))MB)"
-          Write-Host "📦 ZIP size: $ZIP_SIZE bytes ($([math]::Round($ZIP_SIZE / 1MB, 2))MB)"
-          
+
+          Write-Host "EXE size: $EXE_SIZE bytes ($([math]::Round($EXE_SIZE / 1MB, 2))MB)"
+          Write-Host "ZIP size: $ZIP_SIZE bytes ($([math]::Round($ZIP_SIZE / 1MB, 2))MB)"
+
           if ($EXE_SIZE -lt 100000000) {
             Write-Error "EXE seems too small (less than 100MB). Build may have failed."
             exit 1
           }
-          
-          Write-Host "✅ Windows app artifacts verification passed!"
+
+          Write-Host "Windows app artifacts verification passed!"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: BlinkGuard-Windows
+          if-no-files-found: error
           path: |
             dist/BlinkGuard.Setup.exe
             dist/BlinkGuard-x64.zip
+
+      - name: Upload updater metadata
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlinkGuard-Windows-updater
+          path: |
+            dist/latest.yml
+            dist/*.blockmap
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
           name: BlinkGuard.Setup.exe
-          path: dist/BlinkGuard.Setup.exe 
+          path: dist/BlinkGuard.Setup.exe

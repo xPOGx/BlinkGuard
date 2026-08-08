@@ -374,8 +374,22 @@ export const uk: MessageCatalog = {
 
 	// Tray / window titles
 	"tray.show": "Показати BlinkGuard",
+	"tray.checkForUpdates": "Перевірити оновлення",
 	"tray.quit": "Вийти",
 	"window.cameraTitle": "Візуалізація камери",
+
+	// Auto-update dialogs
+	"updates.ok": "OK",
+	"updates.upToDate.title": "BlinkGuard",
+	"updates.upToDate.message": "У вас остання версія.",
+	"updates.error.title": "Не вдалося перевірити оновлення",
+	"updates.error.message":
+		"Не вдалося перевірити оновлення. BlinkGuard продовжить роботу — спробуйте пізніше.",
+	"updates.ready.title": "Оновлення готове",
+	"updates.ready.message":
+		"BlinkGuard {version} завантажено. Перезапустіть, щоб встановити.",
+	"updates.ready.restart": "Перезапустити",
+	"updates.ready.later": "Пізніше",
 
 	// Popup chrome
 	"popup.blink.title": "Нагадування проморгати",
