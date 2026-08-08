@@ -46,6 +46,14 @@ export const uk: MessageCatalog = {
 	"about.opensource.body":
 		"BlinkGuard — з відкритим кодом. Він виріс зі ScreenBlink і тепер розвивається як окремий проєкт — можна читати код, відкривати issues, ділитися ідеями чи долучатися на GitHub.",
 	"about.opensource.github": "Відкрити на GitHub",
+	"about.exportDiagnostics.title": "Експорт діагностики",
+	"about.exportDiagnostics.body":
+		"Збереже локальний zip із логами детекції моргань, недавніми діями (налаштування, попапи, трей, шорткати), app.log якщо є, та налаштуваннями алгоритму — без кастомного тексту попапів. Нічого не завантажується в мережу; за бажанням додай файл до issue на GitHub, щоб допомогти покращити BlinkGuard.",
+	"about.exportDiagnostics.button": "Експортувати",
+	"about.exportDiagnostics.busy": "Експорт…",
+	"about.exportDiagnostics.success": "Збережено: {path}",
+	"about.exportDiagnostics.cancelled": "Експорт скасовано",
+	"about.exportDiagnostics.error": "Не вдалося експортувати: {message}",
 	"about.meta.version": "Версія {version}",
 	"about.meta.author": "Автор: {name}",
 	"about.checkForUpdates": "Перевірити оновлення",

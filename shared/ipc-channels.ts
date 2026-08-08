@@ -77,6 +77,7 @@ export const IPC_CHANNELS = {
 	debugPreviewSound: "debug-preview-sound",
 	openGithubRepo: "open-github-repo",
 	checkForUpdates: "check-for-updates",
+	exportDiagnostics: "export-diagnostics",
 	updateGoalsConfig: "update-goals-config",
 	spendBlinkReward: "spend-blink-reward",
 } as const;

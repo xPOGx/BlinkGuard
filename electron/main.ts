@@ -18,6 +18,7 @@ import { AppLifecycle } from "./infrastructure/lifecycle/app-lifecycle";
 import { applyLaunchAtLogin } from "./infrastructure/lifecycle/login-item";
 import { BlinkDetectorDebugLogger } from "./infrastructure/logging/blink-detector-debug-logger";
 import { configureFileLogging } from "./infrastructure/logging/configure-file-logging";
+import { InteractionLogger } from "./infrastructure/logging/interaction-logger";
 import { configureAppPaths } from "./infrastructure/paths/app-paths";
 import { ChildProcessRegistry } from "./infrastructure/process/child-process-registry";
 import {
@@ -104,6 +105,7 @@ function bootstrap(): void {
 
 	let reminders: ReminderService;
 	const blinkDebugLogger = new BlinkDetectorDebugLogger();
+	const interactionLogger = new InteractionLogger();
 	const sidecar = new BlinkDetectorSidecar(
 		paths,
 		app.isPackaged,
@@ -196,6 +198,7 @@ function bootstrap(): void {
 		state,
 		reminders,
 		windows,
+		interactionLogger,
 	);
 	const lifecycle = new AppLifecycle(
 		preferences,
@@ -220,6 +223,7 @@ function bootstrap(): void {
 		() => lifecycle.quit(),
 		() => preferences.locale,
 		() => autoUpdates.checkForUpdates({ interactive: true }),
+		interactionLogger,
 	);
 	lifecycle.attachTray(tray);
 
@@ -250,6 +254,7 @@ function bootstrap(): void {
 		focusPause,
 		sound,
 		checkForUpdates: () => autoUpdates.checkForUpdates({ interactive: true }),
+		interactions: interactionLogger,
 	});
 
 	app.on("second-instance", () => {

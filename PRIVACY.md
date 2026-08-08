@@ -7,8 +7,13 @@ BlinkGuard is designed to keep your data on your machine.
 - Preferences and settings (via `electron-store` under the app user-data folder)
 - Blink session statistics
 - Optional blink-detector debug logs under `{userData}/logs/` (only if you use camera detection / debug capture)
+- Interaction trail under `{userData}/logs/interactions.jsonl` (settings changes, popup snooze/skip, tray and shortcut actions — custom popup/exercise text is redacted)
 
 There is **no** BlinkGuard account, cloud sync backend, or analytics pipeline that watches how you use the app.
+
+## Export diagnostics
+
+About → **Export diagnostics** builds a local zip (or folder) with blink logs, the interaction trail, `app.log` when present, and algorithm-related settings. Nothing is uploaded. You choose whether to share that file (for example by attaching it to a GitHub issue).
 
 ## Camera
 

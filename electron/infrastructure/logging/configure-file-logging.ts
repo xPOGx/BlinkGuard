@@ -1,13 +1,19 @@
 import { existsSync, createWriteStream, mkdirSync } from "node:fs";
 import path from "node:path";
 
-export function configureFileLogging(): void {
-	if (process.platform !== "win32") return;
-	const logPath = path.join(
+/** Windows console tee path; empty string when unavailable / non-Windows. */
+export function getAppLogPath(): string {
+	if (process.platform !== "win32") return "";
+	return path.join(
 		process.env.APPDATA || process.env.USERPROFILE || "",
 		"BlinkGuard",
 		"app.log",
 	);
+}
+
+export function configureFileLogging(): void {
+	const logPath = getAppLogPath();
+	if (!logPath) return;
 	const directory = path.dirname(logPath);
 	if (!existsSync(directory)) {
 		try {

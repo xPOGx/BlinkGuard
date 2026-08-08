@@ -1,6 +1,7 @@
 import { Menu, Tray, nativeImage, type MenuItemConstructorOptions } from "electron";
 import path from "node:path";
 import { t, type Locale } from "../../../shared/i18n";
+import type { InteractionLogger } from "../logging/interaction-logger";
 import type { AppPaths } from "../paths/app-paths";
 import type { WindowManager } from "../windows/window-manager";
 
@@ -13,6 +14,7 @@ export class TrayController {
 		private readonly onQuit: () => void,
 		private readonly getLocale: () => Locale = () => "en",
 		private readonly onCheckForUpdates: (() => void) | null = null,
+		private readonly interactions: InteractionLogger | null = null,
 	) {}
 
 	create(): void {
@@ -21,8 +23,17 @@ export class TrayController {
 		this.tray = new Tray(icon);
 		this.tray.setToolTip("BlinkGuard");
 		this.rebuildMenu(this.getLocale());
-		this.tray.on("click", () => this.windows.showMain());
-		this.tray.on("double-click", () => this.windows.showMain());
+		this.tray.on("click", () => {
+			this.interactions?.append({ source: "tray", action: "click-show" });
+			this.windows.showMain();
+		});
+		this.tray.on("double-click", () => {
+			this.interactions?.append({
+				source: "tray",
+				action: "double-click-show",
+			});
+			this.windows.showMain();
+		});
 	}
 
 	rebuildMenu(locale: Locale = this.getLocale()): void {
@@ -30,20 +41,32 @@ export class TrayController {
 		const items: MenuItemConstructorOptions[] = [
 			{
 				label: t(locale, "tray.show"),
-				click: () => this.windows.showMain(),
+				click: () => {
+					this.interactions?.append({ source: "tray", action: "menu-show" });
+					this.windows.showMain();
+				},
 			},
 		];
 		if (this.onCheckForUpdates) {
 			items.push({
 				label: t(locale, "tray.checkForUpdates"),
-				click: () => this.onCheckForUpdates?.(),
+				click: () => {
+					this.interactions?.append({
+						source: "tray",
+						action: "menu-check-for-updates",
+					});
+					this.onCheckForUpdates?.();
+				},
 			});
 		}
 		items.push(
 			{ type: "separator" },
 			{
 				label: t(locale, "tray.quit"),
-				click: () => this.onQuit(),
+				click: () => {
+					this.interactions?.append({ source: "tray", action: "menu-quit" });
+					this.onQuit();
+				},
 			},
 		);
 		this.tray.setContextMenu(Menu.buildFromTemplate(items));

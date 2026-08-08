@@ -3,6 +3,7 @@ import type {
 	DebugOverlayKind,
 	DebugSoundKind,
 } from "../../../shared/debug-preview";
+import type { ExportDiagnosticsResult } from "../../../shared/diagnostics";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import type {
 	CameraQuality,
@@ -16,6 +17,7 @@ interface RendererBridge {
 	on(channel: string, listener: Listener): void;
 	off(channel: string, listener: Listener): void;
 	send(channel: string, ...args: unknown[]): void;
+	invoke(channel: string, ...args: unknown[]): Promise<unknown>;
 }
 
 const bridge = (): RendererBridge | undefined =>
@@ -150,4 +152,19 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.debugPreviewSound, kind, volume),
 	openGithubRepo: () => send(IPC_CHANNELS.openGithubRepo),
 	checkForUpdates: () => send(IPC_CHANNELS.checkForUpdates),
+	exportDiagnostics: async (): Promise<ExportDiagnosticsResult> => {
+		const result = await bridge()?.invoke(IPC_CHANNELS.exportDiagnostics);
+		if (
+			result &&
+			typeof result === "object" &&
+			"status" in result &&
+			(result as ExportDiagnosticsResult).status
+		) {
+			return result as ExportDiagnosticsResult;
+		}
+		return {
+			status: "error",
+			message: "Diagnostics export is unavailable in this environment",
+		};
+	},
 };

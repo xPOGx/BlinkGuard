@@ -45,6 +45,14 @@ export const en: MessageCatalog = {
 	"about.opensource.body":
 		"BlinkGuard is open source. It started from ScreenBlink and is now maintained as its own project — read the code, open issues, share ideas, or contribute on GitHub.",
 	"about.opensource.github": "View on GitHub",
+	"about.exportDiagnostics.title": "Export diagnostics",
+	"about.exportDiagnostics.body":
+		"Save a local zip with blink debug logs, a recent action trail (settings, popups, tray, shortcuts), app log if present, and algorithm settings — no custom popup text. Nothing is uploaded; attach the file to a GitHub issue if you want help improving BlinkGuard.",
+	"about.exportDiagnostics.button": "Export diagnostics",
+	"about.exportDiagnostics.busy": "Exporting…",
+	"about.exportDiagnostics.success": "Saved to {path}",
+	"about.exportDiagnostics.cancelled": "Export cancelled",
+	"about.exportDiagnostics.error": "Export failed: {message}",
 	"about.meta.version": "Version {version}",
 	"about.meta.author": "Made by {name}",
 	"about.checkForUpdates": "Check for updates",

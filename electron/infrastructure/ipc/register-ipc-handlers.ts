@@ -1,15 +1,10 @@
-import { ipcMain, shell } from "electron";
+import { ipcMain, shell, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
 import { isValidEarCalibration } from "../../../shared/ear-calibration";
 import { isCameraQuality } from "../../../shared/camera-quality";
 import { isBlinkRewardId } from "../../../shared/blink-rewards";
 import { isDebugOverlayKind, isDebugSoundKind } from "../../../shared/debug-preview";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
-import type {
-	CameraQuality,
-	Point,
-	PopupColors,
-	Size,
-} from "../../../shared/preferences";
+import type { Point, PopupColors, Size } from "../../../shared/preferences";
 import { sanitizeGoalsConfig } from "../../../shared/preferences";
 import type { BlinkStatsService } from "../../application/blink-stats-service";
 import type { ExerciseService } from "../../application/exercise-service";
@@ -20,6 +15,8 @@ import type { PreferencesService } from "../../application/preferences-service";
 import type { ReminderService } from "../../application/reminder-service";
 import type { NotificationSoundPort } from "../../application/ports/runtime-ports";
 import { normalizeQuietHoursTime } from "../../domain/focus-policy";
+import { exportDiagnosticsBundle } from "../logging/diagnostics-export";
+import type { InteractionLogger } from "../logging/interaction-logger";
 import { applyLaunchAtLogin } from "../lifecycle/login-item";
 import type { BlinkDetectorSidecar } from "../sidecar/blink-detector-sidecar";
 import type { ShortcutController } from "../shortcuts/shortcut-controller";
@@ -38,6 +35,7 @@ interface IpcDependencies {
 	focusPause: FocusPauseService;
 	sound: NotificationSoundPort;
 	checkForUpdates: () => void;
+	interactions: InteractionLogger;
 }
 
 export function registerIpcHandlers(deps: IpcDependencies): void {
@@ -54,278 +52,230 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		focusPause,
 		sound,
 		checkForUpdates,
+		interactions,
 	} = deps;
 	const current = preferences.current;
 
-	ipcMain.on(IPC_CHANNELS.startBlinkReminders, (_event, interval: number) => {
-		reminders.start(interval);
+	const on = (
+		channel: string,
+		listener: (event: IpcMainEvent, ...args: unknown[]) => void,
+	): void => {
+		ipcMain.on(channel, (event, ...args: unknown[]) => {
+			interactions.logIpc(channel, args);
+			listener(event, ...args);
+		});
+	};
+
+	on(IPC_CHANNELS.startBlinkReminders, (_event, interval: unknown) => {
+		reminders.start(interval as number);
 	});
-	ipcMain.on(IPC_CHANNELS.stopBlinkReminders, () => reminders.stop(true));
-	ipcMain.on(IPC_CHANNELS.updatePopupPosition, (_event, position: Point) => {
-		preferences.set("popupPosition", position);
+	on(IPC_CHANNELS.stopBlinkReminders, () => reminders.stop(true));
+	on(IPC_CHANNELS.updatePopupPosition, (_event, position: unknown) => {
+		preferences.set("popupPosition", position as Point);
 	});
-	ipcMain.on(IPC_CHANNELS.updateInterval, (_event, interval: number) => {
-		preferences.set("reminderInterval", interval);
+	on(IPC_CHANNELS.updateInterval, (_event, interval: unknown) => {
+		preferences.set("reminderInterval", interval as number);
 	});
-	ipcMain.on(
-		IPC_CHANNELS.updatePopupColors,
-		(_event, colors: PopupColors) => {
-			preferences.set("popupColors", colors);
-			windows.applyPopupAppearance();
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.updatePopupTransparency,
-		(_event, transparency: number) => {
-			current.popupColors.transparency = transparency;
-			preferences.set("popupColors", current.popupColors);
-			windows.applyPopupAppearance();
-		},
-	);
-	ipcMain.on(IPC_CHANNELS.updatePopupMessage, (_event, message: string) => {
-		preferences.set("popupMessage", message);
+	on(IPC_CHANNELS.updatePopupColors, (_event, colors: unknown) => {
+		preferences.set("popupColors", colors as PopupColors);
+		windows.applyPopupAppearance();
 	});
-	ipcMain.on(IPC_CHANNELS.updateDarkMode, (_event, enabled: boolean) => {
-		preferences.set("darkMode", enabled);
+	on(IPC_CHANNELS.updatePopupTransparency, (_event, transparency: unknown) => {
+		current.popupColors.transparency = transparency as number;
+		preferences.set("popupColors", current.popupColors);
+		windows.applyPopupAppearance();
 	});
-	ipcMain.on(IPC_CHANNELS.updateCameraEnabled, (_event, enabled: boolean) => {
-		preferences.set("cameraEnabled", enabled);
+	on(IPC_CHANNELS.updatePopupMessage, (_event, message: unknown) => {
+		preferences.set("popupMessage", message as string);
+	});
+	on(IPC_CHANNELS.updateDarkMode, (_event, enabled: unknown) => {
+		preferences.set("darkMode", enabled as boolean);
+	});
+	on(IPC_CHANNELS.updateCameraEnabled, (_event, enabled: unknown) => {
+		preferences.set("cameraEnabled", enabled as boolean);
 		if (windows.reminder && !windows.reminder.isDestroyed()) {
-			windows.reminder.webContents.send(IPC_CHANNELS.cameraMode, enabled);
+			windows.reminder.webContents.send(
+				IPC_CHANNELS.cameraMode,
+				enabled as boolean,
+			);
 		}
 	});
-	ipcMain.on(
-		IPC_CHANNELS.updateCameraQuality,
-		(_event, quality: CameraQuality) => {
-			if (!isCameraQuality(quality)) return;
-			preferences.set("cameraQuality", quality);
-			sidecar.applyCameraQuality(quality);
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.updateAutoStopNoFaceEnabled,
-		(_event, enabled: boolean) => {
-			preferences.set("autoStopNoFaceEnabled", enabled);
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.updateAutoStopNoFaceMinutes,
-		(_event, minutes: number) => {
-			preferences.set("autoStopNoFaceMinutes", minutes);
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.updateEarCalibration,
-		(_event, baseline: number | null) => {
-			if (baseline === null) {
-				preferences.set("earCalibration", null);
-				sidecar.applyEarCalibration(null);
-				return;
-			}
-			if (!isValidEarCalibration(baseline)) return;
-			preferences.set("earCalibration", baseline);
-			sidecar.applyEarCalibration(baseline);
-		},
-	);
-	ipcMain.on(IPC_CHANNELS.startEarCalibration, () => {
+	on(IPC_CHANNELS.updateCameraQuality, (_event, quality: unknown) => {
+		if (!isCameraQuality(quality)) return;
+		preferences.set("cameraQuality", quality);
+		sidecar.applyCameraQuality(quality);
+	});
+	on(IPC_CHANNELS.updateAutoStopNoFaceEnabled, (_event, enabled: unknown) => {
+		preferences.set("autoStopNoFaceEnabled", enabled as boolean);
+	});
+	on(IPC_CHANNELS.updateAutoStopNoFaceMinutes, (_event, minutes: unknown) => {
+		preferences.set("autoStopNoFaceMinutes", minutes as number);
+	});
+	on(IPC_CHANNELS.updateEarCalibration, (_event, baseline: unknown) => {
+		if (baseline === null) {
+			preferences.set("earCalibration", null);
+			sidecar.applyEarCalibration(null);
+			return;
+		}
+		if (!isValidEarCalibration(baseline)) return;
+		preferences.set("earCalibration", baseline);
+		sidecar.applyEarCalibration(baseline);
+	});
+	on(IPC_CHANNELS.startEarCalibration, () => {
 		preferenceActions.startEarCalibration();
 	});
-	ipcMain.on(IPC_CHANNELS.cancelEarCalibration, () => {
+	on(IPC_CHANNELS.cancelEarCalibration, () => {
 		sidecar.cancelEarCalibration();
 	});
-	ipcMain.on(
-		IPC_CHANNELS.updateEyeExercisesEnabled,
-		(_event, enabled: boolean) => {
-			preferences.set("eyeExercisesEnabled", enabled);
-			if (enabled) exercises.start();
-			else exercises.stop();
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.updateExerciseInterval,
-		(_event, interval: number) => {
-			preferences.set("exerciseInterval", interval);
-			if (current.eyeExercisesEnabled) {
-				exercises.stop();
-				exercises.start();
-			}
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.updateExercisePrompts,
-		(_event, prompts: unknown) => {
-			preferences.set("exercisePrompts", prompts as string[]);
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.updateLookAwayEnabled,
-		(_event, enabled: boolean) => {
-			preferences.set("lookAwayEnabled", enabled);
-			if (enabled) lookAway.start();
-			else lookAway.stop();
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.updateLookAwayInterval,
-		(_event, interval: number) => {
-			preferences.set("lookAwayInterval", interval);
-			if (current.lookAwayEnabled) {
-				lookAway.stop();
-				lookAway.start();
-			}
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.updateLookAwayDuration,
-		(_event, duration: number) => {
-			preferences.set("lookAwayDuration", duration);
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.updateKeyboardShortcut,
-		(_event, shortcut: string) => {
-			preferences.set("keyboardShortcut", shortcut);
-			shortcuts.register(shortcut);
-		},
-	);
-	ipcMain.on(IPC_CHANNELS.startCameraTracking, () => {
+	on(IPC_CHANNELS.updateEyeExercisesEnabled, (_event, enabled: unknown) => {
+		preferences.set("eyeExercisesEnabled", enabled as boolean);
+		if (enabled) exercises.start();
+		else exercises.stop();
+	});
+	on(IPC_CHANNELS.updateExerciseInterval, (_event, interval: unknown) => {
+		preferences.set("exerciseInterval", interval as number);
+		if (current.eyeExercisesEnabled) {
+			exercises.stop();
+			exercises.start();
+		}
+	});
+	on(IPC_CHANNELS.updateExercisePrompts, (_event, prompts: unknown) => {
+		preferences.set("exercisePrompts", prompts as string[]);
+	});
+	on(IPC_CHANNELS.updateLookAwayEnabled, (_event, enabled: unknown) => {
+		preferences.set("lookAwayEnabled", enabled as boolean);
+		if (enabled) lookAway.start();
+		else lookAway.stop();
+	});
+	on(IPC_CHANNELS.updateLookAwayInterval, (_event, interval: unknown) => {
+		preferences.set("lookAwayInterval", interval as number);
+		if (current.lookAwayEnabled) {
+			lookAway.stop();
+			lookAway.start();
+		}
+	});
+	on(IPC_CHANNELS.updateLookAwayDuration, (_event, duration: unknown) => {
+		preferences.set("lookAwayDuration", duration as number);
+	});
+	on(IPC_CHANNELS.updateKeyboardShortcut, (_event, shortcut: unknown) => {
+		preferences.set("keyboardShortcut", shortcut as string);
+		shortcuts.register(shortcut as string);
+	});
+	on(IPC_CHANNELS.startCameraTracking, () => {
 		if (current.isTracking) reminders.stop(true);
 		preferences.set("cameraEnabled", true);
 	});
-	ipcMain.on(IPC_CHANNELS.stopCameraTracking, () => {
+	on(IPC_CHANNELS.stopCameraTracking, () => {
 		if (current.isTracking) reminders.stop(true);
 		preferences.set("cameraEnabled", false);
 	});
-	ipcMain.on(IPC_CHANNELS.skipExercise, () => exercises.skip());
-	ipcMain.on(IPC_CHANNELS.snoozeExercise, () => exercises.snooze());
-	ipcMain.on(IPC_CHANNELS.skipLookAway, () => lookAway.skip());
-	ipcMain.on(IPC_CHANNELS.snoozeLookAway, () => lookAway.snooze());
-	ipcMain.on(IPC_CHANNELS.snoozeBlink, () => reminders.snooze());
-	ipcMain.on(IPC_CHANNELS.updateMgdMode, (_event, enabled: boolean) => {
-		preferences.set("mgdMode", enabled);
+	on(IPC_CHANNELS.skipExercise, () => exercises.skip());
+	on(IPC_CHANNELS.snoozeExercise, () => exercises.snooze());
+	on(IPC_CHANNELS.skipLookAway, () => lookAway.skip());
+	on(IPC_CHANNELS.snoozeLookAway, () => lookAway.snooze());
+	on(IPC_CHANNELS.snoozeBlink, () => reminders.snooze());
+	on(IPC_CHANNELS.updateMgdMode, (_event, enabled: unknown) => {
+		preferences.set("mgdMode", enabled as boolean);
 		reminders.syncCameraLoopForMgdMode();
 	});
-	ipcMain.on(IPC_CHANNELS.updateSoundEnabled, (_event, enabled: boolean) => {
-		preferences.set("soundEnabled", enabled);
+	on(IPC_CHANNELS.updateSoundEnabled, (_event, enabled: unknown) => {
+		preferences.set("soundEnabled", enabled as boolean);
 	});
-	ipcMain.on(IPC_CHANNELS.updateSoundVolume, (_event, volume: number) => {
-		preferences.set("soundVolume", volume);
+	on(IPC_CHANNELS.updateSoundVolume, (_event, volume: unknown) => {
+		preferences.set("soundVolume", volume as number);
 	});
-	ipcMain.on(IPC_CHANNELS.updateLaunchAtLogin, (_event, enabled: boolean) => {
-		preferences.set("launchAtLogin", enabled);
-		applyLaunchAtLogin(enabled);
+	on(IPC_CHANNELS.updateLaunchAtLogin, (_event, enabled: unknown) => {
+		preferences.set("launchAtLogin", enabled as boolean);
+		applyLaunchAtLogin(enabled as boolean);
 	});
-	ipcMain.on(
-		IPC_CHANNELS.updateHasCompletedOnboarding,
-		(_event, completed: boolean) => {
-			preferences.set("hasCompletedOnboarding", Boolean(completed));
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.updateQuietHoursEnabled,
-		(_event, enabled: boolean) => {
-			preferences.set("quietHoursEnabled", Boolean(enabled));
-			focusPause.recompute();
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.updateQuietHoursStart,
-		(_event, value: string) => {
-			const normalized = normalizeQuietHoursTime(value);
-			if (!normalized) return;
-			preferences.set("quietHoursStart", normalized);
-			focusPause.recompute();
-		},
-	);
-	ipcMain.on(IPC_CHANNELS.updateQuietHoursEnd, (_event, value: string) => {
-		const normalized = normalizeQuietHoursTime(value);
+	on(IPC_CHANNELS.updateHasCompletedOnboarding, (_event, completed: unknown) => {
+		preferences.set("hasCompletedOnboarding", Boolean(completed));
+	});
+	on(IPC_CHANNELS.updateQuietHoursEnabled, (_event, enabled: unknown) => {
+		preferences.set("quietHoursEnabled", Boolean(enabled));
+		focusPause.recompute();
+	});
+	on(IPC_CHANNELS.updateQuietHoursStart, (_event, value: unknown) => {
+		const normalized = normalizeQuietHoursTime(value as string);
+		if (!normalized) return;
+		preferences.set("quietHoursStart", normalized);
+		focusPause.recompute();
+	});
+	on(IPC_CHANNELS.updateQuietHoursEnd, (_event, value: unknown) => {
+		const normalized = normalizeQuietHoursTime(value as string);
 		if (!normalized) return;
 		preferences.set("quietHoursEnd", normalized);
 		focusPause.recompute();
 	});
-	ipcMain.on(
-		IPC_CHANNELS.updatePauseOnFullscreen,
-		(_event, enabled: boolean) => {
-			preferences.set("pauseOnFullscreen", Boolean(enabled));
-			focusPause.recompute();
-		},
-	);
-	ipcMain.on(
+	on(IPC_CHANNELS.updatePauseOnFullscreen, (_event, enabled: unknown) => {
+		preferences.set("pauseOnFullscreen", Boolean(enabled));
+		focusPause.recompute();
+	});
+	on(
 		IPC_CHANNELS.updateBlinkRateCoachingEnabled,
-		(_event, enabled: boolean) => {
+		(_event, enabled: unknown) => {
 			preferences.set("blinkRateCoachingEnabled", Boolean(enabled));
 		},
 	);
-	ipcMain.on(
-		IPC_CHANNELS.updateBlinkRateThreshold,
-		(_event, threshold: number) => {
-			preferences.set("blinkRateThresholdPerMin", threshold);
-		},
-	);
-	ipcMain.on(IPC_CHANNELS.updateLocale, (_event, value: string) => {
-		preferenceActions.updateLocale(value);
+	on(IPC_CHANNELS.updateBlinkRateThreshold, (_event, threshold: unknown) => {
+		preferences.set("blinkRateThresholdPerMin", threshold as number);
 	});
-	ipcMain.on(IPC_CHANNELS.showCameraWindow, () => {
+	on(IPC_CHANNELS.updateLocale, (_event, value: unknown) => {
+		preferenceActions.updateLocale(value as string);
+	});
+	on(IPC_CHANNELS.showCameraWindow, () => {
 		preferenceActions.showCameraWindow();
 	});
-	ipcMain.on(IPC_CHANNELS.closeCameraWindow, () => windows.closeCamera());
-	ipcMain.on(IPC_CHANNELS.requestVideoStream, () => sidecar.requestVideo());
-	ipcMain.on(IPC_CHANNELS.showPopupEditor, () => windows.showEditor());
-	ipcMain.on(IPC_CHANNELS.debugPreviewOverlay, (_event, kind: unknown) => {
+	on(IPC_CHANNELS.closeCameraWindow, () => windows.closeCamera());
+	on(IPC_CHANNELS.requestVideoStream, () => sidecar.requestVideo());
+	on(IPC_CHANNELS.showPopupEditor, () => windows.showEditor());
+	on(IPC_CHANNELS.debugPreviewOverlay, (_event, kind: unknown) => {
 		if (!isDebugOverlayKind(kind)) return;
 		windows.previewDebugOverlay(kind);
 	});
-	ipcMain.on(
-		IPC_CHANNELS.debugPreviewSound,
-		(_event, kind: unknown, volume?: unknown) => {
-			if (!isDebugSoundKind(kind)) return;
-			const options: { force: true; volume?: number } = { force: true };
-			if (typeof volume === "number") {
-				options.volume = volume;
-			}
-			sound.play(kind, options);
-		},
-	);
-	ipcMain.on(IPC_CHANNELS.openGithubRepo, () => {
+	on(IPC_CHANNELS.debugPreviewSound, (_event, kind: unknown, volume?: unknown) => {
+		if (!isDebugSoundKind(kind)) return;
+		const options: { force: true; volume?: number } = { force: true };
+		if (typeof volume === "number") {
+			options.volume = volume;
+		}
+		sound.play(kind, options);
+	});
+	on(IPC_CHANNELS.openGithubRepo, () => {
 		void shell.openExternal("https://github.com/xPOGx/BlinkGuard");
 	});
-	ipcMain.on(IPC_CHANNELS.checkForUpdates, () => {
+	on(IPC_CHANNELS.checkForUpdates, () => {
 		checkForUpdates();
 	});
-	ipcMain.on(
-		IPC_CHANNELS.popupEditorSaved,
-		(_event, value: { size: Size; position: Point }) => {
-			preferences.set("popupSize", value.size);
-			preferences.set("popupPosition", value.position);
-			windows.applyPopupGeometry(value.size, value.position);
-			windows.sendPreferences();
-		},
-	);
-	ipcMain.on(
-		IPC_CHANNELS.resetPreferences,
-		(_event, replayOnboarding?: boolean) => {
-			preferenceActions.resetPreferences(replayOnboarding);
-		},
-	);
-	ipcMain.on(IPC_CHANNELS.requestBlinkStats, () => {
+	on(IPC_CHANNELS.popupEditorSaved, (_event, value: unknown) => {
+		const payload = value as { size: Size; position: Point };
+		preferences.set("popupSize", payload.size);
+		preferences.set("popupPosition", payload.position);
+		windows.applyPopupGeometry(payload.size, payload.position);
+		windows.sendPreferences();
+	});
+	on(IPC_CHANNELS.resetPreferences, (_event, replayOnboarding?: unknown) => {
+		preferenceActions.resetPreferences(replayOnboarding as boolean | undefined);
+	});
+	on(IPC_CHANNELS.requestBlinkStats, () => {
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
 	});
-	ipcMain.on(IPC_CHANNELS.subscribeBlinkStats, () => {
+	on(IPC_CHANNELS.subscribeBlinkStats, () => {
 		blinkStats.setLivePushEnabled(true);
 	});
-	ipcMain.on(IPC_CHANNELS.unsubscribeBlinkStats, () => {
+	on(IPC_CHANNELS.unsubscribeBlinkStats, () => {
 		blinkStats.setLivePushEnabled(false);
 	});
-	ipcMain.on(IPC_CHANNELS.resetBlinkStats, () => {
+	on(IPC_CHANNELS.resetBlinkStats, () => {
 		blinkStats.reset();
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
 	});
-	ipcMain.on(IPC_CHANNELS.spendBlinkReward, (_event, rewardId: unknown) => {
+	on(IPC_CHANNELS.spendBlinkReward, (_event, rewardId: unknown) => {
 		if (!isBlinkRewardId(rewardId)) return;
 		blinkStats.purchaseReward(rewardId);
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
 	});
-	ipcMain.on(IPC_CHANNELS.updateGoalsConfig, (_event, raw: unknown) => {
+	on(IPC_CHANNELS.updateGoalsConfig, (_event, raw: unknown) => {
 		const goals = sanitizeGoalsConfig(raw);
 		preferences.set("goalsEnabled", goals.goalsEnabled);
 		preferences.set("dailyBlinkGoal", goals.dailyBlinkGoal);
@@ -339,4 +289,17 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 			windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
 		}
 	});
+
+	ipcMain.handle(
+		IPC_CHANNELS.exportDiagnostics,
+		async (_event: IpcMainInvokeEvent) => {
+			interactions.logIpc(IPC_CHANNELS.exportDiagnostics, []);
+			return exportDiagnosticsBundle({
+				preferences: current,
+				parentWindow: windows.main && !windows.main.isDestroyed()
+					? windows.main
+					: null,
+			});
+		},
+	);
 }

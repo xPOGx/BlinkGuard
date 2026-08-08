@@ -1,4 +1,5 @@
-import { ExternalLink } from "lucide-react";
+import { Download, ExternalLink } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/button";
 import { SettingPanel, SettingRow } from "@/components/setting-panel";
 import { useT } from "@/i18n";
@@ -9,6 +10,40 @@ const AUTHOR_NAME = author.name;
 
 export function AboutPanel() {
 	const t = useT();
+	const [exportBusy, setExportBusy] = useState(false);
+	const [exportStatus, setExportStatus] = useState<string | null>(null);
+
+	const handleExportDiagnostics = async () => {
+		if (exportBusy) return;
+		setExportBusy(true);
+		setExportStatus(null);
+		try {
+			const result = await rendererIpc.exportDiagnostics();
+			if (result.status === "cancelled") {
+				setExportStatus(t("about.exportDiagnostics.cancelled"));
+			} else if (result.status === "saved") {
+				setExportStatus(
+					t("about.exportDiagnostics.success", {
+						path: result.path ?? "",
+					}),
+				);
+			} else {
+				setExportStatus(
+					t("about.exportDiagnostics.error", {
+						message: result.message ?? "unknown",
+					}),
+				);
+			}
+		} catch (error) {
+			setExportStatus(
+				t("about.exportDiagnostics.error", {
+					message: error instanceof Error ? error.message : String(error),
+				}),
+			);
+		} finally {
+			setExportBusy(false);
+		}
+	};
 
 	return (
 		<>
@@ -48,6 +83,34 @@ export function AboutPanel() {
 						</Button>
 					}
 				/>
+			</SettingPanel>
+
+			<SettingPanel>
+				<SettingRow
+					title={t("about.exportDiagnostics.title")}
+					description={t("about.exportDiagnostics.body")}
+					action={
+						<Button
+							type="button"
+							variant="secondary"
+							disabled={exportBusy}
+							onClick={() => {
+								void handleExportDiagnostics();
+							}}
+						>
+							<Download className="mr-2 h-4 w-4" aria-hidden />
+							{exportBusy
+								? t("about.exportDiagnostics.busy")
+								: t("about.exportDiagnostics.button")}
+						</Button>
+					}
+				>
+					{exportStatus ? (
+						<p className="text-sm text-muted-foreground break-all">
+							{exportStatus}
+						</p>
+					) : null}
+				</SettingRow>
 			</SettingPanel>
 
 			<SettingPanel>

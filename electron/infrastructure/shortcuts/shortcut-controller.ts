@@ -3,6 +3,7 @@ import type { AppPreferences } from "../../../shared/preferences";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import type { AppRuntimeState } from "../../application/app-runtime-state";
 import type { ReminderService } from "../../application/reminder-service";
+import type { InteractionLogger } from "../logging/interaction-logger";
 import type { WindowManager } from "../windows/window-manager";
 
 export class ShortcutController {
@@ -11,6 +12,7 @@ export class ShortcutController {
 		private readonly state: AppRuntimeState,
 		private readonly reminders: ReminderService,
 		private readonly windows: WindowManager,
+		private readonly interactions: InteractionLogger | null = null,
 	) {}
 
 	register(shortcut: string): void {
@@ -21,11 +23,21 @@ export class ShortcutController {
 					this.state.isAutoResuming = false;
 					this.reminders.ensureStopped();
 				}
-				if (this.preferences.isTracking) {
+				const wasTracking = this.preferences.isTracking;
+				if (wasTracking) {
 					this.reminders.stop(true);
 				} else {
 					this.reminders.start();
 				}
+				this.interactions?.append({
+					source: "shortcut",
+					action: "toggle-tracking",
+					detail: {
+						shortcut,
+						wasTracking,
+						isTracking: this.preferences.isTracking,
+					},
+				});
 				this.windows.sendPreferences();
 			});
 			this.windows.sendToMain(
