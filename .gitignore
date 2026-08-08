@@ -64,7 +64,9 @@ ENV/
 env.bak/
 venv.bak/
 
-# Model files
+# Model files (downloaded in CI / local setup; not committed)
+electron/assets/models/shape_predictor_68_face_landmarks.dat
+electron/assets/models/*.dat
 
 # Blink detector binary (built during CI)
 electron/resources/blink_detector
