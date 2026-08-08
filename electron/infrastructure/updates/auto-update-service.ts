@@ -1,7 +1,10 @@
 import { app, dialog } from "electron";
-import { autoUpdater } from "electron-updater";
+import electronUpdater from "electron-updater";
 import { t, type Locale } from "../../../shared/i18n";
 import { hasUpdateFeed } from "./update-feed";
+
+// electron-updater is CJS; named ESM imports fail under Electron's ESM loader.
+const { autoUpdater } = electronUpdater;
 
 export type CheckForUpdatesOptions = {
 	/** When true, show dialogs for up-to-date / errors (tray menu). */
