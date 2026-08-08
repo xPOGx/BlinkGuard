@@ -76,6 +76,7 @@ export const IPC_CHANNELS = {
 	applyI18n: "apply-i18n",
 	debugPreviewOverlay: "debug-preview-overlay",
 	debugPreviewSound: "debug-preview-sound",
+	openGithubRepo: "open-github-repo",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -153,4 +154,5 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.updateLocale,
 	IPC_CHANNELS.debugPreviewOverlay,
 	IPC_CHANNELS.debugPreviewSound,
+	IPC_CHANNELS.openGithubRepo,
 ] as const;

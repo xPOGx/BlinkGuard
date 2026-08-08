@@ -3,12 +3,14 @@ import {
 	Bug,
 	Camera,
 	Dumbbell,
+	Info,
 	Keyboard,
 	Palette,
 	Timer,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { dismissBootSplash } from "@/boot-splash";
+import { AboutPanel } from "@/features/about/ui/about-panel";
 import { useCameraStatus } from "@/features/camera/model/use-camera-status";
 import {
 	CameraControls,
@@ -44,6 +46,7 @@ type SectionId =
 	| "appearance"
 	| "statistics"
 	| "system"
+	| "about"
 	| "debug";
 
 export default function BlinkGuardHomepage() {
@@ -137,6 +140,13 @@ function SettingsShell({
 			description: t("app.section.system.desc"),
 			icon: Keyboard,
 		},
+		{
+			id: "about",
+			label: t("app.section.about"),
+			description: t("app.section.about.desc"),
+			icon: Info,
+		},
+		// Debug must always be the last nav section (DEV-only).
 		...(import.meta.env.DEV
 			? [
 					{
@@ -319,6 +329,8 @@ function SettingsShell({
 								/>
 							</>
 						)}
+
+						{section === "about" && <AboutPanel />}
 
 						{section === "debug" && import.meta.env.DEV ? (
 							<DebugPanel setPreferences={setPreferences} />

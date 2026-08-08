@@ -135,4 +135,5 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.debugPreviewOverlay, kind),
 	debugPreviewSound: (kind: DebugSoundKind, volume?: number) =>
 		send(IPC_CHANNELS.debugPreviewSound, kind, volume),
+	openGithubRepo: () => send(IPC_CHANNELS.openGithubRepo),
 };

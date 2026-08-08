@@ -21,9 +21,29 @@ export const en: MessageCatalog = {
 		"Local blink counts, tracking time, and day/week charts.",
 	"app.section.system": "System",
 	"app.section.system.desc": "Shortcut, language, launch at login, and reset.",
+	"app.section.about": "About",
+	"app.section.about.desc":
+		"What BlinkGuard is, why it exists, privacy, and the open-source repo.",
 	"app.section.debug": "Debug",
 	"app.section.debug.desc":
 		"Preview overlays, test notification sounds, and reopen onboarding for local testing.",
+
+	// About
+	"about.what.title": "What it is",
+	"about.what.body":
+		"BlinkGuard is a small desktop companion for your eyes when you spend long hours at a screen. It can nudge you to blink on a timer, optionally watch blinks with the camera, and remind you about short eye exercises or classic 20-20-20 look-away breaks. Use as much or as little as you want — the goal is simply kinder eyes on long workdays.",
+	"about.why.title": "Why it exists",
+	"about.why.body":
+		"I built BlinkGuard because I needed it myself. After enough dry, tired eyes from coding and browsing, I wanted something local, quiet, and under my control — not another cloud product. This is a personal project made from the heart; if it helps you too, that is the whole point.",
+	"about.privacy.title": "Local by design",
+	"about.privacy.body":
+		"Everything important stays on your machine. Preferences and blink statistics live in local storage. There is no account to create, no cloud backend to sync to, and no analytics pipeline watching how you use the app.",
+	"about.opensource.title": "Open source",
+	"about.opensource.body":
+		"BlinkGuard is open source. You can read the code, open issues, share ideas, or contribute on GitHub — the same repo this app is built from.",
+	"about.opensource.github": "View on GitHub",
+	"about.meta.version": "Version {version}",
+	"about.meta.author": "Made by {name}",
 
 	// Debug
 	"debug.overlays.title": "Preview overlays",

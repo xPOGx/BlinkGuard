@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/app";
+import { version } from "../../../package.json";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import {
 	DEFAULT_PREFERENCES,
@@ -81,6 +82,13 @@ describe("settings shell", () => {
 			screen.getByRole("button", { name: "Clear statistics" }),
 		).toBeDefined();
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.subscribeBlinkStats);
+
+		fireEvent.click(screen.getByRole("button", { name: "About" }));
+		expect(screen.getByText("What it is")).toBeDefined();
+		expect(screen.getByText("Open source")).toBeDefined();
+		expect(screen.getByText(`Version ${version}`)).toBeDefined();
+		fireEvent.click(screen.getByRole("button", { name: "View on GitHub" }));
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.openGithubRepo);
 
 		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.unsubscribeBlinkStats);
@@ -260,7 +268,10 @@ describe("settings shell", () => {
 			screen.getByRole("switch", { name: "Toggle launch at login" }),
 		);
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.updateLaunchAtLogin, true);
-		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateSoundEnabled, true);
+		expect(send).not.toHaveBeenCalledWith(
+			IPC_CHANNELS.updateSoundEnabled,
+			true,
+		);
 
 		send.mockClear();
 		fireEvent.click(screen.getByRole("switch", { name: "Toggle quiet hours" }));

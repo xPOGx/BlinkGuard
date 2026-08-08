@@ -1,4 +1,4 @@
-import { ipcMain } from "electron";
+import { ipcMain, shell } from "electron";
 import { isValidEarCalibration } from "../../../shared/ear-calibration";
 import { isCameraQuality } from "../../../shared/camera-quality";
 import { isDebugOverlayKind, isDebugSoundKind } from "../../../shared/debug-preview";
@@ -310,6 +310,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 			sound.play(kind, options);
 		},
 	);
+	ipcMain.on(IPC_CHANNELS.openGithubRepo, () => {
+		void shell.openExternal("https://github.com/xPOGx/BlinkGuard");
+	});
 	ipcMain.on(
 		IPC_CHANNELS.popupEditorSaved,
 		(_event, value: { size: Size; position: Point }) => {
