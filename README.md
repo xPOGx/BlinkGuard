@@ -84,17 +84,6 @@ See `AGENTS.md` for Cursor Cloud–specific notes.
   - Otherwise packages unsigned so CI still ships artifacts
 - macOS: `npm run build:mac` (notarize uses Electron Builder + Apple secrets when configured)
 
-### GitHub product identity (repo owner)
-
-Run while authenticated as the `xPOGx` account (admin on this repo):
-
-```bash
-gh repo edit xPOGx/BlinkGuard --homepage "https://github.com/xPOGx/BlinkGuard"
-gh repo edit xPOGx/BlinkGuard --add-topic electron --add-topic typescript --add-topic react --add-topic vite --add-topic eye-care --add-topic blink-detection --add-topic desktop-app
-```
-
-To detach the historical fork relationship from ScreenBlink (keeps issues/stars; does not rewrite git history), open a GitHub Support ticket asking to convert `xPOGx/BlinkGuard` from a fork of `katunli/ScreenBlink` into a standalone repository.
-
 ## Third-party attribution
 
 BlinkGuard is originally based on [ScreenBlink](https://github.com/katunli/ScreenBlink) by Katun Li. Copyright and license notices for that lineage are recorded in [NOTICE](NOTICE). BlinkGuard is maintained independently under the MIT License ([LICENSE](LICENSE)).
