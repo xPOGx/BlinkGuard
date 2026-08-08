@@ -328,7 +328,8 @@ export class WindowManager {
 			},
 		});
 		popup.webContents.on("did-finish-load", () => this.sendI18n(popup));
-		popup.once("ready-to-show", () => popup.show());
+		// Same as blink: show without stealing focus (games / mouse capture).
+		popup.once("ready-to-show", () => popup.showInactive());
 		popup.on("closed", () => {
 			if (this.lookAway === popup) this.lookAway = null;
 			onClosed();
