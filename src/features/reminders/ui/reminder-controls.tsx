@@ -2,6 +2,8 @@ import { Activity, Clock, Play, Square } from "lucide-react";
 import { Button } from "@/components/button";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import { SettingPanel, SettingRow } from "@/features/settings/ui/setting-panel";
+import { useI18n } from "@/i18n";
+import { pluralKey } from "../../../../shared/i18n";
 
 interface ReminderControlsProps {
 	preferences: SettingsPreferences;
@@ -19,6 +21,7 @@ export function ReminderControls({
 	onIntervalChange,
 	onToggleTracking,
 }: ReminderControlsProps) {
+	const { t, locale } = useI18n();
 	const progress = ((preferences.reminderInterval - 1) / 9) * 100;
 	const trackColor = preferences.darkMode
 		? "hsl(217 25% 18%)"
@@ -27,7 +30,14 @@ export function ReminderControls({
 	const blinksPerMinute = 60 / preferences.reminderInterval;
 	const formattedRate = formatBlinksPerMinute(preferences.reminderInterval);
 	const inTypicalRange = blinksPerMinute >= 15 && blinksPerMinute <= 20;
-
+	const interval = preferences.reminderInterval;
+	const descKey = pluralKey(
+		preferences.cameraEnabled
+			? "reminders.desc.camera"
+			: "reminders.desc.timer",
+		locale,
+		interval,
+	);
 	return (
 		<>
 			<SettingPanel>
@@ -35,19 +45,17 @@ export function ReminderControls({
 					title={
 						<>
 							<Clock className="h-4 w-4 text-muted-foreground" aria-hidden />
-							<label htmlFor="reminder-interval">Reminder Interval</label>
+							<label htmlFor="reminder-interval">
+								{t("reminders.interval")}
+							</label>
 						</>
 					}
-					description={
-						preferences.cameraEnabled
-							? `Show reminder if you haven't blinked for ${preferences.reminderInterval} second${preferences.reminderInterval !== 1 ? "s" : ""}`
-							: `Show reminder every ${preferences.reminderInterval} second${preferences.reminderInterval !== 1 ? "s" : ""}`
-					}
+					description={t(descKey, { n: interval })}
 				>
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
 						<input
 							id="reminder-interval"
-							aria-label="Reminder interval"
+							aria-label={t("reminders.intervalAria")}
 							type="range"
 							min="1"
 							max="10"
@@ -68,27 +76,25 @@ export function ReminderControls({
 								{preferences.isTracking ? (
 									<div className="absolute bottom-full left-0 right-0 mb-1 flex items-center justify-center gap-1 text-xs font-medium text-primary">
 										<Activity className="h-3 w-3" aria-hidden />
-										<span>Active</span>
+										<span>{t("common.active")}</span>
 									</div>
 								) : null}
 								<Button
 									type="button"
 									size="default"
-									variant={
-										preferences.isTracking ? "destructive" : "default"
-									}
+									variant={preferences.isTracking ? "destructive" : "default"}
 									onClick={onToggleTracking}
 									className="w-[5.75rem] gap-2 whitespace-nowrap"
 								>
 									{preferences.isTracking ? (
 										<>
 											<Square className="h-4 w-4" aria-hidden />
-											Stop
+											{t("common.stop")}
 										</>
 									) : (
 										<>
 											<Play className="h-4 w-4" aria-hidden />
-											Start
+											{t("common.start")}
 										</>
 									)}
 								</Button>
@@ -104,52 +110,49 @@ export function ReminderControls({
 			>
 				<p>
 					<span className="font-semibold text-foreground">
-						~{formattedRate} blinks/min
+						{t("reminders.rateSummary", { rate: formattedRate })}
 					</span>
 					{" — "}
 					{preferences.cameraEnabled && !preferences.mgdMode
-						? "upper bound if you blink once whenever a reminder would fire (reminders only appear after you have not blinked for the interval)."
-						: "target cadence if you blink once per reminder interval."}
+						? t("reminders.rateHint.camera")
+						: t("reminders.rateHint.timer")}
 				</p>
 				{inTypicalRange ? (
-					<p className="mt-1.5 text-primary">
-						Within the typical resting blink range (about 15–20/min).
-					</p>
+					<p className="mt-1.5 text-primary">{t("reminders.inTypicalRange")}</p>
 				) : null}
 			</aside>
 
 			<aside className="rounded-md bg-accent/60 p-3 text-xs text-muted-foreground sm:text-sm">
 				<p className="mb-2 font-semibold text-foreground">
-					Blink rate guidance
+					{t("reminders.guidanceTitle")}
 				</p>
 				<ul className="list-disc space-y-1.5 pl-4">
 					<li>
-						Typical resting rate is about{" "}
-						<span className="font-medium text-foreground">15–20 blinks/min</span>{" "}
-						(every 3–4s). During focused screen work it often drops to about{" "}
-						<span className="font-medium text-foreground">4–7/min</span>.
+						{t("reminders.guidance.1", {
+							resting: t("reminders.guidance.1.resting"),
+							focused: t("reminders.guidance.1.focused"),
+						})}
 					</li>
 					<li>
-						Gender studies are mixed; when a difference is reported, women often
-						average a bit higher (roughly{" "}
-						<span className="font-medium text-foreground">15–20/min</span>) than
-						men (roughly{" "}
-						<span className="font-medium text-foreground">10–15/min</span>).
-						Individual variation is large — use this as orientation, not a
-						personal target.
+						{t("reminders.guidance.2", {
+							women: t("reminders.guidance.2.women"),
+							men: t("reminders.guidance.2.men"),
+						})}
 					</li>
 					<li>
-						With MGD or dry eye, prefer{" "}
-						<span className="font-medium text-foreground">complete</span> blinks
-						(lids meet) at a regular ~15–20/min cadence; incomplete blinks during
-						screen use matter as much as rate. Deliberate close–squeeze blink sets
-						during long sessions can help. Enable Camera →{" "}
-						<span className="font-medium text-foreground">MGD Mode</span> for
-						fixed-interval reminders.
+						{t("reminders.guidance.3.before")}
+						<span className="font-medium text-foreground">
+							{t("reminders.guidance.3.complete")}
+						</span>
+						{t("reminders.guidance.3.after")}
+						<span className="font-medium text-foreground">
+							{t("reminders.guidance.3.mgd")}
+						</span>
+						{t("reminders.guidance.3.afterMgd")}
 					</li>
 				</ul>
 				<p className="mt-2 text-[0.7rem] opacity-80 sm:text-xs">
-					Educational only — not a diagnosis or medical advice.
+					{t("reminders.guidance.disclaimer")}
 				</p>
 			</aside>
 		</>

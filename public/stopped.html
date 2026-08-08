@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self';">
-  <title>Stopped Reminder</title>
+  <title data-i18n="popup.stopped.title">Stopped Reminder</title>
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/reminder.css">
 </head>
@@ -16,9 +16,10 @@
           <rect width="14" height="14" x="5" y="5" rx="2"/>
         </svg>
       </div>
-      <div class="reminder-message">Stopped</div>
+      <div class="reminder-message" data-i18n="popup.stopped.message">Stopped</div>
     </div>
   </div>
+  <script src="js/shared/i18n.js"></script>
   <script src="js/shared/theme.js"></script>
   <script src="js/reminder.js"></script>
 </body>

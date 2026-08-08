@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self';">
-  <title>Popup Editor</title>
+  <title data-i18n="popup.editor.windowTitle">Popup Editor</title>
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/editor.css">
 </head>
@@ -20,21 +20,22 @@
   <div class="resize-handle sw"></div>
   
   <!-- Drag indicator -->
-  <div class="drag-indicator" id="dragIndicator">Click & Drag to Move</div>
+  <div class="drag-indicator" id="dragIndicator" data-i18n="popup.editor.drag">Click & Drag to Move</div>
   
   <div class="editor-container">
     <div class="editor-content">
-      <div class="editor-title">EDIT POPUP</div>
-      <div class="editor-instructions">
+      <div class="editor-title" data-i18n="popup.editor.title">EDIT POPUP</div>
+      <div class="editor-instructions" data-i18n="popup.editor.instructions">
         Click & drag to move • Drag edges to resize
       </div>
       <div class="editor-size-display" id="sizeDisplay">Width: 300px, Height: 120px</div>
       <div class="editor-buttons">
-        <button class="editor-button save" id="saveBtn">Save</button>
-        <button class="editor-button cancel" id="cancelBtn">Cancel</button>
+        <button class="editor-button save" id="saveBtn" type="button" data-i18n="popup.editor.save">Save</button>
+        <button class="editor-button cancel" id="cancelBtn" type="button" data-i18n="popup.editor.cancel">Cancel</button>
       </div>
     </div>
   </div>
+  <script src="js/shared/i18n.js"></script>
   <script src="js/shared/theme.js"></script>
   <script src="js/editor.js"></script>
 </body>

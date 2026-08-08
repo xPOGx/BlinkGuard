@@ -4,26 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:;">
-  <title>Camera Visualization</title>
+  <title data-i18n="window.cameraTitle">Camera Visualization</title>
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/camera.css">
 </head>
 <body>
   <div class="camera-container">
     <canvas id="canvas" class="camera-canvas"></canvas>
-    <div id="status" class="camera-status">Camera: Initializing...</div>
-    <div id="info" class="camera-info">
+    <div id="status" class="camera-status" data-i18n="popup.camera.initializing">Camera: Initializing...</div>
+    <div id="info" class="camera-info" data-i18n="popup.camera.info">
       When your eye size goes below your set threshold a blink is detected
     </div>
-    <div id="tip" class="camera-tip">
-      <strong>Tip:</strong> If green dots aren't tracking your eyes precisely, improve your lighting and/or clean your camera lens.
+    <div id="tip" class="camera-tip" data-i18n="popup.camera.tip">
+      Tip: If green dots aren't tracking your eyes precisely, improve your lighting and/or clean your camera lens.
     </div>
-    <div id="current-values" class="camera-values">
-      <strong>Current:</strong> Eye size: 0.000
-      <br>
-      <strong>Threshold:</strong> 0.200
-    </div>
+    <div id="current-values" class="camera-values"></div>
   </div>
+  <script src="js/shared/i18n.js"></script>
   <script src="js/camera.js"></script>
 </body>
 </html>

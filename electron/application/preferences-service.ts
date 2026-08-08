@@ -5,6 +5,7 @@ import {
 	type AppPreferences,
 	type PersistedPreferences,
 } from "../../shared/preferences";
+import { sanitizeLocale } from "../../shared/i18n";
 import { isValidEarCalibration } from "../../shared/ear-calibration";
 import { isCameraQuality } from "../../shared/camera-quality";
 import {
@@ -67,11 +68,13 @@ export class PreferencesService {
 			persisted.blinkRateCoachingEnabled =
 				DEFAULT_PREFERENCES.blinkRateCoachingEnabled;
 		}
+		persisted.locale = sanitizeLocale(persisted.locale);
 		persisted.blinkRateThresholdPerMin = sanitizeBlinkRateThresholdPerMin(
 			persisted.blinkRateThresholdPerMin,
 		);
 		persisted.exercisePrompts = sanitizeExercisePrompts(
 			persisted.exercisePrompts,
+			persisted.locale,
 		);
 
 		// Upgrade: existing installs without the flag should skip first-run.
@@ -94,8 +97,13 @@ export class PreferencesService {
 		value: PersistedPreferences[K],
 	): void {
 		let next = value;
-		if (key === "exercisePrompts") {
-			next = sanitizeExercisePrompts(value) as PersistedPreferences[K];
+		if (key === "locale") {
+			next = sanitizeLocale(value) as PersistedPreferences[K];
+		} else if (key === "exercisePrompts") {
+			next = sanitizeExercisePrompts(
+				value,
+				this.current.locale,
+			) as PersistedPreferences[K];
 		} else if (key === "blinkRateThresholdPerMin") {
 			next = sanitizeBlinkRateThresholdPerMin(
 				value,

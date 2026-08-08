@@ -1,6 +1,7 @@
 import { Zap } from "lucide-react";
 import { Button } from "@/components/button";
 import { SettingPanel, SettingRow } from "@/features/settings/ui/setting-panel";
+import { useT } from "@/i18n";
 
 interface ShortcutSettingsProps {
 	shortcut: string;
@@ -21,26 +22,27 @@ export function ShortcutSettings({
 	onSave,
 	onCancel,
 }: ShortcutSettingsProps) {
+	const t = useT();
 	return (
 		<SettingPanel>
 			<SettingRow
 				title={
 					<>
 						<Zap className="h-4 w-4 text-muted-foreground" aria-hidden />
-						Keyboard Shortcut
+						{t("shortcut.title")}
 					</>
 				}
-				description="Press the shortcut to start/stop reminders. Use at least one modifier key (Ctrl, Shift, Alt, Cmd, Win) and one regular key."
+				description={t("shortcut.description")}
 			>
 				<div className="flex items-center gap-2">
 					<div
 						role="status"
-						aria-label="Current keyboard shortcut"
+						aria-label={t("shortcut.currentAria")}
 						className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
 					>
 						{isRecording ? (
 							<span className="text-primary">
-								{temporaryShortcut || "Press keys..."}
+								{temporaryShortcut || t("shortcut.pressKeys")}
 							</span>
 						) : (
 							shortcut
@@ -49,15 +51,15 @@ export function ShortcutSettings({
 					{isRecording ? (
 						<div className="flex gap-2">
 							<Button type="button" variant="secondary" onClick={onCancel}>
-								Cancel
+								{t("common.cancel")}
 							</Button>
 							<Button type="button" onClick={onSave}>
-								Save
+								{t("common.save")}
 							</Button>
 						</div>
 					) : (
 						<Button type="button" onClick={onStartRecording}>
-							Change
+							{t("common.change")}
 						</Button>
 					)}
 				</div>

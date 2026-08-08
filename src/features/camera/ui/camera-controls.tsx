@@ -8,12 +8,14 @@ import {
 	SettingRow,
 	ToggleSwitch,
 } from "@/features/settings/ui/setting-panel";
+import { useI18n, useT } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import {
 	CAMERA_QUALITY_OPTIONS,
 	CAMERA_QUALITY_PRESETS,
 } from "../../../../shared/camera-quality";
+import { t as translate } from "../../../../shared/i18n";
 import type { CameraQuality } from "../../../../shared/preferences";
 
 interface CameraErrorBannerProps {
@@ -25,6 +27,7 @@ export function CameraErrorBanner({
 	error,
 	onDismiss,
 }: CameraErrorBannerProps) {
+	const t = useT();
 	if (!error) return null;
 
 	return (
@@ -32,12 +35,12 @@ export function CameraErrorBanner({
 			<div className="flex items-center justify-between gap-3">
 				<div className="flex min-w-0 items-center gap-2 text-sm">
 					<Camera className="h-4 w-4 shrink-0" aria-hidden />
-					<span className="font-medium">Camera Error:</span>
+					<span className="font-medium">{t("camera.error")}</span>
 					<span className="truncate">{error}</span>
 				</div>
 				<button
 					type="button"
-					aria-label="Dismiss camera error"
+					aria-label={t("camera.dismissError")}
 					onClick={onDismiss}
 					className="shrink-0 text-lg leading-none opacity-70 hover:opacity-100"
 				>
@@ -47,12 +50,6 @@ export function CameraErrorBanner({
 		</div>
 	);
 }
-
-const QUALITY_LABELS: Record<CameraQuality, string> = {
-	performance: "Performance",
-	medium: "Medium",
-	high: "High",
-};
 
 interface CameraControlsProps {
 	preferences: SettingsPreferences;
@@ -67,12 +64,20 @@ export function CameraControls({
 	isWindowOpen,
 	setIsWindowOpen,
 }: CameraControlsProps) {
+	const t = useT();
+	const { locale } = useI18n();
 	const [calibrating, setCalibrating] = useState(false);
 	const [calibrationElapsedMs, setCalibrationElapsedMs] = useState(0);
 	const [calibrationDurationMs, setCalibrationDurationMs] = useState(8000);
 	const [calibrationMessage, setCalibrationMessage] = useState<string | null>(
 		null,
 	);
+
+	const qualityLabels: Record<CameraQuality, string> = {
+		performance: t("camera.quality.performance"),
+		medium: t("camera.quality.medium"),
+		high: t("camera.quality.high"),
+	};
 
 	useEffect(() => {
 		const offProgress = rendererIpc.onEarCalibrationProgress((payload) => {
@@ -89,17 +94,21 @@ export function CameraControls({
 					earCalibration: payload.baseline,
 				}));
 				setCalibrationMessage(
-					`Calibration saved (EAR ${payload.baseline.toFixed(3)})`,
+					translate(locale, "camera.calibrationSaved", {
+						value: payload.baseline.toFixed(3),
+					}),
 				);
 			} else {
-				setCalibrationMessage(payload.error ?? "Calibration did not complete");
+				setCalibrationMessage(
+					payload.error ?? translate(locale, "camera.calibrationIncomplete"),
+				);
 			}
 		});
 		return () => {
 			offProgress();
 			offComplete();
 		};
-	}, [setPreferences]);
+	}, [locale, setPreferences]);
 
 	const toggleCamera = () => {
 		const enabled = !preferences.cameraEnabled;
@@ -155,7 +164,7 @@ export function CameraControls({
 		rendererIpc.cancelEarCalibration();
 		setCalibrating(false);
 		setCalibrationElapsedMs(0);
-		setCalibrationMessage("Calibration cancelled");
+		setCalibrationMessage(t("camera.calibrationCancelled"));
 	};
 
 	const resetCalibration = () => {
@@ -164,7 +173,7 @@ export function CameraControls({
 			earCalibration: null,
 		}));
 		rendererIpc.updateEarCalibration(null);
-		setCalibrationMessage("Calibration cleared");
+		setCalibrationMessage(t("camera.calibrationCleared"));
 	};
 
 	const activePreset = CAMERA_QUALITY_PRESETS[preferences.cameraQuality];
@@ -183,7 +192,7 @@ export function CameraControls({
 					title={
 						<>
 							<Camera className="h-4 w-4 text-muted-foreground" aria-hidden />
-							Camera Detection
+							{t("camera.detection")}
 						</>
 					}
 					action={
@@ -199,7 +208,7 @@ export function CameraControls({
 											setIsWindowOpen(false);
 										}}
 									>
-										Stop Showing
+										{t("camera.stopShowing")}
 									</Button>
 								) : (
 									<Button
@@ -216,12 +225,12 @@ export function CameraControls({
 											setIsWindowOpen(true);
 										}}
 									>
-										Show Camera
+										{t("camera.show")}
 									</Button>
 								)
 							) : null}
 							<ToggleSwitch
-								aria-label="Toggle camera detection"
+								aria-label={t("camera.toggleAria")}
 								checked={preferences.cameraEnabled}
 								onChange={toggleCamera}
 							/>
@@ -234,8 +243,8 @@ export function CameraControls({
 				<>
 					<SettingPanel>
 						<SettingRow
-							title="Camera Quality"
-							description="Medium is recommended. Performance saves CPU; High improves blink timing accuracy."
+							title={t("camera.quality")}
+							description={t("camera.qualityDesc")}
 							action={
 								<span className="text-xs text-muted-foreground">
 									{activePreset.targetFps} FPS ·{" "}
@@ -245,7 +254,7 @@ export function CameraControls({
 							}
 						>
 							<fieldset
-								aria-label="Camera quality"
+								aria-label={t("camera.qualityAria")}
 								className="m-0 flex overflow-hidden rounded-md border border-border p-0"
 							>
 								{CAMERA_QUALITY_OPTIONS.map((option) => {
@@ -263,7 +272,7 @@ export function CameraControls({
 													: "bg-background text-foreground hover:bg-muted",
 											)}
 										>
-											{QUALITY_LABELS[option]}
+											{qualityLabels[option]}
 										</button>
 									);
 								})}
@@ -279,10 +288,10 @@ export function CameraControls({
 										className="h-4 w-4 text-muted-foreground"
 										aria-hidden
 									/>
-									Open-eye Calibration
+									{t("camera.calibration")}
 								</>
 							}
-							description="Keep eyes open and look at the camera for about 8 seconds. This tunes blink thresholds to your face."
+							description={t("camera.calibrationDesc")}
 							action={
 								preferences.earCalibration !== null ? (
 									<span className="text-xs text-primary">
@@ -299,11 +308,11 @@ export function CameraControls({
 										variant="secondary"
 										onClick={cancelCalibration}
 									>
-										Cancel ({remainingSec}s)
+										{t("camera.cancelCalibration", { n: remainingSec })}
 									</Button>
 								) : (
 									<Button type="button" size="sm" onClick={startCalibration}>
-										Calibrate
+										{t("camera.calibrate")}
 									</Button>
 								)}
 								{preferences.earCalibration !== null && !calibrating ? (
@@ -313,7 +322,7 @@ export function CameraControls({
 										variant="ghost"
 										onClick={resetCalibration}
 									>
-										Reset
+										{t("common.reset")}
 									</Button>
 								) : null}
 							</div>
@@ -341,13 +350,13 @@ export function CameraControls({
 										className="h-4 w-4 text-muted-foreground"
 										aria-hidden
 									/>
-									Blink rate coaching
+									{t("camera.coaching")}
 								</>
 							}
-							description="Soft tip when your recent camera blink rate is low. Live rate stays in Statistics."
+							description={t("camera.coachingDesc")}
 							action={
 								<ToggleSwitch
-									aria-label="Toggle blink rate coaching"
+									aria-label={t("camera.coachingToggleAria")}
 									checked={preferences.blinkRateCoachingEnabled}
 									onChange={() =>
 										setPreferences((current) => ({
@@ -364,7 +373,7 @@ export function CameraControls({
 									htmlFor="blink-rate-threshold"
 									className="text-xs text-muted-foreground"
 								>
-									Min blinks / min
+									{t("camera.minBlinks")}
 								</label>
 								<input
 									id="blink-rate-threshold"
@@ -396,13 +405,13 @@ export function CameraControls({
 										className="h-4 w-4 text-muted-foreground"
 										aria-hidden
 									/>
-									MGD Mode
+									{t("camera.mgd")}
 								</>
 							}
-							description="Reminders on a fixed interval regardless of blinks. Popup still closes when a blink is detected."
+							description={t("camera.mgdDesc")}
 							action={
 								<ToggleSwitch
-									aria-label="Toggle MGD mode"
+									aria-label={t("camera.mgdToggleAria")}
 									checked={preferences.mgdMode}
 									onChange={toggleMgd}
 								/>
@@ -419,21 +428,19 @@ export function CameraControls({
 									}
 									className="text-xs text-primary hover:underline"
 								>
-									{preferences.showMgdInfo ? "Hide Info" : "Learn More"}
+									{preferences.showMgdInfo
+										? t("common.hideInfo")
+										: t("common.learnMore")}
 								</button>
 								{preferences.mgdMode ? (
 									<span className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary">
-										MGD mode is active
+										{t("camera.mgdActive")}
 									</span>
 								) : null}
 							</div>
 							{preferences.showMgdInfo ? (
 								<div className="mt-2 rounded-md bg-accent/60 p-3 text-xs text-muted-foreground sm:text-sm">
-									MGD is a common condition where the meibomian glands in your
-									eyelids don't produce enough oil, leading to dry eyes. When
-									enabled, reminders appear at regular intervals regardless of
-									detected blinks. The popup still closes when a blink is
-									detected.
+									{t("camera.mgdInfo")}
 								</div>
 							) : null}
 						</SettingRow>

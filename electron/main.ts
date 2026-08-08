@@ -61,7 +61,10 @@ function bootstrap(): void {
 	const statsStore = new ElectronPreferenceStore({ name: "blinkguard-stats" });
 	const preferencesService = new PreferencesService(store);
 	const preferences = preferencesService.current;
-	const blinkStats = new BlinkStatsService(statsStore);
+	const blinkStats = new BlinkStatsService(
+		statsStore,
+		() => preferences.locale,
+	);
 	const state = new AppRuntimeState();
 	const processes = new ChildProcessRegistry();
 	const windows = new WindowManager(paths, preferences, VITE_DEV_SERVER_URL);
@@ -192,7 +195,12 @@ function bootstrap(): void {
 			blinkRateCoaching.dispose();
 		},
 	);
-	const tray = new TrayController(paths, windows, () => lifecycle.quit());
+	const tray = new TrayController(
+		paths,
+		windows,
+		() => lifecycle.quit(),
+		() => preferences.locale,
+	);
 	lifecycle.attachTray(tray);
 
 	registerIpcHandlers({
@@ -205,6 +213,7 @@ function bootstrap(): void {
 		windows,
 		blinkStats,
 		focusPause,
+		tray,
 	});
 
 	app.on("second-instance", () => {

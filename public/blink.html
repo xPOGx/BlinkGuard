@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self';">
-  <title>Blink Reminder</title>
+  <title data-i18n="popup.blink.title">Blink Reminder</title>
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/reminder.css">
 </head>
@@ -20,9 +20,10 @@
         </div>
         <div class="reminder-message">Blink!</div>
       </div>
-      <button type="button" class="reminder-snooze" id="snooze-blink">Snooze (5 min)</button>
+      <button type="button" class="reminder-snooze" id="snooze-blink" data-i18n="popup.blink.snooze">Snooze (5 min)</button>
     </div>
   </div>
+  <script src="js/shared/i18n.js"></script>
   <script src="js/shared/theme.js"></script>
   <script src="js/reminder.js"></script>
 </body>

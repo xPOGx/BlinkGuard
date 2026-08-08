@@ -54,16 +54,18 @@ export function usePreferences() {
 			preferences.blinkRateCoachingEnabled,
 		);
 		rendererIpc.updateBlinkRateThreshold(preferences.blinkRateThresholdPerMin);
+		rendererIpc.updateLocale(preferences.locale);
 		rendererIpc.updateHasCompletedOnboarding(
 			preferences.hasCompletedOnboarding,
 		);
 	}, [preferences, prefsHydrated]);
 
 	useEffect(() => {
-		if (!preferences.isTracking) {
-			rendererIpc.updateReminderInterval(preferences.reminderInterval);
-		}
-	}, [preferences.isTracking, preferences.reminderInterval]);
+		// Same hydrate gate as the prefs sync above — otherwise the default
+		// interval is written to the store before loadPreferences arrives.
+		if (!prefsHydrated || preferences.isTracking) return;
+		rendererIpc.updateReminderInterval(preferences.reminderInterval);
+	}, [prefsHydrated, preferences.isTracking, preferences.reminderInterval]);
 
 	const toggleTracking = () => {
 		setPreferences((current) => ({

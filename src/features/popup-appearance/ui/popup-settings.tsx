@@ -4,6 +4,7 @@ import { Button } from "@/components/button";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { SettingPanel, SettingRow } from "@/features/settings/ui/setting-panel";
+import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 
 interface PopupSettingsProps {
@@ -15,6 +16,7 @@ export function PopupSettings({
 	preferences,
 	setPreferences,
 }: PopupSettingsProps) {
+	const t = useT();
 	const [isEditingMessage, setIsEditingMessage] = useState(false);
 	const [temporaryMessage, setTemporaryMessage] = useState("");
 
@@ -39,10 +41,13 @@ export function PopupSettings({
 				title={
 					<>
 						<Settings className="h-4 w-4 text-muted-foreground" aria-hidden />
-						Popup Settings
+						{t("popup.settings")}
 					</>
 				}
-				description={`Current size: ${preferences.popupSize.width}px × ${preferences.popupSize.height}px`}
+				description={t("popup.currentSize", {
+					width: preferences.popupSize.width,
+					height: preferences.popupSize.height,
+				})}
 				action={
 					<button
 						type="button"
@@ -54,7 +59,9 @@ export function PopupSettings({
 						}
 						className="text-xs text-primary hover:underline"
 					>
-						{preferences.showPopupColors ? "Hide" : "Customize Appearance"}
+						{preferences.showPopupColors
+							? t("common.hide")
+							: t("popup.customize")}
 					</button>
 				}
 			>
@@ -64,14 +71,14 @@ export function PopupSettings({
 					onClick={rendererIpc.showPopupEditor}
 				>
 					<Settings className="h-4 w-4" aria-hidden />
-					Change Position or Size
+					{t("popup.changePosition")}
 				</Button>
 
 				{preferences.showPopupColors ? (
 					<div className="mt-4 space-y-4 border-t border-border pt-4">
 						<div className="flex items-center gap-2 text-sm font-medium text-foreground">
 							<Palette className="h-4 w-4 text-muted-foreground" aria-hidden />
-							Popup Appearance
+							{t("popup.appearance")}
 						</div>
 
 						<div>
@@ -79,13 +86,13 @@ export function PopupSettings({
 								htmlFor="popup-message"
 								className="mb-1 block text-xs text-muted-foreground"
 							>
-								Popup Message
+								{t("popup.message")}
 							</label>
 							{isEditingMessage ? (
 								<div className="space-y-2">
 									<input
 										id="popup-message"
-										aria-label="Popup message"
+										aria-label={t("popup.messageAria")}
 										type="text"
 										value={temporaryMessage}
 										onChange={(event) =>
@@ -101,7 +108,7 @@ export function PopupSettings({
 									/>
 									<div className="flex items-center gap-2">
 										<Button type="button" size="sm" onClick={saveMessage}>
-											Save
+											{t("common.save")}
 										</Button>
 										<Button
 											type="button"
@@ -109,7 +116,7 @@ export function PopupSettings({
 											variant="secondary"
 											onClick={() => setIsEditingMessage(false)}
 										>
-											Cancel
+											{t("common.cancel")}
 										</Button>
 									</div>
 								</div>
@@ -126,7 +133,7 @@ export function PopupSettings({
 										}}
 										className="shrink-0 text-xs text-primary hover:underline"
 									>
-										Edit
+										{t("common.edit")}
 									</button>
 								</div>
 							)}
@@ -134,12 +141,12 @@ export function PopupSettings({
 
 						<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 							<ColorSetting
-								label="Background Color"
+								label={t("popup.background")}
 								value={preferences.popupColors.background}
 								onChange={(value) => updateColor("background", value)}
 							/>
 							<ColorSetting
-								label="Text Color"
+								label={t("popup.textColor")}
 								value={preferences.popupColors.text}
 								onChange={(value) => updateColor("text", value)}
 							/>
@@ -150,12 +157,12 @@ export function PopupSettings({
 								htmlFor="window-transparency"
 								className="mb-1 block text-xs text-muted-foreground"
 							>
-								Window Transparency
+								{t("popup.transparency")}
 							</label>
 							<div className="flex items-center gap-2">
 								<input
 									id="window-transparency"
-									aria-label="Window transparency"
+									aria-label={t("popup.transparencyAria")}
 									type="range"
 									min="0"
 									max="1"
@@ -177,7 +184,7 @@ export function PopupSettings({
 								</span>
 							</div>
 							<p className="mt-2 text-xs text-muted-foreground sm:text-sm">
-								Higher values make the window more transparent.
+								{t("popup.transparencyHint")}
 							</p>
 						</div>
 					</div>
@@ -194,6 +201,7 @@ interface ColorSettingProps {
 }
 
 function ColorSetting({ label, value, onChange }: ColorSettingProps) {
+	const t = useT();
 	const inputId = useId();
 
 	return (
@@ -206,7 +214,7 @@ function ColorSetting({ label, value, onChange }: ColorSettingProps) {
 			</label>
 			<div className="flex items-center gap-2">
 				<input
-					aria-label={`${label} picker`}
+					aria-label={t("popup.colorPickerAria", { label })}
 					type="color"
 					value={value}
 					onChange={(event) => onChange(event.target.value)}

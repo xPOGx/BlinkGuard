@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self';">
     <link rel="stylesheet" href="css/base.css">
@@ -7,13 +7,14 @@
 </head>
 <body>
     <div class="exercise-container" id="container">
-        <div class="exercise-title">Eye Exercise Time!</div>
+        <div class="exercise-title" data-i18n="popup.exercise.title">Eye Exercise Time!</div>
         <div class="exercise-text" id="exercise"></div>
         <div class="exercise-buttons">
-            <button class="exercise-button skip">Skip</button>
-            <button class="exercise-button snooze">Snooze (5 min)</button>
+            <button class="exercise-button skip" type="button" data-i18n="popup.exercise.skip">Skip</button>
+            <button class="exercise-button snooze" type="button" data-i18n="popup.exercise.snooze">Snooze (5 min)</button>
         </div>
     </div>
+    <script src="js/shared/i18n.js"></script>
     <script src="js/shared/theme.js"></script>
     <script src="js/exercise.js"></script>
 </body>

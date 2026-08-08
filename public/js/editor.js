@@ -5,7 +5,11 @@ function updateSizeDisplay() {
 	if (sizeDisplay) {
 		const width = Math.round(window.innerWidth);
 		const height = Math.round(window.innerHeight);
-		sizeDisplay.textContent = `Width: ${width}px, Height: ${height}px`;
+		const tr =
+			window.__i18n && typeof window.__i18n.t === "function"
+				? window.__i18n.t.bind(window.__i18n)
+				: (key) => key;
+		sizeDisplay.textContent = tr("popup.editor.size", { width, height });
 	}
 }
 
@@ -28,6 +32,9 @@ function cancelPopupEditor() {
 
 function initPopupEditor() {
 	updateSizeDisplay();
+	if (window.__i18n) {
+		window.__i18n.onApply = updateSizeDisplay;
+	}
 
 	const saveBtn = document.getElementById("saveBtn");
 	const cancelBtn = document.getElementById("cancelBtn");

@@ -6,6 +6,7 @@ import {
 	SettingRow,
 	ToggleSwitch,
 } from "@/features/settings/ui/setting-panel";
+import { useT } from "@/i18n";
 
 interface LookAwaySettingsProps {
 	preferences: SettingsPreferences;
@@ -16,12 +17,23 @@ export function LookAwaySettings({
 	preferences,
 	setPreferences,
 }: LookAwaySettingsProps) {
+	const t = useT();
 	const intervalProgress = ((preferences.lookAwayInterval - 5) / 55) * 100;
 	const durationProgress = ((preferences.lookAwayDuration - 10) / 50) * 100;
 	const trackColor = preferences.darkMode
 		? "hsl(217 25% 18%)"
 		: "hsl(210 18% 90%)";
 	const fillColor = "hsl(173 58% 36%)";
+	const intervalPlural = preferences.lookAwayInterval !== 1;
+	const durationPlural = preferences.lookAwayDuration !== 1;
+	const descKey =
+		intervalPlural && durationPlural
+			? "lookAway.desc_both_plural"
+			: intervalPlural
+				? "lookAway.desc_interval_plural"
+				: durationPlural
+					? "lookAway.desc_duration_plural"
+					: "lookAway.desc";
 
 	return (
 		<SettingPanel>
@@ -29,13 +41,16 @@ export function LookAwaySettings({
 				title={
 					<>
 						<Eye className="h-4 w-4 text-muted-foreground" aria-hidden />
-						20-20-20 Look Away
+						{t("lookAway.title")}
 					</>
 				}
-				description={`Every ${preferences.lookAwayInterval} minute${preferences.lookAwayInterval !== 1 ? "s" : ""}, look ~20 feet away for ${preferences.lookAwayDuration} second${preferences.lookAwayDuration !== 1 ? "s" : ""}`}
+				description={t(descKey, {
+					interval: preferences.lookAwayInterval,
+					duration: preferences.lookAwayDuration,
+				})}
 				action={
 					<ToggleSwitch
-						aria-label="Toggle look-away breaks"
+						aria-label={t("lookAway.toggleAria")}
 						checked={preferences.lookAwayEnabled}
 						onChange={() =>
 							setPreferences((current) => ({
@@ -50,11 +65,11 @@ export function LookAwaySettings({
 					<div className="space-y-3 border-t border-border pt-3">
 						<div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
 							<Clock className="h-3 w-3" aria-hidden />
-							Interval
+							{t("common.interval")}
 						</div>
 						<div className="flex items-center gap-2">
 							<input
-								aria-label="Look-away interval"
+								aria-label={t("lookAway.intervalAria")}
 								type="range"
 								min="5"
 								max="60"
@@ -75,11 +90,11 @@ export function LookAwaySettings({
 							</div>
 						</div>
 						<div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-							Duration
+							{t("common.duration")}
 						</div>
 						<div className="flex items-center gap-2">
 							<input
-								aria-label="Look-away duration"
+								aria-label={t("lookAway.durationAria")}
 								type="range"
 								min="10"
 								max="60"
@@ -100,7 +115,7 @@ export function LookAwaySettings({
 							</div>
 						</div>
 						<div className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">
-							Blink reminders pause while the look-away popup is open
+							{t("lookAway.hint")}
 						</div>
 					</div>
 				) : null}

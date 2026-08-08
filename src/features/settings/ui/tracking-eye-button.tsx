@@ -1,6 +1,7 @@
 import lottieWeb, { type AnimationItem } from "lottie-web";
 import { useEffect, useRef } from "react";
 import eyeAnimation from "@/assets/eye.json";
+import { useT } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 type LottiePlayer = {
@@ -57,10 +58,12 @@ export function TrackingEyeButton({
 	isTracking,
 	onToggle,
 }: TrackingEyeButtonProps) {
+	const t = useT();
 	const containerRef = useRef<HTMLSpanElement>(null);
 	const animRef = useRef<AnimationItem | null>(null);
 	const settleRef = useRef<(() => void) | null>(null);
 	const wasTrackingRef = useRef(false);
+	const trackingLabel = isTracking ? t("tracking.stop") : t("tracking.start");
 
 	useEffect(() => {
 		const container = containerRef.current;
@@ -133,8 +136,8 @@ export function TrackingEyeButton({
 			type="button"
 			onClick={onToggle}
 			aria-pressed={isTracking}
-			aria-label={isTracking ? "Stop reminders" : "Start reminders"}
-			title={isTracking ? "Stop reminders" : "Start reminders"}
+			aria-label={trackingLabel}
+			title={trackingLabel}
 			className={cn(
 				"relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors",
 				"focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",

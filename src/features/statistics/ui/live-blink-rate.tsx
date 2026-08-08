@@ -1,5 +1,6 @@
 import { Activity, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useI18n, useT } from "@/i18n";
 import { cn } from "@/lib/utils";
 import {
 	BLINK_RATE_WINDOW_MS,
@@ -25,6 +26,8 @@ export function LiveBlinkRate({
 	blinkRateReady,
 	blinkRateWarmupMs,
 }: LiveBlinkRateProps) {
+	const t = useT();
+	const { locale } = useI18n();
 	const previousTargetRef = useRef(blinksPerMinute);
 	const [trend, setTrend] = useState<Trend>(null);
 	const warming = !blinkRateReady;
@@ -33,8 +36,8 @@ export function LiveBlinkRate({
 		!warming,
 		VALUE_TWEEN_MS,
 	);
-	const guidance = classifyBlinkRate(animatedBpm);
-	const targetGuidance = classifyBlinkRate(blinksPerMinute);
+	const guidance = classifyBlinkRate(animatedBpm, locale);
+	const targetGuidance = classifyBlinkRate(blinksPerMinute, locale);
 	const display = formatBlinksPerMinute(animatedBpm);
 	const idle = blinkRateReady && blinksPerMinute <= 0 && animatedBpm < 0.05;
 	const warmupPct = Math.min(
@@ -78,7 +81,7 @@ export function LiveBlinkRate({
 				<div className="min-w-0">
 					<p className="flex items-center gap-1.5 text-xs text-muted-foreground">
 						<Activity className="h-3.5 w-3.5" aria-hidden />
-						Current rate
+						{t("rate.current")}
 					</p>
 					<div className="mt-1 flex items-baseline gap-2">
 						<p
@@ -97,7 +100,7 @@ export function LiveBlinkRate({
 								{warming ? "—" : display}
 							</span>
 							<span className="ml-1 text-base font-medium text-muted-foreground">
-								/min
+								{t("rate.perMin")}
 							</span>
 						</p>
 						<span
@@ -110,12 +113,12 @@ export function LiveBlinkRate({
 							{trend === "up" ? (
 								<TrendingUp
 									className="h-4 w-4 text-primary"
-									aria-label="Rate rising"
+									aria-label={t("rate.rising")}
 								/>
 							) : (
 								<TrendingDown
 									className="h-4 w-4 text-muted-foreground"
-									aria-label="Rate falling"
+									aria-label={t("rate.falling")}
 								/>
 							)}
 						</span>
@@ -129,7 +132,7 @@ export function LiveBlinkRate({
 							: qualityBadgeClass(targetGuidance.quality),
 					)}
 				>
-					{warming ? "Warming up" : idle ? "—" : targetGuidance.label}
+					{warming ? t("rate.warmingUp") : idle ? "—" : targetGuidance.label}
 				</span>
 			</div>
 
@@ -159,10 +162,10 @@ export function LiveBlinkRate({
 			>
 				{warming
 					? blinkRateWarmupMs > 0
-						? `Collecting the first minute… ${remainingSec}s left`
-						: "Start tracking to measure blink rate. The first minute is a warmup."
+						? t("rate.collecting", { n: remainingSec })
+						: t("rate.startTracking")
 					: idle
-						? "Waiting for credited blinks…"
+						? t("rate.waiting")
 						: targetGuidance.description}
 			</p>
 		</div>

@@ -8,14 +8,8 @@ import {
 	ToggleSwitch,
 } from "@/features/settings/ui/setting-panel";
 import { ShortcutSettings } from "@/features/shortcuts/ui/shortcut-settings";
+import { useT } from "@/i18n";
 import { cn } from "@/lib/utils";
-
-const STEPS = [
-	{ id: "mode", title: "Reminder mode", label: "Mode" },
-	{ id: "shortcut", title: "Keyboard shortcut", label: "Shortcut" },
-	{ id: "launch", title: "Launch at login", label: "Launch" },
-	{ id: "quiet", title: "Quiet hours", label: "Quiet hours" },
-] as const;
 
 interface OnboardingWizardProps {
 	preferences: SettingsPreferences;
@@ -35,9 +29,32 @@ export function OnboardingWizard({
 	setPreferences,
 	shortcut,
 }: OnboardingWizardProps) {
+	const t = useT();
 	const [stepIndex, setStepIndex] = useState(0);
-	const isLast = stepIndex === STEPS.length - 1;
-	const step = STEPS[stepIndex];
+	const steps = [
+		{
+			id: "mode" as const,
+			title: t("onboarding.step.mode"),
+			label: t("onboarding.step.modeLabel"),
+		},
+		{
+			id: "shortcut" as const,
+			title: t("onboarding.step.shortcut"),
+			label: t("onboarding.step.shortcutLabel"),
+		},
+		{
+			id: "launch" as const,
+			title: t("onboarding.step.launch"),
+			label: t("onboarding.step.launchLabel"),
+		},
+		{
+			id: "quiet" as const,
+			title: t("onboarding.step.quiet"),
+			label: t("onboarding.step.quietLabel"),
+		},
+	];
+	const isLast = stepIndex === steps.length - 1;
+	const step = steps[stepIndex];
 
 	const complete = () => {
 		setPreferences((current) => ({
@@ -56,7 +73,7 @@ export function OnboardingWizard({
 			<SettingPanel className="flex w-full max-w-lg flex-col gap-5 shadow-lg">
 				<div className="space-y-1">
 					<p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-						Welcome to BlinkGuard
+						{t("onboarding.welcome")}
 					</p>
 					<h2
 						id="onboarding-title"
@@ -65,12 +82,12 @@ export function OnboardingWizard({
 						{step.title}
 					</h2>
 					<p className="text-sm text-muted-foreground">
-						A quick setup — you can change everything later in Settings.
+						{t("onboarding.subtitle")}
 					</p>
 				</div>
 
 				<div className="flex items-center gap-2">
-					{STEPS.map((item, index) => (
+					{steps.map((item, index) => (
 						<span
 							key={item.id}
 							className={cn(
@@ -105,9 +122,9 @@ export function OnboardingWizard({
 									className="mb-2 h-5 w-5 text-muted-foreground"
 									aria-hidden
 								/>
-								<p className="text-sm font-medium">Timer</p>
+								<p className="text-sm font-medium">{t("onboarding.timer")}</p>
 								<p className="mt-1 text-xs text-muted-foreground">
-									Reminders on a fixed interval. Works without a camera.
+									{t("onboarding.timerDesc")}
 								</p>
 							</button>
 							<button
@@ -130,10 +147,9 @@ export function OnboardingWizard({
 									className="mb-2 h-5 w-5 text-muted-foreground"
 									aria-hidden
 								/>
-								<p className="text-sm font-medium">Camera</p>
+								<p className="text-sm font-medium">{t("onboarding.camera")}</p>
 								<p className="mt-1 text-xs text-muted-foreground">
-									Blink-aware reminders when you forget to blink (webcam
-									required).
+									{t("onboarding.cameraDesc")}
 								</p>
 							</button>
 						</div>
@@ -143,7 +159,7 @@ export function OnboardingWizard({
 						<div className="space-y-3">
 							<p className="flex items-start gap-2 text-sm text-muted-foreground">
 								<Keyboard className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-								Use this shortcut anytime to start or stop blink reminders.
+								{t("onboarding.shortcutHint")}
 							</p>
 							<ShortcutSettings
 								shortcut={preferences.keyboardShortcut}
@@ -165,11 +181,11 @@ export function OnboardingWizard({
 										className="h-4 w-4 shrink-0 text-muted-foreground"
 										aria-hidden
 									/>
-									Launch at login
+									{t("launch.title")}
 								</p>
 								<div className="shrink-0">
 									<ToggleSwitch
-										aria-label="Toggle launch at login"
+										aria-label={t("launch.toggleAria")}
 										checked={preferences.launchAtLogin}
 										onChange={() =>
 											setPreferences((current) => ({
@@ -181,8 +197,7 @@ export function OnboardingWizard({
 								</div>
 							</div>
 							<p className="text-xs text-muted-foreground sm:text-sm">
-								Start BlinkGuard hidden in the system tray when you sign in.
-								Closing the window keeps the app running in the tray.
+								{t("onboarding.launchDesc")}
 							</p>
 						</div>
 					) : null}
@@ -195,11 +210,11 @@ export function OnboardingWizard({
 										className="h-4 w-4 shrink-0 text-muted-foreground"
 										aria-hidden
 									/>
-									Quiet hours
+									{t("quietHours.title")}
 								</p>
 								<div className="shrink-0">
 									<ToggleSwitch
-										aria-label="Toggle quiet hours"
+										aria-label={t("quietHours.toggleAria")}
 										checked={preferences.quietHoursEnabled}
 										onChange={() =>
 											setPreferences((current) => ({
@@ -211,12 +226,12 @@ export function OnboardingWizard({
 								</div>
 							</div>
 							<p className="text-xs text-muted-foreground sm:text-sm">
-								Hide blink and eye-care popups during this local-time window.
+								{t("onboarding.quietDesc")}
 							</p>
 							{preferences.quietHoursEnabled ? (
 								<div className="flex flex-wrap items-center gap-3">
 									<label className="flex items-center gap-2 text-sm text-muted-foreground">
-										<span>From</span>
+										<span>{t("common.from")}</span>
 										<input
 											type="time"
 											value={preferences.quietHoursStart}
@@ -230,7 +245,7 @@ export function OnboardingWizard({
 										/>
 									</label>
 									<label className="flex items-center gap-2 text-sm text-muted-foreground">
-										<span>To</span>
+										<span>{t("common.to")}</span>
 										<input
 											type="time"
 											value={preferences.quietHoursEnd}
@@ -251,7 +266,7 @@ export function OnboardingWizard({
 
 				<div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
 					<Button type="button" variant="ghost" onClick={complete}>
-						Skip
+						{t("common.skip")}
 					</Button>
 					<div className="flex gap-2">
 						{stepIndex > 0 ? (
@@ -260,19 +275,19 @@ export function OnboardingWizard({
 								variant="secondary"
 								onClick={() => setStepIndex((current) => current - 1)}
 							>
-								Back
+								{t("common.back")}
 							</Button>
 						) : null}
 						{isLast ? (
 							<Button type="button" onClick={complete}>
-								Finish
+								{t("common.finish")}
 							</Button>
 						) : (
 							<Button
 								type="button"
 								onClick={() => setStepIndex((current) => current + 1)}
 							>
-								Next
+								{t("common.next")}
 							</Button>
 						)}
 					</div>

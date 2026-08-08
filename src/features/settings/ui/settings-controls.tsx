@@ -1,7 +1,15 @@
 import { Gamepad2, LogIn, Moon, Sun, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/button";
+import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
+import {
+	defaultExercisePrompts,
+	defaultPopupMessage,
+	isBuiltInExercisePrompts,
+	isBuiltInPopupMessage,
+	type Locale,
+} from "../../../../shared/i18n";
 import type { SettingsPreferences } from "../model/preferences";
 import type { SetPreferences } from "../model/use-preferences";
 import { SettingPanel, SettingRow, ToggleSwitch } from "./setting-panel";
@@ -17,6 +25,7 @@ export function DarkModeToggle({
 	setPreferences,
 	variant = "icon",
 }: DarkModeToggleProps) {
+	const t = useT();
 	const toggle = () =>
 		setPreferences((current) => ({
 			...current,
@@ -29,7 +38,7 @@ export function DarkModeToggle({
 				type="button"
 				onClick={toggle}
 				className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-muted"
-				aria-label="Toggle dark mode"
+				aria-label={t("common.toggleDarkMode")}
 			>
 				<span className="flex items-center gap-2">
 					{darkMode ? (
@@ -37,7 +46,7 @@ export function DarkModeToggle({
 					) : (
 						<Moon className="h-4 w-4" aria-hidden />
 					)}
-					{darkMode ? "Light mode" : "Dark mode"}
+					{darkMode ? t("common.lightMode") : t("common.darkMode")}
 				</span>
 			</button>
 		);
@@ -48,7 +57,7 @@ export function DarkModeToggle({
 			type="button"
 			onClick={toggle}
 			className="rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:bg-muted"
-			aria-label="Toggle dark mode"
+			aria-label={t("common.toggleDarkMode")}
 		>
 			{darkMode ? (
 				<Sun className="h-4 w-4 text-amber-400" aria-hidden />
@@ -68,6 +77,7 @@ export function SoundSettings({
 	preferences,
 	setPreferences,
 }: SoundSettingsProps) {
+	const t = useT();
 	return (
 		<SettingPanel>
 			<SettingRow
@@ -78,13 +88,13 @@ export function SoundSettings({
 						) : (
 							<VolumeX className="h-4 w-4 text-muted-foreground" aria-hidden />
 						)}
-						Notification Sound
+						{t("sound.title")}
 					</>
 				}
-				description="Play sounds for blink reminders and exercise prompts"
+				description={t("sound.description")}
 				action={
 					<ToggleSwitch
-						aria-label="Toggle notification sound"
+						aria-label={t("sound.toggleAria")}
 						checked={preferences.soundEnabled}
 						onChange={() =>
 							setPreferences((current) => ({
@@ -93,6 +103,52 @@ export function SoundSettings({
 							}))
 						}
 					/>
+				}
+			/>
+		</SettingPanel>
+	);
+}
+
+interface LanguageSettingsProps {
+	preferences: SettingsPreferences;
+	setPreferences: SetPreferences;
+}
+
+export function LanguageSettings({
+	preferences,
+	setPreferences,
+}: LanguageSettingsProps) {
+	const t = useT();
+	return (
+		<SettingPanel>
+			<SettingRow
+				title={t("language.title")}
+				description={t("language.description")}
+				action={
+					<select
+						aria-label={t("language.toggleAria")}
+						value={preferences.locale}
+						onChange={(event) => {
+							const locale = event.target.value as Locale;
+							setPreferences((current) => {
+								const next: SettingsPreferences = {
+									...current,
+									locale,
+								};
+								if (isBuiltInPopupMessage(current.popupMessage)) {
+									next.popupMessage = defaultPopupMessage(locale);
+								}
+								if (isBuiltInExercisePrompts(current.exercisePrompts)) {
+									next.exercisePrompts = defaultExercisePrompts(locale);
+								}
+								return next;
+							});
+						}}
+						className="rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
+					>
+						<option value="en">{t("language.en")}</option>
+						<option value="uk">{t("language.uk")}</option>
+					</select>
 				}
 			/>
 		</SettingPanel>
@@ -108,19 +164,20 @@ export function LaunchAtLoginSettings({
 	preferences,
 	setPreferences,
 }: LaunchAtLoginSettingsProps) {
+	const t = useT();
 	return (
 		<SettingPanel>
 			<SettingRow
 				title={
 					<>
 						<LogIn className="h-4 w-4 text-muted-foreground" aria-hidden />
-						Launch at login
+						{t("launch.title")}
 					</>
 				}
-				description="Start BlinkGuard hidden in the system tray when you sign in"
+				description={t("launch.description")}
 				action={
 					<ToggleSwitch
-						aria-label="Toggle launch at login"
+						aria-label={t("launch.toggleAria")}
 						checked={preferences.launchAtLogin}
 						onChange={() =>
 							setPreferences((current) => ({
@@ -136,6 +193,7 @@ export function LaunchAtLoginSettings({
 }
 
 export function ResetPreferencesButton() {
+	const t = useT();
 	const [confirming, setConfirming] = useState(false);
 	const [replayOnboarding, setReplayOnboarding] = useState(false);
 
@@ -148,9 +206,7 @@ export function ResetPreferencesButton() {
 	if (confirming) {
 		return (
 			<SettingPanel className="space-y-3">
-				<p className="text-sm text-foreground">
-					Reset all preferences to default values?
-				</p>
+				<p className="text-sm text-foreground">{t("reset.confirm")}</p>
 				<label className="flex items-start gap-2 text-sm text-muted-foreground">
 					<input
 						type="checkbox"
@@ -158,7 +214,7 @@ export function ResetPreferencesButton() {
 						onChange={(event) => setReplayOnboarding(event.target.checked)}
 						className="mt-0.5"
 					/>
-					<span>Show first-run setup again</span>
+					<span>{t("reset.replayOnboarding")}</span>
 				</label>
 				<div className="flex flex-wrap gap-2">
 					<Button
@@ -169,10 +225,10 @@ export function ResetPreferencesButton() {
 							setReplayOnboarding(false);
 						}}
 					>
-						Cancel
+						{t("common.cancel")}
 					</Button>
 					<Button type="button" variant="destructive" onClick={confirmReset}>
-						Reset
+						{t("common.reset")}
 					</Button>
 				</div>
 			</SettingPanel>
@@ -186,7 +242,7 @@ export function ResetPreferencesButton() {
 				variant="destructive"
 				onClick={() => setConfirming(true)}
 			>
-				Reset Preferences
+				{t("reset.title")}
 			</Button>
 		</SettingPanel>
 	);
@@ -200,6 +256,7 @@ interface ShowOnboardingButtonProps {
 export function ShowOnboardingButton({
 	setPreferences,
 }: ShowOnboardingButtonProps) {
+	const t = useT();
 	if (!import.meta.env.DEV) return null;
 
 	return (
@@ -214,7 +271,7 @@ export function ShowOnboardingButton({
 					}))
 				}
 			>
-				Show onboarding
+				{t("reset.showOnboarding")}
 			</Button>
 		</SettingPanel>
 	);
@@ -229,6 +286,7 @@ export function QuietHoursFocusSettings({
 	preferences,
 	setPreferences,
 }: QuietHoursFocusSettingsProps) {
+	const t = useT();
 	const [pauseReason, setPauseReason] = useState<
 		"quiet-hours" | "fullscreen" | null
 	>(null);
@@ -243,9 +301,9 @@ export function QuietHoursFocusSettings({
 
 	const statusLabel =
 		pauseReason === "quiet-hours"
-			? "Paused: quiet hours"
+			? t("quietHours.paused")
 			: pauseReason === "fullscreen"
-				? "Paused: fullscreen / gaming"
+				? t("fullscreen.paused")
 				: null;
 
 	return (
@@ -254,13 +312,13 @@ export function QuietHoursFocusSettings({
 				title={
 					<>
 						<Moon className="h-4 w-4 text-muted-foreground" aria-hidden />
-						Quiet hours
+						{t("quietHours.title")}
 					</>
 				}
-				description="Hide blink, exercise, and look-away popups during this local-time window"
+				description={t("quietHours.description")}
 				action={
 					<ToggleSwitch
-						aria-label="Toggle quiet hours"
+						aria-label={t("quietHours.toggleAria")}
 						checked={preferences.quietHoursEnabled}
 						onChange={() =>
 							setPreferences((current) => ({
@@ -274,7 +332,7 @@ export function QuietHoursFocusSettings({
 				{preferences.quietHoursEnabled ? (
 					<div className="flex flex-wrap items-center gap-3">
 						<label className="flex items-center gap-2 text-sm text-muted-foreground">
-							<span>From</span>
+							<span>{t("common.from")}</span>
 							<input
 								type="time"
 								value={preferences.quietHoursStart}
@@ -288,7 +346,7 @@ export function QuietHoursFocusSettings({
 							/>
 						</label>
 						<label className="flex items-center gap-2 text-sm text-muted-foreground">
-							<span>To</span>
+							<span>{t("common.to")}</span>
 							<input
 								type="time"
 								value={preferences.quietHoursEnd}
@@ -309,13 +367,13 @@ export function QuietHoursFocusSettings({
 				title={
 					<>
 						<Gamepad2 className="h-4 w-4 text-muted-foreground" aria-hidden />
-						Pause while fullscreen
+						{t("fullscreen.title")}
 					</>
 				}
-				description="Auto-pause popups (and the camera) when another app is fullscreen. If you leave this off, prefer Borderless Windowed or Windowed mode while gaming."
+				description={t("fullscreen.description")}
 				action={
 					<ToggleSwitch
-						aria-label="Toggle pause while fullscreen"
+						aria-label={t("fullscreen.toggleAria")}
 						checked={preferences.pauseOnFullscreen}
 						onChange={() =>
 							setPreferences((current) => ({

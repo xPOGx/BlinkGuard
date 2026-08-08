@@ -1,3 +1,5 @@
+import { t, type Locale } from "./i18n";
+
 /** Rolling window used for live blinks-per-minute. */
 export const BLINK_RATE_WINDOW_MS = 60_000;
 
@@ -38,25 +40,28 @@ export function computeBlinksPerMinute(
 	return (recent.length * 60_000) / windowMs;
 }
 
-export function classifyBlinkRate(bpm: number): BlinkRateGuidance {
+export function classifyBlinkRate(
+	bpm: number,
+	locale: Locale = "en",
+): BlinkRateGuidance {
 	if (bpm < BLINK_RATE_LOW_MAX) {
 		return {
 			quality: "low",
-			label: "Low",
-			description: "Below typical screen-work range (4–7/min).",
+			label: t(locale, "rate.low"),
+			description: t(locale, "rate.lowDesc"),
 		};
 	}
 	if (bpm <= BLINK_RATE_OK_MAX) {
 		return {
 			quality: "ok",
-			label: "OK",
-			description: "Common during focused screen work.",
+			label: t(locale, "rate.ok"),
+			description: t(locale, "rate.okDesc"),
 		};
 	}
 	return {
 		quality: "good",
-		label: "Good",
-		description: "Typical resting range (15–20/min).",
+		label: t(locale, "rate.good"),
+		description: t(locale, "rate.goodDesc"),
 	};
 }
 

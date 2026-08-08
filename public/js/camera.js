@@ -6,26 +6,45 @@ let blinkDisplayTimer = null;
 let currentThreshold = 0.2;
 let thresholdUpdateTimer = null;
 
+function tr(key, vars) {
+	if (window.__i18n && typeof window.__i18n.t === "function") {
+		return window.__i18n.t(key, vars);
+	}
+	return key;
+}
+
 function updateInfoDisplay(eyeSize, isBlinking = false) {
 	const info = document.getElementById("info");
 	const currentValues = document.getElementById("current-values");
 
 	if (info) {
-		info.innerHTML = `
-      Your eye size is continously being calculated, once it drops significantly below your baseline (average eye size) a blink is detected
-    `;
+		info.textContent = tr("popup.camera.infoLive");
 		info.style.background = isBlinking ? "rgba(0, 255, 0, 0.5)" : "rgba(0, 0, 0, 0.4)";
 	}
 
 	if (currentValues) {
 		const eyeSizeText = eyeSize !== null ? eyeSize.toFixed(3) : "0.000";
-		currentValues.innerHTML = `
-      <strong>Current:</strong> Eye size: ${eyeSizeText}
-      <br>
-      <strong>Baseline:</strong> ${lastFaceData && lastFaceData.baseline ? lastFaceData.baseline.toFixed(3) : "Building..."}
-      <br>
-      <strong>Status:</strong> ${lastFaceData && lastFaceData.blink_phase ? lastFaceData.blink_phase : "monitoring"}
-    `;
+		const baseline =
+			lastFaceData && lastFaceData.baseline
+				? lastFaceData.baseline.toFixed(3)
+				: tr("popup.camera.building");
+		const statusText =
+			lastFaceData && lastFaceData.blink_phase
+				? lastFaceData.blink_phase
+				: tr("popup.camera.monitoring");
+		currentValues.innerHTML =
+			"<strong>" +
+			tr("popup.camera.current") +
+			"</strong> " +
+			tr("popup.camera.eyeSize", { value: eyeSizeText }) +
+			"<br><strong>" +
+			tr("popup.camera.baseline") +
+			"</strong> " +
+			baseline +
+			"<br><strong>" +
+			tr("popup.camera.status") +
+			"</strong> " +
+			statusText;
 		currentValues.style.background = isBlinking ? "rgba(0, 255, 0, 0.5)" : "rgba(0, 0, 0, 0.4)";
 	}
 }
@@ -35,7 +54,9 @@ function resetBlinkDisplay() {
 		const eyeSize = lastFaceData.ear || 0;
 		const status = document.getElementById("status");
 		if (status) {
-			status.textContent = "Eye size: " + eyeSize.toFixed(3);
+			status.textContent = tr("popup.camera.eyeSize", {
+				value: eyeSize.toFixed(3),
+			});
 			status.style.background = "rgba(0, 0, 0, 0.4)";
 		}
 		updateInfoDisplay(eyeSize);
@@ -77,7 +98,9 @@ function drawOverlays(faceData) {
 
 		const status = document.getElementById("status");
 		if (status) {
-			status.textContent = isBlinking ? "BLINK DETECTED!" : "Eye size: " + eyeSize.toFixed(3);
+			status.textContent = isBlinking
+				? tr("popup.camera.blinkDetected")
+				: tr("popup.camera.eyeSize", { value: eyeSize.toFixed(3) });
 			status.style.background = isBlinking ? "rgba(0, 255, 0, 0.5)" : "rgba(0, 0, 0, 0.4)";
 		}
 
@@ -85,7 +108,7 @@ function drawOverlays(faceData) {
 	} else {
 		const status = document.getElementById("status");
 		if (status) {
-			status.textContent = "No face detected";
+			status.textContent = tr("popup.camera.noFace");
 			status.style.background = "rgba(255, 0, 0, 0.5)";
 		}
 		updateInfoDisplay(null);
@@ -105,8 +128,12 @@ function initCameraPopup() {
 
 			const status = document.getElementById("status");
 			if (status) {
-				status.textContent = isBlinking ? "BLINK DETECTED!" : "Eye size: " + eyeSize.toFixed(3);
-				status.style.background = isBlinking ? "rgba(0, 255, 0, 0.5)" : "rgba(0, 0, 0, 0.4)";
+				status.textContent = isBlinking
+					? tr("popup.camera.blinkDetected")
+					: tr("popup.camera.eyeSize", { value: eyeSize.toFixed(3) });
+				status.style.background = isBlinking
+					? "rgba(0, 255, 0, 0.5)"
+					: "rgba(0, 0, 0, 0.4)";
 			}
 
 			updateInfoDisplay(eyeSize, isBlinking);
@@ -123,7 +150,7 @@ function initCameraPopup() {
 		if (lastFaceData && lastFaceData.faceDetected) {
 			const status = document.getElementById("status");
 			if (status) {
-				status.textContent = "BLINK DETECTED!";
+				status.textContent = tr("popup.camera.blinkDetected");
 				status.style.background = "rgba(0, 255, 0, 0.5)";
 			}
 
@@ -162,11 +189,17 @@ function initCameraPopup() {
 			console.error("Error handling video stream:", error);
 			const status = document.getElementById("status");
 			if (status) {
-				status.textContent = "Error: Failed to process video stream";
+				status.textContent = tr("popup.camera.streamError");
 				status.style.background = "rgba(255, 0, 0, 0.5)";
 			}
 		}
 	});
+
+	if (window.__i18n) {
+		window.__i18n.onApply = function () {
+			updateInfoDisplay(lastFaceData ? lastFaceData.ear : null);
+		};
+	}
 
 	window.popupAPI.requestVideoStream();
 	updateInfoDisplay(null);

@@ -6,7 +6,11 @@ import {
 	SettingRow,
 	ToggleSwitch,
 } from "@/features/settings/ui/setting-panel";
-import { DEFAULT_EXERCISE_PROMPTS } from "../../../../shared/preferences";
+import { useI18n } from "@/i18n";
+import {
+	defaultExercisePrompts,
+	pluralKey,
+} from "../../../../shared/i18n";
 
 interface ExerciseSettingsProps {
 	preferences: SettingsPreferences;
@@ -17,13 +21,18 @@ export function ExerciseSettings({
 	preferences,
 	setPreferences,
 }: ExerciseSettingsProps) {
+	const { t, locale } = useI18n();
 	const progress = ((preferences.exerciseInterval - 5) / 55) * 100;
 	const trackColor = preferences.darkMode
 		? "hsl(217 25% 18%)"
 		: "hsl(210 18% 90%)";
 	const fillColor = "hsl(173 58% 36%)";
 	const prompts = preferences.exercisePrompts;
-
+	const descKey = pluralKey(
+		"exercises.desc",
+		locale,
+		preferences.exerciseInterval,
+	);
 	const updatePrompt = (index: number, value: string) => {
 		setPreferences((current) => {
 			const next = [...current.exercisePrompts];
@@ -35,7 +44,7 @@ export function ExerciseSettings({
 	const addPrompt = () => {
 		setPreferences((current) => ({
 			...current,
-			exercisePrompts: [...current.exercisePrompts, "New exercise"],
+			exercisePrompts: [...current.exercisePrompts, t("exercises.newPrompt")],
 		}));
 	};
 
@@ -52,7 +61,7 @@ export function ExerciseSettings({
 	const resetPrompts = () => {
 		setPreferences((current) => ({
 			...current,
-			exercisePrompts: [...DEFAULT_EXERCISE_PROMPTS],
+			exercisePrompts: [...defaultExercisePrompts(current.locale)],
 		}));
 	};
 
@@ -62,13 +71,13 @@ export function ExerciseSettings({
 				title={
 					<>
 						<Dumbbell className="h-4 w-4 text-muted-foreground" aria-hidden />
-						Eye Exercises
+						{t("exercises.title")}
 					</>
 				}
-				description={`Get prompted for eye exercises every ${preferences.exerciseInterval} minute${preferences.exerciseInterval !== 1 ? "s" : ""} to help reduce eye strain`}
+				description={t(descKey, { n: preferences.exerciseInterval })}
 				action={
 					<ToggleSwitch
-						aria-label="Toggle eye exercises"
+						aria-label={t("exercises.toggleAria")}
 						checked={preferences.eyeExercisesEnabled}
 						onChange={() =>
 							setPreferences((current) => ({
@@ -83,11 +92,11 @@ export function ExerciseSettings({
 					<div className="space-y-3 border-t border-border pt-3">
 						<div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
 							<Clock className="h-3 w-3" aria-hidden />
-							Interval
+							{t("common.interval")}
 						</div>
 						<div className="flex items-center gap-2">
 							<input
-								aria-label="Exercise interval"
+								aria-label={t("exercises.intervalAria")}
 								type="range"
 								min="5"
 								max="60"
@@ -111,7 +120,7 @@ export function ExerciseSettings({
 						<div className="space-y-2 border-t border-border pt-3">
 							<div className="flex items-center justify-between gap-2">
 								<div className="text-xs font-medium text-muted-foreground">
-									Exercise prompts
+									{t("exercises.prompts")}
 								</div>
 								<button
 									type="button"
@@ -119,7 +128,7 @@ export function ExerciseSettings({
 									className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
 								>
 									<RotateCcw className="h-3 w-3" aria-hidden />
-									Reset defaults
+									{t("exercises.resetDefaults")}
 								</button>
 							</div>
 							<div className="space-y-2">
@@ -127,7 +136,7 @@ export function ExerciseSettings({
 									// biome-ignore lint/suspicious/noArrayIndexKey: editable prefs rows use index as identity
 									<div key={index} className="flex items-start gap-2">
 										<textarea
-											aria-label={`Exercise prompt ${index + 1}`}
+											aria-label={t("exercises.promptAria", { n: index + 1 })}
 											value={prompt}
 											rows={2}
 											onChange={(event) =>
@@ -137,7 +146,7 @@ export function ExerciseSettings({
 										/>
 										<button
 											type="button"
-											aria-label={`Remove exercise prompt ${index + 1}`}
+											aria-label={t("exercises.removeAria", { n: index + 1 })}
 											disabled={prompts.length <= 1}
 											onClick={() => removePrompt(index)}
 											className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
@@ -153,12 +162,12 @@ export function ExerciseSettings({
 								className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
 							>
 								<Plus className="h-3 w-3" aria-hidden />
-								Add prompt
+								{t("exercises.addPrompt")}
 							</button>
 						</div>
 
 						<div className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">
-							Exercise reminders will appear periodically
+							{t("exercises.hint")}
 						</div>
 					</div>
 				) : null}

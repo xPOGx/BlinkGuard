@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from "electron";
 import path from "node:path";
+import { resolveCatalog, resolvePopupMessage, t } from "../../../shared/i18n";
 import type { AppPreferences, Point, Size } from "../../../shared/preferences";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import { toRendererPreferences } from "../../../shared/preferences";
@@ -32,6 +33,14 @@ export class WindowManager {
 
 	setOnMainLoaded(handler: (() => void) | null): void {
 		this.onMainLoaded = handler;
+	}
+
+	private sendI18n(window: BrowserWindow): void {
+		const locale = this.preferences.locale === "uk" ? "uk" : "en";
+		window.webContents.send(IPC_CHANNELS.applyI18n, {
+			locale,
+			messages: resolveCatalog(locale),
+		});
 	}
 
 	createMain(
@@ -123,14 +132,17 @@ export class WindowManager {
 		this.reminder = popup;
 		void popup.loadFile(path.join(this.paths.publicDir, `${kind}.html`));
 		popup.webContents.on("did-finish-load", () => {
+			this.sendI18n(popup);
 			popup.webContents.send(
 				IPC_CHANNELS.updateColors,
 				this.preferences.popupColors,
 			);
 			if (kind === "blink") {
+				const locale =
+					this.preferences.locale === "uk" ? "uk" : "en";
 				popup.webContents.send(
 					IPC_CHANNELS.updateMessage,
-					this.preferences.popupMessage,
+					resolvePopupMessage(this.preferences.popupMessage, locale),
 				);
 				popup.webContents.send(
 					IPC_CHANNELS.cameraMode,
@@ -186,7 +198,10 @@ export class WindowManager {
 		}, this.paths.preload);
 		this.noFace = popup;
 		void popup.loadFile(path.join(this.paths.publicDir, "no-face.html"));
-		popup.webContents.on("did-finish-load", () => popup.setIgnoreMouseEvents(true));
+		popup.webContents.on("did-finish-load", () => {
+			this.sendI18n(popup);
+			popup.setIgnoreMouseEvents(true);
+		});
 		popup.once("ready-to-show", () => popup.showInactive());
 		popup.on("closed", () => {
 			if (this.noFace === popup) this.noFace = null;
@@ -225,9 +240,10 @@ export class WindowManager {
 		void popup.loadFile(
 			path.join(this.paths.publicDir, "blink-rate-coach.html"),
 		);
-		popup.webContents.on("did-finish-load", () =>
-			popup.setIgnoreMouseEvents(true),
-		);
+		popup.webContents.on("did-finish-load", () => {
+			this.sendI18n(popup);
+			popup.setIgnoreMouseEvents(true);
+		});
 		popup.once("ready-to-show", () => popup.showInactive());
 		popup.on("closed", () => {
 			if (this.blinkRateCoach === popup) this.blinkRateCoach = null;
@@ -272,6 +288,7 @@ export class WindowManager {
 		this.exercise = popup;
 		void popup.loadFile(path.join(this.paths.publicDir, "exercise.html"));
 		popup.webContents.on("did-finish-load", () => {
+			this.sendI18n(popup);
 			popup.webContents.send(IPC_CHANNELS.updateExercisePrompt, prompt);
 		});
 		popup.once("ready-to-show", () => popup.show());
@@ -310,6 +327,7 @@ export class WindowManager {
 				duration: String(Math.max(1, this.preferences.lookAwayDuration)),
 			},
 		});
+		popup.webContents.on("did-finish-load", () => this.sendI18n(popup));
 		popup.once("ready-to-show", () => popup.show());
 		popup.on("closed", () => {
 			if (this.lookAway === popup) this.lookAway = null;
@@ -334,10 +352,11 @@ export class WindowManager {
 			return this.camera;
 		}
 		const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+		const locale = this.preferences.locale === "uk" ? "uk" : "en";
 		const window = new BrowserWindow({
 			width: Math.min(640, width * 0.8),
 			height: Math.min(480, height * 0.8),
-			title: "Camera Visualization",
+			title: t(locale, "window.cameraTitle"),
 			webPreferences: {
 				nodeIntegration: false,
 				contextIsolation: true,
@@ -346,6 +365,7 @@ export class WindowManager {
 		});
 		this.camera = window;
 		void window.loadFile(path.join(this.paths.publicDir, "camera.html"));
+		window.webContents.on("did-finish-load", () => this.sendI18n(window));
 		window.on("close", onClosed);
 		window.on("closed", () => {
 			if (this.camera === window) this.camera = null;
@@ -384,6 +404,7 @@ export class WindowManager {
 		window.setOpacity(1 - this.preferences.popupColors.transparency);
 		void window.loadFile(path.join(this.paths.publicDir, "popup-editor.html"));
 		window.webContents.on("did-finish-load", () => {
+			this.sendI18n(window);
 			window.webContents.send(
 				IPC_CHANNELS.updateColors,
 				this.preferences.popupColors,

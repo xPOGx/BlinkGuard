@@ -1,4 +1,12 @@
 import { BLINK_RATE_LOW_MAX } from "./blink-rate";
+import {
+	defaultExercisePrompts,
+	defaultPopupMessage,
+	sanitizeLocale,
+	type Locale,
+} from "./i18n";
+
+export type { Locale };
 
 export interface Point {
 	x: number;
@@ -76,6 +84,8 @@ export interface PersistedPreferences {
 	pauseOnFullscreen: boolean;
 	/** First-run setup completed or skipped; false until Finish/Skip. */
 	hasCompletedOnboarding: boolean;
+	/** UI language for settings and popups. */
+	locale: Locale;
 }
 
 export type AppPreferences = PersistedPreferences;
@@ -84,23 +94,23 @@ export type RendererPreferences = Omit<AppPreferences, "reminderInterval"> & {
 	reminderInterval: number;
 };
 
-export const DEFAULT_EXERCISE_PROMPTS: readonly string[] = [
-	"Close your eyes and gently roll them in a circular motion for 10 seconds. Then reverse direction.",
-	"Close your eyes and look up and down slowly 5 times, then left and right 5 times.",
-	"Take a deep breath and yawn naturally a few times to help lubricate your eyes.",
-	"Take a break and look at something 20 feet away for 20 seconds.",
-];
+export const DEFAULT_EXERCISE_PROMPTS: readonly string[] =
+	defaultExercisePrompts("en");
 
 /** Coerce stored/IPC exercise prompts; never returns an empty list. */
-export function sanitizeExercisePrompts(input: unknown): string[] {
+export function sanitizeExercisePrompts(
+	input: unknown,
+	locale: Locale = "en",
+): string[] {
+	const fallback = defaultExercisePrompts(sanitizeLocale(locale));
 	if (!Array.isArray(input)) {
-		return [...DEFAULT_EXERCISE_PROMPTS];
+		return [...fallback];
 	}
 	const cleaned = input
 		.filter((item): item is string => typeof item === "string")
 		.map((item) => item.trim())
 		.filter((item) => item.length > 0);
-	return cleaned.length > 0 ? cleaned : [...DEFAULT_EXERCISE_PROMPTS];
+	return cleaned.length > 0 ? cleaned : [...fallback];
 }
 
 export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
@@ -124,7 +134,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 		text: "#F8FAFC",
 		transparency: 0.15,
 	},
-	popupMessage: "Blink!",
+	popupMessage: defaultPopupMessage("en"),
 	keyboardShortcut: "Ctrl+I",
 	mgdMode: false,
 	soundEnabled: false,
@@ -135,6 +145,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	quietHoursEnd: "08:00",
 	pauseOnFullscreen: true,
 	hasCompletedOnboarding: false,
+	locale: "en",
 };
 
 export function toRendererPreferences(

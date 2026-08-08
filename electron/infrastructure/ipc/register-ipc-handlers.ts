@@ -2,6 +2,13 @@ import { ipcMain } from "electron";
 import { isValidEarCalibration } from "../../../shared/ear-calibration";
 import { isCameraQuality } from "../../../shared/camera-quality";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
+import {
+	defaultExercisePrompts,
+	defaultPopupMessage,
+	isBuiltInExercisePrompts,
+	isBuiltInPopupMessage,
+	sanitizeLocale,
+} from "../../../shared/i18n";
 import type {
 	CameraQuality,
 	Point,
@@ -18,6 +25,7 @@ import { normalizeQuietHoursTime } from "../../domain/focus-policy";
 import { applyLaunchAtLogin } from "../lifecycle/login-item";
 import type { BlinkDetectorSidecar } from "../sidecar/blink-detector-sidecar";
 import type { ShortcutController } from "../shortcuts/shortcut-controller";
+import type { TrayController } from "../tray/tray-controller";
 import type { WindowManager } from "../windows/window-manager";
 
 interface IpcDependencies {
@@ -30,6 +38,7 @@ interface IpcDependencies {
 	windows: WindowManager;
 	blinkStats: BlinkStatsService;
 	focusPause: FocusPauseService;
+	tray?: TrayController;
 }
 
 export function registerIpcHandlers(deps: IpcDependencies): void {
@@ -43,6 +52,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		windows,
 		blinkStats,
 		focusPause,
+		tray,
 	} = deps;
 	const current = preferences.current;
 
@@ -240,6 +250,22 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 			preferences.set("blinkRateThresholdPerMin", threshold);
 		},
 	);
+	ipcMain.on(IPC_CHANNELS.updateLocale, (_event, value: string) => {
+		const locale = sanitizeLocale(value);
+		preferences.set("locale", locale);
+		if (isBuiltInPopupMessage(current.popupMessage)) {
+			preferences.set("popupMessage", defaultPopupMessage(locale));
+		}
+		if (isBuiltInExercisePrompts(current.exercisePrompts)) {
+			preferences.set("exercisePrompts", defaultExercisePrompts(locale));
+		}
+		tray?.rebuildMenu(locale);
+		blinkStats.invalidateCharts();
+		windows.sendPreferences();
+		if (blinkStats.isLivePushEnabled()) {
+			windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
+		}
+	});
 	ipcMain.on(IPC_CHANNELS.showCameraWindow, () => {
 		if (!current.cameraEnabled) {
 			preferences.set("cameraEnabled", true);

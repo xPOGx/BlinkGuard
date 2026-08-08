@@ -100,6 +100,26 @@ describe("PreferencesService", () => {
 		expect(service.current.cameraQuality).toBe("medium");
 	});
 
+	it("sanitizes invalid locale to en", () => {
+		const store = new FakePreferenceStore();
+		store.set("locale", "de");
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.locale).toBe("en");
+	});
+
+	it("persists a valid locale", () => {
+		const store = new FakePreferenceStore();
+		store.set("locale", "uk");
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.locale).toBe("uk");
+		service.set("locale", "en");
+		expect(service.current.locale).toBe("en");
+	});
+
 	it("sanitizes empty or invalid exercisePrompts on load", () => {
 		const store = new FakePreferenceStore();
 		store.set("exercisePrompts", []);

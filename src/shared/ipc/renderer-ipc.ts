@@ -103,6 +103,7 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateBlinkRateCoachingEnabled, enabled),
 	updateBlinkRateThreshold: (threshold: number) =>
 		send(IPC_CHANNELS.updateBlinkRateThreshold, threshold),
+	updateLocale: (locale: string) => send(IPC_CHANNELS.updateLocale, locale),
 	onFocusPauseState: (
 		listener: (payload: {
 			reason: "quiet-hours" | "fullscreen" | null;

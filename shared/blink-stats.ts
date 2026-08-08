@@ -1,3 +1,10 @@
+import {
+	monthLabels,
+	t,
+	weekdayLabels,
+	type Locale,
+} from "./i18n";
+
 export const BLINK_STATS_RETENTION_DAYS = 366;
 export const BLINK_STATS_STORE_KEY = "state";
 
@@ -215,10 +222,12 @@ export function toDayChart(
 export function toWeekChart(
 	state: BlinkStatsState,
 	today: string = localDateKey(),
+	locale: Locale = "en",
 ): ChartBucket[] {
 	const byDate = new Map(state.days.map((day) => [day.date, day.blinks]));
 	const monday = startOfWeekMonday(today);
-	return WEEKDAY_LABELS_MON_SUN.map((label, offset) => {
+	const labels = weekdayLabels(locale);
+	return labels.map((label, offset) => {
 		const date = shiftDateKey(monday, offset);
 		return {
 			label,
@@ -248,6 +257,7 @@ export function toMonthChart(
 export function toYearChart(
 	state: BlinkStatsState,
 	today: string = localDateKey(),
+	locale: Locale = "en",
 ): ChartBucket[] {
 	const year = today.slice(0, 4);
 	const monthly = Array.from({ length: 12 }, () => 0);
@@ -258,7 +268,8 @@ export function toYearChart(
 			monthly[month - 1] += day.blinks;
 		}
 	}
-	return MONTH_LABELS_UA.map((label, index) => ({
+	const labels = monthLabels(locale);
+	return labels.map((label, index) => ({
 		label,
 		value: monthly[index] ?? 0,
 	}));
@@ -286,27 +297,31 @@ export function toBlinkStatsSnapshot(
 	blinksPerMinute = 0,
 	blinkRateReady = false,
 	blinkRateWarmupMs = 0,
+	locale: Locale = "en",
 ): BlinkStatsSnapshot {
 	const today = localDateKey(now);
 	return {
 		today: todaySummary(state, today),
 		totals: totalsSummary(state),
 		dayChart: toDayChart(state, today),
-		weekChart: toWeekChart(state, today),
+		weekChart: toWeekChart(state, today, locale),
 		monthChart: toMonthChart(state, today),
-		yearChart: toYearChart(state, today),
+		yearChart: toYearChart(state, today, locale),
 		blinksPerMinute,
 		blinkRateReady,
 		blinkRateWarmupMs,
 	};
 }
 
-export function formatTrackingDuration(ms: number): string {
+export function formatTrackingDuration(
+	ms: number,
+	locale: Locale = "en",
+): string {
 	const totalMinutes = Math.floor(Math.max(0, ms) / 60_000);
 	const hours = Math.floor(totalMinutes / 60);
 	const minutes = totalMinutes % 60;
-	if (hours <= 0) return `${minutes}m`;
-	return `${hours}h ${minutes}m`;
+	if (hours <= 0) return t(locale, "stats.duration.minutes", { m: minutes });
+	return t(locale, "stats.duration.hoursMinutes", { h: hours, m: minutes });
 }
 
 export function shiftDateKey(dateKey: string, dayOffset: number): string {
@@ -331,31 +346,6 @@ export function daysInCalendarMonth(dateKey: string): number {
 	const [year, month] = dateKey.split("-").map(Number);
 	return new Date(year, month, 0).getDate();
 }
-
-const WEEKDAY_LABELS_MON_SUN = [
-	"Пн",
-	"Вт",
-	"Ср",
-	"Чт",
-	"Пт",
-	"Сб",
-	"Нд",
-] as const;
-
-const MONTH_LABELS_UA = [
-	"Січ",
-	"Лют",
-	"Бер",
-	"Кві",
-	"Тра",
-	"Чер",
-	"Лип",
-	"Сер",
-	"Вер",
-	"Жов",
-	"Лис",
-	"Гру",
-] as const;
 
 function nonNegativeInt(value: unknown): number | null {
 	if (typeof value !== "number" || !Number.isFinite(value)) return null;

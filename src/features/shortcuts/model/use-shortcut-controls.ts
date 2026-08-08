@@ -1,7 +1,8 @@
+import { useCallback, useEffect, useState } from "react";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
-import { useCallback, useEffect, useState } from "react";
+import { t } from "../../../../shared/i18n";
 
 interface ShortcutControlsInput {
 	preferences: SettingsPreferences;
@@ -17,33 +18,30 @@ export function useShortcutControls({
 	const [isRecording, setIsRecording] = useState(false);
 	const [temporaryShortcut, setTemporaryShortcut] = useState("");
 	const [error, setError] = useState("");
+	const locale = preferences.locale;
 
 	useEffect(
 		() =>
 			rendererIpc.onShortcutError((shortcut) => {
 				if (shortcut) {
-					setError(
-						`Invalid shortcut: ${shortcut}. Please use only ASCII characters and valid combinations.`,
-					);
+					setError(t(locale, "shortcut.invalid", { shortcut }));
 					setIsRecording(true);
 				} else {
 					setError("");
 				}
 			}),
-		[],
+		[locale],
 	);
 
 	const save = useCallback(() => {
 		if (
 			[...temporaryShortcut].some((character) => character.charCodeAt(0) > 127)
 		) {
-			setError("Shortcut must only contain ASCII characters.");
+			setError(t(locale, "shortcut.asciiOnly"));
 			return;
 		}
 		if (temporaryShortcut.split("+").length < 2) {
-			setError(
-				"Please use at least one modifier key (Ctrl, Shift, Alt) and one regular key",
-			);
+			setError(t(locale, "shortcut.needModifier"));
 			return;
 		}
 		setPreferences((current) => ({
@@ -53,7 +51,7 @@ export function useShortcutControls({
 		setIsRecording(false);
 		setError("");
 		rendererIpc.updateKeyboardShortcut(temporaryShortcut);
-	}, [setPreferences, temporaryShortcut]);
+	}, [locale, setPreferences, temporaryShortcut]);
 
 	const cancel = useCallback(() => {
 		setIsRecording(false);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/button";
 import { SettingPanel, SettingRow } from "@/features/settings/ui/setting-panel";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import {
 	type BlinkStatsSnapshot,
@@ -11,28 +12,6 @@ import { LiveBlinkRate } from "./live-blink-rate";
 import { StatsBarChart } from "./stats-bar-chart";
 
 type ChartRange = "today" | "week" | "month" | "year";
-
-const CHART_COPY: Record<
-	ChartRange,
-	{ description: string; ariaLabel: string }
-> = {
-	today: {
-		description: "Blinks per hour for today.",
-		ariaLabel: "Blinks per hour today",
-	},
-	week: {
-		description: "Blinks per day this week (Пн–Нд).",
-		ariaLabel: "Blinks per day Monday through Sunday",
-	},
-	month: {
-		description: "Blinks per day this calendar month.",
-		ariaLabel: "Blinks per day this month",
-	},
-	year: {
-		description: "Blinks per month this year (Січ–Гру).",
-		ariaLabel: "Blinks per month January through December",
-	},
-};
 
 function chartBuckets(range: ChartRange, snapshot: BlinkStatsSnapshot) {
 	switch (range) {
@@ -48,34 +27,64 @@ function chartBuckets(range: ChartRange, snapshot: BlinkStatsSnapshot) {
 }
 
 export function StatisticsPanel() {
+	const { t, locale } = useI18n();
 	const { snapshot, clearStatistics } = useBlinkStats();
 	const [range, setRange] = useState<ChartRange>("today");
 	const { today, totals } = snapshot;
 	const buckets = chartBuckets(range, snapshot);
+	const chartCopy: Record<
+		ChartRange,
+		{ description: string; ariaLabel: string }
+	> = {
+		today: {
+			description: t("stats.chart.today.desc"),
+			ariaLabel: t("stats.chart.today.aria"),
+		},
+		week: {
+			description: t("stats.chart.week.desc"),
+			ariaLabel: t("stats.chart.week.aria"),
+		},
+		month: {
+			description: t("stats.chart.month.desc"),
+			ariaLabel: t("stats.chart.month.aria"),
+		},
+		year: {
+			description: t("stats.chart.year.desc"),
+			ariaLabel: t("stats.chart.year.aria"),
+		},
+	};
 
 	return (
 		<>
 			<SettingPanel>
 				<SettingRow
-					title="Totals"
-					description="Lifetime credited blinks. Available balance is reserved for future rewards."
+					title={t("stats.totals")}
+					description={t("stats.totalsDesc")}
 				>
 					<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-						<SummaryStat label="Total" value={String(totals.total)} />
-						<SummaryStat label="Available" value={String(totals.available)} />
-						<SummaryStat label="Spent" value={String(totals.spent)} />
+						<SummaryStat
+							label={t("stats.total")}
+							value={String(totals.total)}
+						/>
+						<SummaryStat
+							label={t("stats.available")}
+							value={String(totals.available)}
+						/>
+						<SummaryStat
+							label={t("stats.spent")}
+							value={String(totals.spent)}
+						/>
 					</div>
 					<p className="mt-3 text-xs text-muted-foreground">
-						Spending is not enabled yet — balance is tracked so rewards can
-						deduct from Available later.
+						{t("stats.spendingNote")}
 					</p>
 				</SettingRow>
 			</SettingPanel>
 
 			<SettingPanel>
 				<SettingRow
-					title="Live blink rate"
-					description="Credited blinks over the last minute while tracking is active. The first minute is a warmup."
+					title={t("stats.liveRate")}
+					description={t("stats.liveRateDesc")}
 				>
 					<LiveBlinkRate
 						blinksPerMinute={snapshot.blinksPerMinute}
@@ -86,17 +95,20 @@ export function StatisticsPanel() {
 			</SettingPanel>
 
 			<SettingPanel>
-				<SettingRow
-					title="Today"
-					description="Credited blinks, tracking time, and start/stop sessions for the local day."
-				>
+				<SettingRow title={t("stats.today")} description={t("stats.todayDesc")}>
 					<div className="grid grid-cols-3 gap-3">
-						<SummaryStat label="Blinks" value={String(today.blinks)} />
 						<SummaryStat
-							label="Tracking"
-							value={formatTrackingDuration(today.trackingMs)}
+							label={t("stats.blinks")}
+							value={String(today.blinks)}
 						/>
-						<SummaryStat label="Sessions" value={String(today.sessions)} />
+						<SummaryStat
+							label={t("stats.tracking")}
+							value={formatTrackingDuration(today.trackingMs, locale)}
+						/>
+						<SummaryStat
+							label={t("stats.sessions")}
+							value={String(today.sessions)}
+						/>
 					</div>
 				</SettingRow>
 			</SettingPanel>
@@ -104,18 +116,20 @@ export function StatisticsPanel() {
 			<SettingPanel>
 				<div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<div>
-						<p className="text-sm font-medium text-foreground">Blink chart</p>
+						<p className="text-sm font-medium text-foreground">
+							{t("stats.chart")}
+						</p>
 						<p className="text-xs text-muted-foreground sm:text-sm">
-							{CHART_COPY[range].description}
+							{chartCopy[range].description}
 						</p>
 					</div>
 					<div className="inline-flex shrink-0 flex-wrap rounded-md border border-border p-0.5">
 						{(
 							[
-								["today", "Today"],
-								["week", "Week"],
-								["month", "Month"],
-								["year", "Year"],
+								["today", t("stats.today")],
+								["week", t("stats.week")],
+								["month", t("stats.month")],
+								["year", t("stats.year")],
 							] as const
 						).map(([id, label]) => (
 							<RangeButton
@@ -130,13 +144,13 @@ export function StatisticsPanel() {
 				</div>
 				<StatsBarChart
 					buckets={buckets}
-					ariaLabel={CHART_COPY[range].ariaLabel}
+					ariaLabel={chartCopy[range].ariaLabel}
 				/>
 			</SettingPanel>
 
 			<SettingPanel className="flex items-center justify-center">
 				<Button type="button" variant="destructive" onClick={clearStatistics}>
-					Clear statistics
+					{t("stats.clear")}
 				</Button>
 			</SettingPanel>
 		</>

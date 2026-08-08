@@ -191,4 +191,17 @@ describe("settings shell", () => {
 			"Ctrl+K",
 		);
 	});
+
+	it("switches language and updates React UI immediately", () => {
+		render(<App />);
+		hydratePreferences({ hasCompletedOnboarding: true, locale: "en" });
+
+		fireEvent.click(screen.getByRole("button", { name: "System" }));
+		const select = screen.getByLabelText("Select language");
+		fireEvent.change(select, { target: { value: "uk" } });
+
+		expect(screen.getByRole("button", { name: "Система" })).toBeDefined();
+		expect(screen.getByText("Мова")).toBeDefined();
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "uk");
+	});
 });

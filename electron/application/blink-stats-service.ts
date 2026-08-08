@@ -18,6 +18,7 @@ import {
 	toBlinkStatsSnapshot,
 	totalsSummary,
 } from "../../shared/blink-stats";
+import type { Locale } from "../../shared/i18n";
 import type { PreferenceStore } from "./ports/preference-store";
 
 const TRACKING_FLUSH_MS = 15_000;
@@ -47,12 +48,22 @@ export class BlinkStatsService {
 		BlinkStatsSnapshot,
 		"dayChart" | "weekChart" | "monthChart" | "yearChart"
 	> | null = null;
+	private cachedLocale: Locale | null = null;
 
-	constructor(private readonly store: PreferenceStore) {
+	constructor(
+		private readonly store: PreferenceStore,
+		private readonly getLocale: () => Locale = () => "en",
+	) {
 		this.state = normalizeBlinkStatsState(
 			this.store.get(BLINK_STATS_STORE_KEY, DEFAULT_BLINK_STATS),
 		);
 		this.persist();
+	}
+
+	invalidateCharts(): void {
+		this.chartsDirty = true;
+		this.cachedCharts = null;
+		this.cachedLocale = null;
 	}
 
 	setPushHandler(handler: (snapshot: BlinkStatsSnapshot) => void): void {
@@ -90,14 +101,20 @@ export class BlinkStatsService {
 			? computeBlinksPerMinute(this.blinkTimestamps, nowMs)
 			: 0;
 		const today = localDateKey(now);
+		const locale = this.getLocale();
 
-		if (this.chartsDirty || !this.cachedCharts) {
+		if (
+			this.chartsDirty ||
+			!this.cachedCharts ||
+			this.cachedLocale !== locale
+		) {
 			const full = toBlinkStatsSnapshot(
 				this.state,
 				now,
 				blinksPerMinute,
 				ready,
 				warmupMs,
+				locale,
 			);
 			this.cachedCharts = {
 				dayChart: full.dayChart,
@@ -106,6 +123,7 @@ export class BlinkStatsService {
 				yearChart: full.yearChart,
 			};
 			this.chartsDirty = false;
+			this.cachedLocale = locale;
 			return full;
 		}
 

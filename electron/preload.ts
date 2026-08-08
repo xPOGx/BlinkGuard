@@ -69,6 +69,9 @@ contextBridge.exposeInMainWorld('popupAPI', {
   onUpdateExercisePrompt: (callback: (prompt: string) => void) => {
     ipcRenderer.on(IPC_CHANNELS.updateExercisePrompt, (_event, prompt) => callback(prompt));
   },
+  onApplyI18n: (callback: (payload: { locale: string; messages: Record<string, string> }) => void) => {
+    ipcRenderer.on(IPC_CHANNELS.applyI18n, (_event, payload) => callback(payload));
+  },
   skipExercise: () => {
     ipcRenderer.send(IPC_CHANNELS.skipExercise);
   },
@@ -119,6 +122,7 @@ declare global {
       onThresholdUpdated: (callback: (threshold: number) => void) => void;
       requestVideoStream: () => void;
       onUpdateExercisePrompt: (callback: (prompt: string) => void) => void;
+      onApplyI18n: (callback: (payload: { locale: string; messages: Record<string, string> }) => void) => void;
       skipExercise: () => void;
       snoozeExercise: () => void;
       skipLookAway: () => void;

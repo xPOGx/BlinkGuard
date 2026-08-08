@@ -108,6 +108,8 @@ describe("blink-stats helpers", () => {
 		});
 		expect(formatTrackingDuration(90_000)).toBe("1m");
 		expect(formatTrackingDuration(3_660_000)).toBe("1h 1m");
+		expect(formatTrackingDuration(90_000, "uk")).toBe("1хв");
+		expect(formatTrackingDuration(3_660_000, "uk")).toBe("1год 1хв");
 	});
 
 	it("builds a Mon–Sun week chart with gaps filled as zero", () => {
@@ -119,6 +121,18 @@ describe("blink-stats helpers", () => {
 		state = recordBlink(state, new Date(2026, 7, 5, 10, 0, 0));
 		const week = toWeekChart(state, today);
 		expect(week.map((bucket) => bucket.label)).toEqual([
+			"Mon",
+			"Tue",
+			"Wed",
+			"Thu",
+			"Fri",
+			"Sat",
+			"Sun",
+		]);
+		expect(week.map((bucket) => bucket.value)).toEqual([0, 0, 1, 0, 1, 0, 0]);
+
+		const weekUk = toWeekChart(state, today, "uk");
+		expect(weekUk.map((bucket) => bucket.label)).toEqual([
 			"Пн",
 			"Вт",
 			"Ср",
@@ -127,7 +141,6 @@ describe("blink-stats helpers", () => {
 			"Сб",
 			"Нд",
 		]);
-		expect(week.map((bucket) => bucket.value)).toEqual([0, 0, 1, 0, 1, 0, 0]);
 	});
 
 	it("builds a year chart with monthly blink totals", () => {
@@ -140,24 +153,28 @@ describe("blink-stats helpers", () => {
 		]);
 		const year = toYearChart(state, today);
 		expect(year.map((bucket) => bucket.label)).toEqual([
-			"Січ",
-			"Лют",
-			"Бер",
-			"Кві",
-			"Тра",
-			"Чер",
-			"Лип",
-			"Сер",
-			"Вер",
-			"Жов",
-			"Лис",
-			"Гру",
+			"Jan",
+			"Feb",
+			"Mar",
+			"Apr",
+			"May",
+			"Jun",
+			"Jul",
+			"Aug",
+			"Sep",
+			"Oct",
+			"Nov",
+			"Dec",
 		]);
 		expect(year[0]?.value).toBe(5);
 		expect(year[7]?.value).toBe(4);
 		expect(year.map((bucket) => bucket.value)).toEqual([
 			5, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0,
 		]);
+
+		const yearUk = toYearChart(state, today, "uk");
+		expect(yearUk.map((bucket) => bucket.label)[0]).toBe("Січ");
+		expect(yearUk.map((bucket) => bucket.label)[7]).toBe("Сер");
 	});
 
 	it("builds a month chart with one bar per calendar day", () => {

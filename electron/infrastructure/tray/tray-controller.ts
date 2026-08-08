@@ -1,5 +1,6 @@
 import { Menu, Tray, nativeImage } from "electron";
 import path from "node:path";
+import { t, type Locale } from "../../../shared/i18n";
 import type { AppPaths } from "../paths/app-paths";
 import type { WindowManager } from "../windows/window-manager";
 
@@ -10,6 +11,7 @@ export class TrayController {
 		private readonly paths: AppPaths,
 		private readonly windows: WindowManager,
 		private readonly onQuit: () => void,
+		private readonly getLocale: () => Locale = () => "en",
 	) {}
 
 	create(): void {
@@ -17,21 +19,26 @@ export class TrayController {
 		const icon = this.loadIcon();
 		this.tray = new Tray(icon);
 		this.tray.setToolTip("BlinkGuard");
+		this.rebuildMenu(this.getLocale());
+		this.tray.on("click", () => this.windows.showMain());
+		this.tray.on("double-click", () => this.windows.showMain());
+	}
+
+	rebuildMenu(locale: Locale = this.getLocale()): void {
+		if (!this.tray) return;
 		this.tray.setContextMenu(
 			Menu.buildFromTemplate([
 				{
-					label: "Show BlinkGuard",
+					label: t(locale, "tray.show"),
 					click: () => this.windows.showMain(),
 				},
 				{ type: "separator" },
 				{
-					label: "Quit",
+					label: t(locale, "tray.quit"),
 					click: () => this.onQuit(),
 				},
 			]),
 		);
-		this.tray.on("click", () => this.windows.showMain());
-		this.tray.on("double-click", () => this.windows.showMain());
 	}
 
 	destroy(): void {

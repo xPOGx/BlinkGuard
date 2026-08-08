@@ -22,6 +22,7 @@ import { ReminderControls } from "@/features/reminders/ui/reminder-controls";
 import { usePreferences } from "@/features/settings/model/use-preferences";
 import {
 	DarkModeToggle,
+	LanguageSettings,
 	LaunchAtLoginSettings,
 	QuietHoursFocusSettings,
 	ResetPreferencesButton,
@@ -32,6 +33,7 @@ import { TrackingEyeButton } from "@/features/settings/ui/tracking-eye-button";
 import { useShortcutControls } from "@/features/shortcuts/model/use-shortcut-controls";
 import { ShortcutSettings } from "@/features/shortcuts/ui/shortcut-settings";
 import { StatisticsPanel } from "@/features/statistics/ui/statistics-panel";
+import { I18nProvider, useT } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 type SectionId =
@@ -41,50 +43,6 @@ type SectionId =
 	| "appearance"
 	| "statistics"
 	| "system";
-
-const SECTIONS: {
-	id: SectionId;
-	label: string;
-	description: string;
-	icon: typeof Timer;
-}[] = [
-	{
-		id: "reminders",
-		label: "Reminders",
-		description: "Interval and start/stop controls for blink reminders.",
-		icon: Timer,
-	},
-	{
-		id: "camera",
-		label: "Camera",
-		description: "Detection, quality, calibration, and MGD mode.",
-		icon: Camera,
-	},
-	{
-		id: "exercises",
-		label: "Eye care",
-		description: "Exercises and 20-20-20 look-away breaks.",
-		icon: Dumbbell,
-	},
-	{
-		id: "appearance",
-		label: "Appearance",
-		description: "Popup message, colors, size, and notification sound.",
-		icon: Palette,
-	},
-	{
-		id: "statistics",
-		label: "Statistics",
-		description: "Local blink counts, tracking time, and day/week charts.",
-		icon: BarChart3,
-	},
-	{
-		id: "system",
-		label: "System",
-		description: "Shortcut, launch at login, and reset.",
-		icon: Keyboard,
-	},
-];
 
 export default function BlinkGuardHomepage() {
 	const {
@@ -100,8 +58,85 @@ export default function BlinkGuardHomepage() {
 		setPreferences,
 		toggleTracking,
 	});
+
+	return (
+		<I18nProvider locale={preferences.locale}>
+			<SettingsShell
+				preferences={preferences}
+				setPreferences={setPreferences}
+				prefsHydrated={prefsHydrated}
+				toggleTracking={toggleTracking}
+				changeReminderInterval={changeReminderInterval}
+				camera={camera}
+				shortcuts={shortcuts}
+			/>
+		</I18nProvider>
+	);
+}
+
+function SettingsShell({
+	preferences,
+	setPreferences,
+	prefsHydrated,
+	toggleTracking,
+	changeReminderInterval,
+	camera,
+	shortcuts,
+}: {
+	preferences: ReturnType<typeof usePreferences>["preferences"];
+	setPreferences: ReturnType<typeof usePreferences>["setPreferences"];
+	prefsHydrated: boolean;
+	toggleTracking: () => void;
+	changeReminderInterval: (seconds: number) => void;
+	camera: ReturnType<typeof useCameraStatus>;
+	shortcuts: ReturnType<typeof useShortcutControls>;
+}) {
+	const t = useT();
 	const [section, setSection] = useState<SectionId>("reminders");
-	const active = SECTIONS.find((item) => item.id === section) ?? SECTIONS[0];
+	const sections: {
+		id: SectionId;
+		label: string;
+		description: string;
+		icon: typeof Timer;
+	}[] = [
+		{
+			id: "reminders",
+			label: t("app.section.reminders"),
+			description: t("app.section.reminders.desc"),
+			icon: Timer,
+		},
+		{
+			id: "camera",
+			label: t("app.section.camera"),
+			description: t("app.section.camera.desc"),
+			icon: Camera,
+		},
+		{
+			id: "exercises",
+			label: t("app.section.exercises"),
+			description: t("app.section.exercises.desc"),
+			icon: Dumbbell,
+		},
+		{
+			id: "appearance",
+			label: t("app.section.appearance"),
+			description: t("app.section.appearance.desc"),
+			icon: Palette,
+		},
+		{
+			id: "statistics",
+			label: t("app.section.statistics"),
+			description: t("app.section.statistics.desc"),
+			icon: BarChart3,
+		},
+		{
+			id: "system",
+			label: t("app.section.system"),
+			description: t("app.section.system.desc"),
+			icon: Keyboard,
+		},
+	];
+	const active = sections.find((item) => item.id === section) ?? sections[0];
 	const showOnboarding = prefsHydrated && !preferences.hasCompletedOnboarding;
 
 	useEffect(() => {
@@ -129,16 +164,16 @@ export default function BlinkGuardHomepage() {
 							BlinkGuard
 						</h1>
 						<p className="hidden text-xs text-muted-foreground min-[721px]:block">
-							Eye care settings
+							{t("app.tagline")}
 						</p>
 					</div>
 				</div>
 
 				<nav
-					aria-label="Settings sections"
+					aria-label={t("app.navAria")}
 					className="flex gap-1 overflow-x-auto px-3 pb-3 min-[721px]:flex-1 min-[721px]:flex-col min-[721px]:overflow-visible min-[721px]:px-3 min-[721px]:pb-0"
 				>
-					{SECTIONS.map((item) => {
+					{sections.map((item) => {
 						const Icon = item.icon;
 						const selected = item.id === section;
 						return (
@@ -256,6 +291,10 @@ export default function BlinkGuardHomepage() {
 									onCancel={shortcuts.cancel}
 								/>
 								<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+									<LanguageSettings
+										preferences={preferences}
+										setPreferences={setPreferences}
+									/>
 									<LaunchAtLoginSettings
 										preferences={preferences}
 										setPreferences={setPreferences}

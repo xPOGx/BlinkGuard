@@ -1,3 +1,4 @@
+import { resolveExercisePrompts } from "../../shared/i18n";
 import {
 	sanitizeExercisePrompts,
 	type AppPreferences,
@@ -72,7 +73,11 @@ export class ExerciseService {
 		this.state.isExerciseShowing = true;
 		this.store.set("lastExerciseTime", Date.now());
 
-		const prompts = sanitizeExercisePrompts(this.preferences.exercisePrompts);
+		const locale = this.preferences.locale === "uk" ? "uk" : "en";
+		const prompts = resolveExercisePrompts(
+			sanitizeExercisePrompts(this.preferences.exercisePrompts, locale),
+			locale,
+		);
 		const rawIndex = this.store.get("exercisePromptIndex", 0);
 		const index =
 			(typeof rawIndex === "number" && Number.isFinite(rawIndex)
