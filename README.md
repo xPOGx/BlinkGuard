@@ -24,6 +24,16 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 - **In-app updates (Windows & macOS)** — checks GitHub Releases for this repo
 - **Cross-platform packaging** — Windows and macOS (Electron Builder)
 
+## Screenshots
+
+![Reminders settings](docs/screenshots/settings-reminders.png)
+
+![Camera settings](docs/screenshots/settings-camera.png)
+
+![Blink reminder popup](docs/screenshots/popup-blink.png)
+
+![Exercise reminder popup](docs/screenshots/popup-exercise.png)
+
 ## Technology stack
 
 | Area | Stack |
