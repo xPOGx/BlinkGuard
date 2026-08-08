@@ -30,6 +30,7 @@ interface SidecarCallbacks {
 		elapsedMs: number;
 		sampleCount: number;
 		durationMs: number;
+		faceDetected: boolean;
 	}) => void;
 	onCalibrationComplete?: (payload: {
 		baseline: number | null;
@@ -57,6 +58,7 @@ export class BlinkDetectorSidecar {
 	private calibrationTimer: ReturnType<typeof setTimeout> | null = null;
 	private calibrationProgressTimer: ReturnType<typeof setInterval> | null =
 		null;
+	private calibrationFaceDetected = false;
 
 	constructor(
 		private readonly paths: AppPaths,
@@ -203,6 +205,7 @@ export class BlinkDetectorSidecar {
 
 		this.calibrationActive = true;
 		this.calibrationSamples = [];
+		this.calibrationFaceDetected = false;
 		this.calibrationStartedAt = Date.now();
 		this.calibrationDurationMs = durationMs;
 
@@ -212,6 +215,7 @@ export class BlinkDetectorSidecar {
 				elapsedMs: Date.now() - this.calibrationStartedAt,
 				sampleCount: this.calibrationSamples.length,
 				durationMs: this.calibrationDurationMs,
+				faceDetected: this.calibrationFaceDetected,
 			});
 		}, 250);
 
@@ -223,6 +227,7 @@ export class BlinkDetectorSidecar {
 			elapsedMs: 0,
 			sampleCount: 0,
 			durationMs,
+			faceDetected: false,
 		});
 		return true;
 	}
@@ -274,6 +279,7 @@ export class BlinkDetectorSidecar {
 
 	private sampleFaceDataForCalibration(data: FaceDataSample): void {
 		if (!this.calibrationActive) return;
+		this.calibrationFaceDetected = Boolean(data.faceDetected);
 		if (!data.faceDetected) return;
 		if (data.blink) return;
 		if (data.blink_phase === "start" || data.blink_phase === "complete") {

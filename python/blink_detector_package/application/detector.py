@@ -7,8 +7,12 @@ import cv2
 from blink_detector_package.domain import (
 	BLINK_DISPLAY_DURATION,
 	DEFAULT_POSE_STRICTNESS,
+	MIN_FACE_AREA_PX,
+	MIN_INTEROCULAR_PX,
 	BlinkDetectionState,
 	estimate_head_pose,
+	face_bbox_area,
+	interocular_distance_px,
 	select_largest_face,
 )
 from blink_detector_package.domain.ear import calculate_ear_fast
@@ -181,10 +185,15 @@ class BlinkDetectorApplication:
 				)
 
 	def _resolve_face(self, detector, gray):
-		"""Run HOG face detect on interval; otherwise reuse largest bbox."""
+		"""Run HOG face detect on interval; otherwise reuse largest bbox.
+
+		While a blink candidate is active, re-detect every frame so a stale
+		bbox (performance face_detect_interval>1) cannot poison mid-blink EAR.
+		"""
 		should_detect = (
 			self._cached_face is None
 			or self._frames_since_face_detect >= self.face_detect_interval
+			or self.detection.blink_in_progress
 		)
 		if should_detect:
 			faces = detector(gray, 0)
@@ -195,6 +204,46 @@ class BlinkDetectorApplication:
 
 		self._frames_since_face_detect += 1
 		return self._cached_face
+
+	def _face_quality_ok(self, face, landmarks):
+		"""Reject tiny / junk faces before EAR (symmetric noise bypasses asymmetry)."""
+		area = face_bbox_area(face) if face is not None else 0
+		interocular = interocular_distance_px(landmarks)
+		ok = area >= MIN_FACE_AREA_PX and interocular >= MIN_INTEROCULAR_PX
+		return ok, area, interocular
+
+	def _emit_face_lost(self, current_time, had_candidate):
+		"""Emit skip_face_lost only when an in-progress candidate was cancelled."""
+		if not had_candidate:
+			return
+		self._last_skip_debug_time = current_time
+		self._emit_blink_outcome(
+			{
+				"phase": "skip_face_lost",
+				"baseline": self.detection.current_baseline_ear,
+				"drop": 0.0,
+				"ear": 0.0,
+				"ear_raw": 0.0,
+				"ear_smooth": 0.0,
+				"peak_velocity": 0.0,
+				"peak_velocity_raw": 0.0,
+				"peak_velocity_effective": 0.0,
+				"peak_opening_velocity": 0.0,
+				"closed_frames": 0,
+				"min_velocity": 0.0,
+				"duration": 0.0,
+				"cooldown_remaining": 0.0,
+				"absolute_drop": 0.0,
+				"yaw": 0.0,
+				"pitch": 0.0,
+				"pitch_delta": 0.0,
+				"look_down": False,
+				"pose_strictness": self.pose_strictness,
+				"resting_pitch": self.detection.resting_pitch,
+			},
+			face=None,
+			credited=False,
+		)
 
 	def _blink_debug_payload(self, blink_info, face=None, credited=False):
 		"""Structured + human-readable blink debug for tuning."""
@@ -253,6 +302,8 @@ class BlinkDetectorApplication:
 				or blink_info.get("velocity")
 				or 0.0
 			),
+			"peak_velocity_raw": _opt_float("peak_velocity_raw"),
+			"peak_velocity_effective": _opt_float("peak_velocity_effective"),
 			"peak_opening_velocity": float(
 				blink_info.get("peak_opening_velocity") or 0.0
 			),
@@ -266,7 +317,12 @@ class BlinkDetectorApplication:
 			"require_bilateral": bool(
 				blink_info.get("require_bilateral", False)
 			),
-			"face_area": face_area,
+			"face_area": (
+				int(blink_info["face_area"])
+				if blink_info.get("face_area") is not None
+				else face_area
+			),
+			"interocular": _opt_float("interocular"),
 			"target_fps": int(self.camera.target_fps),
 			"face_detect_interval": int(self.face_detect_interval),
 			"processing_resolution": list(self.camera.processing_resolution),
@@ -401,8 +457,9 @@ class BlinkDetectorApplication:
 			"skip_eyes_closed",
 			"skip_await_open",
 			"skip_cooldown",
+			"skip_face_quality",
 		):
-			# Rate-limit continuous skip spam while pose is bad.
+			# Rate-limit continuous skip spam while pose / quality is bad.
 			if current_time - self._last_skip_debug_time >= 0.5:
 				self._last_skip_debug_time = current_time
 				debug_payload = self._emit_blink_outcome(
@@ -413,7 +470,7 @@ class BlinkDetectorApplication:
 						"right_ear": right_ear,
 						"pose_strictness": self.pose_strictness,
 						"resting_pitch": self.detection.resting_pitch,
-						"look_down": False,
+						"look_down": blink_info.get("look_down", False),
 						"min_velocity": 0.0,
 						"duration": 0.0,
 						"cooldown_remaining": 0.0,
@@ -552,37 +609,70 @@ class BlinkDetectorApplication:
 					)
 
 				if face is not None and left_eye is not None:
-					left_ear = calculate_ear_fast(left_eye, buffers)
-					right_ear = calculate_ear_fast(right_eye, buffers)
-					avg_ear = (left_ear + right_ear) * 0.5
-					pose = estimate_head_pose(landmarks)
-					face_data["faceDetected"] = True
-					face_data["ear"] = float(avg_ear)
-					face_data["faceRect"] = {
-						"x": float(face.left() / frame_width),
-						"y": float(face.top() / frame_height),
-						"width": float(face.width() / frame_width),
-						"height": float(face.height() / frame_height),
-					}
-					self._fill_eye_landmarks_ui(
-						face_data,
-						left_eye,
-						right_eye,
-						buffers,
-						frame_width,
-						frame_height,
-					)
-					self._handle_detection(
-						face_data,
-						avg_ear,
-						current_time,
-						left_ear,
-						right_ear,
-						pose,
+					quality_ok, face_area, interocular = self._face_quality_ok(
 						face,
+						landmarks,
 					)
+					if not quality_ok:
+						if self.detection.blink_in_progress:
+							self.detection.cancel_on_face_lost()
+						face_data["faceDetected"] = False
+						if current_time - self._last_skip_debug_time >= 0.5:
+							self._last_skip_debug_time = current_time
+							self._emit_blink_outcome(
+								{
+									"phase": "skip_face_quality",
+									"baseline": self.detection.current_baseline_ear,
+									"drop": 0.0,
+									"ear": 0.0,
+									"face_area": face_area,
+									"interocular": interocular,
+									"look_down": False,
+									"pose_strictness": self.pose_strictness,
+									"resting_pitch": self.detection.resting_pitch,
+									"min_velocity": 0.0,
+									"duration": 0.0,
+									"cooldown_remaining": 0.0,
+									"absolute_drop": 0.0,
+								},
+								face=face,
+								credited=False,
+							)
+						self._cached_face = None
+					else:
+						left_ear = calculate_ear_fast(left_eye, buffers)
+						right_ear = calculate_ear_fast(right_eye, buffers)
+						avg_ear = (left_ear + right_ear) * 0.5
+						pose = estimate_head_pose(landmarks)
+						face_data["faceDetected"] = True
+						face_data["ear"] = float(avg_ear)
+						face_data["faceRect"] = {
+							"x": float(face.left() / frame_width),
+							"y": float(face.top() / frame_height),
+							"width": float(face.width() / frame_width),
+							"height": float(face.height() / frame_height),
+						}
+						self._fill_eye_landmarks_ui(
+							face_data,
+							left_eye,
+							right_eye,
+							buffers,
+							frame_width,
+							frame_height,
+						)
+						self._handle_detection(
+							face_data,
+							avg_ear,
+							current_time,
+							left_ear,
+							right_ear,
+							pose,
+							face,
+						)
 				else:
 					self._cached_face = None
+					had_candidate = self.detection.cancel_on_face_lost()
+					self._emit_face_lost(current_time, had_candidate)
 
 				if face_data.get("faceDetected", False):
 					self.transport.send({"faceData": face_data})

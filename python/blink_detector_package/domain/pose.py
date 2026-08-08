@@ -161,6 +161,15 @@ def face_bbox_area(face):
 		return 0
 
 
+def interocular_distance_px(landmarks):
+	"""Horizontal eye-center distance in pixels; 0 if landmarks invalid."""
+	if landmarks is None or len(landmarks) < 48:
+		return 0.0
+	left_eye = _mean_xy(landmarks, 36, 42)
+	right_eye = _mean_xy(landmarks, 42, 48)
+	return abs(right_eye[0] - left_eye[0])
+
+
 def select_largest_face(faces):
 	"""Pick the largest face bbox; None if empty."""
 	if not faces:

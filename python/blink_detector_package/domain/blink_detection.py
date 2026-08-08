@@ -54,7 +54,10 @@ RESTING_PITCH_OPEN_DROP_MAX = 0.12
 EYES_CLOSED_RATIO = 0.52
 EYES_OPEN_RATIO = 0.74
 EYES_CLOSED_HOLD_S = 0.18
-# Safety: never block new blinks forever if gaze stays mid-low.
+# Must stay near-open this long to clear eyes_closed (noise while lids shut).
+EYES_OPEN_HOLD_S = 0.12
+# Safety: drop awaiting after this; if lids still not open → latch eyes_closed
+# (clearing unlock while shut caused ~1s credit storms — POG 2026-08-08).
 AWAITING_REOPEN_MAX_S = 0.35
 
 # Frontal opening waive when effective (history/synthetic) close peak is strong
@@ -90,9 +93,32 @@ def short_frontal_velocity(fps):
 	return 0.50
 
 
+def short_look_down_velocity(fps):
+	"""
+	FPS-aware short-blink closing velocity for look-down.
+
+	Slightly stricter than frontal (soft eyelid drift FP) but no longer a
+	flat 0.50 floor that mass-rejects real screen-bottom blinks at 15–20 FPS.
+	"""
+	try:
+		rate = float(fps)
+	except (TypeError, ValueError):
+		rate = DEFAULT_TARGET_FPS
+	if rate >= 18:
+		return 0.42
+	if rate >= 12:
+		return 0.47
+	return 0.50
+
+
 # Strong drop can cover a short-velocity miss (smooth lag under-reports peak).
 SHORT_BLINK_STRONG_DROP = 0.20
 SHORT_BLINK_STRONG_ABS = 0.05
+
+# Face / landmark quality (junk boxes produce symmetric-but-useless EAR).
+# Absolute floors suit 320×240–640×480 processing resolutions.
+MIN_FACE_AREA_PX = 1600  # ~40×40
+MIN_INTEROCULAR_PX = 12.0
 
 
 def min_blink_duration_s(fps):
@@ -156,6 +182,9 @@ class BlinkDetectionState:
 		self.prev_ear = None
 		self.prev_time = None
 		self.peak_closing_velocity = 0.0
+		# Measured closing peak only (raw deltas + pre-blink history).
+		# Gate decisions may still use effective_peak (synthetic short-frontal).
+		self.peak_closing_velocity_measured = 0.0
 		self.peak_opening_velocity = 0.0
 		self._smoothed_closing_velocity = 0.0
 		self._closing_history = deque(maxlen=CLOSING_HISTORY_FRAMES)
@@ -173,6 +202,7 @@ class BlinkDetectionState:
 		self.awaiting_reopen_since = None
 		self.eyes_closed = False
 		self._low_ear_since = None
+		self._open_ear_since = None
 
 	def set_target_fps(self, fps):
 		"""Update expected camera FPS for duration / short-velocity gates."""
@@ -239,6 +269,16 @@ class BlinkDetectionState:
 		if self.blink_in_progress or self.eyes_closed or self.awaiting_reopen:
 			return
 
+		# Never pull baseline toward half-closed / shut EAR. Without this,
+		# held-closed lids collapse baseline (~0.28→0.22) so shut eyes look
+		# "open" and credit as a blink every cooldown (POG JSONL storm).
+		if self.current_baseline_ear > 0:
+			drop = (
+				self.current_baseline_ear - float(current_ear)
+			) / self.current_baseline_ear
+			if drop > RESTING_PITCH_OPEN_DROP_MAX:
+				return
+
 		self.baseline_ear_values.append(current_ear)
 		if len(self.baseline_ear_values) < 5:
 			return
@@ -295,11 +335,13 @@ class BlinkDetectionState:
 					+ (1.0 - alpha) * self._smoothed_closing_velocity
 				)
 				self._closing_history.append(closing_raw)
+				if self.blink_in_progress and closing_raw > self.peak_closing_velocity:
+					self.peak_closing_velocity = closing_raw
 				if (
 					self.blink_in_progress
-					and closing_raw > self.peak_closing_velocity
+					and closing_raw > self.peak_closing_velocity_measured
 				):
-					self.peak_closing_velocity = closing_raw
+					self.peak_closing_velocity_measured = closing_raw
 				if (
 					self.blink_in_progress
 					and opening > self.peak_opening_velocity
@@ -318,11 +360,30 @@ class BlinkDetectionState:
 	def _reset_blink_tracking(self):
 		self.blink_in_progress = False
 		self.peak_closing_velocity = 0.0
+		self.peak_closing_velocity_measured = 0.0
 		self.peak_opening_velocity = 0.0
 		self.closed_frames = 0
 		self.max_left_drop = 0.0
 		self.max_right_drop = 0.0
 		self.max_drop_percentage = 0.0
+
+	def cancel_on_face_lost(self):
+		"""
+		Cancel an in-progress blink when the face disappears mid-candidate.
+
+		Keeps baseline + EAR calibration. Clears velocity / EAR smooth so the
+		next face frame does not inherit stale ΔEAR/Δt.
+		Returns True when a candidate was cancelled.
+		"""
+		had_candidate = self.blink_in_progress
+		if had_candidate:
+			self._reset_blink_tracking()
+		self.prev_ear = None
+		self.prev_time = None
+		self._smoothed_closing_velocity = 0.0
+		self._closing_history.clear()
+		self._ear_window.clear()
+		return had_candidate
 
 	def _eye_drop(self, eye_ear):
 		if self.current_baseline_ear <= 0 or eye_ear is None:
@@ -368,24 +429,33 @@ class BlinkDetectionState:
 		):
 			self.awaiting_reopen = False
 			self.awaiting_reopen_since = None
+			# Still not clearly open → latch closed (do not unlock for new starts).
+			if open_ratio < EYES_OPEN_RATIO:
+				self.eyes_closed = True
+				self._open_ear_since = None
 
 		if open_ratio >= EYES_OPEN_RATIO:
 			self._low_ear_since = None
-			self.eyes_closed = False
-			self.awaiting_reopen = False
-			self.awaiting_reopen_since = None
+			if self._open_ear_since is None:
+				self._open_ear_since = current_time
+			# Clear closed/await only after a short sustained open (anti noise).
+			if (current_time - self._open_ear_since) >= EYES_OPEN_HOLD_S:
+				self.eyes_closed = False
+				self.awaiting_reopen = False
+				self.awaiting_reopen_since = None
 			return
+
+		self._open_ear_since = None
 
 		if open_ratio < EYES_CLOSED_RATIO:
 			if self._low_ear_since is None:
 				self._low_ear_since = current_time
-			elif (
-				not self.blink_in_progress
-				and (current_time - self._low_ear_since) >= EYES_CLOSED_HOLD_S
-			):
+			elif (current_time - self._low_ear_since) >= EYES_CLOSED_HOLD_S:
+				# Latch even while a candidate is active so held-shut lids
+				# become eyes_closed as soon as the candidate ends.
 				self.eyes_closed = True
 		else:
-			# Between closed and open — clear sustained timer only.
+			# Between closed and open — clear sustained-closed timer only.
 			self._low_ear_since = None
 
 	def detect(
@@ -588,12 +658,14 @@ class BlinkDetectionState:
 			# invent implied close from band-cross alone (soft drift FP).
 			if gate["look_down"]:
 				implied_close = 0.0
-			self.peak_closing_velocity = max(
+			measured = max(
 				closing_velocity,
-				self.peak_closing_velocity,
+				self.peak_closing_velocity_measured,
 				pre_peak,
-				implied_close,
 			)
+			self.peak_closing_velocity_measured = measured
+			# Effective peak for gates may include frontal implied_close seed.
+			self.peak_closing_velocity = max(measured, implied_close)
 			self.peak_opening_velocity = 0.0
 			self.closed_frames = 1
 			self.max_left_drop = left_drop
@@ -607,6 +679,8 @@ class BlinkDetectionState:
 				"threshold": adaptive_threshold,
 				"velocity": closing_velocity,
 				"peak_velocity": self.peak_closing_velocity,
+				"peak_velocity_raw": self.peak_closing_velocity_measured,
+				"peak_velocity_effective": self.peak_closing_velocity,
 				**info_pose,
 			}
 
@@ -626,10 +700,32 @@ class BlinkDetectionState:
 			info_pose["peak_opening_velocity"] = self.peak_opening_velocity
 
 			blink_duration = current_time - self.blink_start_time
+			clearly_shut = (
+				ear_smooth < self.current_baseline_ear * EYES_CLOSED_RATIO
+			)
+			# Held-closed lids: do not run credit/reject gates on duration-max —
+			# latch eyes_closed so noise cannot start the next candidate.
+			if blink_duration > BLINK_DURATION_MAX + 1e-3 and clearly_shut:
+				self._reset_blink_tracking()
+				self.eyes_closed = True
+				self.awaiting_reopen = False
+				self.awaiting_reopen_since = None
+				self._open_ear_since = None
+				return False, {
+					"baseline": self.current_baseline_ear,
+					"drop": ear_drop_percentage,
+					"phase": "skip_eyes_closed",
+					"threshold": adaptive_threshold,
+					"velocity": closing_velocity,
+					"peak_velocity": self.peak_closing_velocity,
+					"absolute_drop": ear_drop_absolute,
+					**info_pose,
+				}
+
 			if (
 				ear_smooth
 				> self.current_baseline_ear * recovery_threshold
-				or blink_duration > BLINK_DURATION_MAX
+				or blink_duration > BLINK_DURATION_MAX + 1e-3
 			):
 				velocity_ok = self.peak_closing_velocity >= min_velocity
 				absolute_drop = (
@@ -639,6 +735,7 @@ class BlinkDetectionState:
 				# depth/duration. Look-down keeps measured/history peak only
 				# (synthetic would credit soft eyelid drifts at screen-bottom).
 				frame_dt = 1.0 / max(float(self.target_fps), 1.0)
+				measured_peak = self.peak_closing_velocity_measured
 				effective_peak = self.peak_closing_velocity
 				if (
 					not gate["look_down"]
@@ -649,7 +746,7 @@ class BlinkDetectionState:
 				short_min = min_velocity
 				if blink_duration < SHORT_BLINK_DURATION:
 					short_min = (
-						SHORT_BLINK_MIN_VELOCITY
+						short_look_down_velocity(self.target_fps)
 						if gate["look_down"]
 						else short_frontal_velocity(self.target_fps)
 					)
@@ -688,10 +785,11 @@ class BlinkDetectionState:
 					)
 
 				closed_ok = self.closed_frames >= MIN_CLOSED_FRAMES
-				# Epsilon: wall-clock dt at 20 FPS is often 0.05±1e-4 float.
+				# Epsilon: wall-clock dt at 20 FPS is often 0.05±1e-4 float;
+				# sum of 0.1 steps can land at 0.6000000000000005.
 				duration_ok = (
 					blink_duration + 1e-3 >= duration_min
-					and blink_duration <= BLINK_DURATION_MAX
+					and blink_duration <= BLINK_DURATION_MAX + 1e-3
 					and closed_ok
 				)
 				threshold_ok = (
@@ -725,7 +823,10 @@ class BlinkDetectionState:
 						"phase": phase,
 						"threshold": adaptive_threshold,
 						"velocity": peak_vel,
+						# peak_velocity stays effective for backward-compat logs.
 						"peak_velocity": peak_vel,
+						"peak_velocity_raw": measured_peak,
+						"peak_velocity_effective": peak_vel,
 						"peak_opening_velocity": peak_open,
 						"closed_frames": closed_at_end,
 						"cooldown_remaining": cooldown_remaining,
@@ -747,6 +848,7 @@ class BlinkDetectionState:
 						self.awaiting_reopen = True
 						self.awaiting_reopen_since = current_time
 						self._low_ear_since = None
+						self._open_ear_since = None
 						return _outcome("complete", credited=True)
 
 					self._reset_blink_tracking()
@@ -791,6 +893,7 @@ class BlinkDetectionState:
 		self.prev_ear = None
 		self.prev_time = None
 		self.peak_closing_velocity = 0.0
+		self.peak_closing_velocity_measured = 0.0
 		self.peak_opening_velocity = 0.0
 		self._smoothed_closing_velocity = 0.0
 		self._closing_history.clear()
@@ -803,6 +906,7 @@ class BlinkDetectionState:
 		self.awaiting_reopen_since = None
 		self.eyes_closed = False
 		self._low_ear_since = None
+		self._open_ear_since = None
 		# Keep ear_calibration across camera restarts; re-seed if set.
 		if self.ear_calibration and self.ear_calibration > 0:
 			self._seed_baseline(self.ear_calibration)

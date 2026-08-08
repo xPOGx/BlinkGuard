@@ -7,15 +7,19 @@ import unittest
 from blink_detector_package.domain.blink_detection import (
 	BLINK_MIN_CLOSING_VELOCITY,
 	MIN_CLOSED_FRAMES,
+	MIN_FACE_AREA_PX,
+	MIN_INTEROCULAR_PX,
 	MIN_OPENING_VELOCITY,
 	BlinkDetectionState,
 	get_adaptive_ear_drop_threshold,
 	min_blink_duration_s,
 	short_frontal_velocity,
+	short_look_down_velocity,
 )
 from blink_detector_package.domain.pose import (
 	estimate_head_pose,
 	evaluate_pose_gate,
+	interocular_distance_px,
 	select_largest_face,
 )
 
@@ -197,6 +201,20 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertAlmostEqual(short_frontal_velocity(12), 0.45, places=3)
 		self.assertAlmostEqual(short_frontal_velocity(10), 0.50, places=3)
 
+	def test_short_look_down_velocity_fps_bands(self):
+		self.assertAlmostEqual(short_look_down_velocity(20), 0.42, places=3)
+		self.assertAlmostEqual(short_look_down_velocity(15), 0.47, places=3)
+		self.assertAlmostEqual(short_look_down_velocity(10), 0.50, places=3)
+		# Look-down short floor stays ≥ frontal at each band.
+		self.assertGreaterEqual(
+			short_look_down_velocity(20),
+			short_frontal_velocity(20),
+		)
+		self.assertGreaterEqual(
+			short_look_down_velocity(15),
+			short_frontal_velocity(15),
+		)
+
 	def test_min_blink_duration_s_scales_with_high_fps(self):
 		# ≤20 FPS keep ~50ms floor; Ultra/Max allow one-frame wall-clock.
 		self.assertAlmostEqual(min_blink_duration_s(20), 0.0475, places=3)
@@ -286,11 +304,12 @@ class BlinkDetectionTests(unittest.TestCase):
 
 		first, t, _info, _phases = _feed(state, t, _CREDIT_STEPS, pose=None)
 		self.assertTrue(first)
-		# Clear await-reopen while still inside cooldown window.
-		for ear in (0.24, 0.26, 0.28):
+		# Clear await-reopen / eyes_closed while still inside cooldown window.
+		for ear in (0.24, 0.26, 0.28, 0.28):
 			t += 0.05
 			state.detect(ear, t)
 		self.assertFalse(state.awaiting_reopen)
+		self.assertFalse(state.eyes_closed)
 		self.assertLess(t - state.last_blink_time, 0.55)
 		# Bounce dip during cooldown must not start a candidate.
 		t += 0.05
@@ -489,14 +508,16 @@ class BlinkDetectionTests(unittest.TestCase):
 		t += 0.1
 		credited, info = state.detect(0.19, t)
 		self.assertFalse(credited)
-		self.assertEqual(info["phase"], "skip_await_open")
-		# Clear await with clearly open samples (smooth must reach OPEN ratio).
-		for ear in (0.24, 0.26, 0.28):
+		self.assertIn(info["phase"], ("skip_await_open", "skip_eyes_closed"))
+		# Clear await with clearly open samples (smooth must reach OPEN ratio
+		# and hold briefly).
+		for ear in (0.24, 0.26, 0.28, 0.28):
 			t += 0.1
 			state.detect(ear, t)
 		self.assertFalse(state.awaiting_reopen)
+		self.assertFalse(state.eyes_closed)
 
-	def test_await_reopen_expires(self):
+	def test_await_reopen_expires_latches_eyes_closed_if_still_shut(self):
 		state = BlinkDetectionState()
 		t = _seed_open_eye(state, ear=0.28)
 		state.awaiting_reopen = True
@@ -504,6 +525,8 @@ class BlinkDetectionTests(unittest.TestCase):
 		t += 0.5
 		state._update_eyes_closed_state(0.18, t)
 		self.assertFalse(state.awaiting_reopen)
+		# Mid/low EAR after timeout must not unlock new blink starts.
+		self.assertTrue(state.eyes_closed)
 
 	def test_sustained_low_ear_marks_eyes_closed(self):
 		state = BlinkDetectionState()
@@ -521,6 +544,34 @@ class BlinkDetectionTests(unittest.TestCase):
 		credited, info = state.detect(0.10, t + 0.05)
 		self.assertFalse(credited)
 		self.assertEqual(info["phase"], "skip_eyes_closed")
+
+	def test_baseline_not_pulled_down_by_half_closed_ear(self):
+		state = BlinkDetectionState()
+		t = _seed_open_eye(state, ear=0.28)
+		baseline = state.current_baseline_ear
+		# Mid-band EAR (drop > 12%) must not collapse open-eye baseline.
+		for _ in range(20):
+			t += 0.1
+			state.detect(0.20, t)
+		self.assertGreater(state.current_baseline_ear, baseline * 0.92)
+
+	def test_held_closed_eyes_no_credit_storm(self):
+		"""Shut lids for several seconds must not credit a blink every cooldown."""
+		state = BlinkDetectionState(target_fps=15)
+		t = _seed_open_eye(state, ear=0.28)
+		baseline = state.current_baseline_ear
+		credits = 0
+		# Noisy closed-eye EAR around 0.12–0.16 (matches POG storm logs shape
+		# after baseline collapse — here baseline must stay high).
+		for index in range(80):
+			t += 0.05
+			ear = 0.12 + (0.04 if index % 3 == 0 else 0.0)
+			credited, _info = state.detect(ear, t)
+			if credited:
+				credits += 1
+		self.assertLessEqual(credits, 1)
+		self.assertGreater(state.current_baseline_ear, baseline * 0.90)
+		self.assertTrue(state.eyes_closed)
 
 	def test_side_glance_asymmetry_near_half_not_skipped(self):
 		state = BlinkDetectionState()
@@ -651,7 +702,50 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertFalse(state.blink_in_progress)
 		self.assertIsNone(state.prev_ear)
 		self.assertEqual(state.peak_closing_velocity, 0.0)
+		self.assertEqual(state.peak_closing_velocity_measured, 0.0)
 		self.assertEqual(state.closed_frames, 0)
+
+	def test_cancel_on_face_lost_clears_candidate_keeps_calibration(self):
+		state = BlinkDetectionState()
+		state.set_ear_calibration(0.30)
+		t = _seed_open_eye(state, ear=0.30)
+		t += 0.1
+		state.detect(0.12, t)
+		self.assertTrue(state.blink_in_progress)
+		baseline = state.current_baseline_ear
+		self.assertTrue(state.cancel_on_face_lost())
+		self.assertFalse(state.blink_in_progress)
+		self.assertIsNone(state.prev_ear)
+		self.assertEqual(len(state._ear_window), 0)
+		self.assertAlmostEqual(state.ear_calibration, 0.30, places=5)
+		self.assertAlmostEqual(state.current_baseline_ear, baseline, places=5)
+		# Second call with no candidate is a no-op cancel.
+		self.assertFalse(state.cancel_on_face_lost())
+
+	def test_completion_logs_measured_and_effective_peak(self):
+		state = BlinkDetectionState(target_fps=15)
+		t = _seed_open_eye(state, ear=0.28)
+		credited_any, _t, info, phases = _feed(state, t, _CREDIT_STEPS)
+		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+		self.assertIn("peak_velocity_raw", info)
+		self.assertIn("peak_velocity_effective", info)
+		self.assertAlmostEqual(
+			info["peak_velocity"],
+			info["peak_velocity_effective"],
+			places=5,
+		)
+		self.assertGreaterEqual(
+			info["peak_velocity_effective"],
+			info["peak_velocity_raw"],
+		)
+
+	def test_interocular_distance_and_face_quality_floors(self):
+		landmarks = _frontal_landmarks()
+		iod = interocular_distance_px(landmarks)
+		self.assertGreater(iod, MIN_INTEROCULAR_PX)
+		self.assertGreater(MIN_FACE_AREA_PX, 0)
+		self.assertEqual(interocular_distance_px(None), 0.0)
 
 	def test_set_target_fps(self):
 		state = BlinkDetectionState(target_fps=10)

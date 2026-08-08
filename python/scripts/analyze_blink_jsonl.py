@@ -135,6 +135,56 @@ def cooldown_remaining_buckets(label: str, items: list[dict]) -> None:
 	stats(label, items, "cooldown_remaining")
 
 
+def _is_look_down(bd: dict) -> bool:
+	return bool(bd.get("look_down"))
+
+
+def _completion_attempts(rows: list) -> list[dict]:
+	"""Credited completes + reject_* (finished candidates)."""
+	out = []
+	for _, bd in rows:
+		phase = bd.get("phase") or ("complete" if bd.get("credited") else None)
+		if not phase:
+			continue
+		if bd.get("credited") is True or str(phase).startswith("reject_"):
+			out.append(bd)
+	return out
+
+
+def _print_pose_reject_split(attempts: list[dict]) -> None:
+	"""Frontal vs look-down reject shares (Phase 0 acceptance metric)."""
+	if not attempts:
+		print("pose_split: n=0")
+		return
+
+	def bucket(items: list[dict], label: str) -> None:
+		n = len(items)
+		if n == 0:
+			print(f"  {label}: n=0")
+			return
+		phases = Counter(
+			(b.get("phase") or ("complete" if b.get("credited") else "?"))
+			for b in items
+		)
+		vel = phases.get("reject_velocity", 0)
+		opn = phases.get("reject_opening", 0)
+		cred = sum(1 for b in items if b.get("credited") is True)
+		print(
+			f"  {label}: n={n} credited={cred} "
+			f"credit_rate={cred / n:.3f} "
+			f"reject_velocity={vel} ({vel / n:.3f}) "
+			f"reject_opening={opn} ({opn / n:.3f}) "
+			f"reject_vel+open={(vel + opn) / n:.3f}"
+		)
+		print(f"    phases={dict(phases.most_common())}")
+
+	frontal = [b for b in attempts if not _is_look_down(b)]
+	look_down = [b for b in attempts if _is_look_down(b)]
+	print("--- pose split (completion attempts) ---")
+	bucket(frontal, "frontal")
+	bucket(look_down, "look_down")
+
+
 def main() -> int:
 	parser = argparse.ArgumentParser(description=__doc__)
 	parser.add_argument("--path", type=Path, default=None)
@@ -185,9 +235,14 @@ def main() -> int:
 	look_down = [b for b in credited if b.get("look_down")]
 	print(f"credited_short={len(short)} credited_look_down={len(look_down)}")
 
+	attempts = _completion_attempts(rows)
+	_print_pose_reject_split(attempts)
+
 	print("--- credited ---")
 	stats("cred", credited, "duration")
 	stats("cred", credited, "peak_velocity")
+	stats("cred", credited, "peak_velocity_raw")
+	stats("cred", credited, "peak_velocity_effective")
 	stats("cred", credited, "absolute_drop")
 	stats("cred", credited, "drop")
 	stats("cred", credited, "yaw")
@@ -199,6 +254,8 @@ def main() -> int:
 		"skip_cooldown",
 		"reject_opening",
 		"reject_bilateral",
+		"skip_face_lost",
+		"skip_face_quality",
 	):
 		bucket = [b for b in rejected if b.get("phase") == phase]
 		if not bucket:
@@ -206,10 +263,15 @@ def main() -> int:
 		print(f"--- {phase} n={len(bucket)} ---")
 		stats(phase, bucket, "duration")
 		stats(phase, bucket, "peak_velocity")
+		stats(phase, bucket, "peak_velocity_raw")
+		stats(phase, bucket, "peak_velocity_effective")
 		stats(phase, bucket, "absolute_drop")
 		stats(phase, bucket, "drop")
 		if phase in ("reject_cooldown", "skip_cooldown"):
 			cooldown_remaining_buckets(phase, bucket)
+		if phase == "skip_face_quality":
+			stats(phase, bucket, "face_area")
+			stats(phase, bucket, "interocular")
 
 	# Scenario hint: credits closer than 0.5s often mean FP storms
 	times = [t for t, bd in rows if bd.get("credited")]

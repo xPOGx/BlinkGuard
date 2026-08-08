@@ -1,5 +1,5 @@
 import { Activity, Camera, Crosshair, Gauge, UserRoundX } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/button";
 import {
 	SettingPanel,
@@ -15,6 +15,7 @@ import {
 	CAMERA_QUALITY_OPTIONS,
 	CAMERA_QUALITY_PRESETS,
 } from "../../../../shared/camera-quality";
+import { EAR_CALIBRATION_MIN_SAMPLES } from "../../../../shared/ear-calibration";
 import { pluralKey, t as translate } from "../../../../shared/i18n";
 import type { CameraQuality } from "../../../../shared/preferences";
 
@@ -69,9 +70,12 @@ export function CameraControls({
 	const [calibrating, setCalibrating] = useState(false);
 	const [calibrationElapsedMs, setCalibrationElapsedMs] = useState(0);
 	const [calibrationDurationMs, setCalibrationDurationMs] = useState(8000);
+	const [calibrationSampleCount, setCalibrationSampleCount] = useState(0);
+	const [calibrationFaceDetected, setCalibrationFaceDetected] = useState(false);
 	const [calibrationMessage, setCalibrationMessage] = useState<string | null>(
 		null,
 	);
+	const calibrationSampleCountRef = useRef(0);
 
 	const qualityLabels: Record<CameraQuality, string> = {
 		performance: t("camera.quality.performance"),
@@ -96,10 +100,14 @@ export function CameraControls({
 			setCalibrating(true);
 			setCalibrationElapsedMs(payload.elapsedMs);
 			setCalibrationDurationMs(payload.durationMs);
+			calibrationSampleCountRef.current = payload.sampleCount;
+			setCalibrationSampleCount(payload.sampleCount);
+			setCalibrationFaceDetected(Boolean(payload.faceDetected));
 		});
 		const offComplete = rendererIpc.onEarCalibrationComplete((payload) => {
 			setCalibrating(false);
 			setCalibrationElapsedMs(0);
+			const samples = calibrationSampleCountRef.current;
 			if (payload.baseline !== null) {
 				setPreferences((current) => ({
 					...current,
@@ -110,11 +118,19 @@ export function CameraControls({
 						value: payload.baseline.toFixed(3),
 					}),
 				);
+			} else if (payload.error === "Calibration cancelled") {
+				setCalibrationMessage(translate(locale, "camera.calibrationCancelled"));
 			} else {
 				setCalibrationMessage(
-					payload.error ?? translate(locale, "camera.calibrationIncomplete"),
+					translate(locale, "camera.calibrationIncompleteSamples", {
+						n: samples,
+						min: EAR_CALIBRATION_MIN_SAMPLES,
+					}),
 				);
 			}
+			calibrationSampleCountRef.current = 0;
+			setCalibrationSampleCount(0);
+			setCalibrationFaceDetected(false);
 		});
 		return () => {
 			offProgress();
@@ -163,6 +179,9 @@ export function CameraControls({
 		setCalibrationMessage(null);
 		setCalibrating(true);
 		setCalibrationElapsedMs(0);
+		calibrationSampleCountRef.current = 0;
+		setCalibrationSampleCount(0);
+		setCalibrationFaceDetected(false);
 		if (!preferences.cameraEnabled) {
 			setPreferences((current) => ({
 				...current,
@@ -176,6 +195,9 @@ export function CameraControls({
 		rendererIpc.cancelEarCalibration();
 		setCalibrating(false);
 		setCalibrationElapsedMs(0);
+		calibrationSampleCountRef.current = 0;
+		setCalibrationSampleCount(0);
+		setCalibrationFaceDetected(false);
 		setCalibrationMessage(t("camera.calibrationCancelled"));
 	};
 
@@ -394,12 +416,24 @@ export function CameraControls({
 								) : null}
 							</div>
 							{calibrating ? (
-								<div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
-									<div
-										className="h-full bg-primary transition-[width] duration-200"
-										style={{ width: `${progressRatio * 100}%` }}
-									/>
-								</div>
+								<>
+									<div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+										<div
+											className="h-full bg-primary transition-[width] duration-200"
+											style={{ width: `${progressRatio * 100}%` }}
+										/>
+									</div>
+									<p className="mt-2 text-xs text-muted-foreground">
+										{t("camera.calibrationProgress", {
+											n: calibrationSampleCount,
+											min: EAR_CALIBRATION_MIN_SAMPLES,
+										})}
+										{" · "}
+										{calibrationFaceDetected
+											? t("camera.calibrationFaceOk")
+											: t("camera.calibrationFaceMissing")}
+									</p>
+								</>
 							) : null}
 							{calibrationMessage ? (
 								<p className="mt-2 text-xs text-muted-foreground">

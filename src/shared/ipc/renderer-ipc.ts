@@ -71,6 +71,7 @@ export const rendererIpc = {
 			elapsedMs: number;
 			sampleCount: number;
 			durationMs: number;
+			faceDetected: boolean;
 		}) => void,
 	) => subscribe(IPC_CHANNELS.earCalibrationProgress, listener),
 	onEarCalibrationComplete: (

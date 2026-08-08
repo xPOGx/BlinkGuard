@@ -170,7 +170,7 @@ export const uk: MessageCatalog = {
 	"camera.stopShowing": "Припинити показ",
 	"camera.quality": "Якість камери",
 	"camera.qualityDesc":
-		"Рекомендовано «Середня». «Швидкість» економить CPU; «Висока» точніше фіксує момент моргання.",
+		"Рекомендовано «Середня». «Швидкість» економить CPU (може пропускати короткі моргання); «Висока» точніше фіксує момент моргання, якщо на «Швидкості» багато відхилень.",
 	"camera.qualityAria": "Якість камери",
 	"camera.quality.performance": "Швидкість",
 	"camera.quality.medium": "Середня",
@@ -180,8 +180,14 @@ export const uk: MessageCatalog = {
 		"Тримайте очі відкритими й дивіться в камеру близько 8 секунд. Це підлаштує пороги моргання під ваше обличчя.",
 	"camera.calibrate": "Калібрувати",
 	"camera.cancelCalibration": "Скасувати ({n} с)",
+	"camera.calibrationProgress": "Зразки {n}/{min}",
+	"camera.calibrationFaceOk": "Обличчя виявлено",
+	"camera.calibrationFaceMissing":
+		"Немає обличчя — розташуйте обличчя по центру камери",
 	"camera.calibrationSaved": "Калібрування збережено (EAR {value})",
 	"camera.calibrationIncomplete": "Калібрування не завершено",
+	"camera.calibrationIncompleteSamples":
+		"Замало зразків з відкритими очима ({n}/{min}). Тримайте обличчя по центру з відкритими очима.",
 	"camera.calibrationCancelled": "Калібрування скасовано",
 	"camera.calibrationCleared": "Калібрування скинуто",
 	"camera.coaching": "Підказки за частотою моргання",

@@ -164,7 +164,7 @@ export const en: MessageCatalog = {
 	"camera.stopShowing": "Stop Showing",
 	"camera.quality": "Camera Quality",
 	"camera.qualityDesc":
-		"Medium is recommended. Performance saves CPU; High improves blink timing accuracy.",
+		"Medium is recommended. Performance saves CPU (may miss short blinks); High improves blink timing accuracy if rejects spike on Performance.",
 	"camera.qualityAria": "Camera quality",
 	"camera.quality.performance": "Performance",
 	"camera.quality.medium": "Medium",
@@ -174,8 +174,14 @@ export const en: MessageCatalog = {
 		"Keep eyes open and look at the camera for about 8 seconds. This tunes blink thresholds to your face.",
 	"camera.calibrate": "Calibrate",
 	"camera.cancelCalibration": "Cancel ({n}s)",
+	"camera.calibrationProgress": "Samples {n}/{min}",
+	"camera.calibrationFaceOk": "Face detected",
+	"camera.calibrationFaceMissing":
+		"No face — center yourself in the camera",
 	"camera.calibrationSaved": "Calibration saved (EAR {value})",
 	"camera.calibrationIncomplete": "Calibration did not complete",
+	"camera.calibrationIncompleteSamples":
+		"Not enough open-eye samples ({n}/{min}). Keep your face centered with eyes open.",
 	"camera.calibrationCancelled": "Calibration cancelled",
 	"camera.calibrationCleared": "Calibration cleared",
 	"camera.coaching": "Blink rate coaching",
