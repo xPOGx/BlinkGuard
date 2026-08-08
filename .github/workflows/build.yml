@@ -2,11 +2,13 @@ name: Build and Release
 
 on:
   # branches + tags together under push are ANDed by GitHub (workflow never runs).
-  # Tag releases only; use workflow_dispatch for a manual package/publish dry-run
-  # or to attach platform artifacts to an existing tag (e.g. add macOS to v2.0.0).
+  # Prefer release:published — gh release create often has no push webhook for the tag.
+  # Keep push tags as a fallback; workflow_dispatch for manual attach/dry-run.
   push:
     tags:
       - "v*"
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       publish_to_tag:
@@ -26,10 +28,16 @@ on:
 permissions:
   contents: write
 
+# Avoid duplicate Win+mac runs if both push(tag) and release.published fire.
+concurrency:
+  group: build-release-${{ github.event.release.tag_name || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   build-windows:
     if: >-
       github.event_name == 'push' ||
+      (github.event_name == 'release' && startsWith(github.ref, 'refs/tags/v')) ||
       github.event.inputs.platforms == 'both' ||
       github.event.inputs.platforms == 'windows' ||
       github.event.inputs.platforms == ''
@@ -470,6 +478,7 @@ jobs:
   build-macos:
     if: >-
       github.event_name == 'push' ||
+      (github.event_name == 'release' && startsWith(github.ref, 'refs/tags/v')) ||
       github.event.inputs.platforms == 'both' ||
       github.event.inputs.platforms == 'macos' ||
       github.event.inputs.platforms == ''
