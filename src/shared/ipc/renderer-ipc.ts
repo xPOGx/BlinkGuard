@@ -1,5 +1,8 @@
 import type { BlinkStatsSnapshot } from "../../../shared/blink-stats";
-import type { DebugOverlayKind, DebugSoundKind } from "../../../shared/debug-preview";
+import type {
+	DebugOverlayKind,
+	DebugSoundKind,
+} from "../../../shared/debug-preview";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import type {
 	CameraQuality,
@@ -114,6 +117,7 @@ export const rendererIpc = {
 	onFocusPauseState: (
 		listener: (payload: {
 			reason: "quiet-hours" | "fullscreen" | null;
+			fullscreenDetectionSupported: boolean;
 		}) => void,
 	) => subscribe(IPC_CHANNELS.focusPauseState, listener),
 	updateMgdMode: (enabled: boolean) =>

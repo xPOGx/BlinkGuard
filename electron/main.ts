@@ -150,6 +150,7 @@ function bootstrap(): void {
 		windows,
 		reminders,
 		IPC_CHANNELS.focusPauseState,
+		focusEnvironment.supportsFullscreenDetection(),
 	);
 	gateHolder.current = focusPause;
 	const focusMonitor = new FocusEnvironmentMonitor(

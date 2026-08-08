@@ -344,11 +344,14 @@ export function QuietHoursFocusSettings({
 	const [pauseReason, setPauseReason] = useState<
 		"quiet-hours" | "fullscreen" | null
 	>(null);
+	const [fullscreenDetectionSupported, setFullscreenDetectionSupported] =
+		useState<boolean | null>(null);
 
 	useEffect(
 		() =>
 			rendererIpc.onFocusPauseState((payload) => {
 				setPauseReason(payload.reason);
+				setFullscreenDetectionSupported(payload.fullscreenDetectionSupported);
 			}),
 		[],
 	);
@@ -359,6 +362,8 @@ export function QuietHoursFocusSettings({
 			: pauseReason === "fullscreen"
 				? t("fullscreen.paused")
 				: null;
+
+	const fullscreenUnsupported = fullscreenDetectionSupported === false;
 
 	return (
 		<SettingPanel className="space-y-4">
@@ -424,11 +429,16 @@ export function QuietHoursFocusSettings({
 						{t("fullscreen.title")}
 					</>
 				}
-				description={t("fullscreen.description")}
+				description={
+					fullscreenUnsupported
+						? t("fullscreen.unsupportedDescription")
+						: t("fullscreen.description")
+				}
 				action={
 					<ToggleSwitch
 						aria-label={t("fullscreen.toggleAria")}
 						checked={preferences.pauseOnFullscreen}
+						disabled={fullscreenUnsupported}
 						onChange={() =>
 							setPreferences((current) => ({
 								...current,

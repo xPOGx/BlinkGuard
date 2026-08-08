@@ -96,6 +96,32 @@ describe("settings shell", () => {
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.unsubscribeBlinkStats);
 	});
 
+	it("disables fullscreen pause toggle when detection is unsupported", () => {
+		render(<App />);
+		hydratePreferences({ hasCompletedOnboarding: true });
+		fireEvent.click(screen.getByRole("button", { name: "System" }));
+
+		const toggle = screen.getByRole("switch", {
+			name: "Toggle pause while fullscreen",
+		});
+		expect(toggle.hasAttribute("disabled")).toBe(false);
+
+		act(() => {
+			for (const listener of listeners.get(IPC_CHANNELS.focusPauseState) ??
+				[]) {
+				listener({
+					reason: null,
+					fullscreenDetectionSupported: false,
+				});
+			}
+		});
+
+		expect(
+			screen.getByText("Fullscreen pause is available on Windows and macOS."),
+		).toBeDefined();
+		expect(toggle.hasAttribute("disabled")).toBe(true);
+	});
+
 	it("shows first-run onboarding after prefs hydrate incomplete", () => {
 		render(<App />);
 		expect(screen.queryByRole("dialog")).toBeNull();

@@ -16,6 +16,11 @@ export interface FocusPauseWindowsPort {
 	sendToMain(channel: string, ...args: unknown[]): void;
 }
 
+export interface FocusPauseStatePayload {
+	reason: FocusPauseReason;
+	fullscreenDetectionSupported: boolean;
+}
+
 export class FocusPauseService implements NotificationGate {
 	private reason: FocusPauseReason = null;
 	private cameraPausedForFullscreen = false;
@@ -27,6 +32,7 @@ export class FocusPauseService implements NotificationGate {
 		private readonly windows: FocusPauseWindowsPort,
 		private readonly reminders: ReminderService,
 		private readonly focusPauseChannel: string,
+		private readonly fullscreenDetectionSupported: boolean,
 	) {}
 
 	notificationsAllowed(): boolean {
@@ -87,9 +93,11 @@ export class FocusPauseService implements NotificationGate {
 	}
 
 	pushState(): void {
-		this.windows.sendToMain(this.focusPauseChannel, {
+		const payload: FocusPauseStatePayload = {
 			reason: this.reason,
-		});
+			fullscreenDetectionSupported: this.fullscreenDetectionSupported,
+		};
+		this.windows.sendToMain(this.focusPauseChannel, payload);
 	}
 
 	private closeInterruptiveUi(): void {

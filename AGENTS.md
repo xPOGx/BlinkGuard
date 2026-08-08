@@ -13,7 +13,7 @@ Pragmatic Clean Architecture with a thin `electron/main.ts` composition root. Fe
 | `shared/` | IPC channel constants/whitelists + preference types/defaults, camera quality / EAR, blink-rate / blink-stats, `i18n/` (no Electron imports) |
 | `electron/domain/` | Pure policies (`reminder-policy`, `focus-policy`, `blink-rate-coaching`) |
 | `electron/application/` | Runtime state + preferences / reminder / exercise / look-away / blink-stats / blink-rate-coaching / focus-pause / preference-actions and ports |
-| `electron/infrastructure/` | IPC, windows, lifecycle/power, sidecar, shortcuts, sound, store, process cleanup, paths/logging |
+| `electron/infrastructure/` | IPC, windows, lifecycle/power, sidecar, shortcuts, sound, store, process cleanup, paths/logging, focus (Win+Mac fullscreen detectors; stub elsewhere) |
 | `electron/main.ts` | Vite entry/composition root only: constructs collaborators, connects callbacks, starts lifecycle |
 | `electron/preload.ts` | `contextBridge`; whitelists from `shared/ipc-channels` |
 | `src/app.tsx` | Settings shell (`BlinkGuardHomepage`) |

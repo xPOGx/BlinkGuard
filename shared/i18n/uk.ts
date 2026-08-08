@@ -271,7 +271,9 @@ export const uk: MessageCatalog = {
 	"quietHours.paused": "Пауза: тихі години",
 	"fullscreen.title": "Пауза на повноекранному режимі",
 	"fullscreen.description":
-		"Автопауза спливаючих вікон (і камери), коли інша програма на весь екран. Якщо вимкнено, для ігор краще Borderless Windowed або віконний режим.",
+		"Автопауза спливаючих вікон (і камери), коли інша програма на весь екран. У Windows, якщо вимкнено, для ігор краще Borderless Windowed або віконний режим.",
+	"fullscreen.unsupportedDescription":
+		"Пауза на повноекранному режимі доступна у Windows і macOS.",
 	"fullscreen.toggleAria": "Перемкнути паузу на повноекранному режимі",
 	"fullscreen.paused": "Пауза: повний екран / гра",
 

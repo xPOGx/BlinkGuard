@@ -4,8 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import { BrowserWindow, screen } from "electron";
 import type { FocusEnvironmentPort } from "../../application/ports/focus-environment-port";
-
-const COVER_RATIO = 0.95;
+import {
+	isNearFullscreenCover,
+	parseProbeBounds,
+} from "./fullscreen-geometry";
 
 const HOST_SCRIPT = `
 Add-Type -TypeDefinition @"
@@ -71,6 +73,10 @@ export class WindowsFullscreenDetector implements FocusEnvironmentPort {
 	isOtherAppFullscreen(): boolean {
 		void this.refresh();
 		return this.lastResult;
+	}
+
+	supportsFullscreenDetection(): boolean {
+		return true;
 	}
 
 	dispose(): void {
@@ -177,36 +183,11 @@ export class WindowsFullscreenDetector implements FocusEnvironmentPort {
 	}
 
 	private interpret(line: string): boolean {
-		if (!line || line === "0") return false;
-		const parts = line.split("|");
-		if (parts[0] !== "1" || parts.length < 6) return false;
-		const left = Number(parts[2]);
-		const top = Number(parts[3]);
-		const right = Number(parts[4]);
-		const bottom = Number(parts[5]);
-		if (![left, top, right, bottom].every(Number.isFinite)) return false;
-
-		const bounds = {
-			x: left,
-			y: top,
-			width: Math.max(0, right - left),
-			height: Math.max(0, bottom - top),
-		};
-		if (bounds.width === 0 || bounds.height === 0) return false;
+		const bounds = parseProbeBounds(line);
+		if (!bounds) return false;
 
 		const display = screen.getDisplayMatching(bounds);
-		const area = display.bounds;
-		const cover =
-			(bounds.width * bounds.height) / (area.width * area.height || 1);
-		if (cover < COVER_RATIO) return false;
-
-		const marginX =
-			Math.abs(bounds.x - area.x) +
-			Math.abs(bounds.x + bounds.width - (area.x + area.width));
-		const marginY =
-			Math.abs(bounds.y - area.y) +
-			Math.abs(bounds.y + bounds.height - (area.y + area.height));
-		return marginX <= area.width * 0.05 && marginY <= area.height * 0.05;
+		return isNearFullscreenCover(bounds, display.bounds);
 	}
 }
 
