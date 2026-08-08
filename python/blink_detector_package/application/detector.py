@@ -29,6 +29,7 @@ NO_FACE_DATA = json.dumps(
 	{
 		"faceData": {
 			"faceDetected": False,
+			"faceStatus": "none",
 			"ear": 0.0,
 			"blink": False,
 			"faceRect": {"x": 0, "y": 0, "width": 0, "height": 0},
@@ -546,6 +547,7 @@ class BlinkDetectorApplication:
 		last_frame_time = time.time()
 		default_face_data = {
 			"faceDetected": False,
+			"faceStatus": "none",
 			"ear": 0.0,
 			"blink": False,
 			"faceRect": {
@@ -617,6 +619,13 @@ class BlinkDetectorApplication:
 						if self.detection.blink_in_progress:
 							self.detection.cancel_on_face_lost()
 						face_data["faceDetected"] = False
+						face_data["faceStatus"] = "too_far"
+						face_data["faceRect"] = {
+							"x": float(face.left() / frame_width),
+							"y": float(face.top() / frame_height),
+							"width": float(face.width() / frame_width),
+							"height": float(face.height() / frame_height),
+						}
 						if current_time - self._last_skip_debug_time >= 0.5:
 							self._last_skip_debug_time = current_time
 							self._emit_blink_outcome(
@@ -645,6 +654,7 @@ class BlinkDetectorApplication:
 						avg_ear = (left_ear + right_ear) * 0.5
 						pose = estimate_head_pose(landmarks)
 						face_data["faceDetected"] = True
+						face_data["faceStatus"] = "ok"
 						face_data["ear"] = float(avg_ear)
 						face_data["faceRect"] = {
 							"x": float(face.left() / frame_width),
@@ -674,15 +684,12 @@ class BlinkDetectorApplication:
 					had_candidate = self.detection.cancel_on_face_lost()
 					self._emit_face_lost(current_time, had_candidate)
 
-				if face_data.get("faceDetected", False):
-					self.transport.send({"faceData": face_data})
-				else:
+				if face_data.get("faceStatus") == "none":
 					self.transport.send_serialized(NO_FACE_DATA)
+				else:
+					self.transport.send({"faceData": face_data})
 
-				if (
-					self.send_video
-					and face_data.get("faceDetected", False)
-				):
+				if self.send_video:
 					if self.camera.processing_resolution == (640, 480):
 						frame_base64 = encode_frame(frame)
 					else:

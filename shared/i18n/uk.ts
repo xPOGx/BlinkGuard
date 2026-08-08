@@ -533,5 +533,10 @@ export const uk: MessageCatalog = {
 	"popup.camera.threshold": "Поріг:",
 	"popup.camera.blinkDetected": "МОРГАННЯ!",
 	"popup.camera.noFace": "Обличчя не виявлено",
+	"popup.camera.noFaceTitle": "Обличчя не виявлено",
+	"popup.camera.hintNone":
+		"Розташуйте обличчя по центру кадру, покращте освітлення та протріть об’єктив камери.",
+	"popup.camera.hintTooFar":
+		"Підійдіть ближче, щоб обличчя займало більше місця в кадрі.",
 	"popup.camera.streamError": "Потік камери недоступний",
 };

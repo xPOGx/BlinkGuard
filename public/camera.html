@@ -11,6 +11,12 @@
 <body>
   <div class="camera-container">
     <canvas id="canvas" class="camera-canvas"></canvas>
+    <div id="face-missing-overlay" class="camera-face-missing" hidden>
+      <div class="camera-face-missing-title" data-i18n="popup.camera.noFaceTitle">No face detected</div>
+      <div id="face-missing-hint" class="camera-face-missing-hint" data-i18n="popup.camera.hintNone">
+        Center your face in the frame, improve lighting, and clean the camera lens.
+      </div>
+    </div>
     <div id="status" class="camera-status" data-i18n="popup.camera.initializing">Camera: Initializing...</div>
     <div id="info" class="camera-info" data-i18n="popup.camera.info">
       When your eye size goes below your set threshold a blink is detected

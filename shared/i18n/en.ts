@@ -524,5 +524,10 @@ export const en: MessageCatalog = {
 	"popup.camera.threshold": "Threshold:",
 	"popup.camera.blinkDetected": "BLINK DETECTED!",
 	"popup.camera.noFace": "No face detected",
+	"popup.camera.noFaceTitle": "No face detected",
+	"popup.camera.hintNone":
+		"Center your face in the frame, improve lighting, and clean the camera lens.",
+	"popup.camera.hintTooFar":
+		"Move closer so your face fills more of the frame.",
 	"popup.camera.streamError": "Camera stream unavailable",
 };

@@ -13,6 +13,26 @@ function tr(key, vars) {
 	return key;
 }
 
+function setFaceMissingOverlay(visible, faceStatus) {
+	const overlay = document.getElementById("face-missing-overlay");
+	const hint = document.getElementById("face-missing-hint");
+	if (!overlay) return;
+
+	if (visible) {
+		overlay.hidden = false;
+		if (hint) {
+			const hintKey =
+				faceStatus === "too_far"
+					? "popup.camera.hintTooFar"
+					: "popup.camera.hintNone";
+			hint.textContent = tr(hintKey);
+			hint.setAttribute("data-i18n", hintKey);
+		}
+	} else {
+		overlay.hidden = true;
+	}
+}
+
 function updateInfoDisplay(eyeSize, isBlinking = false) {
 	const info = document.getElementById("info");
 	const currentValues = document.getElementById("current-values");
@@ -63,32 +83,38 @@ function resetBlinkDisplay() {
 	}
 }
 
+function drawFaceRect(ctx, canvas, faceRect, strokeStyle) {
+	if (!faceRect || !faceRect.width || !faceRect.height) return;
+	ctx.save();
+	ctx.strokeStyle = strokeStyle;
+	ctx.lineWidth = 2;
+	ctx.strokeRect(
+		faceRect.x * canvas.width,
+		faceRect.y * canvas.height,
+		faceRect.width * canvas.width,
+		faceRect.height * canvas.height,
+	);
+	ctx.restore();
+}
+
 function drawOverlays(faceData) {
 	const canvas = document.getElementById("canvas");
 	if (!canvas || !faceData) return;
 
 	const ctx = canvas.getContext("2d");
 	if (faceData.faceDetected) {
-		ctx.save();
-		ctx.strokeStyle = "#00FF00";
-		ctx.lineWidth = 2;
-
-		ctx.strokeRect(
-			faceData.faceRect.x * canvas.width,
-			faceData.faceRect.y * canvas.height,
-			faceData.faceRect.width * canvas.width,
-			faceData.faceRect.height * canvas.height,
-		);
+		drawFaceRect(ctx, canvas, faceData.faceRect, "#00FF00");
 
 		if (faceData.eyeLandmarks) {
+			ctx.save();
 			ctx.fillStyle = "#00FF00";
 			faceData.eyeLandmarks.forEach((point) => {
 				ctx.beginPath();
 				ctx.arc(point.x * canvas.width, point.y * canvas.height, 2, 0, Math.PI * 2);
 				ctx.fill();
 			});
+			ctx.restore();
 		}
-		ctx.restore();
 
 		const timeSinceLastBlink = Date.now() - lastBlinkTime;
 		const shouldShowBlink = timeSinceLastBlink < 350;
@@ -105,6 +131,42 @@ function drawOverlays(faceData) {
 		}
 
 		updateInfoDisplay(eyeSize, isBlinking);
+		setFaceMissingOverlay(false);
+	} else {
+		if (faceData.faceStatus === "too_far") {
+			drawFaceRect(ctx, canvas, faceData.faceRect, "#FACC15");
+		}
+
+		const status = document.getElementById("status");
+		if (status) {
+			status.textContent = tr("popup.camera.noFace");
+			status.style.background = "rgba(255, 0, 0, 0.5)";
+		}
+		updateInfoDisplay(null);
+		setFaceMissingOverlay(true, faceData.faceStatus || "none");
+	}
+}
+
+function applyFaceTrackingUi(data) {
+	const timeSinceLastBlink = Date.now() - lastBlinkTime;
+	const shouldShowBlink = timeSinceLastBlink < 350;
+
+	if (data.faceDetected) {
+		const eyeSize = data.ear || 0;
+		const isBlinking = data.blink || shouldShowBlink;
+
+		const status = document.getElementById("status");
+		if (status) {
+			status.textContent = isBlinking
+				? tr("popup.camera.blinkDetected")
+				: tr("popup.camera.eyeSize", { value: eyeSize.toFixed(3) });
+			status.style.background = isBlinking
+				? "rgba(0, 255, 0, 0.5)"
+				: "rgba(0, 0, 0, 0.4)";
+		}
+
+		updateInfoDisplay(eyeSize, isBlinking);
+		setFaceMissingOverlay(false);
 	} else {
 		const status = document.getElementById("status");
 		if (status) {
@@ -112,32 +174,14 @@ function drawOverlays(faceData) {
 			status.style.background = "rgba(255, 0, 0, 0.5)";
 		}
 		updateInfoDisplay(null);
+		setFaceMissingOverlay(true, data.faceStatus || "none");
 	}
 }
 
 function initCameraPopup() {
 	window.popupAPI.onFaceTrackingData((data) => {
 		lastFaceData = data;
-
-		const timeSinceLastBlink = Date.now() - lastBlinkTime;
-		const shouldShowBlink = timeSinceLastBlink < 350;
-
-		if (data.faceDetected) {
-			const eyeSize = data.ear || 0;
-			const isBlinking = data.blink || shouldShowBlink;
-
-			const status = document.getElementById("status");
-			if (status) {
-				status.textContent = isBlinking
-					? tr("popup.camera.blinkDetected")
-					: tr("popup.camera.eyeSize", { value: eyeSize.toFixed(3) });
-				status.style.background = isBlinking
-					? "rgba(0, 255, 0, 0.5)"
-					: "rgba(0, 0, 0, 0.4)";
-			}
-
-			updateInfoDisplay(eyeSize, isBlinking);
-		}
+		applyFaceTrackingUi(data);
 	});
 
 	window.popupAPI.onBlinkDetected((blinkData) => {
@@ -198,6 +242,9 @@ function initCameraPopup() {
 	if (window.__i18n) {
 		window.__i18n.onApply = function () {
 			updateInfoDisplay(lastFaceData ? lastFaceData.ear : null);
+			if (lastFaceData && !lastFaceData.faceDetected) {
+				setFaceMissingOverlay(true, lastFaceData.faceStatus || "none");
+			}
 		};
 	}
 
