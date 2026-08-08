@@ -19,7 +19,7 @@ Pragmatic Clean Architecture with a thin `electron/main.ts` composition root. Fe
 | `src/app.tsx` | Settings shell (`BlinkGuardHomepage`) |
 | `src/features/*` | Feature `model/` + `ui/` (reminders, camera, exercises, look-away, popup-appearance, statistics, rewards, settings, onboarding, about, shortcuts, debug) |
 | `src/shared/ipc/` | Renderer IPC adapter |
-| `public/js`, `public/css` | Vanilla popup scripts/styles (old monolithic popup renderer/styles removed) |
+| `public/js`, `public/css` | Vanilla popup scripts/styles; panel transparency via CSS alpha in `theme.js` (not `BrowserWindow.setOpacity`); frosted panels use `.popup-glass` underlay blur |
 | `python/blink_detector.py` | Thin entry |
 | `python/blink_detector_package/` | `domain` / `application` / `infrastructure` for the sidecar |
 

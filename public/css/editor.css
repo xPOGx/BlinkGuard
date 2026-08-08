@@ -1,4 +1,8 @@
 /* Popup size/position editor */
+body:has(.editor-container) {
+	background: transparent !important;
+}
+
 .editor-container {
 	width: 100%;
 	height: 100%;
@@ -9,7 +13,7 @@
 	align-items: center;
 	justify-content: center;
 	overflow: hidden;
-	background: var(--popup-bg-color);
+	background: var(--popup-bg-alpha);
 	font-family: var(--popup-font);
 	-webkit-app-region: drag;
 	position: relative;
@@ -33,21 +37,40 @@
 .editor-instructions,
 .editor-size-display {
 	-webkit-app-region: drag;
-	background: rgba(15, 23, 42, 0.72);
+	position: relative;
+	isolation: isolate;
+	background: transparent;
 	color: #f8fafc;
 	border: 1px solid var(--popup-border);
-	backdrop-filter: blur(6px);
 	border-radius: var(--popup-radius-sm);
 	text-align: center;
 	cursor: pointer;
 	max-width: 95%;
 }
 
+.editor-title::before,
+.editor-instructions::before,
+.editor-size-display::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	border-radius: inherit;
+	background: rgba(15, 23, 42, 0.72);
+	backdrop-filter: blur(var(--popup-glass-blur));
+	-webkit-backdrop-filter: blur(var(--popup-glass-blur));
+}
+
 .editor-title:hover,
 .editor-instructions:hover,
 .editor-size-display:hover {
-	background: rgba(15, 23, 42, 0.88);
 	border-color: rgba(248, 250, 252, 0.18);
+}
+
+.editor-title:hover::before,
+.editor-instructions:hover::before,
+.editor-size-display:hover::before {
+	background: rgba(15, 23, 42, 0.88);
 }
 
 .editor-title {
@@ -214,10 +237,10 @@
 	top: 6px;
 	left: 50%;
 	transform: translateX(-50%);
-	background: rgba(15, 23, 42, 0.8);
+	isolation: isolate;
+	background: transparent;
 	color: #f8fafc;
 	border: 1px solid var(--popup-border);
-	backdrop-filter: blur(6px);
 	padding: 3px 8px;
 	border-radius: var(--popup-radius-sm);
 	font-size: 0.6rem;
@@ -228,6 +251,17 @@
 	transition: opacity 0.3s;
 	pointer-events: none;
 	white-space: nowrap;
+}
+
+.drag-indicator::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	border-radius: inherit;
+	background: rgba(15, 23, 42, 0.8);
+	backdrop-filter: blur(var(--popup-glass-blur));
+	-webkit-backdrop-filter: blur(var(--popup-glass-blur));
 }
 
 .drag-indicator.show {

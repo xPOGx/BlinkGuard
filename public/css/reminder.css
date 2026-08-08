@@ -14,11 +14,12 @@ body:has(.reminder-card) {
 	align-items: center;
 	justify-content: center;
 	padding: clamp(0.5rem, 6%, 1rem);
-	background: transparent;
+	/* Card alpha only — window stays fully opaque for sharp text. */
+	background: var(--popup-bg-alpha);
 	color: var(--popup-text-color);
-	border: none;
-	border-radius: 0;
-	box-shadow: none;
+	border: 1px solid var(--popup-border);
+	border-radius: var(--popup-radius);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
 	font-family: var(--popup-font);
 	opacity: 0;
 	animation: fadeInOut 2.5s forwards;

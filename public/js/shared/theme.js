@@ -1,12 +1,84 @@
 // Shared popup theme helpers (CSS variables + reminder text/mode)
 
+function parseHexColor(hex) {
+	if (typeof hex !== "string") return null;
+	const raw = hex.trim().replace(/^#/, "");
+	if (!/^[0-9a-fA-F]{3}$/.test(raw) && !/^[0-9a-fA-F]{6}$/.test(raw)) {
+		return null;
+	}
+	const full =
+		raw.length === 3
+			? raw
+					.split("")
+					.map((c) => c + c)
+					.join("")
+			: raw;
+	return {
+		r: Number.parseInt(full.slice(0, 2), 16),
+		g: Number.parseInt(full.slice(2, 4), 16),
+		b: Number.parseInt(full.slice(4, 6), 16),
+	};
+}
+
+function clamp01(value) {
+	if (!Number.isFinite(value)) return 0;
+	return Math.min(1, Math.max(0, value));
+}
+
+/** Card/surface alpha from transparency — keep window opacity at 1 for sharp glyphs. */
+function applyPopupSurfaceAlpha() {
+	const root = document.documentElement;
+	const styles = getComputedStyle(root);
+	const transparency = clamp01(
+		Number.parseFloat(styles.getPropertyValue("--popup-transparency")),
+	);
+	const alpha = clamp01(1 - transparency);
+	const bg =
+		styles.getPropertyValue("--popup-bg-color").trim() || "#0f172a";
+	const rgb = parseHexColor(bg);
+	if (rgb) {
+		root.style.setProperty(
+			"--popup-bg-alpha",
+			`rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`,
+		);
+		root.style.setProperty(
+			"--popup-surface",
+			`rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${Math.min(0.92, Math.max(0.2, alpha))})`,
+		);
+		return;
+	}
+	const pct = Math.round(alpha * 100);
+	root.style.setProperty(
+		"--popup-bg-alpha",
+		`color-mix(in srgb, ${bg} ${pct}%, transparent)`,
+	);
+	root.style.setProperty(
+		"--popup-surface",
+		`color-mix(in srgb, ${bg} ${Math.min(92, Math.max(20, pct))}%, transparent)`,
+	);
+}
+
 function updateColors(colors) {
+	if (!colors) return;
 	if (colors.background) {
-		document.documentElement.style.setProperty("--popup-bg-color", colors.background);
+		document.documentElement.style.setProperty(
+			"--popup-bg-color",
+			colors.background,
+		);
 	}
 	if (colors.text) {
-		document.documentElement.style.setProperty("--popup-text-color", colors.text);
+		document.documentElement.style.setProperty(
+			"--popup-text-color",
+			colors.text,
+		);
 	}
+	if (typeof colors.transparency === "number") {
+		document.documentElement.style.setProperty(
+			"--popup-transparency",
+			String(clamp01(colors.transparency)),
+		);
+	}
+	applyPopupSurfaceAlpha();
 }
 
 function updateMessage(message) {
@@ -25,3 +97,5 @@ function updateCameraMode(isEnabled) {
 	if (!blinkElement) return;
 	blinkElement.classList.toggle("camera-mode", Boolean(isEnabled));
 }
+
+applyPopupSurfaceAlpha();

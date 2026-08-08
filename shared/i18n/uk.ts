@@ -42,6 +42,9 @@ export const uk: MessageCatalog = {
 	"about.privacy.title": "Усе локально",
 	"about.privacy.body":
 		"Усе важливе лишається на твоєму комп’ютері. Налаштування й статистика моргань зберігаються локально. Немає акаунта, немає хмарного бекенду для синхронізації й немає аналітики, яка б стежила, як ти користуєшся додатком.",
+	"about.display.title": "Чіткіший текст у Windows",
+	"about.display.body":
+		"BlinkGuard застосовує прозорість лише до фону панелі (не до всього вікна), щоб текст лишався чітким. Якщо шрифти все ще «мильні» на NVIDIA, відкрий NVIDIA Control Panel → Manage 3D settings → Program Settings для BlinkGuard (або Electron), постав Antialiasing - Mode у Application-controlled і вимкни MFAA / FXAA / «Enhance application setting». Для порівняння також спробуй масштаб дисплея 100%. Ці зміни в драйвері — компроміс і стосуються лише профілю цієї програми.",
 	"about.opensource.title": "Open source",
 	"about.opensource.body":
 		"BlinkGuard — з відкритим кодом. Він виріс зі ScreenBlink і тепер розвивається як окремий проєкт — можна читати код, відкривати issues, ділитися ідеями чи долучатися на GitHub.",
@@ -252,9 +255,10 @@ export const uk: MessageCatalog = {
 	"popup.messageAria": "Текст повідомлення",
 	"popup.background": "Колір фону",
 	"popup.textColor": "Колір тексту",
-	"popup.transparency": "Прозорість вікна",
-	"popup.transparencyAria": "Прозорість вікна",
-	"popup.transparencyHint": "Більші значення роблять вікно прозорішим.",
+	"popup.transparency": "Прозорість панелі",
+	"popup.transparencyAria": "Прозорість панелі",
+	"popup.transparencyHint":
+		"Більші значення роблять фон панелі прозорішим. Текст лишається повністю непрозорим — так гліфи чіткіші.",
 	"popup.colorPickerAria": "Вибір кольору: {label}",
 
 	// Sound / launch / reset / quiet hours

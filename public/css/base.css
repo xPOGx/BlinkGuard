@@ -3,18 +3,42 @@
 	--popup-bg-color: #0f172a;
 	--popup-text-color: #f8fafc;
 	--popup-transparency: 0.15;
+	/* Alpha surfaces from theme.js — prefer these over BrowserWindow.setOpacity. */
+	--popup-bg-alpha: rgba(15, 23, 42, 0.85);
 	--popup-accent: #0f766e;
 	--popup-accent-soft: rgba(15, 118, 110, 0.14);
-	--popup-surface: rgba(15, 23, 42, 0.88);
+	--popup-surface: rgba(15, 23, 42, 0.85);
 	--popup-surface-solid: #0f172a;
 	--popup-border: rgba(248, 250, 252, 0.1);
 	--popup-radius: 10px;
 	--popup-radius-sm: 6px;
+	--popup-glass-blur: 4px;
 	--popup-font:
 		system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
 		Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
 	--popup-success: #16a34a;
 	--popup-danger: #dc2626;
+}
+
+/*
+ * Frosted underlay: blur the desktop behind the panel without putting
+ * backdrop-filter on the same layer as text (sharper glyphs on Win GPUs).
+ */
+.popup-glass {
+	position: relative;
+	isolation: isolate;
+	background: transparent;
+}
+
+.popup-glass::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	border-radius: inherit;
+	background: var(--popup-surface);
+	backdrop-filter: blur(var(--popup-glass-blur));
+	-webkit-backdrop-filter: blur(var(--popup-glass-blur));
 }
 
 html,

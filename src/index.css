@@ -140,7 +140,8 @@
 	}
 
 	body {
-		@apply bg-background text-foreground font-sans antialiased;
+		/* Avoid Tailwind `antialiased` (grayscale AA) — ClearType/subpixel stays sharper on Windows LCD. */
+		@apply bg-background text-foreground font-sans;
 	}
 
 	button:not(:disabled):not([aria-disabled="true"]),

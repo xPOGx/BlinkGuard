@@ -41,6 +41,9 @@ export const en: MessageCatalog = {
 	"about.privacy.title": "Local by design",
 	"about.privacy.body":
 		"Everything important stays on your machine. Preferences and blink statistics live in local storage. There is no account to create, no cloud backend to sync to, and no analytics pipeline watching how you use the app.",
+	"about.display.title": "Sharper text on Windows",
+	"about.display.body":
+		"BlinkGuard keeps panel transparency on the card background (not the whole window) so text stays sharp. If fonts still look soft on NVIDIA GPUs, open NVIDIA Control Panel → Manage 3D settings → Program Settings for BlinkGuard (or Electron), set Antialiasing - Mode to Application-controlled, and turn off MFAA / FXAA / “Enhance application setting”. Also try Display scale at 100% when comparing. Disabling those overrides is a driver-side tradeoff and only affects that app profile.",
 	"about.opensource.title": "Open source",
 	"about.opensource.body":
 		"BlinkGuard is open source. It started from ScreenBlink and is now maintained as its own project — read the code, open issues, share ideas, or contribute on GitHub.",
@@ -244,10 +247,10 @@ export const en: MessageCatalog = {
 	"popup.messageAria": "Popup message",
 	"popup.background": "Background Color",
 	"popup.textColor": "Text Color",
-	"popup.transparency": "Window Transparency",
-	"popup.transparencyAria": "Window transparency",
+	"popup.transparency": "Panel Transparency",
+	"popup.transparencyAria": "Panel transparency",
 	"popup.transparencyHint":
-		"Higher values make the window more transparent.",
+		"Higher values make the panel background more see-through. Text stays fully opaque for sharper glyphs.",
 	"popup.colorPickerAria": "{label} picker",
 
 	// Sound / launch / reset / quiet hours

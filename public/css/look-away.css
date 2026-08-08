@@ -1,14 +1,12 @@
 /* Look-away / 20-20-20 popup */
 .look-away-container {
 	width: 300px;
-	background: var(--popup-surface);
 	border: 1px solid var(--popup-border);
 	border-radius: var(--popup-radius);
 	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 	padding: 18px 16px;
 	text-align: center;
 	font-family: var(--popup-font);
-	backdrop-filter: blur(8px);
 }
 
 body:has(.look-away-container) {

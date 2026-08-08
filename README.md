@@ -86,6 +86,19 @@ cd python
 
 See `AGENTS.md` for Cursor Cloud–specific notes.
 
+### Sharper UI text (Windows + NVIDIA)
+
+Popup transparency is applied to the **panel background** (CSS alpha), not `BrowserWindow.setOpacity`, so glyphs stay fully opaque. Frosted panels use a blur underlay behind text. Settings no longer force grayscale font smoothing.
+
+If text still looks soft on NVIDIA:
+
+1. NVIDIA Control Panel → Manage 3D settings → Program Settings → BlinkGuard (or Electron)
+2. Antialiasing - Mode → **Application-controlled**
+3. Disable **MFAA**, **FXAA**, and **Enhance application setting** for that profile
+4. Compare at **100%** Windows display scale when testing
+
+Tradeoff: less driver AA for that app profile; in-app glass may look slightly less frosted than before.
+
 ### Packaging notes
 
 - Local Windows package (always unsigned): `npm run build:windows`

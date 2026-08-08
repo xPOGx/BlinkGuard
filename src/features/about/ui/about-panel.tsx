@@ -70,6 +70,13 @@ export function AboutPanel() {
 
 			<SettingPanel>
 				<SettingRow
+					title={t("about.display.title")}
+					description={t("about.display.body")}
+				/>
+			</SettingPanel>
+
+			<SettingPanel>
+				<SettingRow
 					title={t("about.opensource.title")}
 					description={t("about.opensource.body")}
 					action={

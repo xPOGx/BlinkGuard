@@ -156,7 +156,6 @@ export class WindowManager {
 			y: position.y,
 			focusable: interactive,
 		}, this.paths.preload);
-		popup.setOpacity(1 - this.preferences.popupColors.transparency);
 		this.reminder = popup;
 		void popup.loadFile(path.join(this.paths.publicDir, `${kind}.html`));
 		popup.webContents.on("did-finish-load", () => {
@@ -557,7 +556,6 @@ export class WindowManager {
 			minHeight: 80,
 		}, this.paths.preload);
 		this.editor = window;
-		window.setOpacity(1 - this.preferences.popupColors.transparency);
 		void window.loadFile(path.join(this.paths.publicDir, "popup-editor.html"));
 		window.webContents.on("did-finish-load", () => {
 			this.sendI18n(window);
@@ -578,9 +576,14 @@ export class WindowManager {
 	}
 
 	applyPopupAppearance(): void {
+		// Push colors/transparency into CSS (card alpha). Do not use
+		// BrowserWindow.setOpacity — it soft-composites glyphs on Windows GPUs.
 		for (const window of [this.reminder, this.editor]) {
 			if (window && !window.isDestroyed()) {
-				window.setOpacity(1 - this.preferences.popupColors.transparency);
+				window.webContents.send(
+					IPC_CHANNELS.updateColors,
+					this.preferences.popupColors,
+				);
 			}
 		}
 	}
