@@ -37,7 +37,7 @@ export function CameraErrorBanner({
 				<div className="flex min-w-0 items-center gap-2 text-sm">
 					<Camera className="h-4 w-4 shrink-0" aria-hidden />
 					<span className="font-medium">{t("camera.error")}</span>
-					<span className="truncate">{error}</span>
+					<span className="select-text truncate">{error}</span>
 				</div>
 				<button
 					type="button"
@@ -383,7 +383,7 @@ export function CameraControls({
 							description={t("camera.calibrationDesc")}
 							action={
 								preferences.earCalibration !== null ? (
-									<span className="text-xs text-primary">
+									<span className="select-text text-xs text-primary">
 										EAR {preferences.earCalibration.toFixed(3)}
 									</span>
 								) : null
@@ -436,7 +436,7 @@ export function CameraControls({
 								</>
 							) : null}
 							{calibrationMessage ? (
-								<p className="mt-2 text-xs text-muted-foreground">
+								<p className="mt-2 select-text text-xs text-muted-foreground">
 									{calibrationMessage}
 								</p>
 							) : null}

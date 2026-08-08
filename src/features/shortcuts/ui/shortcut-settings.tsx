@@ -64,7 +64,7 @@ export function ShortcutSettings({
 					)}
 				</div>
 				{error ? (
-					<p className="mt-2 text-sm text-destructive">{error}</p>
+					<p className="mt-2 select-text text-sm text-destructive">{error}</p>
 				) : null}
 			</SettingRow>
 		</SettingPanel>

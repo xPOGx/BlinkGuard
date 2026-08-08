@@ -84,7 +84,7 @@ export function UpdateDialog({ status, install, dismiss }: AutoUpdateApi) {
 					<h2 id={titleId} className="text-xl font-semibold tracking-tight">
 						{title}
 					</h2>
-					<p className="text-sm text-muted-foreground">{message}</p>
+					<p className="select-text text-sm text-muted-foreground">{message}</p>
 				</div>
 
 				{showProgress ? (

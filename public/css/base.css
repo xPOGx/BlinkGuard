@@ -54,6 +54,16 @@ body {
 	background: var(--popup-bg-color);
 	color: var(--popup-text-color);
 	font-family: var(--popup-font);
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"] {
+	user-select: text;
+	-webkit-user-select: text;
 }
 
 button:not(:disabled),

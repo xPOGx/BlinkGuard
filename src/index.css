@@ -142,6 +142,16 @@
 	body {
 		/* Avoid Tailwind `antialiased` (grayscale AA) — ClearType/subpixel stays sharper on Windows LCD. */
 		@apply bg-background text-foreground font-sans;
+		user-select: none;
+		-webkit-user-select: none;
+	}
+
+	input,
+	textarea,
+	select,
+	[contenteditable="true"] {
+		user-select: text;
+		-webkit-user-select: text;
 	}
 
 	button:not(:disabled):not([aria-disabled="true"]),

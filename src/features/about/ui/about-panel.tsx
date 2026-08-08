@@ -118,7 +118,7 @@ export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 					}
 				>
 					{exportStatus ? (
-						<p className="text-sm text-muted-foreground break-all">
+						<p className="select-text text-sm text-muted-foreground break-all">
 							{exportStatus}
 						</p>
 					) : null}
@@ -139,7 +139,7 @@ export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 						</Button>
 					}
 				>
-					<p className="text-sm text-muted-foreground">
+					<p className="select-text text-sm text-muted-foreground">
 						{t("about.meta.version", { version })}
 					</p>
 					<p className="mt-1 text-sm text-muted-foreground">
