@@ -8,6 +8,7 @@ export class AppRuntimeState {
 	blinkSnoozeTimeout: ReturnType<typeof setTimeout> | null = null;
 	cameraThresholdUpdateTimeout: ReturnType<typeof setTimeout> | null = null;
 	noFaceDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	noFaceAutoStopTimer: ReturnType<typeof setTimeout> | null = null;
 
 	blinkReminderActive = false;
 	mgdReminderLoopActive = false;

@@ -122,6 +122,15 @@ export const en: MessageCatalog = {
 		"Soft tip when your recent camera blink rate is low. Live rate stays in Statistics.",
 	"camera.coachingToggleAria": "Toggle blink rate coaching",
 	"camera.minBlinks": "Min blinks / min",
+	"camera.autoStopNoFace": "Auto-stop when away",
+	"camera.autoStopNoFaceDesc":
+		"Stop camera tracking after {n} minute without a face. Start again when you return.",
+	"camera.autoStopNoFaceDesc_few":
+		"Stop camera tracking after {n} minutes without a face. Start again when you return.",
+	"camera.autoStopNoFaceDesc_plural":
+		"Stop camera tracking after {n} minutes without a face. Start again when you return.",
+	"camera.autoStopNoFaceToggleAria": "Toggle auto-stop when away from camera",
+	"camera.autoStopNoFaceIntervalAria": "Minutes without face before auto-stop",
 	"camera.mgd": "MGD Mode",
 	"camera.mgdDesc":
 		"Reminders on a fixed interval regardless of blinks. Popup still closes when a blink is detected.",

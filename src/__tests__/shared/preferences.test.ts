@@ -12,6 +12,7 @@ import {
 	type AppPreferences,
 	DEFAULT_EXERCISE_PROMPTS,
 	DEFAULT_PREFERENCES,
+	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
 	toRendererPreferences,
@@ -143,6 +144,20 @@ describe("blink-rate coaching preference defaults", () => {
 		expect(sanitizeBlinkRateThresholdPerMin(0)).toBe(1);
 		expect(sanitizeBlinkRateThresholdPerMin(99)).toBe(60);
 		expect(sanitizeBlinkRateThresholdPerMin(7.6)).toBe(8);
+	});
+});
+
+describe("auto-stop on no-face preference defaults", () => {
+	it("defaults enabled with 2 minutes", () => {
+		expect(DEFAULT_PREFERENCES.autoStopNoFaceEnabled).toBe(true);
+		expect(DEFAULT_PREFERENCES.autoStopNoFaceMinutes).toBe(2);
+	});
+
+	it("sanitizes autoStopNoFaceMinutes to 1…30", () => {
+		expect(sanitizeAutoStopNoFaceMinutes(null)).toBe(2);
+		expect(sanitizeAutoStopNoFaceMinutes(0)).toBe(1);
+		expect(sanitizeAutoStopNoFaceMinutes(99)).toBe(30);
+		expect(sanitizeAutoStopNoFaceMinutes(7.6)).toBe(8);
 	});
 });
 

@@ -4,6 +4,8 @@ export const CAMERA_POLL_INTERVAL_MS = 100;
 export const BLINK_CREDIT_DEBOUNCE_MS = 150;
 /** How long blink reminder popups stay suppressed after Snooze. */
 export const BLINK_SNOOZE_MS = 5 * 60 * 1000;
+/** Debounce before treating no-face as confirmed (also arms auto-stop). */
+export const NO_FACE_DEBOUNCE_MS = 750;
 
 export type BlinkCreditSource =
 	| "detected"
@@ -13,6 +15,24 @@ export type BlinkCreditSource =
 
 export function nextTimerReminderDelay(reminderIntervalMs: number): number {
 	return reminderIntervalMs + REMINDER_POPUP_VISIBLE_MS;
+}
+
+export function autoStopNoFaceDelayMs(minutes: number): number {
+	return Math.max(1, minutes) * 60 * 1000;
+}
+
+export function shouldArmAutoStopOnNoFace(input: {
+	isTracking: boolean;
+	cameraEnabled: boolean;
+	autoStopNoFaceEnabled: boolean;
+	cameraSoftPaused: boolean;
+}): boolean {
+	return (
+		input.isTracking &&
+		input.cameraEnabled &&
+		input.autoStopNoFaceEnabled &&
+		!input.cameraSoftPaused
+	);
 }
 
 export function shouldShowCameraReminder(input: {

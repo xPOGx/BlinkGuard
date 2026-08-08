@@ -29,6 +29,10 @@ export type CameraQuality = "performance" | "medium" | "high";
 const BLINK_RATE_THRESHOLD_MIN = 1;
 const BLINK_RATE_THRESHOLD_MAX = 60;
 
+const AUTO_STOP_NO_FACE_MINUTES_MIN = 1;
+const AUTO_STOP_NO_FACE_MINUTES_MAX = 30;
+const AUTO_STOP_NO_FACE_MINUTES_DEFAULT = 2;
+
 /** Coerce stored/IPC blink-rate coaching threshold to 1…60. */
 export function sanitizeBlinkRateThresholdPerMin(input: unknown): number {
 	if (input === null || input === undefined || input === "") {
@@ -42,11 +46,28 @@ export function sanitizeBlinkRateThresholdPerMin(input: unknown): number {
 	);
 }
 
+/** Coerce stored/IPC auto-stop-on-no-face minutes to 1…30. */
+export function sanitizeAutoStopNoFaceMinutes(input: unknown): number {
+	if (input === null || input === undefined || input === "") {
+		return AUTO_STOP_NO_FACE_MINUTES_DEFAULT;
+	}
+	const n = typeof input === "number" ? input : Number(input);
+	if (!Number.isFinite(n)) return AUTO_STOP_NO_FACE_MINUTES_DEFAULT;
+	return Math.min(
+		AUTO_STOP_NO_FACE_MINUTES_MAX,
+		Math.max(AUTO_STOP_NO_FACE_MINUTES_MIN, Math.round(n)),
+	);
+}
+
 export interface PersistedPreferences {
 	darkMode: boolean;
 	reminderInterval: number;
 	cameraEnabled: boolean;
 	cameraQuality: CameraQuality;
+	/** Stop tracking after sustained no-face while camera monitoring. */
+	autoStopNoFaceEnabled: boolean;
+	/** Minutes without a face before auto-stop (1…30). */
+	autoStopNoFaceMinutes: number;
 	/** Soft toast when live camera blink rate is below threshold. */
 	blinkRateCoachingEnabled: boolean;
 	/** Soft-coach when blinks/min is strictly below this value (default = Low band). */
@@ -118,6 +139,8 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	reminderInterval: 3000,
 	cameraEnabled: false,
 	cameraQuality: "medium",
+	autoStopNoFaceEnabled: true,
+	autoStopNoFaceMinutes: AUTO_STOP_NO_FACE_MINUTES_DEFAULT,
 	blinkRateCoachingEnabled: true,
 	blinkRateThresholdPerMin: BLINK_RATE_LOW_MAX,
 	earCalibration: null,

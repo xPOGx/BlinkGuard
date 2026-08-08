@@ -1,22 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppRuntimeState } from "../../../electron/application/app-runtime-state";
-import { ReminderService } from "../../../electron/application/reminder-service";
+import type { PreferenceStore } from "../../../electron/application/ports/preference-store";
 import type {
 	BlinkDetectorPort,
 	NotificationSoundPort,
 	ReminderWindowPort,
 } from "../../../electron/application/ports/runtime-ports";
+import { ReminderService } from "../../../electron/application/reminder-service";
 import {
 	BLINK_CREDIT_DEBOUNCE_MS,
 	BLINK_SNOOZE_MS,
-	REMINDER_POPUP_VISIBLE_MS,
+	NO_FACE_DEBOUNCE_MS,
 	nextTimerReminderDelay,
+	REMINDER_POPUP_VISIBLE_MS,
 } from "../../../electron/domain/reminder-policy";
 import {
-	DEFAULT_PREFERENCES,
 	type AppPreferences,
+	DEFAULT_PREFERENCES,
 } from "../../../shared/preferences";
-import type { PreferenceStore } from "../../../electron/application/ports/preference-store";
 
 function createStore(): PreferenceStore {
 	const data = new Map<string, unknown>();
@@ -358,5 +359,132 @@ describe("ReminderService credit semantics", () => {
 		expect(stats.recordBlink).toHaveBeenCalledTimes(1);
 		expect(state.lastBlinkTime).toBeGreaterThan(blinkBefore);
 		expect(windows.closeReminder).toHaveBeenCalled();
+	});
+});
+
+describe("ReminderService auto-stop on no face", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it("stops tracking and sends preferences after N minutes without a face", () => {
+		const preferences = createPreferences({
+			autoStopNoFaceEnabled: true,
+			autoStopNoFaceMinutes: 2,
+		});
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const store = createStore();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			store,
+		);
+
+		service.onFaceDetection(false);
+		vi.advanceTimersByTime(NO_FACE_DEBOUNCE_MS);
+		expect(state.noFaceAutoStopTimer).not.toBeNull();
+		expect(windows.showNoFace).toHaveBeenCalled();
+
+		vi.advanceTimersByTime(2 * 60 * 1000 - 1);
+		expect(preferences.isTracking).toBe(true);
+
+		vi.advanceTimersByTime(1);
+		expect(preferences.isTracking).toBe(false);
+		expect(store.get("isTracking")).toBe(false);
+		expect(windows.showReminder).toHaveBeenCalledWith("stopped");
+		expect(windows.sendPreferences).toHaveBeenCalled();
+		expect(state.noFaceAutoStopTimer).toBeNull();
+	});
+
+	it("cancels auto-stop when the face returns before the timeout", () => {
+		const preferences = createPreferences({
+			autoStopNoFaceEnabled: true,
+			autoStopNoFaceMinutes: 2,
+		});
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			createStore(),
+		);
+
+		service.onFaceDetection(false);
+		vi.advanceTimersByTime(NO_FACE_DEBOUNCE_MS);
+		expect(state.noFaceAutoStopTimer).not.toBeNull();
+
+		service.onFaceDetection(true);
+		expect(state.noFaceAutoStopTimer).toBeNull();
+		expect(state.isFaceDetected).toBe(true);
+
+		vi.advanceTimersByTime(2 * 60 * 1000);
+		expect(preferences.isTracking).toBe(true);
+		expect(windows.sendPreferences).not.toHaveBeenCalled();
+	});
+
+	it("does not arm auto-stop when the feature is disabled", () => {
+		const preferences = createPreferences({
+			autoStopNoFaceEnabled: false,
+			autoStopNoFaceMinutes: 2,
+		});
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			createStore(),
+		);
+
+		service.onFaceDetection(false);
+		vi.advanceTimersByTime(NO_FACE_DEBOUNCE_MS);
+		expect(state.noFaceAutoStopTimer).toBeNull();
+		expect(preferences.isTracking).toBe(true);
+
+		vi.advanceTimersByTime(2 * 60 * 1000);
+		expect(preferences.isTracking).toBe(true);
+		expect(windows.sendPreferences).not.toHaveBeenCalled();
+	});
+
+	it("cancels a pending auto-stop when soft-pausing for focus", () => {
+		const preferences = createPreferences({
+			autoStopNoFaceEnabled: true,
+			autoStopNoFaceMinutes: 2,
+		});
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			createStore(),
+		);
+
+		service.onFaceDetection(false);
+		vi.advanceTimersByTime(NO_FACE_DEBOUNCE_MS);
+		expect(state.noFaceAutoStopTimer).not.toBeNull();
+
+		service.pauseCameraForFocus();
+		expect(state.noFaceAutoStopTimer).toBeNull();
+		expect(service.isCameraSoftPaused).toBe(true);
+
+		vi.advanceTimersByTime(2 * 60 * 1000);
+		expect(preferences.isTracking).toBe(true);
+		expect(windows.sendPreferences).not.toHaveBeenCalled();
 	});
 });

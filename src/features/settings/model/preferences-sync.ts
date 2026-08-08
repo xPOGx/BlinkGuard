@@ -40,6 +40,8 @@ export function sameRendererPrefs(
 		a.reminderInterval === b.reminderInterval &&
 		a.cameraEnabled === b.cameraEnabled &&
 		a.cameraQuality === b.cameraQuality &&
+		a.autoStopNoFaceEnabled === b.autoStopNoFaceEnabled &&
+		a.autoStopNoFaceMinutes === b.autoStopNoFaceMinutes &&
 		a.blinkRateCoachingEnabled === b.blinkRateCoachingEnabled &&
 		a.blinkRateThresholdPerMin === b.blinkRateThresholdPerMin &&
 		a.earCalibration === b.earCalibration &&
@@ -80,6 +82,18 @@ export function pushPreferenceDiff(
 	}
 	if (!previous || previous.cameraQuality !== next.cameraQuality) {
 		rendererIpc.updateCameraQuality(next.cameraQuality);
+	}
+	if (
+		!previous ||
+		previous.autoStopNoFaceEnabled !== next.autoStopNoFaceEnabled
+	) {
+		rendererIpc.updateAutoStopNoFaceEnabled(next.autoStopNoFaceEnabled);
+	}
+	if (
+		!previous ||
+		previous.autoStopNoFaceMinutes !== next.autoStopNoFaceMinutes
+	) {
+		rendererIpc.updateAutoStopNoFaceMinutes(next.autoStopNoFaceMinutes);
 	}
 	if (!previous || previous.earCalibration !== next.earCalibration) {
 		rendererIpc.updateEarCalibration(next.earCalibration);

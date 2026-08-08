@@ -11,6 +11,8 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updateDarkMode: vi.fn(),
 		updateCameraEnabled: vi.fn(),
 		updateCameraQuality: vi.fn(),
+		updateAutoStopNoFaceEnabled: vi.fn(),
+		updateAutoStopNoFaceMinutes: vi.fn(),
 		updateEarCalibration: vi.fn(),
 		updateEyeExercisesEnabled: vi.fn(),
 		updateExerciseInterval: vi.fn(),
@@ -64,6 +66,22 @@ describe("sameRendererPrefs", () => {
 			}),
 		).toBe(false);
 	});
+
+	it("detects auto-stop no-face preference changes", () => {
+		const base = { ...DEFAULT_RENDERER_PREFERENCES };
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				autoStopNoFaceEnabled: false,
+			}),
+		).toBe(false);
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				autoStopNoFaceMinutes: 5,
+			}),
+		).toBe(false);
+	});
 });
 
 describe("pushPreferenceDiff", () => {
@@ -89,6 +107,7 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateEyeExercisesEnabled).not.toHaveBeenCalled();
 		expect(rendererIpc.updateLookAwayEnabled).not.toHaveBeenCalled();
 		expect(rendererIpc.updateKeyboardShortcut).not.toHaveBeenCalled();
+		expect(rendererIpc.updateAutoStopNoFaceEnabled).not.toHaveBeenCalled();
 	});
 
 	it("does not touch locale when only unrelated prefs change", () => {
@@ -101,5 +120,21 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateMgdMode).toHaveBeenCalledWith(true);
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 		expect(rendererIpc.updateDarkMode).not.toHaveBeenCalled();
+	});
+
+	it("pushes only auto-stop no-face fields when they change", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = {
+			...previous,
+			autoStopNoFaceEnabled: false,
+			autoStopNoFaceMinutes: 10,
+		};
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateAutoStopNoFaceEnabled).toHaveBeenCalledWith(false);
+		expect(rendererIpc.updateAutoStopNoFaceMinutes).toHaveBeenCalledWith(10);
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+		expect(rendererIpc.updateCameraEnabled).not.toHaveBeenCalled();
 	});
 });

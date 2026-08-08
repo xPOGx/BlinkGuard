@@ -1,4 +1,4 @@
-import { Activity, Camera, Crosshair, Gauge } from "lucide-react";
+import { Activity, Camera, Crosshair, Gauge, UserRoundX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/button";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
@@ -15,7 +15,7 @@ import {
 	CAMERA_QUALITY_OPTIONS,
 	CAMERA_QUALITY_PRESETS,
 } from "../../../../shared/camera-quality";
-import { t as translate } from "../../../../shared/i18n";
+import { pluralKey, t as translate } from "../../../../shared/i18n";
 import type { CameraQuality } from "../../../../shared/preferences";
 
 interface CameraErrorBannerProps {
@@ -78,6 +78,18 @@ export function CameraControls({
 		medium: t("camera.quality.medium"),
 		high: t("camera.quality.high"),
 	};
+
+	const autoStopMinutes = preferences.autoStopNoFaceMinutes;
+	const autoStopProgress = ((autoStopMinutes - 1) / 29) * 100;
+	const trackColor = preferences.darkMode
+		? "hsl(217 25% 18%)"
+		: "hsl(210 18% 90%)";
+	const fillColor = "hsl(173 58% 36%)";
+	const autoStopDescKey = pluralKey(
+		"camera.autoStopNoFaceDesc",
+		locale,
+		autoStopMinutes,
+	);
 
 	useEffect(() => {
 		const offProgress = rendererIpc.onEarCalibrationProgress((payload) => {
@@ -277,6 +289,61 @@ export function CameraControls({
 									);
 								})}
 							</fieldset>
+						</SettingRow>
+					</SettingPanel>
+
+					<SettingPanel>
+						<SettingRow
+							title={
+								<>
+									<UserRoundX
+										className="h-4 w-4 text-muted-foreground"
+										aria-hidden
+									/>
+									{t("camera.autoStopNoFace")}
+								</>
+							}
+							description={t(autoStopDescKey, { n: autoStopMinutes })}
+							action={
+								<ToggleSwitch
+									aria-label={t("camera.autoStopNoFaceToggleAria")}
+									checked={preferences.autoStopNoFaceEnabled}
+									onChange={() =>
+										setPreferences((current) => ({
+											...current,
+											autoStopNoFaceEnabled: !current.autoStopNoFaceEnabled,
+										}))
+									}
+								/>
+							}
+						>
+							{preferences.autoStopNoFaceEnabled ? (
+								<div className="flex items-center gap-2">
+									<input
+										aria-label={t("camera.autoStopNoFaceIntervalAria")}
+										type="range"
+										min="1"
+										max="30"
+										value={autoStopMinutes}
+										onChange={(event) =>
+											setPreferences((current) => ({
+												...current,
+												autoStopNoFaceMinutes: Number.parseInt(
+													event.target.value,
+													10,
+												),
+											}))
+										}
+										className="h-1.5 flex-1 cursor-pointer appearance-none rounded-lg bg-muted"
+										style={{
+											background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${autoStopProgress}%, ${trackColor} ${autoStopProgress}%, ${trackColor} 100%)`,
+										}}
+									/>
+									<div className="min-w-[2.5rem] text-center text-xs font-medium text-primary">
+										{autoStopMinutes}m
+									</div>
+								</div>
+							) : null}
 						</SettingRow>
 					</SettingPanel>
 

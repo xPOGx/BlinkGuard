@@ -43,6 +43,8 @@ describe("PreferencesService", () => {
 		expect(service.current.cameraQuality).toBe(
 			DEFAULT_PREFERENCES.cameraQuality,
 		);
+		expect(service.current.autoStopNoFaceEnabled).toBe(true);
+		expect(service.current.autoStopNoFaceMinutes).toBe(2);
 	});
 
 	it("migrates upgrades to hasCompletedOnboarding when other prefs exist", () => {
@@ -212,6 +214,23 @@ describe("PreferencesService", () => {
 
 		service.set("exercisePrompts", [...service.current.exercisePrompts]);
 		expect(store.setCounts.get("exercisePrompts") ?? 0).toBe(0);
+
+		service.set("autoStopNoFaceMinutes", 2);
+		expect(store.setCounts.get("autoStopNoFaceMinutes") ?? 0).toBe(0);
+		service.set("autoStopNoFaceMinutes", 99);
+		expect(service.current.autoStopNoFaceMinutes).toBe(30);
+		expect(store.setCounts.get("autoStopNoFaceMinutes")).toBe(1);
+	});
+
+	it("sanitizes invalid autoStopNoFaceMinutes on hydrate", () => {
+		const store = new FakePreferenceStore();
+		store.set("autoStopNoFaceMinutes", 0);
+		store.set("autoStopNoFaceEnabled", "yes");
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.autoStopNoFaceMinutes).toBe(1);
+		expect(service.current.autoStopNoFaceEnabled).toBe(true);
 	});
 
 	it("reset clears the store and restores defaults with a popup position", () => {

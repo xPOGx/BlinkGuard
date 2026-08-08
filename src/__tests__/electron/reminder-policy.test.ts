@@ -4,7 +4,9 @@ import {
 	BLINK_SNOOZE_MS,
 	CAMERA_POLL_INTERVAL_MS,
 	REMINDER_POPUP_VISIBLE_MS,
+	autoStopNoFaceDelayMs,
 	nextTimerReminderDelay,
+	shouldArmAutoStopOnNoFace,
 	shouldShowCameraReminder,
 } from "../../../electron/domain/reminder-policy";
 
@@ -15,6 +17,38 @@ describe("reminder-policy", () => {
 		expect(CAMERA_POLL_INTERVAL_MS).toBe(100);
 		expect(BLINK_CREDIT_DEBOUNCE_MS).toBe(150);
 		expect(BLINK_SNOOZE_MS).toBe(5 * 60 * 1000);
+	});
+
+	it("converts auto-stop minutes to milliseconds", () => {
+		expect(autoStopNoFaceDelayMs(2)).toBe(120_000);
+		expect(autoStopNoFaceDelayMs(1)).toBe(60_000);
+	});
+
+	it("arms auto-stop only while tracking with camera and feature on", () => {
+		expect(
+			shouldArmAutoStopOnNoFace({
+				isTracking: true,
+				cameraEnabled: true,
+				autoStopNoFaceEnabled: true,
+				cameraSoftPaused: false,
+			}),
+		).toBe(true);
+		expect(
+			shouldArmAutoStopOnNoFace({
+				isTracking: true,
+				cameraEnabled: true,
+				autoStopNoFaceEnabled: true,
+				cameraSoftPaused: true,
+			}),
+		).toBe(false);
+		expect(
+			shouldArmAutoStopOnNoFace({
+				isTracking: true,
+				cameraEnabled: true,
+				autoStopNoFaceEnabled: false,
+				cameraSoftPaused: false,
+			}),
+		).toBe(false);
 	});
 
 	it("shows a camera reminder only when all gates pass", () => {

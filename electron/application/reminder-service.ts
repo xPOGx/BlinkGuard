@@ -3,9 +3,12 @@ import {
 	BLINK_CREDIT_DEBOUNCE_MS,
 	BLINK_SNOOZE_MS,
 	CAMERA_POLL_INTERVAL_MS,
+	NO_FACE_DEBOUNCE_MS,
 	REMINDER_POPUP_VISIBLE_MS,
+	autoStopNoFaceDelayMs,
 	type BlinkCreditSource,
 	nextTimerReminderDelay,
+	shouldArmAutoStopOnNoFace,
 	shouldShowCameraReminder,
 } from "../domain/reminder-policy";
 import type { AppRuntimeState } from "./app-runtime-state";
@@ -128,6 +131,7 @@ export class ReminderService {
 			const wasDetected = this.state.isFaceDetected;
 			this.state.isFaceDetected = true;
 			this.cancelNoFaceDebounce();
+			this.cancelNoFaceAutoStop();
 			this.windows.hideNoFace();
 			if (!wasDetected) this.creditBlink("face-return");
 			return;
@@ -146,9 +150,10 @@ export class ReminderService {
 			this.state.isFaceDetected = false;
 			this.windows.closeReminder();
 			this.windows.hideBlinkRateCoach();
+			this.armNoFaceAutoStop();
 			if (!this.notificationGate.notificationsAllowed()) return;
 			this.windows.showNoFace();
-		}, 750);
+		}, NO_FACE_DEBOUNCE_MS);
 	}
 
 	resumeAfterSleep(useCamera: boolean): void {
@@ -331,6 +336,7 @@ export class ReminderService {
 	private resetFaceTracking(): void {
 		this.state.isFaceDetected = false;
 		this.cancelNoFaceDebounce();
+		this.cancelNoFaceAutoStop();
 		this.windows.hideNoFace();
 		this.windows.hideBlinkRateCoach();
 	}
@@ -340,5 +346,44 @@ export class ReminderService {
 			clearTimeout(this.state.noFaceDebounceTimer);
 			this.state.noFaceDebounceTimer = null;
 		}
+	}
+
+	private cancelNoFaceAutoStop(): void {
+		if (this.state.noFaceAutoStopTimer) {
+			clearTimeout(this.state.noFaceAutoStopTimer);
+			this.state.noFaceAutoStopTimer = null;
+		}
+	}
+
+	private armNoFaceAutoStop(): void {
+		if (
+			!shouldArmAutoStopOnNoFace({
+				isTracking: this.preferences.isTracking,
+				cameraEnabled: this.preferences.cameraEnabled,
+				autoStopNoFaceEnabled: this.preferences.autoStopNoFaceEnabled,
+				cameraSoftPaused: this.cameraSoftPaused,
+			})
+		) {
+			return;
+		}
+		if (this.state.noFaceAutoStopTimer) return;
+		const delayMs = autoStopNoFaceDelayMs(
+			this.preferences.autoStopNoFaceMinutes,
+		);
+		this.state.noFaceAutoStopTimer = setTimeout(() => {
+			this.state.noFaceAutoStopTimer = null;
+			if (
+				!shouldArmAutoStopOnNoFace({
+					isTracking: this.preferences.isTracking,
+					cameraEnabled: this.preferences.cameraEnabled,
+					autoStopNoFaceEnabled: this.preferences.autoStopNoFaceEnabled,
+					cameraSoftPaused: this.cameraSoftPaused,
+				})
+			) {
+				return;
+			}
+			this.stop(true);
+			this.windows.sendPreferences();
+		}, delayMs);
 	}
 }

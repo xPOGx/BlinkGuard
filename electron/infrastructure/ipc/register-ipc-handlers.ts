@@ -96,6 +96,18 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		},
 	);
 	ipcMain.on(
+		IPC_CHANNELS.updateAutoStopNoFaceEnabled,
+		(_event, enabled: boolean) => {
+			preferences.set("autoStopNoFaceEnabled", enabled);
+		},
+	);
+	ipcMain.on(
+		IPC_CHANNELS.updateAutoStopNoFaceMinutes,
+		(_event, minutes: number) => {
+			preferences.set("autoStopNoFaceMinutes", minutes);
+		},
+	);
+	ipcMain.on(
 		IPC_CHANNELS.updateEarCalibration,
 		(_event, baseline: number | null) => {
 			if (baseline === null) {

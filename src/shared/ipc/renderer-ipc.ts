@@ -51,6 +51,10 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateCameraEnabled, enabled),
 	updateCameraQuality: (quality: CameraQuality) =>
 		send(IPC_CHANNELS.updateCameraQuality, quality),
+	updateAutoStopNoFaceEnabled: (enabled: boolean) =>
+		send(IPC_CHANNELS.updateAutoStopNoFaceEnabled, enabled),
+	updateAutoStopNoFaceMinutes: (minutes: number) =>
+		send(IPC_CHANNELS.updateAutoStopNoFaceMinutes, minutes),
 	updateEarCalibration: (baseline: number | null) =>
 		send(IPC_CHANNELS.updateEarCalibration, baseline),
 	startEarCalibration: () => send(IPC_CHANNELS.startEarCalibration),

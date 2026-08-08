@@ -1,5 +1,6 @@
 import {
 	DEFAULT_PREFERENCES,
+	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
 	type AppPreferences,
@@ -111,9 +112,16 @@ export class PreferencesService {
 			persisted.blinkRateCoachingEnabled =
 				DEFAULT_PREFERENCES.blinkRateCoachingEnabled;
 		}
+		if (typeof persisted.autoStopNoFaceEnabled !== "boolean") {
+			persisted.autoStopNoFaceEnabled =
+				DEFAULT_PREFERENCES.autoStopNoFaceEnabled;
+		}
 		persisted.locale = sanitizeLocale(persisted.locale);
 		persisted.blinkRateThresholdPerMin = sanitizeBlinkRateThresholdPerMin(
 			persisted.blinkRateThresholdPerMin,
+		);
+		persisted.autoStopNoFaceMinutes = sanitizeAutoStopNoFaceMinutes(
+			persisted.autoStopNoFaceMinutes,
 		);
 		persisted.exercisePrompts = sanitizeExercisePrompts(
 			persisted.exercisePrompts,
@@ -149,6 +157,10 @@ export class PreferencesService {
 			) as PersistedPreferences[K];
 		} else if (key === "blinkRateThresholdPerMin") {
 			next = sanitizeBlinkRateThresholdPerMin(
+				value,
+			) as PersistedPreferences[K];
+		} else if (key === "autoStopNoFaceMinutes") {
+			next = sanitizeAutoStopNoFaceMinutes(
 				value,
 			) as PersistedPreferences[K];
 		}
