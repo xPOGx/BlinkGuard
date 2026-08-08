@@ -67,7 +67,7 @@ export class LookAwayService {
 	private show(): void {
 		if (this.state.isLookAwayShowing) return;
 		if (!this.notificationGate.notificationsAllowed()) return;
-		this.sound.play("exercise");
+		this.sound.play("lookAway");
 		this.state.isLookAwayShowing = true;
 		this.store.set("lastLookAwayTime", Date.now());
 		const popup = this.windows.showLookAway(() => {

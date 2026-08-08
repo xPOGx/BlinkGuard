@@ -23,7 +23,7 @@ export const en: MessageCatalog = {
 	"app.section.system.desc": "Shortcut, language, launch at login, and reset.",
 	"app.section.debug": "Debug",
 	"app.section.debug.desc":
-		"Preview overlays and reopen onboarding for local testing.",
+		"Preview overlays, test notification sounds, and reopen onboarding for local testing.",
 
 	// Debug
 	"debug.overlays.title": "Preview overlays",
@@ -36,6 +36,14 @@ export const en: MessageCatalog = {
 	"debug.preview.noFace": "No face",
 	"debug.preview.lookAway": "Look away (20-20-20)",
 	"debug.preview.exercise": "Exercise",
+	"debug.sounds.title": "Test sounds",
+	"debug.sounds.desc":
+		"Play each notification sound (ignores the sound toggle; uses volume).",
+	"debug.sound.blink": "Blink",
+	"debug.sound.exercise": "Exercise",
+	"debug.sound.lookAway": "Look away",
+	"debug.sound.starting": "Starting",
+	"debug.sound.stopped": "Stopped",
 	"debug.onboarding.title": "Onboarding",
 	"debug.onboarding.desc":
 		"Reopen the first-run wizard without resetting other preferences.",
@@ -213,8 +221,12 @@ export const en: MessageCatalog = {
 	// Sound / launch / reset / quiet hours
 	"sound.title": "Notification Sound",
 	"sound.description":
-		"Play sounds for blink reminders and exercise prompts",
+		"Play sounds for blink reminders, exercises, look-away breaks, and start/stop status",
 	"sound.toggleAria": "Toggle notification sound",
+	"sound.volume": "Volume",
+	"sound.volumeAria": "Notification sound volume",
+	"sound.test": "Test",
+	"sound.testAria": "Play test notification sound",
 	"launch.title": "Launch at login",
 	"launch.description":
 		"Start BlinkGuard hidden in the system tray when you sign in",

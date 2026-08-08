@@ -55,6 +55,7 @@ export const IPC_CHANNELS = {
 	showSizeEditor: "show-size-editor",
 	sizeSaved: "size-saved",
 	updateSoundEnabled: "update-sound-enabled",
+	updateSoundVolume: "update-sound-volume",
 	updateLaunchAtLogin: "update-launch-at-login",
 	updateHasCompletedOnboarding: "update-has-completed-onboarding",
 	audioFinished: "audio-finished",
@@ -74,6 +75,7 @@ export const IPC_CHANNELS = {
 	updateLocale: "update-locale",
 	applyI18n: "apply-i18n",
 	debugPreviewOverlay: "debug-preview-overlay",
+	debugPreviewSound: "debug-preview-sound",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -133,6 +135,7 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.showSizeEditor,
 	IPC_CHANNELS.sizeSaved,
 	IPC_CHANNELS.updateSoundEnabled,
+	IPC_CHANNELS.updateSoundVolume,
 	IPC_CHANNELS.updateLaunchAtLogin,
 	IPC_CHANNELS.updateHasCompletedOnboarding,
 	IPC_CHANNELS.audioFinished,
@@ -149,4 +152,5 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.updateBlinkRateThreshold,
 	IPC_CHANNELS.updateLocale,
 	IPC_CHANNELS.debugPreviewOverlay,
+	IPC_CHANNELS.debugPreviewSound,
 ] as const;

@@ -220,6 +220,15 @@ describe("PreferencesService", () => {
 		service.set("autoStopNoFaceMinutes", 99);
 		expect(service.current.autoStopNoFaceMinutes).toBe(30);
 		expect(store.setCounts.get("autoStopNoFaceMinutes")).toBe(1);
+
+		service.set("soundVolume", 100);
+		expect(store.setCounts.get("soundVolume") ?? 0).toBe(0);
+		service.set("soundVolume", 50);
+		expect(service.current.soundVolume).toBe(50);
+		expect(store.setCounts.get("soundVolume")).toBe(1);
+		service.set("soundVolume", 150);
+		expect(service.current.soundVolume).toBe(100);
+		expect(store.setCounts.get("soundVolume")).toBe(2);
 	});
 
 	it("sanitizes invalid autoStopNoFaceMinutes on hydrate", () => {
@@ -231,6 +240,15 @@ describe("PreferencesService", () => {
 
 		expect(service.current.autoStopNoFaceMinutes).toBe(1);
 		expect(service.current.autoStopNoFaceEnabled).toBe(true);
+	});
+
+	it("sanitizes invalid soundVolume on hydrate", () => {
+		const store = new FakePreferenceStore();
+		store.set("soundVolume", -20);
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.soundVolume).toBe(0);
 	});
 
 	it("reset clears the store and restores defaults with a popup position", () => {
@@ -259,6 +277,7 @@ describe("PreferencesService", () => {
 		expect(service.current.hasCompletedOnboarding).toBe(true);
 		expect(store.get("hasCompletedOnboarding")).toBe(true);
 		expect(service.current.soundEnabled).toBe(DEFAULT_PREFERENCES.soundEnabled);
+		expect(service.current.soundVolume).toBe(DEFAULT_PREFERENCES.soundVolume);
 		expect(service.current.cameraQuality).toBe(
 			DEFAULT_PREFERENCES.cameraQuality,
 		);

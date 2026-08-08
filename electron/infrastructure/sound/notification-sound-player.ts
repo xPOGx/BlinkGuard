@@ -1,8 +1,27 @@
 import { BrowserWindow } from "electron";
+import fs from "node:fs";
 import path from "node:path";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
-import type { AppPreferences } from "../../../shared/preferences";
+import {
+	sanitizeSoundVolume,
+	type AppPreferences,
+} from "../../../shared/preferences";
 import type { AppPaths } from "../paths/app-paths";
+
+export type NotificationSoundKind =
+	| "blink"
+	| "exercise"
+	| "lookAway"
+	| "starting"
+	| "stopped";
+
+const SOUND_FILES: Record<NotificationSoundKind, string> = {
+	blink: "notification.mp3",
+	exercise: "exercisePopup.mp3",
+	lookAway: "lookAwayPopup.mp3",
+	starting: "startingPopup.mp3",
+	stopped: "stoppedPopup.mp3",
+};
 
 export class NotificationSoundPlayer {
 	constructor(
@@ -11,22 +30,34 @@ export class NotificationSoundPlayer {
 		private readonly isProd: boolean,
 	) {}
 
-	play(kind: "blink" | "exercise" | "stopped"): void {
-		if (!this.preferences.soundEnabled) return;
-		const names = {
-			blink: "notification.mp3",
-			exercise: "exercisePopup.mp3",
-			stopped: "stoppedPopup.mp3",
-		};
+	play(
+		kind: NotificationSoundKind,
+		options?: { force?: boolean; volume?: number },
+	): void {
+		if (!options?.force && !this.preferences.soundEnabled) return;
+
+		const volumePercent =
+			options?.volume !== undefined
+				? sanitizeSoundVolume(options.volume)
+				: this.preferences.soundVolume;
+		if (volumePercent <= 0) return;
+
 		const soundPath = this.isProd
 			? path.join(
 					process.resourcesPath,
 					"app.asar.unpacked",
 					"public",
 					"sounds",
-					names[kind],
+					SOUND_FILES[kind],
 				)
-			: path.join(this.paths.root, "public", "sounds", names[kind]);
+			: path.join(this.paths.root, "public", "sounds", SOUND_FILES[kind]);
+
+		if (!fs.existsSync(soundPath)) {
+			console.warn(`Notification sound missing: ${soundPath}`);
+			return;
+		}
+
+		const volume = Math.min(1, Math.max(0, volumePercent / 100));
 		const window = new BrowserWindow({
 			width: 1,
 			height: 1,
@@ -39,7 +70,10 @@ export class NotificationSoundPlayer {
 		});
 		void window.loadFile(path.join(this.paths.publicDir, "sound-player.html"));
 		window.webContents.on("did-finish-load", () => {
-			window.webContents.send(IPC_CHANNELS.playSound, soundPath);
+			window.webContents.send(IPC_CHANNELS.playSound, {
+				path: soundPath,
+				volume,
+			});
 		});
 		window.webContents.on("ipc-message", (_event, channel) => {
 			if (channel === IPC_CHANNELS.audioFinished && !window.isDestroyed()) {

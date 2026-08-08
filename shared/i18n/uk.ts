@@ -24,7 +24,7 @@ export const uk: MessageCatalog = {
 		"Гаряча клавіша, мова, автозапуск і скидання.",
 	"app.section.debug": "Debug",
 	"app.section.debug.desc":
-		"Перегляд оверлеїв і повторне відкриття онбордингу для локальних тестів.",
+		"Перегляд оверлеїв, тест звуків сповіщень і повторне відкриття онбордингу для локальних тестів.",
 
 	// Debug
 	"debug.overlays.title": "Перегляд оверлеїв",
@@ -37,6 +37,14 @@ export const uk: MessageCatalog = {
 	"debug.preview.noFace": "Немає обличчя",
 	"debug.preview.lookAway": "Подивіться вдалину (20-20-20)",
 	"debug.preview.exercise": "Вправа",
+	"debug.sounds.title": "Тест звуків",
+	"debug.sounds.desc":
+		"Відтворити кожен звук сповіщення (ігнорує перемикач звуку; використовує гучність).",
+	"debug.sound.blink": "Моргання",
+	"debug.sound.exercise": "Вправа",
+	"debug.sound.lookAway": "Подивіться вдалину",
+	"debug.sound.starting": "Запуск",
+	"debug.sound.stopped": "Зупинка",
 	"debug.onboarding.title": "Онбординг",
 	"debug.onboarding.desc":
 		"Знову відкрити майстер першого запуску без скидання інших налаштувань.",
@@ -220,8 +228,12 @@ export const uk: MessageCatalog = {
 	// Sound / launch / reset / quiet hours
 	"sound.title": "Звук сповіщень",
 	"sound.description":
-		"Відтворювати звуки для нагадувань про моргання та вправи",
+		"Відтворювати звуки для нагадувань про моргання, вправ, перерв «подивіться вдалину» та статусу старт/стоп",
 	"sound.toggleAria": "Перемкнути звук сповіщень",
+	"sound.volume": "Гучність",
+	"sound.volumeAria": "Гучність звуку сповіщень",
+	"sound.test": "Тест",
+	"sound.testAria": "Відтворити тестовий звук сповіщення",
 	"launch.title": "Запуск під час входу",
 	"launch.description":
 		"Запускати BlinkGuard у системному треї під час входу в систему",

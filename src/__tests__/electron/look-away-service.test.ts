@@ -99,7 +99,7 @@ describe("LookAwayService", () => {
 		service.start();
 		vi.advanceTimersByTime(60_000);
 
-		expect(sound.play).toHaveBeenCalledWith("exercise");
+		expect(sound.play).toHaveBeenCalledWith("lookAway");
 		expect(windows.showLookAway).toHaveBeenCalledTimes(1);
 		expect(state.isLookAwayShowing).toBe(true);
 	});

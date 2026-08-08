@@ -1,7 +1,7 @@
 import { ipcMain } from "electron";
 import { isValidEarCalibration } from "../../../shared/ear-calibration";
 import { isCameraQuality } from "../../../shared/camera-quality";
-import { isDebugOverlayKind } from "../../../shared/debug-preview";
+import { isDebugOverlayKind, isDebugSoundKind } from "../../../shared/debug-preview";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import { sanitizeLocale } from "../../../shared/i18n";
 import type {
@@ -16,6 +16,7 @@ import type { FocusPauseService } from "../../application/focus-pause-service";
 import type { LookAwayService } from "../../application/look-away-service";
 import type { PreferencesService } from "../../application/preferences-service";
 import type { ReminderService } from "../../application/reminder-service";
+import type { NotificationSoundPort } from "../../application/ports/runtime-ports";
 import { normalizeQuietHoursTime } from "../../domain/focus-policy";
 import { applyLaunchAtLogin } from "../lifecycle/login-item";
 import type { BlinkDetectorSidecar } from "../sidecar/blink-detector-sidecar";
@@ -33,6 +34,7 @@ interface IpcDependencies {
 	windows: WindowManager;
 	blinkStats: BlinkStatsService;
 	focusPause: FocusPauseService;
+	sound: NotificationSoundPort;
 	tray?: TrayController;
 }
 
@@ -47,6 +49,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		windows,
 		blinkStats,
 		focusPause,
+		sound,
 		tray,
 	} = deps;
 	const current = preferences.current;
@@ -206,6 +209,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	ipcMain.on(IPC_CHANNELS.updateSoundEnabled, (_event, enabled: boolean) => {
 		preferences.set("soundEnabled", enabled);
 	});
+	ipcMain.on(IPC_CHANNELS.updateSoundVolume, (_event, volume: number) => {
+		preferences.set("soundVolume", volume);
+	});
 	ipcMain.on(IPC_CHANNELS.updateLaunchAtLogin, (_event, enabled: boolean) => {
 		preferences.set("launchAtLogin", enabled);
 		applyLaunchAtLogin(enabled);
@@ -293,6 +299,17 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		if (!isDebugOverlayKind(kind)) return;
 		windows.previewDebugOverlay(kind);
 	});
+	ipcMain.on(
+		IPC_CHANNELS.debugPreviewSound,
+		(_event, kind: unknown, volume?: unknown) => {
+			if (!isDebugSoundKind(kind)) return;
+			const options: { force: true; volume?: number } = { force: true };
+			if (typeof volume === "number") {
+				options.volume = volume;
+			}
+			sound.play(kind, options);
+		},
+	);
 	ipcMain.on(
 		IPC_CHANNELS.popupEditorSaved,
 		(_event, value: { size: Size; position: Point }) => {

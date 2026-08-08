@@ -3,6 +3,7 @@ import {
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
+	sanitizeSoundVolume,
 	type AppPreferences,
 	type PersistedPreferences,
 } from "../../shared/preferences";
@@ -123,6 +124,7 @@ export class PreferencesService {
 		persisted.autoStopNoFaceMinutes = sanitizeAutoStopNoFaceMinutes(
 			persisted.autoStopNoFaceMinutes,
 		);
+		persisted.soundVolume = sanitizeSoundVolume(persisted.soundVolume);
 		persisted.exercisePrompts = sanitizeExercisePrompts(
 			persisted.exercisePrompts,
 			persisted.locale,
@@ -163,6 +165,8 @@ export class PreferencesService {
 			next = sanitizeAutoStopNoFaceMinutes(
 				value,
 			) as PersistedPreferences[K];
+		} else if (key === "soundVolume") {
+			next = sanitizeSoundVolume(value) as PersistedPreferences[K];
 		}
 		// No-op equal writes: settings sync and dual IPC callers re-send often.
 		if (samePreferenceValue(key, this.current[key], next)) {

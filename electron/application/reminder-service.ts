@@ -56,7 +56,10 @@ export class ReminderService {
 	stop(showStatus = true): void {
 		this.ensureStopped();
 		this.windows.closeCamera();
-		if (showStatus) this.windows.showReminder("stopped");
+		if (showStatus) {
+			this.sound.play("stopped");
+			this.windows.showReminder("stopped");
+		}
 	}
 
 	ensureStopped(): void {
@@ -250,6 +253,7 @@ export class ReminderService {
 		this.sidecar.markCameraUnavailable();
 		this.resetFaceTracking();
 		if (showStarting) {
+			this.sound.play("starting");
 			const popup = this.windows.showReminder("starting");
 			setTimeout(() => {
 				this.windows.closeReminderIfCurrent(popup);

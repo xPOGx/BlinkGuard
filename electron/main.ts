@@ -213,6 +213,7 @@ function bootstrap(): void {
 		windows,
 		blinkStats,
 		focusPause,
+		sound,
 		tray,
 	});
 

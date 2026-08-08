@@ -15,6 +15,7 @@ import {
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
+	sanitizeSoundVolume,
 	toRendererPreferences,
 } from "../../../shared/preferences";
 
@@ -158,6 +159,19 @@ describe("auto-stop on no-face preference defaults", () => {
 		expect(sanitizeAutoStopNoFaceMinutes(0)).toBe(1);
 		expect(sanitizeAutoStopNoFaceMinutes(99)).toBe(30);
 		expect(sanitizeAutoStopNoFaceMinutes(7.6)).toBe(8);
+	});
+});
+
+describe("sound volume preference", () => {
+	it("defaults to 100", () => {
+		expect(DEFAULT_PREFERENCES.soundVolume).toBe(100);
+	});
+
+	it("sanitizes soundVolume to 0…100", () => {
+		expect(sanitizeSoundVolume(null)).toBe(100);
+		expect(sanitizeSoundVolume(-5)).toBe(0);
+		expect(sanitizeSoundVolume(150)).toBe(100);
+		expect(sanitizeSoundVolume(42.6)).toBe(43);
 	});
 });
 

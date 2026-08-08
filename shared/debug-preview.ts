@@ -18,3 +18,20 @@ export function isDebugOverlayKind(
 		(DEBUG_OVERLAY_KINDS as readonly string[]).includes(value)
 	);
 }
+
+export const DEBUG_SOUND_KINDS = [
+	"blink",
+	"exercise",
+	"lookAway",
+	"starting",
+	"stopped",
+] as const;
+
+export type DebugSoundKind = (typeof DEBUG_SOUND_KINDS)[number];
+
+export function isDebugSoundKind(value: unknown): value is DebugSoundKind {
+	return (
+		typeof value === "string" &&
+		(DEBUG_SOUND_KINDS as readonly string[]).includes(value)
+	);
+}

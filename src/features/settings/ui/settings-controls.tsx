@@ -1,5 +1,5 @@
-import { Gamepad2, LogIn, Moon, Sun, Volume2, VolumeX } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Gamepad2, LogIn, Moon, Play, Sun, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/button";
 import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
@@ -78,6 +78,32 @@ export function SoundSettings({
 	setPreferences,
 }: SoundSettingsProps) {
 	const t = useT();
+	const volume = preferences.soundVolume;
+	const volumeProgress = volume;
+	const trackColor = preferences.darkMode
+		? "hsl(217 25% 18%)"
+		: "hsl(210 18% 90%)";
+	const fillColor = "hsl(173 58% 36%)";
+	const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	useEffect(() => {
+		return () => {
+			if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+		};
+	}, []);
+
+	const previewBlinkAt = (nextVolume: number) => {
+		if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+		previewTimerRef.current = setTimeout(() => {
+			rendererIpc.debugPreviewSound("blink", nextVolume);
+		}, 250);
+	};
+
+	const playTestNow = () => {
+		if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
+		rendererIpc.debugPreviewSound("blink", volume);
+	};
+
 	return (
 		<SettingPanel>
 			<SettingRow
@@ -104,7 +130,52 @@ export function SoundSettings({
 						}
 					/>
 				}
-			/>
+			>
+				{preferences.soundEnabled ? (
+					<div className="flex items-center gap-3">
+						<label
+							htmlFor="sound-volume"
+							className="shrink-0 text-sm text-muted-foreground"
+						>
+							{t("sound.volume")}
+						</label>
+						<input
+							id="sound-volume"
+							aria-label={t("sound.volumeAria")}
+							type="range"
+							min="0"
+							max="100"
+							value={volume}
+							onChange={(event) => {
+								const nextVolume = Number.parseInt(event.target.value, 10);
+								setPreferences((current) => ({
+									...current,
+									soundVolume: nextVolume,
+								}));
+								previewBlinkAt(nextVolume);
+							}}
+							className="h-1.5 flex-1 cursor-pointer appearance-none rounded-lg bg-muted"
+							style={{
+								background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${volumeProgress}%, ${trackColor} ${volumeProgress}%, ${trackColor} 100%)`,
+							}}
+						/>
+						<div className="min-w-[3.25rem] rounded-md bg-accent px-2 py-1 text-center text-sm font-semibold text-accent-foreground">
+							{volume}%
+						</div>
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							className="gap-1.5"
+							aria-label={t("sound.testAria")}
+							onClick={playTestNow}
+						>
+							<Play className="h-3.5 w-3.5" aria-hidden />
+							{t("sound.test")}
+						</Button>
+					</div>
+				) : null}
+			</SettingRow>
 		</SettingPanel>
 	);
 }

@@ -1,5 +1,5 @@
 import type { BlinkStatsSnapshot } from "../../../shared/blink-stats";
-import type { DebugOverlayKind } from "../../../shared/debug-preview";
+import type { DebugOverlayKind, DebugSoundKind } from "../../../shared/debug-preview";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import type {
 	CameraQuality,
@@ -92,6 +92,8 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateKeyboardShortcut, shortcut),
 	updateSoundEnabled: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateSoundEnabled, enabled),
+	updateSoundVolume: (volume: number) =>
+		send(IPC_CHANNELS.updateSoundVolume, volume),
 	updateLaunchAtLogin: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateLaunchAtLogin, enabled),
 	updateHasCompletedOnboarding: (completed: boolean) =>
@@ -131,4 +133,6 @@ export const rendererIpc = {
 	resetBlinkStats: () => send(IPC_CHANNELS.resetBlinkStats),
 	debugPreviewOverlay: (kind: DebugOverlayKind) =>
 		send(IPC_CHANNELS.debugPreviewOverlay, kind),
+	debugPreviewSound: (kind: DebugSoundKind, volume?: number) =>
+		send(IPC_CHANNELS.debugPreviewSound, kind, volume),
 };

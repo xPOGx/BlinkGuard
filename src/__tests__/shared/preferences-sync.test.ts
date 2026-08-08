@@ -26,6 +26,7 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updateKeyboardShortcut: vi.fn(),
 		updateMgdMode: vi.fn(),
 		updateSoundEnabled: vi.fn(),
+		updateSoundVolume: vi.fn(),
 		updateLaunchAtLogin: vi.fn(),
 		updateQuietHoursEnabled: vi.fn(),
 		updateQuietHoursStart: vi.fn(),
@@ -79,6 +80,16 @@ describe("sameRendererPrefs", () => {
 			sameRendererPrefs(base, {
 				...base,
 				autoStopNoFaceMinutes: 5,
+			}),
+		).toBe(false);
+	});
+
+	it("detects sound volume preference changes", () => {
+		const base = { ...DEFAULT_RENDERER_PREFERENCES };
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				soundVolume: 40,
 			}),
 		).toBe(false);
 	});
@@ -136,5 +147,16 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateAutoStopNoFaceMinutes).toHaveBeenCalledWith(10);
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 		expect(rendererIpc.updateCameraEnabled).not.toHaveBeenCalled();
+	});
+
+	it("pushes only sound volume when it changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = { ...previous, soundVolume: 55 };
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateSoundVolume).toHaveBeenCalledWith(55);
+		expect(rendererIpc.updateSoundEnabled).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 	});
 });

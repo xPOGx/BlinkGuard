@@ -58,6 +58,7 @@ export function sameRendererPrefs(
 		a.keyboardShortcut === b.keyboardShortcut &&
 		a.mgdMode === b.mgdMode &&
 		a.soundEnabled === b.soundEnabled &&
+		a.soundVolume === b.soundVolume &&
 		a.launchAtLogin === b.launchAtLogin &&
 		a.isTracking === b.isTracking &&
 		a.quietHoursEnabled === b.quietHoursEnabled &&
@@ -134,6 +135,9 @@ export function pushPreferenceDiff(
 	}
 	if (!previous || previous.soundEnabled !== next.soundEnabled) {
 		rendererIpc.updateSoundEnabled(next.soundEnabled);
+	}
+	if (!previous || previous.soundVolume !== next.soundVolume) {
+		rendererIpc.updateSoundVolume(next.soundVolume);
 	}
 	if (!previous || previous.launchAtLogin !== next.launchAtLogin) {
 		rendererIpc.updateLaunchAtLogin(next.launchAtLogin);

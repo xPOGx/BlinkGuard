@@ -33,6 +33,10 @@ const AUTO_STOP_NO_FACE_MINUTES_MIN = 1;
 const AUTO_STOP_NO_FACE_MINUTES_MAX = 30;
 const AUTO_STOP_NO_FACE_MINUTES_DEFAULT = 2;
 
+const SOUND_VOLUME_MIN = 0;
+const SOUND_VOLUME_MAX = 100;
+const SOUND_VOLUME_DEFAULT = 100;
+
 /** Coerce stored/IPC blink-rate coaching threshold to 1…60. */
 export function sanitizeBlinkRateThresholdPerMin(input: unknown): number {
 	if (input === null || input === undefined || input === "") {
@@ -56,6 +60,19 @@ export function sanitizeAutoStopNoFaceMinutes(input: unknown): number {
 	return Math.min(
 		AUTO_STOP_NO_FACE_MINUTES_MAX,
 		Math.max(AUTO_STOP_NO_FACE_MINUTES_MIN, Math.round(n)),
+	);
+}
+
+/** Coerce stored/IPC notification sound volume to 0…100. */
+export function sanitizeSoundVolume(input: unknown): number {
+	if (input === null || input === undefined || input === "") {
+		return SOUND_VOLUME_DEFAULT;
+	}
+	const n = typeof input === "number" ? input : Number(input);
+	if (!Number.isFinite(n)) return SOUND_VOLUME_DEFAULT;
+	return Math.min(
+		SOUND_VOLUME_MAX,
+		Math.max(SOUND_VOLUME_MIN, Math.round(n)),
 	);
 }
 
@@ -91,6 +108,8 @@ export interface PersistedPreferences {
 	keyboardShortcut: string;
 	mgdMode: boolean;
 	soundEnabled: boolean;
+	/** Notification sound loudness 0…100 (HTML audio volume = value / 100). */
+	soundVolume: number;
 	/** Opt-in: start BlinkGuard at OS login (hidden to tray). */
 	launchAtLogin: boolean;
 	/** Whether blink reminders are active; persisted across restarts. */
@@ -161,6 +180,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	keyboardShortcut: "Ctrl+I",
 	mgdMode: false,
 	soundEnabled: false,
+	soundVolume: SOUND_VOLUME_DEFAULT,
 	launchAtLogin: false,
 	isTracking: false,
 	quietHoursEnabled: true,
