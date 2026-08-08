@@ -23,7 +23,8 @@ export const en: MessageCatalog = {
 	"app.section.rewards.desc":
 		"Spend Available blinks on cheers, flair, and streak shields.",
 	"app.section.system": "System",
-	"app.section.system.desc": "Shortcut, language, launch at login, and reset.",
+	"app.section.system.desc":
+		"Shortcut, language, launch at login, backup, and reset.",
 	"app.section.about": "About",
 	"app.section.about.desc":
 		"What BlinkGuard is, why it exists, privacy, and the open-source repo.",
@@ -285,6 +286,25 @@ export const en: MessageCatalog = {
 	"reset.confirm": "Reset all preferences to default values?",
 	"reset.replayOnboarding": "Show first-run setup again",
 	"reset.showOnboarding": "Show onboarding",
+	"backup.title": "Backup",
+	"backup.body":
+		"Export or import a local JSON file with preferences and/or blink statistics. Nothing is uploaded.",
+	"backup.scope.legend": "Backup scope",
+	"backup.scope.both": "Preferences and statistics",
+	"backup.scope.preferences": "Preferences only",
+	"backup.scope.statistics": "Statistics only",
+	"backup.export.button": "Export backup",
+	"backup.export.busy": "Exporting…",
+	"backup.export.success": "Saved to {path}",
+	"backup.export.cancelled": "Export cancelled",
+	"backup.export.error": "Export failed: {message}",
+	"backup.import.button": "Import backup",
+	"backup.import.busy": "Importing…",
+	"backup.import.confirm":
+		"Replace the selected data on this device with the backup file? This cannot be undone.",
+	"backup.import.success": "Backup imported",
+	"backup.import.cancelled": "Import cancelled",
+	"backup.import.error": "Import failed: {message}",
 	"quietHours.title": "Quiet hours",
 	"quietHours.description":
 		"Hide blink, exercise, and look-away popups during this local-time window",

@@ -1,4 +1,5 @@
 import { BLINK_RATE_LOW_MAX } from "./blink-rate";
+import { isValidEarCalibration } from "./ear-calibration";
 import {
 	defaultExercisePrompts,
 	defaultPopupMessage,
@@ -305,5 +306,239 @@ export function toRendererPreferences(
 	return {
 		...preferences,
 		reminderInterval: preferences.reminderInterval / 1000,
+	};
+}
+
+const QUIET_HOURS_HH_MM = /^(\d{1,2}):(\d{2})(?::\d{2})?$/;
+
+function parseQuietHoursMinutes(value: string): number | null {
+	const match = QUIET_HOURS_HH_MM.exec(value.trim());
+	if (!match) return null;
+	const hours = Number(match[1]);
+	const minutes = Number(match[2]);
+	if (
+		!Number.isInteger(hours) ||
+		!Number.isInteger(minutes) ||
+		hours < 0 ||
+		hours > 23 ||
+		minutes < 0 ||
+		minutes > 59
+	) {
+		return null;
+	}
+	return hours * 60 + minutes;
+}
+
+function normalizeQuietHoursTime(value: string): string | null {
+	const minutes = parseQuietHoursMinutes(value);
+	if (minutes === null) return null;
+	const hours = Math.floor(minutes / 60);
+	const mins = minutes % 60;
+	return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+function isCameraQualityValue(value: unknown): value is CameraQuality {
+	return (
+		value === "performance" || value === "medium" || value === "high"
+	);
+}
+
+function asBoolean(value: unknown, fallback: boolean): boolean {
+	return typeof value === "boolean" ? value : fallback;
+}
+
+function asFiniteNumber(value: unknown, fallback: number): number {
+	const n = typeof value === "number" ? value : Number(value);
+	return Number.isFinite(n) ? n : fallback;
+}
+
+function asPositiveMs(value: unknown, fallback: number): number {
+	const n = asFiniteNumber(value, fallback);
+	return n > 0 ? Math.round(n) : fallback;
+}
+
+function asPositiveMinutes(value: unknown, fallback: number): number {
+	const n = asFiniteNumber(value, fallback);
+	return n > 0 ? Math.round(n) : fallback;
+}
+
+function asPositiveSeconds(value: unknown, fallback: number): number {
+	const n = asFiniteNumber(value, fallback);
+	return n > 0 ? Math.round(n) : fallback;
+}
+
+function sanitizePopupPosition(value: unknown): Point | null {
+	if (value === null || value === undefined) return null;
+	if (!value || typeof value !== "object") return null;
+	const record = value as Record<string, unknown>;
+	const x = asFiniteNumber(record.x, Number.NaN);
+	const y = asFiniteNumber(record.y, Number.NaN);
+	if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+	return { x: Math.round(x), y: Math.round(y) };
+}
+
+function sanitizePopupSize(value: unknown, fallback: Size): Size {
+	if (!value || typeof value !== "object") return { ...fallback };
+	const record = value as Record<string, unknown>;
+	const width = asFiniteNumber(record.width, fallback.width);
+	const height = asFiniteNumber(record.height, fallback.height);
+	return {
+		width: Math.max(1, Math.round(width)),
+		height: Math.max(1, Math.round(height)),
+	};
+}
+
+function sanitizePopupColors(value: unknown, fallback: PopupColors): PopupColors {
+	if (!value || typeof value !== "object") return { ...fallback };
+	const record = value as Record<string, unknown>;
+	const background =
+		typeof record.background === "string" && record.background.trim()
+			? record.background
+			: fallback.background;
+	const text =
+		typeof record.text === "string" && record.text.trim()
+			? record.text
+			: fallback.text;
+	const transparency = asFiniteNumber(record.transparency, fallback.transparency);
+	return {
+		background,
+		text,
+		transparency: Math.min(1, Math.max(0, transparency)),
+	};
+}
+
+export type SanitizePersistedPreferencesOptions = {
+	/** When true, always persist isTracking as false (backup import). */
+	forceIsTrackingFalse?: boolean;
+};
+
+/**
+ * Coerce arbitrary JSON into a full PersistedPreferences object.
+ * Missing/invalid fields fall back to DEFAULT_PREFERENCES (and related sanitizers).
+ */
+export function sanitizePersistedPreferences(
+	input: unknown,
+	options?: SanitizePersistedPreferencesOptions,
+): PersistedPreferences {
+	const defaults = DEFAULT_PREFERENCES;
+	const record =
+		input && typeof input === "object"
+			? (input as Record<string, unknown>)
+			: {};
+
+	const locale = sanitizeLocale(record.locale ?? defaults.locale);
+	const earRaw = record.earCalibration;
+	const earCalibration =
+		earRaw === null
+			? null
+			: isValidEarCalibration(earRaw)
+				? earRaw
+				: defaults.earCalibration;
+
+	const quietStartRaw =
+		typeof record.quietHoursStart === "string"
+			? record.quietHoursStart
+			: defaults.quietHoursStart;
+	const quietEndRaw =
+		typeof record.quietHoursEnd === "string"
+			? record.quietHoursEnd
+			: defaults.quietHoursEnd;
+	const quietHoursStart =
+		normalizeQuietHoursTime(quietStartRaw) ?? defaults.quietHoursStart;
+	const quietHoursEnd =
+		normalizeQuietHoursTime(quietEndRaw) ?? defaults.quietHoursEnd;
+
+	const goals = sanitizeGoalsConfig({
+		goalsEnabled: record.goalsEnabled,
+		dailyBlinkGoal: record.dailyBlinkGoal,
+		dailyTrackingMinutesGoal: record.dailyTrackingMinutesGoal,
+		weeklyBlinkGoal: record.weeklyBlinkGoal,
+		weeklyTrackingMinutesGoal: record.weeklyTrackingMinutesGoal,
+	});
+
+	const isTracking = options?.forceIsTrackingFalse
+		? false
+		: asBoolean(record.isTracking, defaults.isTracking);
+
+	return {
+		darkMode: asBoolean(record.darkMode, defaults.darkMode),
+		reminderInterval: asPositiveMs(
+			record.reminderInterval,
+			defaults.reminderInterval,
+		),
+		cameraEnabled: asBoolean(record.cameraEnabled, defaults.cameraEnabled),
+		cameraQuality: isCameraQualityValue(record.cameraQuality)
+			? record.cameraQuality
+			: defaults.cameraQuality,
+		autoStopNoFaceEnabled: asBoolean(
+			record.autoStopNoFaceEnabled,
+			defaults.autoStopNoFaceEnabled,
+		),
+		autoStopNoFaceMinutes: sanitizeAutoStopNoFaceMinutes(
+			record.autoStopNoFaceMinutes,
+		),
+		blinkRateCoachingEnabled: asBoolean(
+			record.blinkRateCoachingEnabled,
+			defaults.blinkRateCoachingEnabled,
+		),
+		blinkRateThresholdPerMin: sanitizeBlinkRateThresholdPerMin(
+			record.blinkRateThresholdPerMin,
+		),
+		earCalibration,
+		eyeExercisesEnabled: asBoolean(
+			record.eyeExercisesEnabled,
+			defaults.eyeExercisesEnabled,
+		),
+		exerciseInterval: asPositiveMinutes(
+			record.exerciseInterval,
+			defaults.exerciseInterval,
+		),
+		exercisePrompts: sanitizeExercisePrompts(record.exercisePrompts, locale),
+		lookAwayEnabled: asBoolean(record.lookAwayEnabled, defaults.lookAwayEnabled),
+		lookAwayInterval: asPositiveMinutes(
+			record.lookAwayInterval,
+			defaults.lookAwayInterval,
+		),
+		lookAwayDuration: asPositiveSeconds(
+			record.lookAwayDuration,
+			defaults.lookAwayDuration,
+		),
+		popupPosition: sanitizePopupPosition(record.popupPosition),
+		popupSize: sanitizePopupSize(record.popupSize, defaults.popupSize),
+		popupColors: sanitizePopupColors(record.popupColors, defaults.popupColors),
+		popupMessage:
+			typeof record.popupMessage === "string" && record.popupMessage.trim()
+				? record.popupMessage
+				: defaults.popupMessage,
+		keyboardShortcut:
+			typeof record.keyboardShortcut === "string" &&
+			record.keyboardShortcut.trim()
+				? record.keyboardShortcut
+				: defaults.keyboardShortcut,
+		mgdMode: asBoolean(record.mgdMode, defaults.mgdMode),
+		soundEnabled: asBoolean(record.soundEnabled, defaults.soundEnabled),
+		soundVolume: sanitizeSoundVolume(record.soundVolume),
+		launchAtLogin: asBoolean(record.launchAtLogin, defaults.launchAtLogin),
+		isTracking,
+		quietHoursEnabled: asBoolean(
+			record.quietHoursEnabled,
+			defaults.quietHoursEnabled,
+		),
+		quietHoursStart,
+		quietHoursEnd,
+		pauseOnFullscreen: asBoolean(
+			record.pauseOnFullscreen,
+			defaults.pauseOnFullscreen,
+		),
+		hasCompletedOnboarding: asBoolean(
+			record.hasCompletedOnboarding,
+			defaults.hasCompletedOnboarding,
+		),
+		locale,
+		goalsEnabled: goals.goalsEnabled,
+		dailyBlinkGoal: goals.dailyBlinkGoal,
+		dailyTrackingMinutesGoal: goals.dailyTrackingMinutesGoal,
+		weeklyBlinkGoal: goals.weeklyBlinkGoal,
+		weeklyTrackingMinutesGoal: goals.weeklyTrackingMinutesGoal,
 	};
 }

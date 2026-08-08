@@ -80,6 +80,8 @@ export const IPC_CHANNELS = {
 	autoUpdateStatus: "auto-update-status",
 	installUpdate: "install-update",
 	exportDiagnostics: "export-diagnostics",
+	exportBackup: "export-backup",
+	importBackup: "import-backup",
 	updateGoalsConfig: "update-goals-config",
 	spendBlinkReward: "spend-blink-reward",
 } as const;

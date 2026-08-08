@@ -242,4 +242,39 @@ describe("BlinkStatsService", () => {
 		expect(service.getSnapshot().blinksPerMinute).toBe(0);
 		service.dispose();
 	});
+
+	it("replaceState restores persisted stats and reset still clears them", () => {
+		const store = createStore();
+		const service = new BlinkStatsService(store);
+		service.recordBlink();
+		expect(service.getSnapshot().totals.total).toBe(1);
+
+		service.replaceState({
+			days: [
+				{
+					date: "2026-08-01",
+					blinks: 40,
+					trackingMs: 120_000,
+					sessions: 2,
+					hourlyBlinks: Array.from({ length: 24 }, () => 0),
+				},
+			],
+			totalBlinks: 40,
+			spentBlinks: 5,
+			unlockedRewardIds: ["statsFlair"],
+			streakShieldCharges: 1,
+			streakShieldUsedDates: [],
+		});
+
+		expect(service.getPersistedState().totalBlinks).toBe(40);
+		expect(service.getPersistedState().spentBlinks).toBe(5);
+		expect(service.getPersistedState().days[0]?.blinks).toBe(40);
+		expect(service.getSnapshot().totals.available).toBe(35);
+		expect(service.getSnapshot().hasStatsFlair).toBe(true);
+
+		service.reset();
+		expect(service.getPersistedState().totalBlinks).toBe(0);
+		expect(service.getPersistedState().days).toEqual([]);
+		service.dispose();
+	});
 });

@@ -304,4 +304,52 @@ describe("PreferencesService", () => {
 		expect(service.current.hasCompletedOnboarding).toBe(false);
 		expect(store.has("hasCompletedOnboarding")).toBe(false);
 	});
+
+	it("replaceFromBackup restores key prefs and forces isTracking false", () => {
+		const store = new FakePreferenceStore();
+		store.set("darkMode", true);
+		store.set("locale", "en");
+		const service = new PreferencesService(store);
+
+		service.replaceFromBackup({
+			...DEFAULT_PREFERENCES,
+			darkMode: false,
+			locale: "uk",
+			reminderInterval: 7000,
+			keyboardShortcut: "Ctrl+B",
+			isTracking: true,
+			hasCompletedOnboarding: true,
+			cameraQuality: "high",
+			dailyBlinkGoal: 100,
+		});
+
+		expect(service.current.darkMode).toBe(false);
+		expect(service.current.locale).toBe("uk");
+		expect(service.current.reminderInterval).toBe(7000);
+		expect(service.current.keyboardShortcut).toBe("Ctrl+B");
+		expect(service.current.isTracking).toBe(false);
+		expect(service.current.hasCompletedOnboarding).toBe(true);
+		expect(service.current.cameraQuality).toBe("high");
+		expect(service.current.dailyBlinkGoal).toBe(100);
+		expect(store.get("isTracking")).toBe(false);
+		expect(store.get("locale")).toBe("uk");
+	});
+
+	it("replaceFromBackup clamps invalid fields instead of rejecting", () => {
+		const store = new FakePreferenceStore();
+		const service = new PreferencesService(store);
+
+		service.replaceFromBackup({
+			...DEFAULT_PREFERENCES,
+			autoStopNoFaceMinutes: 99,
+			soundVolume: -5,
+			cameraQuality: "ultra" as never,
+		});
+
+		expect(service.current.autoStopNoFaceMinutes).toBe(30);
+		expect(service.current.soundVolume).toBe(0);
+		expect(service.current.cameraQuality).toBe(
+			DEFAULT_PREFERENCES.cameraQuality,
+		);
+	});
 });

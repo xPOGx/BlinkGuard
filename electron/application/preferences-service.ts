@@ -3,18 +3,12 @@ import {
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
-	sanitizeGoalsConfig,
+	sanitizePersistedPreferences,
 	sanitizeSoundVolume,
 	type AppPreferences,
 	type PersistedPreferences,
 } from "../../shared/preferences";
 import { sanitizeLocale } from "../../shared/i18n";
-import { isValidEarCalibration } from "../../shared/ear-calibration";
-import { isCameraQuality } from "../../shared/camera-quality";
-import {
-	isValidQuietHoursTime,
-	normalizeQuietHoursTime,
-} from "../domain/focus-policy";
 import type { PreferenceStore } from "./ports/preference-store";
 
 const PERSISTED_KEYS = Object.keys(
@@ -67,81 +61,11 @@ export class PreferencesService {
 	readonly current: AppPreferences;
 
 	constructor(private readonly store: PreferenceStore) {
-		const persisted = { ...DEFAULT_PREFERENCES } as PersistedPreferences;
+		const loaded = { ...DEFAULT_PREFERENCES } as PersistedPreferences;
 		for (const key of PERSISTED_KEYS) {
-			persisted[key] = this.store.get(key, DEFAULT_PREFERENCES[key]) as never;
+			loaded[key] = this.store.get(key, DEFAULT_PREFERENCES[key]) as never;
 		}
-		if (!isCameraQuality(persisted.cameraQuality)) {
-			persisted.cameraQuality = DEFAULT_PREFERENCES.cameraQuality;
-		}
-		if (
-			persisted.earCalibration !== null &&
-			!isValidEarCalibration(persisted.earCalibration)
-		) {
-			persisted.earCalibration = DEFAULT_PREFERENCES.earCalibration;
-		}
-		if (typeof persisted.launchAtLogin !== "boolean") {
-			persisted.launchAtLogin = DEFAULT_PREFERENCES.launchAtLogin;
-		}
-		if (typeof persisted.isTracking !== "boolean") {
-			persisted.isTracking = DEFAULT_PREFERENCES.isTracking;
-		}
-		if (typeof persisted.quietHoursEnabled !== "boolean") {
-			persisted.quietHoursEnabled = DEFAULT_PREFERENCES.quietHoursEnabled;
-		}
-		if (!isValidQuietHoursTime(persisted.quietHoursStart)) {
-			persisted.quietHoursStart = DEFAULT_PREFERENCES.quietHoursStart;
-		} else {
-			persisted.quietHoursStart =
-				normalizeQuietHoursTime(persisted.quietHoursStart) ??
-				DEFAULT_PREFERENCES.quietHoursStart;
-		}
-		if (!isValidQuietHoursTime(persisted.quietHoursEnd)) {
-			persisted.quietHoursEnd = DEFAULT_PREFERENCES.quietHoursEnd;
-		} else {
-			persisted.quietHoursEnd =
-				normalizeQuietHoursTime(persisted.quietHoursEnd) ??
-				DEFAULT_PREFERENCES.quietHoursEnd;
-		}
-		if (typeof persisted.pauseOnFullscreen !== "boolean") {
-			persisted.pauseOnFullscreen = DEFAULT_PREFERENCES.pauseOnFullscreen;
-		}
-		if (typeof persisted.hasCompletedOnboarding !== "boolean") {
-			persisted.hasCompletedOnboarding =
-				DEFAULT_PREFERENCES.hasCompletedOnboarding;
-		}
-		if (typeof persisted.blinkRateCoachingEnabled !== "boolean") {
-			persisted.blinkRateCoachingEnabled =
-				DEFAULT_PREFERENCES.blinkRateCoachingEnabled;
-		}
-		if (typeof persisted.autoStopNoFaceEnabled !== "boolean") {
-			persisted.autoStopNoFaceEnabled =
-				DEFAULT_PREFERENCES.autoStopNoFaceEnabled;
-		}
-		persisted.locale = sanitizeLocale(persisted.locale);
-		persisted.blinkRateThresholdPerMin = sanitizeBlinkRateThresholdPerMin(
-			persisted.blinkRateThresholdPerMin,
-		);
-		persisted.autoStopNoFaceMinutes = sanitizeAutoStopNoFaceMinutes(
-			persisted.autoStopNoFaceMinutes,
-		);
-		persisted.soundVolume = sanitizeSoundVolume(persisted.soundVolume);
-		persisted.exercisePrompts = sanitizeExercisePrompts(
-			persisted.exercisePrompts,
-			persisted.locale,
-		);
-		const goals = sanitizeGoalsConfig({
-			goalsEnabled: persisted.goalsEnabled,
-			dailyBlinkGoal: persisted.dailyBlinkGoal,
-			dailyTrackingMinutesGoal: persisted.dailyTrackingMinutesGoal,
-			weeklyBlinkGoal: persisted.weeklyBlinkGoal,
-			weeklyTrackingMinutesGoal: persisted.weeklyTrackingMinutesGoal,
-		});
-		persisted.goalsEnabled = goals.goalsEnabled;
-		persisted.dailyBlinkGoal = goals.dailyBlinkGoal;
-		persisted.dailyTrackingMinutesGoal = goals.dailyTrackingMinutesGoal;
-		persisted.weeklyBlinkGoal = goals.weeklyBlinkGoal;
-		persisted.weeklyTrackingMinutesGoal = goals.weeklyTrackingMinutesGoal;
+		const persisted = sanitizePersistedPreferences(loaded);
 
 		// Upgrade: existing installs without the flag should skip first-run.
 		if (!this.store.has("hasCompletedOnboarding")) {
@@ -187,6 +111,21 @@ export class PreferencesService {
 		}
 		this.current[key] = next as never;
 		this.store.set(key, next);
+	}
+
+	/**
+	 * Replace all persisted preferences from a sanitized backup payload.
+	 * Caller should pass output of sanitizePersistedPreferences (with forceIsTrackingFalse).
+	 */
+	replaceFromBackup(preferences: PersistedPreferences): void {
+		const next = sanitizePersistedPreferences(preferences, {
+			forceIsTrackingFalse: true,
+		});
+		this.store.clear();
+		Object.assign(this.current, next);
+		for (const key of PERSISTED_KEYS) {
+			this.store.set(key, this.current[key]);
+		}
 	}
 
 	reset(

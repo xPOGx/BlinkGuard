@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,11 +8,21 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>BlinkGuard</title>
     <style>
+      /* Match shared/preferences DEFAULT darkMode + index.css --background tokens. */
       html,
-      body {
+      body,
+      #root {
         margin: 0;
         height: 100%;
-        background: #f4f7f9;
+        overflow: hidden;
+        overscroll-behavior: none;
+        background: hsl(222 40% 8%);
+      }
+
+      html:not(.dark),
+      html:not(.dark) body,
+      html:not(.dark) #root {
+        background: hsl(210 25% 97%);
       }
 
       #boot-splash {

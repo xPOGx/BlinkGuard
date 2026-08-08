@@ -1,4 +1,9 @@
 import type { AutoUpdateStatus } from "../../../shared/auto-update";
+import type {
+	BackupScope,
+	ExportBackupResult,
+	ImportBackupResult,
+} from "../../../shared/backup";
 import type { BlinkStatsSnapshot } from "../../../shared/blink-stats";
 import type {
 	DebugOverlayKind,
@@ -170,6 +175,36 @@ export const rendererIpc = {
 		return {
 			status: "error",
 			message: "Diagnostics export is unavailable in this environment",
+		};
+	},
+	exportBackup: async (scope: BackupScope): Promise<ExportBackupResult> => {
+		const result = await bridge()?.invoke(IPC_CHANNELS.exportBackup, scope);
+		if (
+			result &&
+			typeof result === "object" &&
+			"status" in result &&
+			(result as ExportBackupResult).status
+		) {
+			return result as ExportBackupResult;
+		}
+		return {
+			status: "error",
+			message: "Backup export is unavailable in this environment",
+		};
+	},
+	importBackup: async (scope: BackupScope): Promise<ImportBackupResult> => {
+		const result = await bridge()?.invoke(IPC_CHANNELS.importBackup, scope);
+		if (
+			result &&
+			typeof result === "object" &&
+			"status" in result &&
+			(result as ImportBackupResult).status
+		) {
+			return result as ImportBackupResult;
+		}
+		return {
+			status: "error",
+			message: "Backup import is unavailable in this environment",
 		};
 	},
 };

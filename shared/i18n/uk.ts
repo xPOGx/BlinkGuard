@@ -24,7 +24,7 @@ export const uk: MessageCatalog = {
 		"Витрачайте доступні моргання на «ура», значок і щит серії.",
 	"app.section.system": "Система",
 	"app.section.system.desc":
-		"Гаряча клавіша, мова, автозапуск і скидання.",
+		"Гаряча клавіша, мова, автозапуск, резервна копія і скидання.",
 	"app.section.about": "Про застосунок",
 	"app.section.about.desc":
 		"Що таке BlinkGuard, навіщо він, приватність і open-source репозиторій.",
@@ -294,6 +294,25 @@ export const uk: MessageCatalog = {
 		"Скинути всі налаштування до значень за замовчуванням?",
 	"reset.replayOnboarding": "Показати початкове налаштування знову",
 	"reset.showOnboarding": "Показати онбординг",
+	"backup.title": "Резервна копія",
+	"backup.body":
+		"Експорт або імпорт локального JSON-файлу з налаштуваннями та/або статистикою моргань. Нічого не надсилається в хмару.",
+	"backup.scope.legend": "Обсяг резервної копії",
+	"backup.scope.both": "Налаштування і статистика",
+	"backup.scope.preferences": "Лише налаштування",
+	"backup.scope.statistics": "Лише статистика",
+	"backup.export.button": "Експортувати копію",
+	"backup.export.busy": "Експорт…",
+	"backup.export.success": "Збережено: {path}",
+	"backup.export.cancelled": "Експорт скасовано",
+	"backup.export.error": "Помилка експорту: {message}",
+	"backup.import.button": "Імпортувати копію",
+	"backup.import.busy": "Імпорт…",
+	"backup.import.confirm":
+		"Замінити вибрані дані на цьому пристрої вмістом файлу резервної копії? Цю дію не можна скасувати.",
+	"backup.import.success": "Резервну копію імпортовано",
+	"backup.import.cancelled": "Імпорт скасовано",
+	"backup.import.error": "Помилка імпорту: {message}",
 	"quietHours.title": "Тихі години",
 	"quietHours.description":
 		"Ховати спливаючі вікна моргання, вправ і «подивіться вдалину» у цей локальний час",

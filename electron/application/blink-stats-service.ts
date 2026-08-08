@@ -114,6 +114,43 @@ export class BlinkStatsService {
 		return this.livePushEnabled;
 	}
 
+	/** Persisted stats state for backup export (not the derived UI snapshot). */
+	getPersistedState(): BlinkStatsState {
+		return {
+			...this.state,
+			days: this.state.days.map((day) => ({
+				...day,
+				hourlyBlinks: [...day.hourlyBlinks],
+			})),
+			unlockedRewardIds: [...this.state.unlockedRewardIds],
+			streakShieldUsedDates: [...this.state.streakShieldUsedDates],
+		};
+	}
+
+	/**
+	 * Replace persisted stats from a normalized backup payload.
+	 * Restarts an in-progress tracking session the same way reset() does.
+	 */
+	replaceState(state: BlinkStatsState): void {
+		this.flushTracking();
+		this.stopFlushTimer();
+		this.stopRateTick();
+		this.blinkTimestamps = [];
+		this.lastPushedBpm = null;
+		this.lastPushedWarmupSec = null;
+		this.markChartsDirty();
+		const wasTracking = this.trackingStartedAt !== null;
+		this.trackingStartedAt = null;
+		this.rateSessionStartedAt = null;
+		this.state = normalizeBlinkStatsState(state);
+		this.persist();
+		if (wasTracking) {
+			this.onTrackingStart();
+		} else {
+			this.schedulePush(true);
+		}
+	}
+
 	getSnapshot(now: Date = new Date()): BlinkStatsSnapshot {
 		this.reconcileStreak(now);
 		const nowMs = now.getTime();

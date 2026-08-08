@@ -139,9 +139,19 @@
 		@apply border-border;
 	}
 
+	html,
+	body,
+	#root {
+		height: 100%;
+		overflow: hidden;
+		overscroll-behavior: none;
+		/* Theme surface — follows :root / .dark --background */
+		@apply bg-background;
+	}
+
 	body {
 		/* Avoid Tailwind `antialiased` (grayscale AA) — ClearType/subpixel stays sharper on Windows LCD. */
-		@apply bg-background text-foreground font-sans;
+		@apply text-foreground font-sans;
 		user-select: none;
 		-webkit-user-select: none;
 	}

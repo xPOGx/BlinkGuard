@@ -157,4 +157,88 @@ describe("PreferenceActions", () => {
 			IPC_CHANNELS.cameraWindowClosed,
 		);
 	});
+
+	it("applyBackup replaces prefs with side effects and optional stats", () => {
+		const preferences = new PreferencesService(createStore());
+		preferences.set("isTracking", true);
+		const reminders = { stop: vi.fn() };
+		const exercises = { stop: vi.fn() };
+		const lookAway = { stop: vi.fn() };
+		const focusPause = { recompute: vi.fn() };
+		const snapshot = { totals: { total: 40 } };
+		const blinkStats = {
+			invalidateCharts: vi.fn(),
+			isLivePushEnabled: () => true,
+			getSnapshot: vi.fn(() => snapshot),
+			replaceState: vi.fn(),
+		};
+		const windows = {
+			sendPreferences: vi.fn(),
+			sendToMain: vi.fn(),
+			showCamera: vi.fn(),
+		};
+		const sidecar = {
+			startEarCalibration: vi.fn(),
+			cancelEarCalibration: vi.fn(),
+			applyCameraQuality: vi.fn(),
+			applyEarCalibration: vi.fn(),
+		};
+		const shortcuts = { register: vi.fn() };
+		const applyLaunchAtLogin = vi.fn();
+		const tray = { rebuildMenu: vi.fn() };
+		const actions = createActions(preferences, {
+			reminders,
+			exercises,
+			lookAway,
+			focusPause,
+			blinkStats,
+			windows,
+			sidecar,
+			shortcuts,
+			applyLaunchAtLogin,
+			tray,
+		});
+
+		actions.applyBackup("both", {
+			preferences: {
+				...preferences.current,
+				locale: "uk",
+				darkMode: false,
+				launchAtLogin: true,
+				keyboardShortcut: "Ctrl+B",
+				cameraQuality: "high",
+				earCalibration: 0.25,
+				isTracking: true,
+			},
+			blinkStats: {
+				days: [],
+				totalBlinks: 40,
+				spentBlinks: 0,
+				unlockedRewardIds: [],
+				streakShieldCharges: 0,
+				streakShieldUsedDates: [],
+			},
+		});
+
+		expect(reminders.stop).toHaveBeenCalledWith(true);
+		expect(exercises.stop).toHaveBeenCalledOnce();
+		expect(lookAway.stop).toHaveBeenCalledOnce();
+		expect(sidecar.cancelEarCalibration).toHaveBeenCalledOnce();
+		expect(preferences.current.locale).toBe("uk");
+		expect(preferences.current.darkMode).toBe(false);
+		expect(preferences.current.isTracking).toBe(false);
+		expect(applyLaunchAtLogin).toHaveBeenCalledWith(true);
+		expect(shortcuts.register).toHaveBeenCalledWith("Ctrl+B");
+		expect(sidecar.applyCameraQuality).toHaveBeenCalledWith("high");
+		expect(sidecar.applyEarCalibration).toHaveBeenCalledWith(0.25);
+		expect(tray.rebuildMenu).toHaveBeenCalledWith("uk");
+		expect(blinkStats.invalidateCharts).toHaveBeenCalledOnce();
+		expect(windows.sendPreferences).toHaveBeenCalledOnce();
+		expect(focusPause.recompute).toHaveBeenCalledOnce();
+		expect(blinkStats.replaceState).toHaveBeenCalledOnce();
+		expect(windows.sendToMain).toHaveBeenCalledWith(
+			IPC_CHANNELS.loadBlinkStats,
+			snapshot,
+		);
+	});
 });

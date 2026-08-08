@@ -1,3 +1,9 @@
+import type { ParsedBackup } from "../../shared/backup";
+import {
+	backupScopeIncludesPreferences,
+	backupScopeIncludesStatistics,
+	type BackupScope,
+} from "../../shared/backup";
 import { sanitizeLocale, type Locale } from "../../shared/i18n";
 import { IPC_CHANNELS } from "../../shared/ipc-channels";
 import type { CameraQuality } from "../../shared/preferences";
@@ -106,5 +112,44 @@ export class PreferenceActions {
 		this.sidecar.applyEarCalibration(null);
 		this.windows.sendPreferences();
 		this.focusPause.recompute();
+	}
+
+	/**
+	 * Apply a validated backup payload. Replace only the requested scope.
+	 * Single sendPreferences echo when prefs change (avoid sync bounce).
+	 */
+	applyBackup(scope: BackupScope, parsed: ParsedBackup): void {
+		const applyPrefs =
+			backupScopeIncludesPreferences(scope) && parsed.preferences;
+		const applyStats =
+			backupScopeIncludesStatistics(scope) && parsed.blinkStats;
+
+		if (applyPrefs && parsed.preferences) {
+			const current = this.preferences.current;
+			if (current.isTracking) this.reminders.stop(true);
+			this.exercises.stop();
+			this.lookAway.stop();
+			this.sidecar.cancelEarCalibration("Preferences imported from backup");
+			this.preferences.replaceFromBackup(parsed.preferences);
+			const next = this.preferences.current;
+			this.applyLaunchAtLogin(next.launchAtLogin);
+			this.shortcuts.register(next.keyboardShortcut);
+			this.sidecar.applyCameraQuality(next.cameraQuality);
+			this.sidecar.applyEarCalibration(next.earCalibration);
+			this.tray?.rebuildMenu(next.locale);
+			this.blinkStats.invalidateCharts();
+			this.windows.sendPreferences();
+			this.focusPause.recompute();
+		}
+
+		if (applyStats && parsed.blinkStats) {
+			this.blinkStats.replaceState(parsed.blinkStats);
+			if (this.blinkStats.isLivePushEnabled()) {
+				this.windows.sendToMain(
+					IPC_CHANNELS.loadBlinkStats,
+					this.blinkStats.getSnapshot(),
+				);
+			}
+		}
 	}
 }

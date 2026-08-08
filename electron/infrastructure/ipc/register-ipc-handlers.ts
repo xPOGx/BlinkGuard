@@ -15,6 +15,11 @@ import type { PreferencesService } from "../../application/preferences-service";
 import type { ReminderService } from "../../application/reminder-service";
 import type { NotificationSoundPort } from "../../application/ports/runtime-ports";
 import { normalizeQuietHoursTime } from "../../domain/focus-policy";
+import { isBackupScope } from "../../../shared/backup";
+import {
+	exportBackupBundle,
+	importBackupBundle,
+} from "../backup/backup-io";
 import { exportDiagnosticsBundle } from "../logging/diagnostics-export";
 import type { InteractionLogger } from "../logging/interaction-logger";
 import { applyLaunchAtLogin } from "../lifecycle/login-item";
@@ -304,6 +309,45 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 				parentWindow: windows.main && !windows.main.isDestroyed()
 					? windows.main
 					: null,
+			});
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.exportBackup,
+		async (_event: IpcMainInvokeEvent, scopeRaw: unknown) => {
+			interactions.logIpc(IPC_CHANNELS.exportBackup, [scopeRaw]);
+			const scope = isBackupScope(scopeRaw) ? scopeRaw : null;
+			if (!scope) {
+				return { status: "error", message: "Invalid backup scope" };
+			}
+			return exportBackupBundle({
+				scope,
+				preferences: preferences.current,
+				blinkStats: blinkStats.getPersistedState(),
+				parentWindow: windows.main && !windows.main.isDestroyed()
+					? windows.main
+					: null,
+			});
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.importBackup,
+		async (_event: IpcMainInvokeEvent, scopeRaw: unknown) => {
+			interactions.logIpc(IPC_CHANNELS.importBackup, [scopeRaw]);
+			const scope = isBackupScope(scopeRaw) ? scopeRaw : null;
+			if (!scope) {
+				return { status: "error", message: "Invalid backup scope" };
+			}
+			return importBackupBundle({
+				scope,
+				parentWindow: windows.main && !windows.main.isDestroyed()
+					? windows.main
+					: null,
+				apply: (parsed) => {
+					preferenceActions.applyBackup(scope, parsed);
+				},
 			});
 		},
 	);

@@ -29,6 +29,7 @@ import { ReminderControls } from "@/features/reminders/ui/reminder-controls";
 import { RewardsShopPanel } from "@/features/rewards/ui/rewards-shop-panel";
 import { usePreferences } from "@/features/settings/model/use-preferences";
 import {
+	BackupSettings,
 	DarkModeToggle,
 	GoalsSettings,
 	LanguageSettings,
@@ -180,7 +181,7 @@ function SettingsShell({
 	}, [prefsHydrated]);
 
 	return (
-		<div className="flex h-screen flex-col bg-background text-foreground min-[721px]:flex-row">
+		<div className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground min-[721px]:flex-row">
 			{showOnboarding ? (
 				<OnboardingWizard
 					preferences={preferences}
@@ -264,7 +265,7 @@ function SettingsShell({
 					onDismiss={() => camera.setError(null)}
 				/>
 
-				<main className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+				<main className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] px-4 py-4 sm:px-6 sm:py-5">
 					<div className="mx-auto flex max-w-3xl flex-col gap-4">
 						{section === "reminders" && (
 							<ReminderControls
@@ -343,6 +344,7 @@ function SettingsShell({
 									/>
 									<ResetPreferencesButton />
 								</div>
+								<BackupSettings />
 								<QuietHoursFocusSettings
 									preferences={preferences}
 									setPreferences={setPreferences}
