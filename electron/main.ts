@@ -215,14 +215,13 @@ function bootstrap(): void {
 
 	void app.whenReady().then(async () => {
 		lifecycle.register();
-		windows.createMain(lifecycle.handleMainClose);
 
 		const startHidden =
 			process.argv.includes("--hidden") ||
 			app.getLoginItemSettings().wasOpenedAtLogin;
-		if (startHidden) {
-			windows.main?.hide();
-		}
+		windows.createMain(lifecycle.handleMainClose, {
+			showOnReady: !startHidden,
+		});
 
 		tray.create();
 		applyLaunchAtLogin(preferences.launchAtLogin);

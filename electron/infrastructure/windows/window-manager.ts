@@ -34,12 +34,19 @@ export class WindowManager {
 		this.onMainLoaded = handler;
 	}
 
-	createMain(onClose: (event: Electron.Event) => void): BrowserWindow {
+	createMain(
+		onClose: (event: Electron.Event) => void,
+		options: { showOnReady?: boolean } = {},
+	): BrowserWindow {
+		const showOnReady = options.showOnReady ?? true;
 		const window = new BrowserWindow({
 			width: 900,
 			height: 640,
 			minWidth: 720,
 			minHeight: 520,
+			show: false,
+			// Match renderer boot splash / light shell background.
+			backgroundColor: "#F4F7F9",
 			icon: path.join(this.paths.publicDir, "electron-vite.svg"),
 			autoHideMenuBar: true,
 			webPreferences: {
@@ -51,6 +58,10 @@ export class WindowManager {
 		});
 		this.main = window;
 		window.on("close", onClose);
+		window.once("ready-to-show", () => {
+			if (!showOnReady || window.isDestroyed()) return;
+			window.show();
+		});
 		window.webContents.on("did-finish-load", () => {
 			this.sendToMain(
 				IPC_CHANNELS.mainProcessMessage,

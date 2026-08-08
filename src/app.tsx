@@ -6,7 +6,8 @@ import {
 	Palette,
 	Timer,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { dismissBootSplash } from "@/boot-splash";
 import { useCameraStatus } from "@/features/camera/model/use-camera-status";
 import {
 	CameraControls,
@@ -102,6 +103,11 @@ export default function BlinkGuardHomepage() {
 	const [section, setSection] = useState<SectionId>("reminders");
 	const active = SECTIONS.find((item) => item.id === section) ?? SECTIONS[0];
 	const showOnboarding = prefsHydrated && !preferences.hasCompletedOnboarding;
+
+	useEffect(() => {
+		if (!prefsHydrated) return;
+		void dismissBootSplash();
+	}, [prefsHydrated]);
 
 	return (
 		<div className="flex h-screen flex-col bg-background text-foreground min-[721px]:flex-row">

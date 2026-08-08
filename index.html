@@ -8,8 +8,106 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>BlinkGuard</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #f4f7f9;
+      }
+
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(ellipse 70% 55% at 50% 42%, #d9efe9 0%, transparent 62%),
+          linear-gradient(160deg, #eef3f6 0%, #f4f7f9 45%, #e7f3f0 100%);
+        font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+        color: #0f172a;
+        transition: opacity 320ms ease, visibility 320ms ease;
+      }
+
+      #boot-splash.boot-splash--hide {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .boot-splash__inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.85rem;
+        animation: boot-splash-rise 480ms ease-out both;
+      }
+
+      .boot-splash__lottie {
+        width: 7.5rem;
+        height: 7.5rem;
+      }
+
+      .boot-splash__lottie:empty {
+        border-radius: 9999px;
+        background: hsl(173 45% 92%);
+        box-shadow: inset 0 0 0 2px hsl(173 58% 36% / 0.2);
+        animation: boot-splash-pulse 1.4s ease-in-out infinite;
+      }
+
+      .boot-splash__title {
+        margin: 0;
+        font-size: 1.35rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+      }
+
+      .boot-splash__hint {
+        margin: 0;
+        font-size: 0.8rem;
+        color: #64748b;
+      }
+
+      @keyframes boot-splash-rise {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes boot-splash-pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 0.85;
+        }
+        50% {
+          transform: scale(1.04);
+          opacity: 1;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .boot-splash__inner,
+        .boot-splash__lottie:empty {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="boot-splash" role="status" aria-live="polite" aria-busy="true">
+      <div class="boot-splash__inner">
+        <div id="boot-splash-lottie" class="boot-splash__lottie" aria-hidden="true"></div>
+        <p class="boot-splash__title">BlinkGuard</p>
+        <p class="boot-splash__hint">Getting ready…</p>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
