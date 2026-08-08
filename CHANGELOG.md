@@ -4,9 +4,36 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-08-09
+
 ### Added
 
-- macOS in-app updates via GitHub Releases (`electron-updater`, tray + About “Check for updates”)
+- Goals, streaks, and blink rewards shop in statistics
+- Reset control for goals defaults in settings
+- Local prefs and stats JSON backup export/import
+- In-app update UI (replaces native update dialogs)
+- macOS in-app updates via GitHub Releases
+- macOS fullscreen focus pause with honest unsupported UI when needed
+- Diagnostics export (local logs and interaction trail) for support
+- Camera preview stays live when a face is temporarily missing
+- CI macOS release build and publish path
+
+### Fixed
+
+- Blink tracking hardened; stop closed-eye credit storms
+- Defer Start reminder popup until the settings shell is ready
+- Sharper text by avoiding window opacity soft-compositing
+- Pointer cursor on interactive controls
+- Disable text selection outside shareable content
+- Main window uses the BlinkGuard icon
+- Eye Lottie matte keyframes
+- Release workflow tag triggers (branches+tags AND bug)
+- CI Node version bumped to 22 for Vite 8 builds
+
+### Changed
+
+- Stop tracking the downloaded face-landmark model in git
+- Quieter Windows packaging warnings
 
 ## [2.0.0] - 2026-08
 
