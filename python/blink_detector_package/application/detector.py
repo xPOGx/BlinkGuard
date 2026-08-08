@@ -400,6 +400,7 @@ class BlinkDetectorApplication:
 			"skip_degraded",
 			"skip_eyes_closed",
 			"skip_await_open",
+			"skip_cooldown",
 		):
 			# Rate-limit continuous skip spam while pose is bad.
 			if current_time - self._last_skip_debug_time >= 0.5:

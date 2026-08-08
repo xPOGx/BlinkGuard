@@ -101,6 +101,40 @@ def stats(label: str, items: list[dict], key: str) -> None:
 	)
 
 
+def cooldown_remaining_buckets(label: str, items: list[dict]) -> None:
+	"""Bounce (high rem) vs late-cooldown (low rem) for cooldown phases."""
+	vals = [
+		float(item["cooldown_remaining"])
+		for item in items
+		if item.get("cooldown_remaining") is not None
+	]
+	if not vals:
+		print(f"  {label} cooldown_remaining buckets: n=0")
+		return
+	edges = (0.15, 0.30, 0.40, 0.55)
+	counts = {
+		"lt_0.15": 0,
+		"0.15_0.30": 0,
+		"0.30_0.40": 0,
+		"0.40_0.55": 0,
+		"ge_0.55": 0,
+	}
+	for rem in vals:
+		if rem < edges[0]:
+			counts["lt_0.15"] += 1
+		elif rem < edges[1]:
+			counts["0.15_0.30"] += 1
+		elif rem < edges[2]:
+			counts["0.30_0.40"] += 1
+		elif rem < edges[3]:
+			counts["0.40_0.55"] += 1
+		else:
+			counts["ge_0.55"] += 1
+	parts = " ".join(f"{name}={n}" for name, n in counts.items())
+	print(f"  {label} cooldown_remaining buckets: n={len(vals)} {parts}")
+	stats(label, items, "cooldown_remaining")
+
+
 def main() -> int:
 	parser = argparse.ArgumentParser(description=__doc__)
 	parser.add_argument("--path", type=Path, default=None)
@@ -158,7 +192,14 @@ def main() -> int:
 	stats("cred", credited, "drop")
 	stats("cred", credited, "yaw")
 
-	for phase in ("reject_velocity", "reject_threshold", "reject_cooldown"):
+	for phase in (
+		"reject_velocity",
+		"reject_threshold",
+		"reject_cooldown",
+		"skip_cooldown",
+		"reject_opening",
+		"reject_bilateral",
+	):
 		bucket = [b for b in rejected if b.get("phase") == phase]
 		if not bucket:
 			continue
@@ -167,6 +208,8 @@ def main() -> int:
 		stats(phase, bucket, "peak_velocity")
 		stats(phase, bucket, "absolute_drop")
 		stats(phase, bucket, "drop")
+		if phase in ("reject_cooldown", "skip_cooldown"):
+			cooldown_remaining_buckets(phase, bucket)
 
 	# Scenario hint: credits closer than 0.5s often mean FP storms
 	times = [t for t, bd in rows if bd.get("credited")]

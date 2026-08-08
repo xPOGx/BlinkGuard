@@ -52,10 +52,14 @@ RESTING_PITCH_OPEN_DROP_MAX = 0.12
 # POG look-down "open" sits ~0.73–0.78 of baseline; requiring 0.85 left them
 # stuck in skip_await_open. Reopen ≈ recovery band; closed = clearly shut.
 EYES_CLOSED_RATIO = 0.52
-EYES_OPEN_RATIO = 0.70
+EYES_OPEN_RATIO = 0.74
 EYES_CLOSED_HOLD_S = 0.18
 # Safety: never block new blinks forever if gaze stays mid-low.
 AWAITING_REOPEN_MAX_S = 0.35
+
+# Frontal opening waive when effective (history/synthetic) close peak is strong
+# but reopen velocity was missed — must match logged peak_velocity, not raw only.
+FRONTAL_OPENING_PEAK_WAIVE = 0.95
 
 
 def get_adaptive_ear_drop_threshold(baseline_ear):
@@ -120,9 +124,9 @@ def _ear_asymmetry(left_ear, right_ear):
 
 def _bilateral_drops_agree(left_drop, right_drop, required_drop):
 	"""True when both eyes show a real drop and magnitudes agree."""
-	# 0.5 was harsh for near-threshold frontal blinks (POG: reject_bilateral
-	# with strong peak but one eye slightly shallower).
-	min_each = required_drop * 0.35
+	# Softened for near-threshold frontal (POG 2026-08-08: reject_bilateral
+	# with peak≈1.45 but one eye slightly shallower).
+	min_each = required_drop * 0.28
 	if left_drop < min_each or right_drop < min_each:
 		return False
 	mean_drop = (left_drop + right_drop) * 0.5
@@ -539,6 +543,30 @@ class BlinkDetectionState:
 				**info_pose,
 			}
 
+		# Do not start a new candidate during cooldown — avoids FSM churn and
+		# reject_cooldown storms from same-blink bounce (POG 2026-08-08: ~42%).
+		cooldown_remaining = max(
+			0.0,
+			BLINK_COOLDOWN - (current_time - self.last_blink_time),
+		)
+		if (
+			not self.blink_in_progress
+			and cooldown_remaining > 0
+			and ear_smooth < close_band_ear
+			and ear_drop_absolute > BLINK_MIN_ABSOLUTE_EAR_DROP
+			and ear_drop_percentage > 0
+		):
+			return False, {
+				"baseline": self.current_baseline_ear,
+				"drop": ear_drop_percentage,
+				"phase": "skip_cooldown",
+				"threshold": adaptive_threshold,
+				"velocity": closing_velocity,
+				"peak_velocity": self.peak_closing_velocity,
+				"cooldown_remaining": cooldown_remaining,
+				**info_pose,
+			}
+
 		# Start: smoothed EAR enters close band (hysteresis) with absolute floor.
 		if (
 			not self.blink_in_progress
@@ -638,8 +666,9 @@ class BlinkDetectionState:
 					):
 						velocity_ok = True
 				# V-shape: opening spike, multi-frame hold, or (frontal) a
-				# strong close peak when reopen velocity was missed (smooth
-				# recovery often fires with openVel≈0 — POG reject_opening).
+				# strong effective close peak when reopen velocity was missed
+				# (synthetic/history can lift peak while raw stays <1.0 —
+				# POG 2026-08-08: 142/187 reject_opening had logged peak≥1).
 				opening_ok = (
 					self.peak_opening_velocity >= MIN_OPENING_VELOCITY
 					or self.closed_frames >= max(2, MIN_CLOSED_FRAMES + 1)
@@ -647,7 +676,7 @@ class BlinkDetectionState:
 				if (
 					not opening_ok
 					and not gate["look_down"]
-					and self.peak_closing_velocity >= 1.0
+					and effective_peak >= FRONTAL_OPENING_PEAK_WAIVE
 				):
 					opening_ok = True
 				bilateral_ok = True

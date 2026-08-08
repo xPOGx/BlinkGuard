@@ -286,10 +286,18 @@ class BlinkDetectionTests(unittest.TestCase):
 
 		first, t, _info, _phases = _feed(state, t, _CREDIT_STEPS, pose=None)
 		self.assertTrue(first)
-		# Second attempt inside cooldown window.
-		fast = tuple((0.04, ear) for _, ear in _CREDIT_STEPS)
-		second, _t, _i, _p = _feed(state, t, fast)
-		self.assertFalse(second)
+		# Clear await-reopen while still inside cooldown window.
+		for ear in (0.24, 0.26, 0.28):
+			t += 0.05
+			state.detect(ear, t)
+		self.assertFalse(state.awaiting_reopen)
+		self.assertLess(t - state.last_blink_time, 0.55)
+		# Bounce dip during cooldown must not start a candidate.
+		t += 0.05
+		credited, info = state.detect(0.10, t)
+		self.assertFalse(credited)
+		self.assertEqual(info["phase"], "skip_cooldown")
+		self.assertGreater(info.get("cooldown_remaining", 0), 0)
 
 	def test_extreme_yaw_no_credit(self):
 		state = BlinkDetectionState()
@@ -422,7 +430,8 @@ class BlinkDetectionTests(unittest.TestCase):
 		state.blink_in_progress = True
 		state.blink_start_time = t - 0.25
 		state.closed_frames = 1
-		# Below frontal strong-close waive (peak >= 1.0).
+		# Below frontal effective-peak waive (0.95); duration long so no
+		# synthetic inflation of peak.
 		state.peak_closing_velocity = 0.5
 		state.peak_opening_velocity = 0.02
 		state.max_drop_percentage = 0.55
@@ -440,6 +449,30 @@ class BlinkDetectionTests(unittest.TestCase):
 			MIN_OPENING_VELOCITY,
 		)
 		self.assertLess(info.get("closed_frames", 99), 2)
+
+	def test_opening_waived_when_effective_peak_strong(self):
+		"""Synthetic/history peak ≥ waive threshold credits with openVel≈0."""
+		from blink_detector_package.domain.blink_detection import (
+			FRONTAL_OPENING_PEAK_WAIVE,
+		)
+
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks())
+		# Short blink: deep trough so synthetic peak lifts effective_peak.
+		steps = (
+			(0.05, 0.08),
+			(0.05, 0.22),
+			(0.05, 0.28),
+			(0.05, 0.28),
+		)
+		credited_any, _t, info, phases = _feed(state, t, steps, pose=pose)
+		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+		self.assertGreaterEqual(
+			info["peak_velocity"],
+			FRONTAL_OPENING_PEAK_WAIVE,
+		)
 
 	def test_await_reopen_blocks_rapid_second_blink(self):
 		state = BlinkDetectionState(target_fps=15)
