@@ -84,6 +84,29 @@ See `AGENTS.md` for Cursor Cloud–specific notes.
   - Otherwise packages unsigned so CI still ships artifacts
 - macOS: `npm run build:mac` (notarize uses Electron Builder + Apple secrets when configured)
 
+---
+
+## Connect
+
+[![GitHub](https://img.shields.io/badge/GitHub-xPOGx-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/xPOGx)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Pavlo%20Dzhevaha-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/pavlo-dzhevaha-342068105/)
+[![Open Collective](https://img.shields.io/badge/Open%20Collective-BlinkGuard-7FADF2?style=for-the-badge&logo=open-collective&logoColor=white)](https://opencollective.com/xpogx)
+[![Email](https://img.shields.io/badge/Email-pavel19.1078%40gmail.com-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:pavel19.1078@gmail.com)
+
+BlinkGuard is a personal project by **Pavlo Dzhevaha** — built locally, from the heart, after enough dry eyes from long coding sessions. Issues, ideas, and PRs are welcome.
+
+---
+
+## Star BlinkGuard
+
+If BlinkGuard helps your eyes on long screen days, a star helps others find it and keeps development going.
+
+**BlinkGuard** — a quiet, local companion for your eyes
+
+[![Watch](https://img.shields.io/github/watchers/xPOGx/BlinkGuard?style=for-the-badge&label=Watch&logo=github)](https://github.com/xPOGx/BlinkGuard/subscription)
+[![Fork](https://img.shields.io/github/forks/xPOGx/BlinkGuard?style=for-the-badge&logo=github)](https://github.com/xPOGx/BlinkGuard/fork)
+[![Stars](https://img.shields.io/github/stars/xPOGx/BlinkGuard?style=for-the-badge&logo=github)](https://github.com/xPOGx/BlinkGuard/stargazers)
+
 ## Third-party attribution
 
 BlinkGuard is originally based on [ScreenBlink](https://github.com/katunli/ScreenBlink) by Katun Li. Copyright and license notices for that lineage are recorded in [NOTICE](NOTICE). BlinkGuard is maintained independently under the MIT License ([LICENSE](LICENSE)).
