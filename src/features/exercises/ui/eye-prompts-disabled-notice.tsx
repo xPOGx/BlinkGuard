@@ -1,14 +1,14 @@
 import { useT } from "@/i18n";
 
-interface EyeCareDisabledNoticeProps {
+interface EyePromptsDisabledNoticeProps {
 	eyeExercisesEnabled: boolean;
 	lookAwayEnabled: boolean;
 }
 
-export function EyeCareDisabledNotice({
+export function EyePromptsDisabledNotice({
 	eyeExercisesEnabled,
 	lookAwayEnabled,
-}: EyeCareDisabledNoticeProps) {
+}: EyePromptsDisabledNoticeProps) {
 	const t = useT();
 	if (eyeExercisesEnabled || lookAwayEnabled) return null;
 

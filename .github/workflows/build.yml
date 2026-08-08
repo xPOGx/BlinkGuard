@@ -355,10 +355,16 @@ jobs:
           $process.Kill()
           Write-Host "✅ Binary functionality test passed!"
 
+      # Optional Windows code signing (scripts/publish-windows.js):
+      #   CSC_LINK, CSC_KEY_PASSWORD — when unset, tag releases stay unsigned.
+      # Optional macOS notarize secrets (mac job, if enabled):
+      #   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
       - name: Build Windows app
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: |
           if ("${{ startsWith(github.ref, 'refs/tags/v') }}" -eq "true") {
             Write-Host "Tag release build: publishing to GitHub Releases (latest.yml + Setup.exe + blockmap)"

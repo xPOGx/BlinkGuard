@@ -18,7 +18,7 @@ import {
 } from "@/features/camera/ui/camera-controls";
 import { DebugPanel } from "@/features/debug/ui/debug-panel";
 import { ExerciseSettings } from "@/features/exercises/ui/exercise-settings";
-import { EyeCareDisabledNotice } from "@/features/exercises/ui/eye-care-disabled-notice";
+import { EyePromptsDisabledNotice } from "@/features/exercises/ui/eye-prompts-disabled-notice";
 import { LookAwaySettings } from "@/features/look-away/ui/look-away-settings";
 import { OnboardingWizard } from "@/features/onboarding/ui/onboarding-wizard";
 import { PopupSettings } from "@/features/popup-appearance/ui/popup-settings";
@@ -271,7 +271,7 @@ function SettingsShell({
 
 						{section === "exercises" && (
 							<>
-								<EyeCareDisabledNotice
+								<EyePromptsDisabledNotice
 									eyeExercisesEnabled={preferences.eyeExercisesEnabled}
 									lookAwayEnabled={preferences.lookAwayEnabled}
 								/>

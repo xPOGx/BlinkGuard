@@ -40,7 +40,7 @@ export const en: MessageCatalog = {
 		"Everything important stays on your machine. Preferences and blink statistics live in local storage. There is no account to create, no cloud backend to sync to, and no analytics pipeline watching how you use the app.",
 	"about.opensource.title": "Open source",
 	"about.opensource.body":
-		"BlinkGuard is open source. You can read the code, open issues, share ideas, or contribute on GitHub — the same repo this app is built from.",
+		"BlinkGuard is open source. It started from ScreenBlink and is now maintained as its own project — read the code, open issues, share ideas, or contribute on GitHub.",
 	"about.opensource.github": "View on GitHub",
 	"about.meta.version": "Version {version}",
 	"about.meta.author": "Made by {name}",

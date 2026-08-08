@@ -2,6 +2,8 @@
 
 Cross-platform desktop app that helps prevent dry eyes and eye strain with blink reminders and optional camera-based blink detection.
 
+**Homepage / source:** https://github.com/xPOGx/BlinkGuard · **Privacy:** [PRIVACY.md](PRIVACY.md) · **Security:** [SECURITY.md](SECURITY.md) · **Changelog:** [CHANGELOG.md](CHANGELOG.md)
+
 ## Features
 
 - **Blink reminders** — start/stop tracking from the control panel; interval slider from 1–10 seconds
@@ -10,12 +12,16 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 - **MGD mode** — when camera detection is on, show timed popups even while blinking; the popup still closes when a blink is detected
 - **Camera visualization** — optional live preview window with face/eye landmarks and EAR status
 - **Eye exercise reminders** — configurable interval (5–60 minutes); rotating prompts with Skip and Snooze (5 min); auto-close after 30 seconds
+- **20-20-20 look-away breaks** — independent timer alongside exercises
 - **Customizable reminder popup** — drag to reposition, resize with edge handles, custom message, colors, and transparency
 - **Global keyboard shortcut** — start/stop reminders (default `Ctrl+I`; rebindable)
-- **Sounds** — optional notification sounds for blink and exercise popups
-- **Dark / light mode**
+- **Sounds** — optional notification sounds for blink and exercise popups (per-kind volume)
+- **Quiet hours & fullscreen soft-pause** — hide popups when you ask for quiet time or go fullscreen
+- **Local blink statistics** — session stats and live blinks-per-minute (camera mode)
+- **Dark / light mode** · **EN / UK** localization
 - **Persistent preferences** — saved locally via `electron-store` (reset-to-defaults supported)
 - **Sleep / wake handling** — pauses on suspend and auto-resumes if tracking was active
+- **In-app updates (Windows)** — checks GitHub Releases for this repo
 - **Cross-platform packaging** — Windows and macOS (Electron Builder)
 
 ## Technology stack
@@ -23,7 +29,7 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 | Area | Stack |
 |---|---|
 | UI | React 18, TypeScript, Vite, Tailwind CSS, Lucide |
-| Desktop | Electron 30, `electron-store` |
+| Desktop | Electron 30, `electron-store`, `electron-updater` |
 | Computer vision (optional) | Python, OpenCV, dlib, NumPy, PyInstaller |
 | Tooling | Biome, Vitest, Electron Builder |
 
@@ -70,6 +76,25 @@ cd python
 
 See `AGENTS.md` for Cursor Cloud–specific notes.
 
-## Attribution
+### Packaging notes
 
-BlinkGuard is originally based on [ScreenBlink](https://github.com/katunli/ScreenBlink) by Katun Li ([screenblink.org](https://www.screenblink.org/)).
+- Local Windows package (always unsigned): `npm run build:windows`
+- Tag/CI publish: `npm run build:windows:publish` via `scripts/publish-windows.js`
+  - Signs when `CSC_LINK` (and `CSC_KEY_PASSWORD` if needed) are set
+  - Otherwise packages unsigned so CI still ships artifacts
+- macOS: `npm run build:mac` (notarize uses Electron Builder + Apple secrets when configured)
+
+### GitHub product identity (repo owner)
+
+Run while authenticated as the `xPOGx` account (admin on this repo):
+
+```bash
+gh repo edit xPOGx/BlinkGuard --homepage "https://github.com/xPOGx/BlinkGuard"
+gh repo edit xPOGx/BlinkGuard --add-topic electron --add-topic typescript --add-topic react --add-topic vite --add-topic eye-care --add-topic blink-detection --add-topic desktop-app
+```
+
+To detach the historical fork relationship from ScreenBlink (keeps issues/stars; does not rewrite git history), open a GitHub Support ticket asking to convert `xPOGx/BlinkGuard` from a fork of `katunli/ScreenBlink` into a standalone repository.
+
+## Third-party attribution
+
+BlinkGuard is originally based on [ScreenBlink](https://github.com/katunli/ScreenBlink) by Katun Li. Copyright and license notices for that lineage are recorded in [NOTICE](NOTICE). BlinkGuard is maintained independently under the MIT License ([LICENSE](LICENSE)).
