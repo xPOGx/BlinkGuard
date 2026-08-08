@@ -2,17 +2,37 @@ name: Build and Release
 
 on:
   # branches + tags together under push are ANDed by GitHub (workflow never runs).
-  # Tag releases only; use workflow_dispatch for a manual package/publish dry-run.
+  # Tag releases only; use workflow_dispatch for a manual package/publish dry-run
+  # or to attach platform artifacts to an existing tag (e.g. add macOS to v2.0.0).
   push:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      publish_to_tag:
+        description: "Optional existing release tag to publish to (e.g. v2.0.0). Empty = package only."
+        required: false
+        default: ""
+      platforms:
+        description: "Which platform jobs to run"
+        required: false
+        default: "both"
+        type: choice
+        options:
+          - both
+          - windows
+          - macos
 
 permissions:
   contents: write
 
 jobs:
   build-windows:
+    if: >-
+      github.event_name == 'push' ||
+      github.event.inputs.platforms == 'both' ||
+      github.event.inputs.platforms == 'windows' ||
+      github.event.inputs.platforms == ''
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -357,8 +377,6 @@ jobs:
 
       # Optional Windows code signing (scripts/publish-windows.js):
       #   CSC_LINK, CSC_KEY_PASSWORD — when unset, tag releases stay unsigned.
-      # Optional macOS notarize secrets (mac job, if enabled):
-      #   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
       - name: Build Windows app
         env:
           GH_TOKEN: ${{ github.token }}
@@ -366,8 +384,14 @@ jobs:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
         run: |
-          if ("${{ startsWith(github.ref, 'refs/tags/v') }}" -eq "true") {
-            Write-Host "Tag release build: publishing to GitHub Releases (latest.yml + Setup.exe + blockmap)"
+          $isTag = "${{ startsWith(github.ref, 'refs/tags/v') }}" -eq "true"
+          $publishTag = "${{ github.event.inputs.publish_to_tag }}"
+          if ($isTag -or (![string]::IsNullOrWhiteSpace($publishTag))) {
+            if (![string]::IsNullOrWhiteSpace($publishTag)) {
+              Write-Host "Manual publish to existing release tag: $publishTag"
+            } else {
+              Write-Host "Tag release build: publishing to GitHub Releases (latest.yml + Setup.exe + blockmap)"
+            }
             npm run build:windows:publish
           } else {
             Write-Host "Branch build: package only (--publish never)"
@@ -390,7 +414,8 @@ jobs:
             exit 1
           }
 
-          if ("${{ startsWith(github.ref, 'refs/tags/v') }}" -eq "true") {
+          $expectUpdater = ("${{ startsWith(github.ref, 'refs/tags/v') }}" -eq "true") -or (-not [string]::IsNullOrWhiteSpace("${{ github.event.inputs.publish_to_tag }}"))
+          if ($expectUpdater) {
             if (!(Test-Path "dist/latest.yml")) {
               Write-Error "latest.yml not found (required for electron-updater)"
               Get-ChildItem "dist/" -ErrorAction SilentlyContinue
@@ -428,7 +453,7 @@ jobs:
             dist/BlinkGuard-x64.zip
 
       - name: Upload updater metadata
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish_to_tag != ''
         uses: actions/upload-artifact@v4
         with:
           name: BlinkGuard-Windows-updater
@@ -441,3 +466,187 @@ jobs:
         with:
           name: BlinkGuard.Setup.exe
           path: dist/BlinkGuard.Setup.exe
+
+  build-macos:
+    if: >-
+      github.event_name == 'push' ||
+      github.event.inputs.platforms == 'both' ||
+      github.event.inputs.platforms == 'macos' ||
+      github.event.inputs.platforms == ''
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Download shape predictor model
+        run: |
+          set -euo pipefail
+          MODEL_DIR="electron/assets/models"
+          MODEL_PATH="$MODEL_DIR/shape_predictor_68_face_landmarks.dat"
+          MODEL_URL="https://github.com/davisking/dlib-models/raw/master/shape_predictor_68_face_landmarks.dat.bz2"
+          mkdir -p "$MODEL_DIR"
+          curl -L --fail --retry 3 -o "$MODEL_PATH.bz2" "$MODEL_URL"
+          python3 - <<'PY'
+          import bz2, pathlib
+          src = pathlib.Path("electron/assets/models/shape_predictor_68_face_landmarks.dat.bz2")
+          dst = pathlib.Path("electron/assets/models/shape_predictor_68_face_landmarks.dat")
+          dst.write_bytes(bz2.decompress(src.read_bytes()))
+          src.unlink()
+          print(f"Model size: {dst.stat().st_size / (1024 * 1024):.1f} MB")
+          PY
+          test -s "$MODEL_PATH"
+
+      - name: Cache pip / venv
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/pip
+            python/venv
+          key: ${{ runner.os }}-pip-${{ hashFiles('python/requirements.txt') }}-${{ hashFiles('python/setup.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ hashFiles('python/requirements.txt') }}-
+            ${{ runner.os }}-pip-
+
+      - name: Cache PyInstaller
+        uses: actions/cache@v4
+        with:
+          path: |
+            python/build/
+            python/dist/
+            ~/Library/Application Support/pyinstaller
+          key: ${{ runner.os }}-pyinstaller-${{ hashFiles('python/blink_detector.py', 'python/blink_detector.spec') }}
+          restore-keys: |
+            ${{ runner.os }}-pyinstaller-
+
+      - name: Setup Python environment
+        working-directory: python
+        run: |
+          set -euo pipefail
+          if [[ -d venv ]]; then
+            # shellcheck disable=SC1091
+            source venv/bin/activate
+            if python -c "import cv2, numpy, dlib, PyInstaller" 2>/dev/null; then
+              echo "OK: using cached virtual environment"
+              exit 0
+            fi
+            deactivate || true
+            rm -rf venv
+          fi
+          ./setup.sh
+
+      - name: Build and install Python binary
+        working-directory: python
+        run: |
+          set -euo pipefail
+          ./build_and_install.sh
+          test -x ../electron/resources/blink_detector
+          BINARY_SIZE=$(stat -f%z ../electron/resources/blink_detector)
+          echo "Binary size: $BINARY_SIZE bytes ($(( BINARY_SIZE / 1024 / 1024 )) MB)"
+          if [[ "$BINARY_SIZE" -lt 50000000 ]]; then
+            echo "Binary seems too small (<50MB)"
+            exit 1
+          fi
+
+      # Optional macOS signing/notarize secrets (scripts/publish-mac.js):
+      #   CSC_LINK / CSC_KEY_PASSWORD or CSC_NAME — Developer ID signing
+      #   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID — notarize when signed
+      # When unset, tag releases stay unsigned (identity=null, notarize=false).
+      - name: Build macOS app
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CSC_NAME: ${{ secrets.CSC_NAME }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          PUBLISH_TAG="${{ github.event.inputs.publish_to_tag }}"
+          if [[ "${{ startsWith(github.ref, 'refs/tags/v') }}" == "true" || -n "${PUBLISH_TAG// /}" ]]; then
+            if [[ -n "${PUBLISH_TAG// /}" ]]; then
+              echo "Manual publish to existing release tag: $PUBLISH_TAG"
+            else
+              echo "Tag release build: publishing to GitHub Releases (latest-mac.yml + DMG/ZIP)"
+            fi
+            npm run build:mac:publish
+          else
+            echo "Branch/manual build: package only (--publish never)"
+            npm run build:mac
+          fi
+
+      - name: Verify macOS app artifacts
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          dmgs=(dist/BlinkGuard-*.dmg)
+          zips=(dist/BlinkGuard-*.zip)
+          if [[ ${#dmgs[@]} -eq 0 ]]; then
+            echo "No DMG artifacts found"
+            ls -la dist/ || true
+            exit 1
+          fi
+          if [[ ${#zips[@]} -eq 0 ]]; then
+            echo "No ZIP artifacts found"
+            ls -la dist/ || true
+            exit 1
+          fi
+          for f in "${dmgs[@]}" "${zips[@]}"; do
+            size=$(stat -f%z "$f")
+            echo "$f: $size bytes ($(( size / 1024 / 1024 )) MB)"
+            if [[ "$size" -lt 80000000 ]]; then
+              echo "Artifact seems too small (<80MB): $f"
+              exit 1
+            fi
+          done
+          PUBLISH_TAG="${{ github.event.inputs.publish_to_tag }}"
+          if [[ "${{ startsWith(github.ref, 'refs/tags/v') }}" == "true" || -n "${PUBLISH_TAG// /}" ]]; then
+            if [[ ! -f dist/latest-mac.yml ]]; then
+              echo "latest-mac.yml not found (required for electron-updater)"
+              ls -la dist/ || true
+              exit 1
+            fi
+            blockmaps=(dist/*.blockmap)
+            if [[ ${#blockmaps[@]} -eq 0 ]]; then
+              echo "No .blockmap files found (required for electron-updater)"
+              ls -la dist/ || true
+              exit 1
+            fi
+            echo "OK: updater metadata present (latest-mac.yml + blockmap)"
+          fi
+          echo "macOS app artifacts verification passed!"
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlinkGuard-macOS
+          if-no-files-found: error
+          path: |
+            dist/BlinkGuard-*.dmg
+            dist/BlinkGuard-*.zip
+
+      - name: Upload macOS updater metadata
+        if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish_to_tag != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlinkGuard-macOS-updater
+          path: |
+            dist/latest-mac.yml
+            dist/*.blockmap

@@ -9,8 +9,8 @@
  * Optional GitHub Actions secrets for signed releases:
  *   CSC_LINK              — base64 or file path to .pfx / code-signing cert
  *   CSC_KEY_PASSWORD      — certificate password
- * macOS notarize (build.yml mac job), if used:
- *   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+ * macOS publish (build.yml build-macos + scripts/publish-mac.js):
+ *   APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID — notarize when signed
  */
 import { spawnSync } from "node:child_process";
 

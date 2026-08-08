@@ -36,7 +36,9 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
+# Ignore generated build dirs, but keep electron-builder entitlements tracked.
+build/*
+!build/entitlements.mac.plist
 develop-eggs/
 dist/
 downloads/

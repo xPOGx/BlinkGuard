@@ -82,7 +82,10 @@ See `AGENTS.md` for Cursor Cloud–specific notes.
 - Tag/CI publish: `npm run build:windows:publish` via `scripts/publish-windows.js`
   - Signs when `CSC_LINK` (and `CSC_KEY_PASSWORD` if needed) are set
   - Otherwise packages unsigned so CI still ships artifacts
-- macOS: `npm run build:mac` (notarize uses Electron Builder + Apple secrets when configured)
+- Local macOS package (unsigned, no notarize): `npm run build:mac`
+- Tag/CI macOS publish: `npm run build:mac:publish` via `scripts/publish-mac.js`
+  - Signs/notarizes when Apple + signing secrets are set
+  - Otherwise packages unsigned so CI still ships DMG/ZIP + `latest-mac.yml`
 
 ---
 

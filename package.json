@@ -21,8 +21,9 @@
 		"dev": "vite",
 		"build": "tsc && vite build && electron-builder --publish never",
 		"build:electron": "tsc && vite build",
-		"build:mac": "npm run build:electron && electron-builder --mac --publish never && node scripts/remove-quarantine.js",
+		"build:mac": "npm run build:electron && electron-builder --mac --config.mac.identity=null --config.mac.notarize=false --publish never && node scripts/remove-quarantine.js",
 		"build:mac:clean": "npm run build:mac && node scripts/remove-quarantine.js --clean-dmg",
+		"build:mac:publish": "node scripts/publish-mac.js",
 		"build:windows": "node scripts/prepare-python-windows.js && tsc && vite build && electron-builder --win nsis --config.win.signExecutable=false --publish never",
 		"build:windows:publish": "node scripts/publish-windows.js",
 		"remove-quarantine": "node scripts/remove-quarantine.js",
@@ -123,7 +124,7 @@
 			"gatekeeperAssess": false,
 			"entitlements": "build/entitlements.mac.plist",
 			"entitlementsInherit": "build/entitlements.mac.plist",
-			"notarize": true,
+			"notarize": false,
 			"artifactName": "BlinkGuard-${arch}.${ext}"
 		},
 		"win": {
