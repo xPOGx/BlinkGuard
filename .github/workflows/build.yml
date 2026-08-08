@@ -1,17 +1,17 @@
 name: Build and Release
 
 on:
+  # branches + tags together under push are ANDed by GitHub (workflow never runs).
+  # Tag releases only; use workflow_dispatch for a manual package/publish dry-run.
   push:
-    branches: [ main ]
     tags:
-      - 'v*'
+      - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-
-
   build-windows:
     runs-on: windows-latest
     steps:
