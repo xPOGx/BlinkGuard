@@ -1,25 +1,26 @@
 import { app, dialog } from "electron";
 import electronUpdater from "electron-updater";
 import { t, type Locale } from "../../../shared/i18n";
-import { hasUpdateFeed } from "./update-feed";
+import { hasUpdateFeed, isAutoUpdatePlatform } from "./update-feed";
 
 // electron-updater is CJS; named ESM imports fail under Electron's ESM loader.
 const { autoUpdater } = electronUpdater;
 
 export type CheckForUpdatesOptions = {
-	/** When true, show dialogs for up-to-date / errors (tray menu). */
+	/** When true, show dialogs for up-to-date / errors (tray / About). */
 	interactive?: boolean;
 };
 
 /**
- * Windows GitHub Releases updater. Hard no-op when unpackaged, non-Windows,
- * or when the build has no embedded feed (`app-update.yml` from publish config).
+ * Windows / macOS GitHub Releases updater. Hard no-op when unpackaged,
+ * unsupported platform, or when the build has no embedded feed
+ * (`app-update.yml` from publish config).
  */
 export class AutoUpdateService {
 	private enabled = false;
 	private checking = false;
 	private downloadedVersion: string | null = null;
-	/** Prefer interactive dialogs once the user asked via tray. */
+	/** Prefer interactive dialogs once the user asked via tray / About. */
 	private interactivePending = false;
 
 	constructor(private readonly getLocale: () => Locale) {}
@@ -28,7 +29,7 @@ export class AutoUpdateService {
 	start(): void {
 		try {
 			if (!app.isPackaged) return;
-			if (process.platform !== "win32") return;
+			if (!isAutoUpdatePlatform()) return;
 			if (!hasUpdateFeed(process.resourcesPath)) return;
 
 			autoUpdater.autoDownload = true;
@@ -70,10 +71,15 @@ export class AutoUpdateService {
 		}
 	}
 
-	/** Quiet launch check or interactive tray check. Never throws. */
+	/** Quiet launch check or interactive tray / About check. Never throws. */
 	checkForUpdates(options: CheckForUpdatesOptions = {}): void {
 		try {
-			if (!this.enabled) return;
+			if (!this.enabled) {
+				if (options.interactive) {
+					this.showError();
+				}
+				return;
+			}
 
 			if (options.interactive) {
 				this.interactivePending = true;

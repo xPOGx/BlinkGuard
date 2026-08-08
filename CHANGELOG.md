@@ -2,6 +2,12 @@
 
 All notable changes to BlinkGuard are documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- macOS in-app updates via GitHub Releases (`electron-updater`, tray + About “Check for updates”)
+
 ## [2.0.0] - 2026-08
 
 BlinkGuard-era product release (rebranded and extended from the ScreenBlink lineage; see [NOTICE](NOTICE)).

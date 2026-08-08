@@ -45,6 +45,7 @@ export const uk: MessageCatalog = {
 	"about.opensource.github": "Відкрити на GitHub",
 	"about.meta.version": "Версія {version}",
 	"about.meta.author": "Автор: {name}",
+	"about.checkForUpdates": "Перевірити оновлення",
 
 	// Debug
 	"debug.overlays.title": "Перегляд оверлеїв",

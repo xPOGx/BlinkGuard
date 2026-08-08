@@ -233,6 +233,7 @@ function bootstrap(): void {
 		blinkStats,
 		focusPause,
 		sound,
+		checkForUpdates: () => autoUpdates.checkForUpdates({ interactive: true }),
 	});
 
 	app.on("second-instance", () => {

@@ -35,6 +35,7 @@ interface IpcDependencies {
 	blinkStats: BlinkStatsService;
 	focusPause: FocusPauseService;
 	sound: NotificationSoundPort;
+	checkForUpdates: () => void;
 }
 
 export function registerIpcHandlers(deps: IpcDependencies): void {
@@ -50,6 +51,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		blinkStats,
 		focusPause,
 		sound,
+		checkForUpdates,
 	} = deps;
 	const current = preferences.current;
 
@@ -284,6 +286,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	);
 	ipcMain.on(IPC_CHANNELS.openGithubRepo, () => {
 		void shell.openExternal("https://github.com/xPOGx/BlinkGuard");
+	});
+	ipcMain.on(IPC_CHANNELS.checkForUpdates, () => {
+		checkForUpdates();
 	});
 	ipcMain.on(
 		IPC_CHANNELS.popupEditorSaved,

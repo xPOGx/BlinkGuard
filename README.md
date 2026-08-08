@@ -21,7 +21,7 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 - **Dark / light mode** · **EN / UK** localization
 - **Persistent preferences** — saved locally via `electron-store` (reset-to-defaults supported)
 - **Sleep / wake handling** — pauses on suspend and auto-resumes if tracking was active
-- **In-app updates (Windows)** — checks GitHub Releases for this repo
+- **In-app updates (Windows & macOS)** — checks GitHub Releases for this repo
 - **Cross-platform packaging** — Windows and macOS (Electron Builder)
 
 ## Technology stack
@@ -84,8 +84,9 @@ See `AGENTS.md` for Cursor Cloud–specific notes.
   - Otherwise packages unsigned so CI still ships artifacts
 - Local macOS package (unsigned, no notarize): `npm run build:mac`
 - Tag/CI macOS publish: `npm run build:mac:publish` via `scripts/publish-mac.js`
-  - Signs/notarizes when Apple + signing secrets are set
-  - Otherwise packages unsigned so CI still ships DMG/ZIP + `latest-mac.yml`
+  - Signs/notarizes when Apple + signing secrets (`CSC_LINK` / `CSC_NAME`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`) are set
+  - Otherwise packages **unsigned** so CI still ships DMG/ZIP + `latest-mac.yml` (job does not skip)
+- In-app updates need a **published** build with embedded `app-update.yml` (tag/`build:*:publish`); local `--publish never` packages have no feed. Signed + notarized mac builds are recommended for Gatekeeper; unsigned releases may still publish updater metadata but install can fail at runtime without crashing the app.
 
 ---
 

@@ -89,6 +89,8 @@ describe("settings shell", () => {
 		expect(screen.getByText(`Version ${version}`)).toBeDefined();
 		fireEvent.click(screen.getByRole("button", { name: "View on GitHub" }));
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.openGithubRepo);
+		fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.checkForUpdates);
 
 		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.unsubscribeBlinkStats);

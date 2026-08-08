@@ -44,6 +44,7 @@ export const en: MessageCatalog = {
 	"about.opensource.github": "View on GitHub",
 	"about.meta.version": "Version {version}",
 	"about.meta.author": "Made by {name}",
+	"about.checkForUpdates": "Check for updates",
 
 	// Debug
 	"debug.overlays.title": "Preview overlays",

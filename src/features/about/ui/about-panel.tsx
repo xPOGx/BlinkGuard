@@ -51,7 +51,18 @@ export function AboutPanel() {
 			</SettingPanel>
 
 			<SettingPanel>
-				<SettingRow title="BlinkGuard">
+				<SettingRow
+					title="BlinkGuard"
+					action={
+						<Button
+							type="button"
+							variant="secondary"
+							onClick={() => rendererIpc.checkForUpdates()}
+						>
+							{t("about.checkForUpdates")}
+						</Button>
+					}
+				>
 					<p className="text-sm text-muted-foreground">
 						{t("about.meta.version", { version })}
 					</p>
