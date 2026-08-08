@@ -49,8 +49,8 @@ export class WindowManager {
 	): BrowserWindow {
 		const showOnReady = options.showOnReady ?? true;
 		const window = new BrowserWindow({
-			width: 900,
-			height: 640,
+			width: 1024,
+			height: 768,
 			minWidth: 720,
 			minHeight: 520,
 			show: false,
