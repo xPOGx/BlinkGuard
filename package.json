@@ -14,7 +14,8 @@
 		"url": "https://github.com/xPOGx/BlinkGuard/issues"
 	},
 	"author": {
-		"name": "Pavlo Dzhevaha"
+		"name": "Pavlo Dzhevaha",
+		"email": "pavel19.1078@gmail.com"
 	},
 	"scripts": {
 		"dev": "vite",
