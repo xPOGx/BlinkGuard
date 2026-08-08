@@ -39,6 +39,8 @@ __pycache__/
 # Ignore generated build dirs, but keep electron-builder entitlements tracked.
 build/*
 !build/entitlements.mac.plist
+# PyInstaller workdir (pattern above only matches repo-root build/)
+python/build/
 develop-eggs/
 dist/
 downloads/
