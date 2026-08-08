@@ -3,3 +3,8 @@ export interface BlinkStatsPort {
 	onTrackingStart(): void;
 	onTrackingStop(): void;
 }
+
+export interface BlinkRateCoachingPort {
+	start(): void;
+	stop(): void;
+}

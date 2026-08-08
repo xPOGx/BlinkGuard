@@ -12,6 +12,7 @@ import {
 	type AppPreferences,
 	DEFAULT_EXERCISE_PROMPTS,
 	DEFAULT_PREFERENCES,
+	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
 	toRendererPreferences,
 } from "../../../shared/preferences";
@@ -128,6 +129,20 @@ describe("quiet hours / focus preference defaults", () => {
 describe("onboarding preference defaults", () => {
 	it("defaults hasCompletedOnboarding to false for first-run", () => {
 		expect(DEFAULT_PREFERENCES.hasCompletedOnboarding).toBe(false);
+	});
+});
+
+describe("blink-rate coaching preference defaults", () => {
+	it("defaults coaching on with Low-band threshold", () => {
+		expect(DEFAULT_PREFERENCES.blinkRateCoachingEnabled).toBe(true);
+		expect(DEFAULT_PREFERENCES.blinkRateThresholdPerMin).toBe(4);
+	});
+
+	it("sanitizes blinkRateThresholdPerMin to 1…60", () => {
+		expect(sanitizeBlinkRateThresholdPerMin(null)).toBe(4);
+		expect(sanitizeBlinkRateThresholdPerMin(0)).toBe(1);
+		expect(sanitizeBlinkRateThresholdPerMin(99)).toBe(60);
+		expect(sanitizeBlinkRateThresholdPerMin(7.6)).toBe(8);
 	});
 });
 

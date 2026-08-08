@@ -67,6 +67,8 @@ export const IPC_CHANNELS = {
 	updateQuietHoursEnd: "update-quiet-hours-end",
 	updatePauseOnFullscreen: "update-pause-on-fullscreen",
 	focusPauseState: "focus-pause-state",
+	updateBlinkRateCoachingEnabled: "update-blink-rate-coaching-enabled",
+	updateBlinkRateThreshold: "update-blink-rate-threshold",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -136,4 +138,6 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.updateQuietHoursStart,
 	IPC_CHANNELS.updateQuietHoursEnd,
 	IPC_CHANNELS.updatePauseOnFullscreen,
+	IPC_CHANNELS.updateBlinkRateCoachingEnabled,
+	IPC_CHANNELS.updateBlinkRateThreshold,
 ] as const;

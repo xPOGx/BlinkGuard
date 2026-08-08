@@ -127,6 +127,24 @@ describe("PreferencesService", () => {
 		);
 	});
 
+	it("sanitizes blinkRateThresholdPerMin on load and set()", () => {
+		const store = new FakePreferenceStore();
+		store.set("blinkRateThresholdPerMin", 100);
+		store.set("blinkRateCoachingEnabled", "yes");
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.blinkRateThresholdPerMin).toBe(60);
+		expect(service.current.blinkRateCoachingEnabled).toBe(true);
+
+		service.set("blinkRateThresholdPerMin", 0);
+		expect(service.current.blinkRateThresholdPerMin).toBe(1);
+		expect(store.get("blinkRateThresholdPerMin")).toBe(1);
+
+		service.set("blinkRateCoachingEnabled", false);
+		expect(service.current.blinkRateCoachingEnabled).toBe(false);
+	});
+
 	it("clears invalid earCalibration from the store", () => {
 		const store = new FakePreferenceStore();
 		store.set("earCalibration", 9.9);

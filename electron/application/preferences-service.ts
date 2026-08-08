@@ -1,5 +1,6 @@
 import {
 	DEFAULT_PREFERENCES,
+	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
 	type AppPreferences,
 	type PersistedPreferences,
@@ -62,6 +63,13 @@ export class PreferencesService {
 			persisted.hasCompletedOnboarding =
 				DEFAULT_PREFERENCES.hasCompletedOnboarding;
 		}
+		if (typeof persisted.blinkRateCoachingEnabled !== "boolean") {
+			persisted.blinkRateCoachingEnabled =
+				DEFAULT_PREFERENCES.blinkRateCoachingEnabled;
+		}
+		persisted.blinkRateThresholdPerMin = sanitizeBlinkRateThresholdPerMin(
+			persisted.blinkRateThresholdPerMin,
+		);
 		persisted.exercisePrompts = sanitizeExercisePrompts(
 			persisted.exercisePrompts,
 		);
@@ -85,10 +93,14 @@ export class PreferencesService {
 		key: K,
 		value: PersistedPreferences[K],
 	): void {
-		const next =
-			key === "exercisePrompts"
-				? (sanitizeExercisePrompts(value) as PersistedPreferences[K])
-				: value;
+		let next = value;
+		if (key === "exercisePrompts") {
+			next = sanitizeExercisePrompts(value) as PersistedPreferences[K];
+		} else if (key === "blinkRateThresholdPerMin") {
+			next = sanitizeBlinkRateThresholdPerMin(
+				value,
+			) as PersistedPreferences[K];
+		}
 		this.current[key] = next as never;
 		this.store.set(key, next);
 	}

@@ -6,9 +6,21 @@ export interface ReminderWindowPort {
 	showNoFace(): void;
 	hideNoFace(): void;
 	hasNoFace(): boolean;
+	showBlinkRateCoach(): void;
+	hideBlinkRateCoach(): void;
+	hasBlinkRateCoach(): boolean;
 	closeCamera(): void;
 	sendToMain(channel: string, ...args: unknown[]): void;
 	sendPreferences(): void;
+}
+
+/** Soft blink-rate coach toast surface (subset used by FocusPause + coaching). */
+export interface BlinkRateCoachWindowPort {
+	showBlinkRateCoach(): void;
+	hideBlinkRateCoach(): void;
+	hasBlinkRateCoach(): boolean;
+	hasReminder(): boolean;
+	hasNoFace(): boolean;
 }
 
 export interface BlinkDetectorPort {

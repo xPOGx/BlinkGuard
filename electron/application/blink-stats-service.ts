@@ -165,6 +165,8 @@ export class BlinkStatsService {
 		this.trackingStartedAt = null;
 		this.rateSessionStartedAt = null;
 		this.lastPushedWarmupSec = null;
+		this.blinkTimestamps = [];
+		this.lastPushedBpm = null;
 		this.schedulePush(true);
 	}
 

@@ -2,6 +2,7 @@ import { app } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AppRuntimeState } from "./application/app-runtime-state";
+import { BlinkRateCoachingService } from "./application/blink-rate-coaching-service";
 import { BlinkStatsService } from "./application/blink-stats-service";
 import { ExerciseService } from "./application/exercise-service";
 import { FocusPauseService } from "./application/focus-pause-service";
@@ -121,6 +122,12 @@ function bootstrap(): void {
 		},
 		blinkDebugLogger,
 	);
+	const blinkRateCoaching = new BlinkRateCoachingService(
+		preferences,
+		blinkStats,
+		windows,
+		notificationGate,
+	);
 	reminders = new ReminderService(
 		preferences,
 		state,
@@ -130,6 +137,7 @@ function bootstrap(): void {
 		store,
 		blinkStats,
 		notificationGate,
+		blinkRateCoaching,
 	);
 	const focusEnvironment = createFocusEnvironment();
 	const focusPause = new FocusPauseService(
@@ -181,6 +189,7 @@ function bootstrap(): void {
 			focusMonitor.stop();
 			focusPause.stopQuietHoursWatch();
 			focusEnvironment.dispose?.();
+			blinkRateCoaching.dispose();
 		},
 	);
 	const tray = new TrayController(paths, windows, () => lifecycle.quit());

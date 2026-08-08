@@ -26,6 +26,10 @@ export function usePreferences() {
 	);
 
 	useEffect(() => {
+		// Wait for main → renderer hydrate so defaults do not overwrite the store
+		// (e.g. hasCompletedOnboarding: false) or bounce sendPreferences loops.
+		if (!prefsHydrated) return;
+
 		document.documentElement.classList.toggle("dark", preferences.darkMode);
 		rendererIpc.updateDarkMode(preferences.darkMode);
 		rendererIpc.updateCameraEnabled(preferences.cameraEnabled);
@@ -46,10 +50,14 @@ export function usePreferences() {
 		rendererIpc.updateQuietHoursStart(preferences.quietHoursStart);
 		rendererIpc.updateQuietHoursEnd(preferences.quietHoursEnd);
 		rendererIpc.updatePauseOnFullscreen(preferences.pauseOnFullscreen);
+		rendererIpc.updateBlinkRateCoachingEnabled(
+			preferences.blinkRateCoachingEnabled,
+		);
+		rendererIpc.updateBlinkRateThreshold(preferences.blinkRateThresholdPerMin);
 		rendererIpc.updateHasCompletedOnboarding(
 			preferences.hasCompletedOnboarding,
 		);
-	}, [preferences]);
+	}, [preferences, prefsHydrated]);
 
 	useEffect(() => {
 		if (!preferences.isTracking) {

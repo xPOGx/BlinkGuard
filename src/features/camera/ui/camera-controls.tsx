@@ -1,4 +1,4 @@
-import { Activity, Camera, Crosshair } from "lucide-react";
+import { Activity, Camera, Crosshair, Gauge } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/button";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
@@ -330,6 +330,61 @@ export function CameraControls({
 									{calibrationMessage}
 								</p>
 							) : null}
+						</SettingRow>
+					</SettingPanel>
+
+					<SettingPanel>
+						<SettingRow
+							title={
+								<>
+									<Gauge
+										className="h-4 w-4 text-muted-foreground"
+										aria-hidden
+									/>
+									Blink rate coaching
+								</>
+							}
+							description="Soft tip when your recent camera blink rate is low. Live rate stays in Statistics."
+							action={
+								<ToggleSwitch
+									aria-label="Toggle blink rate coaching"
+									checked={preferences.blinkRateCoachingEnabled}
+									onChange={() =>
+										setPreferences((current) => ({
+											...current,
+											blinkRateCoachingEnabled:
+												!current.blinkRateCoachingEnabled,
+										}))
+									}
+								/>
+							}
+						>
+							<div className="flex flex-wrap items-center gap-3">
+								<label
+									htmlFor="blink-rate-threshold"
+									className="text-xs text-muted-foreground"
+								>
+									Min blinks / min
+								</label>
+								<input
+									id="blink-rate-threshold"
+									type="number"
+									min={1}
+									max={60}
+									step={1}
+									disabled={!preferences.blinkRateCoachingEnabled}
+									value={preferences.blinkRateThresholdPerMin}
+									onChange={(event) => {
+										const value = Number.parseInt(event.target.value, 10);
+										if (!Number.isFinite(value)) return;
+										setPreferences((current) => ({
+											...current,
+											blinkRateThresholdPerMin: value,
+										}));
+									}}
+									className="w-20 rounded-md border border-border bg-background px-2 py-1 text-sm disabled:opacity-50"
+								/>
+							</div>
 						</SettingRow>
 					</SettingPanel>
 

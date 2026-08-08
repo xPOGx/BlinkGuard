@@ -1,0 +1,28 @@
+/* Soft blink-rate coaching toast (top-center, camera mode) */
+html.blink-rate-coach-root,
+body.blink-rate-coach-body {
+	background: transparent !important;
+}
+
+body.blink-rate-coach-body {
+	justify-content: center;
+	align-items: center;
+	padding: 0;
+}
+
+#blink-rate-coach {
+	font-family: var(--popup-font);
+	font-size: 0.8rem;
+	font-weight: 500;
+	letter-spacing: 0.01em;
+	color: #fbbf24;
+	background: var(--popup-surface);
+	border: 1px solid var(--popup-border);
+	border-radius: var(--popup-radius-sm);
+	padding: 8px 14px;
+	white-space: nowrap;
+	opacity: 0;
+	animation: fadeIn 0.35s forwards;
+	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+	backdrop-filter: blur(8px);
+}

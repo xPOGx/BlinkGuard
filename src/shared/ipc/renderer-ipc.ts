@@ -99,6 +99,10 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateQuietHoursEnd, value),
 	updatePauseOnFullscreen: (enabled: boolean) =>
 		send(IPC_CHANNELS.updatePauseOnFullscreen, enabled),
+	updateBlinkRateCoachingEnabled: (enabled: boolean) =>
+		send(IPC_CHANNELS.updateBlinkRateCoachingEnabled, enabled),
+	updateBlinkRateThreshold: (threshold: number) =>
+		send(IPC_CHANNELS.updateBlinkRateThreshold, threshold),
 	onFocusPauseState: (
 		listener: (payload: {
 			reason: "quiet-hours" | "fullscreen" | null;

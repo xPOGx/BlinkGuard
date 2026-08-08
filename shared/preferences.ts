@@ -1,3 +1,5 @@
+import { BLINK_RATE_LOW_MAX } from "./blink-rate";
+
 export interface Point {
 	x: number;
 	y: number;
@@ -16,11 +18,31 @@ export interface PopupColors {
 
 export type CameraQuality = "performance" | "medium" | "high";
 
+const BLINK_RATE_THRESHOLD_MIN = 1;
+const BLINK_RATE_THRESHOLD_MAX = 60;
+
+/** Coerce stored/IPC blink-rate coaching threshold to 1…60. */
+export function sanitizeBlinkRateThresholdPerMin(input: unknown): number {
+	if (input === null || input === undefined || input === "") {
+		return BLINK_RATE_LOW_MAX;
+	}
+	const n = typeof input === "number" ? input : Number(input);
+	if (!Number.isFinite(n)) return BLINK_RATE_LOW_MAX;
+	return Math.min(
+		BLINK_RATE_THRESHOLD_MAX,
+		Math.max(BLINK_RATE_THRESHOLD_MIN, Math.round(n)),
+	);
+}
+
 export interface PersistedPreferences {
 	darkMode: boolean;
 	reminderInterval: number;
 	cameraEnabled: boolean;
 	cameraQuality: CameraQuality;
+	/** Soft toast when live camera blink rate is below threshold. */
+	blinkRateCoachingEnabled: boolean;
+	/** Soft-coach when blinks/min is strictly below this value (default = Low band). */
+	blinkRateThresholdPerMin: number;
 	/** Personal open-eye EAR baseline; null when unset. */
 	earCalibration: number | null;
 	eyeExercisesEnabled: boolean;
@@ -86,6 +108,8 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	reminderInterval: 3000,
 	cameraEnabled: false,
 	cameraQuality: "medium",
+	blinkRateCoachingEnabled: true,
+	blinkRateThresholdPerMin: BLINK_RATE_LOW_MAX,
 	earCalibration: null,
 	eyeExercisesEnabled: true,
 	exerciseInterval: 20,

@@ -228,6 +228,18 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 			focusPause.recompute();
 		},
 	);
+	ipcMain.on(
+		IPC_CHANNELS.updateBlinkRateCoachingEnabled,
+		(_event, enabled: boolean) => {
+			preferences.set("blinkRateCoachingEnabled", Boolean(enabled));
+		},
+	);
+	ipcMain.on(
+		IPC_CHANNELS.updateBlinkRateThreshold,
+		(_event, threshold: number) => {
+			preferences.set("blinkRateThresholdPerMin", threshold);
+		},
+	);
 	ipcMain.on(IPC_CHANNELS.showCameraWindow, () => {
 		if (!current.cameraEnabled) {
 			preferences.set("cameraEnabled", true);

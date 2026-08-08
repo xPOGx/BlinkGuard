@@ -19,6 +19,9 @@ export class WindowManager {
 	camera: BrowserWindow | null = null;
 	editor: BrowserWindow | null = null;
 	noFace: BrowserWindow | null = null;
+	blinkRateCoach: BrowserWindow | null = null;
+	private blinkRateCoachDismissTimer: ReturnType<typeof setTimeout> | null =
+		null;
 	private onMainLoaded: (() => void) | null = null;
 
 	constructor(
@@ -185,6 +188,62 @@ export class WindowManager {
 
 	hasNoFace(): boolean {
 		return !!this.noFace && !this.noFace.isDestroyed();
+	}
+
+	showBlinkRateCoach(): void {
+		if (
+			!this.preferences.isTracking ||
+			!this.preferences.cameraEnabled ||
+			(this.blinkRateCoach && !this.blinkRateCoach.isDestroyed())
+		) {
+			return;
+		}
+		const width = 280;
+		const { x, y } = getTopCenterPopupPosition(width);
+		const popup = createPanelWindow(
+			{
+				width,
+				height: 48,
+				x,
+				y,
+				focusable: false,
+			},
+			this.paths.preload,
+		);
+		this.blinkRateCoach = popup;
+		void popup.loadFile(
+			path.join(this.paths.publicDir, "blink-rate-coach.html"),
+		);
+		popup.webContents.on("did-finish-load", () =>
+			popup.setIgnoreMouseEvents(true),
+		);
+		popup.once("ready-to-show", () => popup.showInactive());
+		popup.on("closed", () => {
+			if (this.blinkRateCoach === popup) this.blinkRateCoach = null;
+			if (this.blinkRateCoachDismissTimer) {
+				clearTimeout(this.blinkRateCoachDismissTimer);
+				this.blinkRateCoachDismissTimer = null;
+			}
+		});
+		if (this.blinkRateCoachDismissTimer) {
+			clearTimeout(this.blinkRateCoachDismissTimer);
+		}
+		this.blinkRateCoachDismissTimer = setTimeout(() => {
+			this.blinkRateCoachDismissTimer = null;
+			if (this.blinkRateCoach === popup) this.hideBlinkRateCoach();
+		}, 5_000);
+	}
+
+	hideBlinkRateCoach(): void {
+		if (this.blinkRateCoachDismissTimer) {
+			clearTimeout(this.blinkRateCoachDismissTimer);
+			this.blinkRateCoachDismissTimer = null;
+		}
+		this.closeWindow("blinkRateCoach");
+	}
+
+	hasBlinkRateCoach(): boolean {
+		return !!this.blinkRateCoach && !this.blinkRateCoach.isDestroyed();
 	}
 
 	showExercise(prompt: string, onClosed: () => void): BrowserWindow | null {
@@ -356,6 +415,7 @@ export class WindowManager {
 		this.camera = null;
 		this.editor = null;
 		this.noFace = null;
+		this.blinkRateCoach = null;
 	}
 
 	private ensurePopupPosition(): Point {
@@ -367,7 +427,14 @@ export class WindowManager {
 	}
 
 	private closeWindow(
-		key: "reminder" | "exercise" | "lookAway" | "camera" | "editor" | "noFace",
+		key:
+			| "reminder"
+			| "exercise"
+			| "lookAway"
+			| "camera"
+			| "editor"
+			| "noFace"
+			| "blinkRateCoach",
 	): void {
 		const window = this[key];
 		if (window && !window.isDestroyed()) window.close();
