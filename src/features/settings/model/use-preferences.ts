@@ -1,10 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import type { RendererPreferences } from "../../../../shared/preferences";
 import {
 	DEFAULT_RENDERER_PREFERENCES,
 	type SettingsPreferences,
 } from "./preferences";
+import {
+	pushPreferenceDiff,
+	sameRendererPrefs,
+} from "./preferences-sync";
 
 export type SetPreferences = React.Dispatch<
 	React.SetStateAction<SettingsPreferences>
@@ -15,11 +19,26 @@ export function usePreferences() {
 		DEFAULT_RENDERER_PREFERENCES,
 	);
 	const [prefsHydrated, setPrefsHydrated] = useState(false);
+	/** Last snapshot we either received from main or successfully diff-pushed. */
+	const lastSyncedRef = useRef<SettingsPreferences | null>(null);
+	const lastReminderIntervalRef = useRef<number | null>(null);
 
 	useEffect(
 		() =>
 			rendererIpc.onPreferences((saved: RendererPreferences) => {
-				setPreferences((current) => ({ ...current, ...saved }));
+				setPreferences((current) => {
+					const merged = { ...current, ...saved };
+					// Main is source of truth for echoes (shortcut, reset, locale,
+					// calibration). Mark synced so the push effect does not bounce.
+					if (sameRendererPrefs(current, merged)) {
+						lastSyncedRef.current = current;
+						lastReminderIntervalRef.current = current.reminderInterval;
+						return current;
+					}
+					lastSyncedRef.current = merged;
+					lastReminderIntervalRef.current = merged.reminderInterval;
+					return merged;
+				});
 				setPrefsHydrated(true);
 			}),
 		[],
@@ -31,39 +50,29 @@ export function usePreferences() {
 		if (!prefsHydrated) return;
 
 		document.documentElement.classList.toggle("dark", preferences.darkMode);
-		rendererIpc.updateDarkMode(preferences.darkMode);
-		rendererIpc.updateCameraEnabled(preferences.cameraEnabled);
-		rendererIpc.updateCameraQuality(preferences.cameraQuality);
-		rendererIpc.updateEyeExercisesEnabled(preferences.eyeExercisesEnabled);
-		rendererIpc.updateExerciseInterval(preferences.exerciseInterval);
-		rendererIpc.updateExercisePrompts(preferences.exercisePrompts);
-		rendererIpc.updateLookAwayEnabled(preferences.lookAwayEnabled);
-		rendererIpc.updateLookAwayInterval(preferences.lookAwayInterval);
-		rendererIpc.updateLookAwayDuration(preferences.lookAwayDuration);
-		rendererIpc.updatePopupColors(preferences.popupColors);
-		rendererIpc.updatePopupTransparency(preferences.popupColors.transparency);
-		rendererIpc.updatePopupMessage(preferences.popupMessage);
-		rendererIpc.updateKeyboardShortcut(preferences.keyboardShortcut);
-		rendererIpc.updateSoundEnabled(preferences.soundEnabled);
-		rendererIpc.updateLaunchAtLogin(preferences.launchAtLogin);
-		rendererIpc.updateQuietHoursEnabled(preferences.quietHoursEnabled);
-		rendererIpc.updateQuietHoursStart(preferences.quietHoursStart);
-		rendererIpc.updateQuietHoursEnd(preferences.quietHoursEnd);
-		rendererIpc.updatePauseOnFullscreen(preferences.pauseOnFullscreen);
-		rendererIpc.updateBlinkRateCoachingEnabled(
-			preferences.blinkRateCoachingEnabled,
-		);
-		rendererIpc.updateBlinkRateThreshold(preferences.blinkRateThresholdPerMin);
-		rendererIpc.updateLocale(preferences.locale);
-		rendererIpc.updateHasCompletedOnboarding(
-			preferences.hasCompletedOnboarding,
-		);
+
+		const previous = lastSyncedRef.current;
+		if (!previous) {
+			// First hydrate: main already persisted these values — do not echo-write.
+			lastSyncedRef.current = preferences;
+			lastReminderIntervalRef.current = preferences.reminderInterval;
+			return;
+		}
+		if (sameRendererPrefs(previous, preferences)) {
+			return;
+		}
+		lastSyncedRef.current = preferences;
+		pushPreferenceDiff(previous, preferences);
 	}, [preferences, prefsHydrated]);
 
 	useEffect(() => {
 		// Same hydrate gate as the prefs sync above — otherwise the default
 		// interval is written to the store before loadPreferences arrives.
 		if (!prefsHydrated || preferences.isTracking) return;
+		if (lastReminderIntervalRef.current === preferences.reminderInterval) {
+			return;
+		}
+		lastReminderIntervalRef.current = preferences.reminderInterval;
 		rendererIpc.updateReminderInterval(preferences.reminderInterval);
 	}, [prefsHydrated, preferences.isTracking, preferences.reminderInterval]);
 

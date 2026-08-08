@@ -204,4 +204,123 @@ describe("settings shell", () => {
 		expect(screen.getByText("Мова")).toBeDefined();
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "uk");
 	});
+
+	it("toggles dark mode without re-pushing locale or looping on prefs echo", () => {
+		render(<App />);
+		hydratePreferences({ hasCompletedOnboarding: true, darkMode: true });
+		send.mockClear();
+
+		fireEvent.click(
+			screen.getAllByRole("button", { name: "Toggle dark mode" })[0],
+		);
+
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.updateDarkMode, false);
+		expect(
+			send.mock.calls.filter(
+				([channel]) => channel === IPC_CHANNELS.updateDarkMode,
+			),
+		).toHaveLength(1);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
+
+		send.mockClear();
+		// Main used to bounce sendPreferences from updateLocale on every sync.
+		hydratePreferences({ hasCompletedOnboarding: true, darkMode: false });
+
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateDarkMode, false);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
+	});
+
+	it("does not echo-write prefs on hydrate", () => {
+		render(<App />);
+		send.mockClear();
+		hydratePreferences({ hasCompletedOnboarding: true });
+
+		expect(send).not.toHaveBeenCalled();
+	});
+
+	it("pushes only the changed field for common interactive toggles", () => {
+		render(<App />);
+		hydratePreferences({
+			hasCompletedOnboarding: true,
+			cameraEnabled: true,
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Appearance" }));
+		send.mockClear();
+		fireEvent.click(
+			screen.getByRole("switch", { name: "Toggle notification sound" }),
+		);
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.updateSoundEnabled, true);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateDarkMode, true);
+
+		fireEvent.click(screen.getByRole("button", { name: "System" }));
+		send.mockClear();
+		fireEvent.click(
+			screen.getByRole("switch", { name: "Toggle launch at login" }),
+		);
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.updateLaunchAtLogin, true);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateSoundEnabled, true);
+
+		send.mockClear();
+		fireEvent.click(screen.getByRole("switch", { name: "Toggle quiet hours" }));
+		expect(send).toHaveBeenCalledWith(
+			IPC_CHANNELS.updateQuietHoursEnabled,
+			false,
+		);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
+
+		fireEvent.click(screen.getByRole("button", { name: "Eye care" }));
+		send.mockClear();
+		fireEvent.click(
+			screen.getByRole("switch", { name: "Toggle eye exercises" }),
+		);
+		expect(send).toHaveBeenCalledWith(
+			IPC_CHANNELS.updateEyeExercisesEnabled,
+			false,
+		);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
+
+		send.mockClear();
+		fireEvent.click(
+			screen.getByRole("switch", { name: "Toggle look-away breaks" }),
+		);
+		expect(send).toHaveBeenCalledWith(
+			IPC_CHANNELS.updateLookAwayEnabled,
+			false,
+		);
+		expect(send).not.toHaveBeenCalledWith(
+			IPC_CHANNELS.updateEyeExercisesEnabled,
+			false,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Camera" }));
+		send.mockClear();
+		fireEvent.click(
+			screen.getByRole("switch", { name: "Toggle blink rate coaching" }),
+		);
+		expect(send).toHaveBeenCalledWith(
+			IPC_CHANNELS.updateBlinkRateCoachingEnabled,
+			false,
+		);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
+	});
+
+	it("ignores identical preference echoes after interactive changes", () => {
+		render(<App />);
+		hydratePreferences({ hasCompletedOnboarding: true, soundEnabled: false });
+
+		fireEvent.click(screen.getByRole("button", { name: "Appearance" }));
+		fireEvent.click(
+			screen.getByRole("switch", { name: "Toggle notification sound" }),
+		);
+		send.mockClear();
+
+		hydratePreferences({
+			hasCompletedOnboarding: true,
+			soundEnabled: true,
+		});
+
+		expect(send).not.toHaveBeenCalled();
+	});
 });

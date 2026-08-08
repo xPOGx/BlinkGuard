@@ -2,13 +2,7 @@ import { ipcMain } from "electron";
 import { isValidEarCalibration } from "../../../shared/ear-calibration";
 import { isCameraQuality } from "../../../shared/camera-quality";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
-import {
-	defaultExercisePrompts,
-	defaultPopupMessage,
-	isBuiltInExercisePrompts,
-	isBuiltInPopupMessage,
-	sanitizeLocale,
-} from "../../../shared/i18n";
+import { sanitizeLocale } from "../../../shared/i18n";
 import type {
 	CameraQuality,
 	Point,
@@ -252,13 +246,11 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	);
 	ipcMain.on(IPC_CHANNELS.updateLocale, (_event, value: string) => {
 		const locale = sanitizeLocale(value);
+		// Same locale is a no-op. Never rewrite popup/exercise content here —
+		// React LanguageSettings owns built-in prompt updates; sendPreferences
+		// + prompt rewrite used to bounce the settings sync forever.
+		if (locale === current.locale) return;
 		preferences.set("locale", locale);
-		if (isBuiltInPopupMessage(current.popupMessage)) {
-			preferences.set("popupMessage", defaultPopupMessage(locale));
-		}
-		if (isBuiltInExercisePrompts(current.exercisePrompts)) {
-			preferences.set("exercisePrompts", defaultExercisePrompts(locale));
-		}
 		tray?.rebuildMenu(locale);
 		blinkStats.invalidateCharts();
 		windows.sendPreferences();
@@ -267,11 +259,16 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		}
 	});
 	ipcMain.on(IPC_CHANNELS.showCameraWindow, () => {
-		if (!current.cameraEnabled) {
+		const enabledCamera = !current.cameraEnabled;
+		if (enabledCamera) {
 			preferences.set("cameraEnabled", true);
 		}
 		reminders.ensureCameraActive();
-		windows.sendPreferences();
+		// Only echo when main mutated prefs; unconditional sendPreferences
+		// is a bounce vector for the React sync effect.
+		if (enabledCamera) {
+			windows.sendPreferences();
+		}
 		windows.showCamera(() => {
 			windows.sendToMain(IPC_CHANNELS.cameraWindowClosed);
 		});

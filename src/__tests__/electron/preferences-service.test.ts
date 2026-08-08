@@ -8,6 +8,7 @@ import {
 
 class FakePreferenceStore implements PreferenceStore {
 	private readonly data = new Map<string, unknown>();
+	readonly setCounts = new Map<string, number>();
 
 	get<T>(key: string, defaultValue?: T): T {
 		if (this.data.has(key)) return this.data.get(key) as T;
@@ -16,6 +17,7 @@ class FakePreferenceStore implements PreferenceStore {
 
 	set<T>(key: string, value: T): void {
 		this.data.set(key, value);
+		this.setCounts.set(key, (this.setCounts.get(key) ?? 0) + 1);
 	}
 
 	has(key: string): boolean {
@@ -194,6 +196,22 @@ describe("PreferencesService", () => {
 		expect(store.get("launchAtLogin")).toBe(true);
 		expect(service.current.isTracking).toBe(true);
 		expect(store.get("isTracking")).toBe(true);
+	});
+
+	it("no-ops set() when the sanitized value is unchanged", () => {
+		const store = new FakePreferenceStore();
+		const service = new PreferencesService(store);
+
+		service.set("darkMode", DEFAULT_PREFERENCES.darkMode);
+		expect(store.setCounts.get("darkMode") ?? 0).toBe(0);
+
+		service.set("darkMode", !DEFAULT_PREFERENCES.darkMode);
+		expect(store.setCounts.get("darkMode")).toBe(1);
+		service.set("darkMode", !DEFAULT_PREFERENCES.darkMode);
+		expect(store.setCounts.get("darkMode")).toBe(1);
+
+		service.set("exercisePrompts", [...service.current.exercisePrompts]);
+		expect(store.setCounts.get("exercisePrompts") ?? 0).toBe(0);
 	});
 
 	it("reset clears the store and restores defaults with a popup position", () => {

@@ -13,9 +13,52 @@ import {
 	normalizeQuietHoursTime,
 } from "../domain/focus-policy";
 import type { PreferenceStore } from "./ports/preference-store";
+
 const PERSISTED_KEYS = Object.keys(
 	DEFAULT_PREFERENCES,
 ) as (keyof PersistedPreferences)[];
+
+function samePreferenceValue(
+	key: keyof PersistedPreferences,
+	previous: PersistedPreferences[keyof PersistedPreferences],
+	next: PersistedPreferences[keyof PersistedPreferences],
+): boolean {
+	if (previous === next) return true;
+	if (key === "exercisePrompts") {
+		const a = previous as string[];
+		const b = next as string[];
+		return (
+			Array.isArray(a) &&
+			Array.isArray(b) &&
+			a.length === b.length &&
+			a.every((value, index) => value === b[index])
+		);
+	}
+	if (key === "popupColors") {
+		const a = previous as PersistedPreferences["popupColors"];
+		const b = next as PersistedPreferences["popupColors"];
+		return (
+			!!a &&
+			!!b &&
+			a.background === b.background &&
+			a.text === b.text &&
+			a.transparency === b.transparency
+		);
+	}
+	if (key === "popupPosition") {
+		const a = previous as PersistedPreferences["popupPosition"];
+		const b = next as PersistedPreferences["popupPosition"];
+		if (a === b) return true;
+		if (!a || !b) return false;
+		return a.x === b.x && a.y === b.y;
+	}
+	if (key === "popupSize") {
+		const a = previous as PersistedPreferences["popupSize"];
+		const b = next as PersistedPreferences["popupSize"];
+		return !!a && !!b && a.width === b.width && a.height === b.height;
+	}
+	return false;
+}
 
 export class PreferencesService {
 	readonly current: AppPreferences;
@@ -108,6 +151,10 @@ export class PreferencesService {
 			next = sanitizeBlinkRateThresholdPerMin(
 				value,
 			) as PersistedPreferences[K];
+		}
+		// No-op equal writes: settings sync and dual IPC callers re-send often.
+		if (samePreferenceValue(key, this.current[key], next)) {
+			return;
 		}
 		this.current[key] = next as never;
 		this.store.set(key, next);

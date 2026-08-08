@@ -1,0 +1,105 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_RENDERER_PREFERENCES } from "@/features/settings/model/preferences";
+import {
+	pushPreferenceDiff,
+	sameRendererPrefs,
+} from "@/features/settings/model/preferences-sync";
+import { rendererIpc } from "@/shared/ipc/renderer-ipc";
+
+vi.mock("@/shared/ipc/renderer-ipc", () => ({
+	rendererIpc: {
+		updateDarkMode: vi.fn(),
+		updateCameraEnabled: vi.fn(),
+		updateCameraQuality: vi.fn(),
+		updateEarCalibration: vi.fn(),
+		updateEyeExercisesEnabled: vi.fn(),
+		updateExerciseInterval: vi.fn(),
+		updateExercisePrompts: vi.fn(),
+		updateLookAwayEnabled: vi.fn(),
+		updateLookAwayInterval: vi.fn(),
+		updateLookAwayDuration: vi.fn(),
+		updatePopupColors: vi.fn(),
+		updatePopupTransparency: vi.fn(),
+		updatePopupMessage: vi.fn(),
+		updateKeyboardShortcut: vi.fn(),
+		updateMgdMode: vi.fn(),
+		updateSoundEnabled: vi.fn(),
+		updateLaunchAtLogin: vi.fn(),
+		updateQuietHoursEnabled: vi.fn(),
+		updateQuietHoursStart: vi.fn(),
+		updateQuietHoursEnd: vi.fn(),
+		updatePauseOnFullscreen: vi.fn(),
+		updateBlinkRateCoachingEnabled: vi.fn(),
+		updateBlinkRateThreshold: vi.fn(),
+		updateLocale: vi.fn(),
+		updateHasCompletedOnboarding: vi.fn(),
+	},
+}));
+
+describe("sameRendererPrefs", () => {
+	it("ignores UI-only flags", () => {
+		const a = { ...DEFAULT_RENDERER_PREFERENCES, showMgdInfo: false };
+		const b = { ...DEFAULT_RENDERER_PREFERENCES, showMgdInfo: true };
+		expect(sameRendererPrefs(a, b)).toBe(true);
+	});
+
+	it("detects nested popup and prompt changes", () => {
+		const base = { ...DEFAULT_RENDERER_PREFERENCES };
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				popupColors: { ...base.popupColors, transparency: 0.5 },
+			}),
+		).toBe(false);
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				exercisePrompts: [...base.exercisePrompts, "extra"],
+			}),
+		).toBe(false);
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				popupPosition: { x: 1, y: 2 },
+			}),
+		).toBe(false);
+	});
+});
+
+describe("pushPreferenceDiff", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("pushes only the fields that changed", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES, darkMode: true };
+		const next = {
+			...previous,
+			darkMode: false,
+			soundEnabled: true,
+			locale: "uk" as const,
+		};
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateDarkMode).toHaveBeenCalledWith(false);
+		expect(rendererIpc.updateSoundEnabled).toHaveBeenCalledWith(true);
+		expect(rendererIpc.updateLocale).toHaveBeenCalledWith("uk");
+		expect(rendererIpc.updateCameraEnabled).not.toHaveBeenCalled();
+		expect(rendererIpc.updateEyeExercisesEnabled).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLookAwayEnabled).not.toHaveBeenCalled();
+		expect(rendererIpc.updateKeyboardShortcut).not.toHaveBeenCalled();
+	});
+
+	it("does not touch locale when only unrelated prefs change", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = { ...previous, quietHoursEnabled: false, mgdMode: true };
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateQuietHoursEnabled).toHaveBeenCalledWith(false);
+		expect(rendererIpc.updateMgdMode).toHaveBeenCalledWith(true);
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+		expect(rendererIpc.updateDarkMode).not.toHaveBeenCalled();
+	});
+});
