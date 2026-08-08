@@ -1,5 +1,6 @@
 import {
 	BarChart3,
+	Bug,
 	Camera,
 	Dumbbell,
 	Keyboard,
@@ -13,6 +14,7 @@ import {
 	CameraControls,
 	CameraErrorBanner,
 } from "@/features/camera/ui/camera-controls";
+import { DebugPanel } from "@/features/debug/ui/debug-panel";
 import { ExerciseSettings } from "@/features/exercises/ui/exercise-settings";
 import { EyeCareDisabledNotice } from "@/features/exercises/ui/eye-care-disabled-notice";
 import { LookAwaySettings } from "@/features/look-away/ui/look-away-settings";
@@ -26,7 +28,6 @@ import {
 	LaunchAtLoginSettings,
 	QuietHoursFocusSettings,
 	ResetPreferencesButton,
-	ShowOnboardingButton,
 	SoundSettings,
 } from "@/features/settings/ui/settings-controls";
 import { TrackingEyeButton } from "@/features/settings/ui/tracking-eye-button";
@@ -42,7 +43,8 @@ type SectionId =
 	| "exercises"
 	| "appearance"
 	| "statistics"
-	| "system";
+	| "system"
+	| "debug";
 
 export default function BlinkGuardHomepage() {
 	const {
@@ -135,6 +137,16 @@ function SettingsShell({
 			description: t("app.section.system.desc"),
 			icon: Keyboard,
 		},
+		...(import.meta.env.DEV
+			? [
+					{
+						id: "debug" as const,
+						label: t("app.section.debug"),
+						description: t("app.section.debug.desc"),
+						icon: Bug,
+					},
+				]
+			: []),
 	];
 	const active = sections.find((item) => item.id === section) ?? sections[0];
 	const showOnboarding = prefsHydrated && !preferences.hasCompletedOnboarding;
@@ -300,9 +312,6 @@ function SettingsShell({
 										setPreferences={setPreferences}
 									/>
 									<ResetPreferencesButton />
-									{import.meta.env.DEV ? (
-										<ShowOnboardingButton setPreferences={setPreferences} />
-									) : null}
 								</div>
 								<QuietHoursFocusSettings
 									preferences={preferences}
@@ -310,6 +319,10 @@ function SettingsShell({
 								/>
 							</>
 						)}
+
+						{section === "debug" && import.meta.env.DEV ? (
+							<DebugPanel setPreferences={setPreferences} />
+						) : null}
 					</div>
 				</main>
 			</div>

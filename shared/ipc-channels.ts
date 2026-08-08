@@ -73,6 +73,7 @@ export const IPC_CHANNELS = {
 	updateBlinkRateThreshold: "update-blink-rate-threshold",
 	updateLocale: "update-locale",
 	applyI18n: "apply-i18n",
+	debugPreviewOverlay: "debug-preview-overlay",
 } as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
@@ -147,4 +148,5 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.updateBlinkRateCoachingEnabled,
 	IPC_CHANNELS.updateBlinkRateThreshold,
 	IPC_CHANNELS.updateLocale,
+	IPC_CHANNELS.debugPreviewOverlay,
 ] as const;

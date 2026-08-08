@@ -1,17 +1,30 @@
 import { BrowserWindow, screen } from "electron";
 import path from "node:path";
-import { resolveCatalog, resolvePopupMessage, t } from "../../../shared/i18n";
+import type { DebugOverlayKind } from "../../../shared/debug-preview";
+import {
+	resolveCatalog,
+	resolveExercisePrompts,
+	resolvePopupMessage,
+	t,
+} from "../../../shared/i18n";
 import type { AppPreferences, Point, Size } from "../../../shared/preferences";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
-import { toRendererPreferences } from "../../../shared/preferences";
+import {
+	sanitizeExercisePrompts,
+	toRendererPreferences,
+} from "../../../shared/preferences";
+import { REMINDER_POPUP_VISIBLE_MS } from "../../domain/reminder-policy";
 import type { AppPaths } from "../paths/app-paths";
 import { createPanelWindow } from "./panel-window";
 import {
 	getCenteredPopupPosition,
+	getLeftBiasedPopupPosition,
+	getRightBiasedPopupPosition,
 	getTopCenterPopupPosition,
 } from "./window-position";
 
 type ReminderKind = "starting" | "blink" | "stopped";
+type ForceShowOptions = { force?: boolean };
 export class WindowManager {
 	main: BrowserWindow | null = null;
 	reminder: BrowserWindow | null = null;
@@ -116,8 +129,17 @@ export class WindowManager {
 		);
 	}
 
-	showReminder(kind: ReminderKind): BrowserWindow | null {
-		if (kind !== "stopped" && !this.preferences.isTracking) return null;
+	showReminder(
+		kind: ReminderKind,
+		options: ForceShowOptions = {},
+	): BrowserWindow | null {
+		if (
+			!options.force &&
+			kind !== "stopped" &&
+			!this.preferences.isTracking
+		) {
+			return null;
+		}
 		this.closeReminder();
 		const position = this.ensurePopupPosition();
 		const interactive = kind === "blink";
@@ -161,7 +183,10 @@ export class WindowManager {
 			kind === "stopped" ||
 			(kind === "blink" && !this.preferences.cameraEnabled)
 		) {
-			setTimeout(() => this.closeReminderIfCurrent(popup), 2500);
+			setTimeout(
+				() => this.closeReminderIfCurrent(popup),
+				REMINDER_POPUP_VISIBLE_MS,
+			);
 		}
 		return popup;
 	}
@@ -180,13 +205,17 @@ export class WindowManager {
 		return !!this.reminder && !this.reminder.isDestroyed();
 	}
 
-	showNoFace(): void {
+	showNoFace(options: ForceShowOptions = {}): void {
 		if (
-			!this.preferences.isTracking ||
-			!this.preferences.cameraEnabled ||
-			(this.noFace && !this.noFace.isDestroyed())
+			!options.force &&
+			(!this.preferences.isTracking ||
+				!this.preferences.cameraEnabled ||
+				(this.noFace && !this.noFace.isDestroyed()))
 		) {
 			return;
+		}
+		if (this.noFace && !this.noFace.isDestroyed()) {
+			this.hideNoFace();
 		}
 		const { x, y } = getTopCenterPopupPosition(220);
 		const popup = createPanelWindow({
@@ -216,13 +245,17 @@ export class WindowManager {
 		return !!this.noFace && !this.noFace.isDestroyed();
 	}
 
-	showBlinkRateCoach(): void {
+	showBlinkRateCoach(options: ForceShowOptions = {}): void {
 		if (
-			!this.preferences.isTracking ||
-			!this.preferences.cameraEnabled ||
-			(this.blinkRateCoach && !this.blinkRateCoach.isDestroyed())
+			!options.force &&
+			(!this.preferences.isTracking ||
+				!this.preferences.cameraEnabled ||
+				(this.blinkRateCoach && !this.blinkRateCoach.isDestroyed()))
 		) {
 			return;
+		}
+		if (this.blinkRateCoach && !this.blinkRateCoach.isDestroyed()) {
+			this.hideBlinkRateCoach();
 		}
 		const width = 280;
 		const { x, y } = getTopCenterPopupPosition(width);
@@ -277,7 +310,7 @@ export class WindowManager {
 		if (this.exercise && !this.exercise.isDestroyed()) return null;
 		const popupWidth = 340;
 		const popupHeight = 200;
-		const { x, y } = getCenteredPopupPosition(popupWidth, popupHeight);
+		const { x, y } = getLeftBiasedPopupPosition(popupWidth, popupHeight);
 		const popup = createPanelWindow({
 			width: popupWidth,
 			height: popupHeight,
@@ -291,7 +324,8 @@ export class WindowManager {
 			this.sendI18n(popup);
 			popup.webContents.send(IPC_CHANNELS.updateExercisePrompt, prompt);
 		});
-		popup.once("ready-to-show", () => popup.show());
+		// Same as look-away / blink: show without stealing focus.
+		popup.once("ready-to-show", () => popup.showInactive());
 		popup.on("closed", () => {
 			if (this.exercise === popup) this.exercise = null;
 			onClosed();
@@ -309,11 +343,75 @@ export class WindowManager {
 		return true;
 	}
 
+	/** Dev/settings preview: show overlays without tracking / camera gates. */
+	previewDebugOverlay(kind: DebugOverlayKind): void {
+		switch (kind) {
+			case "blink":
+			case "starting":
+			case "stopped": {
+				const popup = this.showReminder(kind, { force: true });
+				if (!popup) return;
+				// Blink with camera on normally stays until a real blink; auto-dismiss for preview.
+				if (
+					kind === "starting" ||
+					(kind === "blink" && this.preferences.cameraEnabled)
+				) {
+					setTimeout(
+						() => this.closeReminderIfCurrent(popup),
+						REMINDER_POPUP_VISIBLE_MS,
+					);
+				}
+				return;
+			}
+			case "coach":
+				this.showBlinkRateCoach({ force: true });
+				return;
+			case "noFace": {
+				this.showNoFace({ force: true });
+				setTimeout(() => this.hideNoFace(), 3_000);
+				return;
+			}
+			case "exercise": {
+				this.closeExercise();
+				const locale =
+					this.preferences.locale === "uk" ? "uk" : "en";
+				const prompts = resolveExercisePrompts(
+					sanitizeExercisePrompts(
+						this.preferences.exercisePrompts,
+						locale,
+					),
+					locale,
+				);
+				const popup = this.showExercise(
+					prompts[0] ?? "Look far away",
+					() => {},
+				);
+				if (popup) {
+					setTimeout(() => this.closeExerciseIfCurrent(popup), 30_000);
+				}
+				return;
+			}
+			case "lookAway": {
+				this.closeLookAway();
+				const popup = this.showLookAway(() => {});
+				if (popup) {
+					const durationMs =
+						Math.max(1, this.preferences.lookAwayDuration) * 1000;
+					setTimeout(
+						() => this.closeLookAwayIfCurrent(popup),
+						durationMs,
+					);
+				}
+				return;
+			}
+		}
+	}
+
 	showLookAway(onClosed: () => void): BrowserWindow | null {
 		if (this.lookAway && !this.lookAway.isDestroyed()) return null;
 		const popupWidth = 340;
 		const popupHeight = 220;
-		const { x, y } = getCenteredPopupPosition(popupWidth, popupHeight);
+		const { x, y } = getRightBiasedPopupPosition(popupWidth, popupHeight);
 		const popup = createPanelWindow({
 			width: popupWidth,
 			height: popupHeight,

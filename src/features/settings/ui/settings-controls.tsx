@@ -248,35 +248,6 @@ export function ResetPreferencesButton() {
 	);
 }
 
-interface ShowOnboardingButtonProps {
-	setPreferences: SetPreferences;
-}
-
-/** Dev-only: reopen the first-run wizard without resetting other prefs. */
-export function ShowOnboardingButton({
-	setPreferences,
-}: ShowOnboardingButtonProps) {
-	const t = useT();
-	if (!import.meta.env.DEV) return null;
-
-	return (
-		<SettingPanel className="flex items-center justify-center">
-			<Button
-				type="button"
-				variant="secondary"
-				onClick={() =>
-					setPreferences((current) => ({
-						...current,
-						hasCompletedOnboarding: false,
-					}))
-				}
-			>
-				{t("reset.showOnboarding")}
-			</Button>
-		</SettingPanel>
-	);
-}
-
 interface QuietHoursFocusSettingsProps {
 	preferences: SettingsPreferences;
 	setPreferences: SetPreferences;

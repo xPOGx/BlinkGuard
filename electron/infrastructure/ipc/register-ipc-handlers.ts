@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import { isValidEarCalibration } from "../../../shared/ear-calibration";
 import { isCameraQuality } from "../../../shared/camera-quality";
+import { isDebugOverlayKind } from "../../../shared/debug-preview";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import { sanitizeLocale } from "../../../shared/i18n";
 import type {
@@ -288,6 +289,10 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	ipcMain.on(IPC_CHANNELS.closeCameraWindow, () => windows.closeCamera());
 	ipcMain.on(IPC_CHANNELS.requestVideoStream, () => sidecar.requestVideo());
 	ipcMain.on(IPC_CHANNELS.showPopupEditor, () => windows.showEditor());
+	ipcMain.on(IPC_CHANNELS.debugPreviewOverlay, (_event, kind: unknown) => {
+		if (!isDebugOverlayKind(kind)) return;
+		windows.previewDebugOverlay(kind);
+	});
 	ipcMain.on(
 		IPC_CHANNELS.popupEditorSaved,
 		(_event, value: { size: Size; position: Point }) => {

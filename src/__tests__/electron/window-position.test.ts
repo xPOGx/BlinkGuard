@@ -15,6 +15,8 @@ vi.mock("electron", () => ({
 import {
 	getActiveDisplay,
 	getCenteredPopupPosition,
+	getLeftBiasedPopupPosition,
+	getRightBiasedPopupPosition,
 	getTopCenterPopupPosition,
 } from "../../../electron/infrastructure/windows/window-position";
 
@@ -50,6 +52,20 @@ describe("window-position", () => {
 	it("centers a popup on the active display workArea including origin", () => {
 		expect(getCenteredPopupPosition(300, 120)).toEqual({
 			x: 1920 + Math.floor((1600 - 300) / 2),
+			y: 100 + Math.floor((900 - 120) / 2),
+		});
+	});
+
+	it("places a popup right-of-center on the active display workArea", () => {
+		expect(getRightBiasedPopupPosition(300, 120)).toEqual({
+			x: 1920 + Math.floor((1600 - 300) * 0.72),
+			y: 100 + Math.floor((900 - 120) / 2),
+		});
+	});
+
+	it("places a popup left-of-center on the active display workArea", () => {
+		expect(getLeftBiasedPopupPosition(300, 120)).toEqual({
+			x: 1920 + Math.floor((1600 - 300) * 0.28),
 			y: 100 + Math.floor((900 - 120) / 2),
 		});
 	});

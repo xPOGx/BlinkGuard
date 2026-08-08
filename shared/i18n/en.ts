@@ -21,6 +21,24 @@ export const en: MessageCatalog = {
 		"Local blink counts, tracking time, and day/week charts.",
 	"app.section.system": "System",
 	"app.section.system.desc": "Shortcut, language, launch at login, and reset.",
+	"app.section.debug": "Debug",
+	"app.section.debug.desc":
+		"Preview overlays and reopen onboarding for local testing.",
+
+	// Debug
+	"debug.overlays.title": "Preview overlays",
+	"debug.overlays.desc":
+		"Show reminder and eye-care popups without waiting for timers.",
+	"debug.preview.blink": "Blink",
+	"debug.preview.starting": "Starting",
+	"debug.preview.stopped": "Stopped",
+	"debug.preview.coach": "Blink-rate coach",
+	"debug.preview.noFace": "No face",
+	"debug.preview.lookAway": "Look away (20-20-20)",
+	"debug.preview.exercise": "Exercise",
+	"debug.onboarding.title": "Onboarding",
+	"debug.onboarding.desc":
+		"Reopen the first-run wizard without resetting other preferences.",
 
 	// Dark mode / common
 	"common.darkMode": "Dark mode",

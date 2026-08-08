@@ -1,4 +1,5 @@
 import type { BlinkStatsSnapshot } from "../../../shared/blink-stats";
+import type { DebugOverlayKind } from "../../../shared/debug-preview";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import type {
 	CameraQuality,
@@ -128,4 +129,6 @@ export const rendererIpc = {
 	subscribeBlinkStats: () => send(IPC_CHANNELS.subscribeBlinkStats),
 	unsubscribeBlinkStats: () => send(IPC_CHANNELS.unsubscribeBlinkStats),
 	resetBlinkStats: () => send(IPC_CHANNELS.resetBlinkStats),
+	debugPreviewOverlay: (kind: DebugOverlayKind) =>
+		send(IPC_CHANNELS.debugPreviewOverlay, kind),
 };

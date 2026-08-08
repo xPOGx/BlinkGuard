@@ -22,6 +22,24 @@ export const uk: MessageCatalog = {
 	"app.section.system": "Система",
 	"app.section.system.desc":
 		"Гаряча клавіша, мова, автозапуск і скидання.",
+	"app.section.debug": "Debug",
+	"app.section.debug.desc":
+		"Перегляд оверлеїв і повторне відкриття онбордингу для локальних тестів.",
+
+	// Debug
+	"debug.overlays.title": "Перегляд оверлеїв",
+	"debug.overlays.desc":
+		"Показати попапи нагадувань і турботи про очі без очікування таймерів.",
+	"debug.preview.blink": "Моргання",
+	"debug.preview.starting": "Запуск",
+	"debug.preview.stopped": "Зупинка",
+	"debug.preview.coach": "Коуч частоти моргання",
+	"debug.preview.noFace": "Немає обличчя",
+	"debug.preview.lookAway": "Подивіться вдалину (20-20-20)",
+	"debug.preview.exercise": "Вправа",
+	"debug.onboarding.title": "Онбординг",
+	"debug.onboarding.desc":
+		"Знову відкрити майстер першого запуску без скидання інших налаштувань.",
 
 	// Dark mode / common
 	"common.darkMode": "Темна тема",
