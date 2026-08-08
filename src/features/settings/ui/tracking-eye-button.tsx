@@ -1,4 +1,4 @@
-import lottieWeb, { type AnimationItem } from "lottie-web";
+import lottieWeb, { type AnimationItem } from "lottie-web/build/player/lottie_light";
 import { useEffect, useRef } from "react";
 import eyeAnimation from "@/assets/eye.json";
 import { useT } from "@/i18n";

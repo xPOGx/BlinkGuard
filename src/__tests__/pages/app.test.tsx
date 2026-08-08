@@ -9,7 +9,7 @@ import {
 	toRendererPreferences,
 } from "../../../shared/preferences";
 
-vi.mock("lottie-web", () => ({
+vi.mock("lottie-web/build/player/lottie_light", () => ({
 	default: {
 		loadAnimation: () => ({
 			goToAndStop: vi.fn(),

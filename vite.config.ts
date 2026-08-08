@@ -39,6 +39,8 @@ export default defineConfig({
 		},
 	},
 	build: {
+		// Desktop settings shell: one chunk is fine; keep advisory noise down.
+		chunkSizeWarningLimit: 800,
 		rolldownOptions: {
 			external: ["electron"],
 		},

@@ -3,7 +3,8 @@
  *
  * Signing: when CSC_LINK (+ CSC_KEY_PASSWORD if required) is set, electron-builder
  * signs the executable. Without those secrets, builds stay unsigned
- * (signAndEditExecutable=false) so CI still packages successfully.
+ * (signExecutable=false) so CI still packages successfully while keeping
+ * exe icon/metadata resource editing.
  *
  * Optional GitHub Actions secrets for signed releases:
  *   CSC_LINK              — base64 or file path to .pfx / code-signing cert
@@ -16,7 +17,7 @@ import { spawnSync } from "node:child_process";
 const hasSigningCert = Boolean(process.env.CSC_LINK?.trim());
 const signFlag = hasSigningCert
 	? "--config.win.signAndEditExecutable=true"
-	: "--config.win.signAndEditExecutable=false";
+	: "--config.win.signExecutable=false";
 
 if (!hasSigningCert) {
 	console.warn(

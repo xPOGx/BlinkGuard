@@ -1,4 +1,4 @@
-import lottieWeb, { type AnimationItem } from "lottie-web";
+import lottieWeb, { type AnimationItem } from "lottie-web/build/player/lottie_light";
 import eyeAnimation from "@/assets/eye.json";
 
 type LottiePlayer = {
