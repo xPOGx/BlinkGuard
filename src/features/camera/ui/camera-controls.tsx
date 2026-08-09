@@ -32,7 +32,7 @@ export function CameraErrorBanner({
 	if (!error) return null;
 
 	return (
-		<div className="mx-4 mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-destructive sm:mx-6">
+		<div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-destructive">
 			<div className="flex items-center justify-between gap-3">
 				<div className="flex min-w-0 items-center gap-2 text-sm">
 					<Camera className="h-4 w-4 shrink-0" aria-hidden />

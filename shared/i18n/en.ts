@@ -4,6 +4,7 @@ export const en: MessageCatalog = {
 	// App shell
 	"app.tagline": "Eye care settings",
 	"app.navAria": "Settings sections",
+	"app.navNeedsAttention": "Needs attention",
 	"app.section.reminders": "Reminders",
 	"app.section.reminders.desc":
 		"Interval and start/stop controls for blink reminders.",

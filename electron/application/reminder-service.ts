@@ -1,3 +1,4 @@
+import { IPC_CHANNELS } from "../../shared/ipc-channels";
 import type { AppPreferences } from "../../shared/preferences";
 import {
 	BLINK_CREDIT_DEBOUNCE_MS,
@@ -268,6 +269,7 @@ export class ReminderService {
 			this.coaching?.start();
 			this.sidecar.requestVideo();
 			this.creditBlink("camera-ready");
+			this.windows.sendToMain(IPC_CHANNELS.cameraReady);
 			if (this.preferences.mgdMode) {
 				this.startMgdLoop();
 			} else {
@@ -297,6 +299,7 @@ export class ReminderService {
 			if (!this.sidecar.isRunning || !this.sidecar.isCameraReady) return;
 			clearInterval(waitForCamera);
 			this.creditBlink("camera-ready");
+			this.windows.sendToMain(IPC_CHANNELS.cameraReady);
 			if (this.preferences.mgdMode) {
 				this.startMgdLoop();
 			} else {

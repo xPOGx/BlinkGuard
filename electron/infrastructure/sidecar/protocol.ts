@@ -1,6 +1,8 @@
 export const SIDECAR_STATUS = {
 	modelsReady: "Models loaded successfully, ready for camera activation",
 	cameraReady: "Camera opened successfully",
+	/** Detector ACK after start_camera (also emitted when camera was already active). */
+	cameraStarted: "Camera started successfully",
 } as const;
 
 export function encodeSidecarMessage(message: object): string {

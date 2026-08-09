@@ -229,6 +229,10 @@ function SettingsShell({
 					{sections.map((item) => {
 						const Icon = item.icon;
 						const selected = item.id === section;
+						const showAttention =
+							item.id === "camera" &&
+							Boolean(camera.error) &&
+							section !== "camera";
 						return (
 							<button
 								key={item.id}
@@ -236,7 +240,7 @@ function SettingsShell({
 								aria-current={selected ? "page" : undefined}
 								onClick={() => setSection(item.id)}
 								className={cn(
-									"inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+									"relative inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
 									selected
 										? "bg-sidebar-active text-primary"
 										: "text-sidebar-foreground hover:bg-muted",
@@ -244,6 +248,12 @@ function SettingsShell({
 							>
 								<Icon className="h-4 w-4 shrink-0" aria-hidden />
 								{item.label}
+								{showAttention ? (
+									<span
+										className="ml-auto h-2 w-2 shrink-0 rounded-full bg-destructive"
+										aria-label={t("app.navNeedsAttention")}
+									/>
+								) : null}
 							</button>
 						);
 					})}
@@ -276,11 +286,6 @@ function SettingsShell({
 					</div>
 				</header>
 
-				<CameraErrorBanner
-					error={camera.error}
-					onDismiss={() => camera.setError(null)}
-				/>
-
 				<main className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] px-4 py-4 sm:px-6 sm:py-5">
 					<div className="mx-auto flex max-w-3xl flex-col gap-4">
 						{section === "reminders" && (
@@ -292,12 +297,18 @@ function SettingsShell({
 						)}
 
 						{section === "camera" && (
-							<CameraControls
-								preferences={preferences}
-								setPreferences={setPreferences}
-								isWindowOpen={camera.isWindowOpen}
-								setIsWindowOpen={camera.setIsWindowOpen}
-							/>
+							<>
+								<CameraErrorBanner
+									error={camera.error}
+									onDismiss={() => camera.setError(null)}
+								/>
+								<CameraControls
+									preferences={preferences}
+									setPreferences={setPreferences}
+									isWindowOpen={camera.isWindowOpen}
+									setIsWindowOpen={camera.setIsWindowOpen}
+								/>
+							</>
 						)}
 
 						{section === "exercises" && (

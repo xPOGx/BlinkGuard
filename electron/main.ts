@@ -127,6 +127,9 @@ function bootstrap(): void {
 			onError: (message) => {
 				windows.sendToMain(IPC_CHANNELS.cameraError, message);
 			},
+			onCameraReady: () => {
+				windows.sendToMain(IPC_CHANNELS.cameraReady);
+			},
 			shouldRetryCamera: () =>
 				preferences.isTracking &&
 				preferences.cameraEnabled &&

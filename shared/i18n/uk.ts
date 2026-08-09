@@ -4,6 +4,7 @@ export const uk: MessageCatalog = {
 	// App shell
 	"app.tagline": "Налаштування для очей",
 	"app.navAria": "Розділи налаштувань",
+	"app.navNeedsAttention": "Потрібна увага",
 	"app.section.reminders": "Нагадування",
 	"app.section.reminders.desc":
 		"Інтервал і керування запуском нагадувань про моргання.",

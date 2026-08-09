@@ -25,6 +25,7 @@ interface SidecarCallbacks {
 	onFaceData: (data: unknown) => void;
 	onVideoStream: (data: unknown) => void;
 	onError: (message: string) => void;
+	onCameraReady: () => void;
 	shouldRetryCamera: () => boolean;
 	onCalibrationProgress?: (payload: {
 		elapsedMs: number;
@@ -139,10 +140,10 @@ export class BlinkDetectorSidecar {
 			this.cancelEarCalibration("Blink detector error");
 		});
 		this.readStdout(child);
+		// OpenCV/MSMF often prints [WARN] to stderr while capture still works —
+		// never promote raw stderr to the settings error banner (NDJSON `error` is enough).
 		child.stderr.on("data", (data: Buffer) => {
-			const message = data.toString();
-			console.error("Blink detector stderr:", message);
-			this.callbacks.onError(`Stderr: ${message}`);
+			console.error("Blink detector stderr:", data.toString());
 		});
 	}
 
@@ -318,9 +319,13 @@ export class BlinkDetectorSidecar {
 		if (message.status) {
 			if (message.status === SIDECAR_STATUS.modelsReady) {
 				this.applySessionConfig();
-			} else if (message.status === SIDECAR_STATUS.cameraReady) {
+			} else if (
+				message.status === SIDECAR_STATUS.cameraReady ||
+				message.status === SIDECAR_STATUS.cameraStarted
+			) {
 				this.cameraReady = true;
 				this.retryCount = 0;
+				this.callbacks.onCameraReady();
 			}
 			return;
 		}

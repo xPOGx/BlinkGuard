@@ -1,27 +1,25 @@
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 export function useCameraStatus() {
 	const [error, setError] = useState<string | null>(null);
 	const [isWindowOpen, setIsWindowOpen] = useState(false);
-	const errorTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(
-		undefined,
-	);
 
 	useEffect(() => {
 		const unsubscribeError = rendererIpc.onCameraError((cameraError) => {
 			console.error("Camera error:", cameraError);
 			setError(cameraError);
-			clearTimeout(errorTimeout.current);
-			errorTimeout.current = setTimeout(() => setError(null), 10000);
+		});
+		const unsubscribeReady = rendererIpc.onCameraReady(() => {
+			setError(null);
 		});
 		const unsubscribeClosed = rendererIpc.onCameraWindowClosed(() =>
 			setIsWindowOpen(false),
 		);
 		return () => {
 			unsubscribeError();
+			unsubscribeReady();
 			unsubscribeClosed();
-			clearTimeout(errorTimeout.current);
 		};
 	}, []);
 

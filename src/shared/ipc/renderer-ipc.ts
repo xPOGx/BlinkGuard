@@ -49,6 +49,8 @@ export const rendererIpc = {
 		subscribe(IPC_CHANNELS.loadPreferences, listener),
 	onCameraError: (listener: (error: string) => void) =>
 		subscribe(IPC_CHANNELS.cameraError, listener),
+	onCameraReady: (listener: () => void) =>
+		subscribe(IPC_CHANNELS.cameraReady, listener),
 	onShortcutError: (listener: (shortcut: string | null) => void) =>
 		subscribe(IPC_CHANNELS.shortcutError, listener),
 	onCameraWindowClosed: (listener: () => void) =>
