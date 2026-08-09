@@ -69,6 +69,10 @@ EYES_CLOSED_RATIO = 0.52
 EYES_OPEN_RATIO = 0.70
 # Soft clear band for look-down open (~0.73–0.85 of live ref).
 EYES_OPEN_SOFT_RATIO = 0.85
+# Look-down await clear (frontal still uses close-band ~0.84 anti-FP).
+# Chat open often sits ~0.70–0.82 of live — requiring close-band made
+# skip_await_open sticky while looking at screen bottom (POG 2026-08-09).
+LOOK_DOWN_AWAIT_CLEAR_RATIO = 0.70
 EYES_CLOSED_HOLD_S = 0.18
 # Must stay near-open this long to clear eyes_closed (noise while lids shut).
 EYES_OPEN_HOLD_S = 0.12
@@ -559,7 +563,9 @@ class BlinkDetectionState:
 			(1 - alpha) * self.resting_pitch + alpha * pitch
 		)
 
-	def _update_eyes_closed_state(self, current_ear, current_time):
+	def _update_eyes_closed_state(
+		self, current_ear, current_time, look_down=False
+	):
 		"""
 		Track sustained low EAR and post-credit reopen vs *live* open ref.
 
@@ -567,8 +573,10 @@ class BlinkDetectionState:
 		instead of sticking in skip_eyes_closed (POG 2026-08-09). Soft clear
 		at EYES_OPEN_SOFT_RATIO unsticks chat look-down without full 0.70 hold.
 
-		Await/open clear must sit at/above the close band — clearing at 0.70 while
-		close≈0.84 re-arms start in the mid-band and credits ~1 Hz (POG center FP).
+		Frontal await clear must sit at/above the close band — clearing at 0.70
+		while close≈0.84 re-arms start in the mid-band (~1 Hz FP). Look-down /
+		ear_depressed use LOOK_DOWN_AWAIT_CLEAR_RATIO so chat open is not
+		sticky skip_await_open.
 		"""
 		ref = self._ref_ear()
 		if ref <= 0:
@@ -576,8 +584,13 @@ class BlinkDetectionState:
 
 		open_ratio = current_ear / ref
 		close_ratio = 1.0 - get_adaptive_ear_drop_threshold(ref)
-		# Must leave the start zone before another candidate can arm.
-		clear_open_ratio = max(EYES_OPEN_RATIO, close_ratio)
+		if look_down:
+			clear_open_ratio = max(
+				EYES_OPEN_RATIO, LOOK_DOWN_AWAIT_CLEAR_RATIO
+			)
+		else:
+			# Must leave the start zone before another candidate can arm.
+			clear_open_ratio = max(EYES_OPEN_RATIO, close_ratio)
 
 		if (
 			self.awaiting_reopen
@@ -591,9 +604,14 @@ class BlinkDetectionState:
 				self.eyes_closed = True
 				self._open_ear_since = None
 			elif open_ratio < close_ratio:
-				# Still inside close band — keep blocking starts; refresh timer
-				# so live_open can fall while awaiting (see _update_live_open_ear).
-				self.awaiting_reopen_since = current_time
+				if look_down:
+					# Look-down resting open often sits under frontal close band;
+					# do not refresh await forever (POG skip_await_open sticky).
+					self.awaiting_reopen = False
+					self.awaiting_reopen_since = None
+				else:
+					# Frontal mid-band — keep blocking; live_open may fall.
+					self.awaiting_reopen_since = current_time
 			else:
 				self.awaiting_reopen = False
 				self.awaiting_reopen_since = None
@@ -610,9 +628,9 @@ class BlinkDetectionState:
 			return
 
 		# Soft clear: look-down "open" often sits ~0.73–0.85 of live ref.
-		# Only clears eyes_closed (not await) below close band — await needs
-		# clear_open_ratio so mid-band cannot re-arm start.
-		if open_ratio >= EYES_OPEN_SOFT_RATIO and self.eyes_closed:
+		if open_ratio >= EYES_OPEN_SOFT_RATIO and (
+			self.eyes_closed or self.awaiting_reopen
+		):
 			self._low_ear_since = None
 			if self._open_ear_since is None:
 				self._open_ear_since = current_time
@@ -620,6 +638,8 @@ class BlinkDetectionState:
 				current_time - self._open_ear_since
 			) >= EYES_OPEN_SOFT_HOLD_S:
 				self.eyes_closed = False
+				self.awaiting_reopen = False
+				self.awaiting_reopen_since = None
 			return
 
 		self._open_ear_since = None
@@ -727,7 +747,12 @@ class BlinkDetectionState:
 		if ref <= 0:
 			return False, None
 
-		self._update_eyes_closed_state(ear_smooth, current_time)
+		treat_as_look_down = bool(gate["look_down"] or self.ear_depressed)
+		self._update_eyes_closed_state(
+			ear_smooth,
+			current_time,
+			look_down=treat_as_look_down,
+		)
 
 		ear_drop_percentage = (ref - ear_smooth) / ref
 		ear_drop_absolute = ref - ear_smooth
@@ -742,8 +767,6 @@ class BlinkDetectionState:
 		# Hysteresis close band vs live open height.
 		close_band_ear = ref * (1.0 - adaptive_threshold)
 		start_band_ear = close_band_ear
-		# Pose look_down OR live open well below session baseline → no synthetic.
-		treat_as_look_down = bool(gate["look_down"] or self.ear_depressed)
 		duration_min = min_blink_duration_s(self.target_fps)
 
 		left_drop = self._eye_drop(left_ear)

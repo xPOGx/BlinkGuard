@@ -755,15 +755,40 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertTrue(state.eyes_closed)
 
 	def test_await_reopen_expires_mid_band_keeps_blocking(self):
-		"""Mid-band timeout must not free start (POG center FP re-arm)."""
+		"""Frontal mid-band timeout must not free start (POG center FP re-arm)."""
 		state = BlinkDetectionState()
 		t = _seed_open_eye(state, ear=0.28)
 		state.awaiting_reopen = True
 		state.awaiting_reopen_since = t
 		t += 0.5
 		# Mid-band still inside close zone → keep awaiting (timer refresh).
-		state._update_eyes_closed_state(0.18, t)
+		state._update_eyes_closed_state(0.18, t, look_down=False)
 		self.assertTrue(state.awaiting_reopen)
+		self.assertFalse(state.eyes_closed)
+
+	def test_look_down_await_clears_at_open_ratio(self):
+		"""Chat look-down open (~0.75×live) must clear await, not sticky skip."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.12
+		state.live_open_ear = 0.28
+		state.awaiting_reopen = True
+		state.awaiting_reopen_since = t
+		# 0.75 of live — below frontal close≈0.84, above look-down clear 0.70.
+		for _ in range(6):
+			t += 0.05
+			state.detect(0.21, t, pose=pose)
+		self.assertFalse(state.awaiting_reopen)
+
+	def test_look_down_await_timeout_mid_band_does_not_refresh(self):
+		state = BlinkDetectionState()
+		t = _seed_open_eye(state, ear=0.28)
+		state.awaiting_reopen = True
+		state.awaiting_reopen_since = t
+		t += 0.5
+		state._update_eyes_closed_state(0.20, t, look_down=True)
+		self.assertFalse(state.awaiting_reopen)
 		self.assertFalse(state.eyes_closed)
 
 	def test_sustained_low_ear_marks_eyes_closed(self):
