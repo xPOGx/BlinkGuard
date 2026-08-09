@@ -29,6 +29,7 @@ export interface BlinkDetectorPort {
 	start(): void;
 	startCamera(): boolean;
 	stopCamera(): void;
+	requestVideo(): void;
 	markCameraUnavailable(): void;
 }
 

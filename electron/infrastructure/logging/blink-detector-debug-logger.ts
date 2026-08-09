@@ -44,15 +44,32 @@ export class BlinkDetectorDebugLogger {
 	}
 
 	/**
-	 * Capture sidecar NDJSON messages that carry debug / blinkDebug.
+	 * Capture sidecar NDJSON messages that carry debug / blinkDebug / cameraState.
 	 * Does not change the blink credit protocol — logging only.
+	 * Raw videoStream / per-frame faceData are intentionally not logged.
 	 */
 	captureSidecarMessage(message: Record<string, unknown>): void {
 		const hasBlinkDebug = message.blinkDebug != null;
 		const hasDebug = message.debug != null;
-		if (!hasBlinkDebug && !hasDebug) return;
+		const hasCameraState = message.cameraState != null;
+		if (!hasBlinkDebug && !hasDebug && !hasCameraState) return;
 
 		this.announce();
+
+		if (hasCameraState) {
+			const cameraState = message.cameraState as Record<string, unknown>;
+			this.append({
+				source: "sidecar",
+				type: "cameraState",
+				cameraState,
+				...(typeof message.debug === "string"
+					? { message: message.debug }
+					: {}),
+			});
+			// cameraState may share a line with debug in future; still allow
+			// blinkDebug handling below when both are present.
+			if (!hasBlinkDebug && !hasDebug) return;
+		}
 
 		if (hasBlinkDebug) {
 			const blinkDebug = message.blinkDebug as Record<string, unknown>;
@@ -67,6 +84,8 @@ export class BlinkDetectorDebugLogger {
 			});
 			return;
 		}
+
+		if (!hasDebug) return;
 
 		const debugText = String(message.debug);
 		// Blink outcomes also arrive as a separate blinkDebug message — file only
@@ -83,6 +102,7 @@ export class BlinkDetectorDebugLogger {
 		type: string;
 		message?: string;
 		blinkDebug?: Record<string, unknown>;
+		cameraState?: Record<string, unknown>;
 		raw?: unknown;
 	}): void {
 		this.ensureDirectory();
@@ -94,6 +114,7 @@ export class BlinkDetectorDebugLogger {
 		};
 		if (entry.message !== undefined) record.message = entry.message;
 		if (entry.blinkDebug !== undefined) record.blinkDebug = entry.blinkDebug;
+		if (entry.cameraState !== undefined) record.cameraState = entry.cameraState;
 		if (entry.raw !== undefined) record.raw = entry.raw;
 		try {
 			appendFileSync(this.logPath, `${JSON.stringify(record)}\n`, "utf8");

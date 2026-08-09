@@ -203,7 +203,12 @@ export class ReminderService {
 			return;
 		}
 		if (!this.sidecar.isRunning) this.sidecar.start();
-		if (!this.sidecar.isCameraReady) this.sidecar.startCamera();
+		if (this.sidecar.isCameraReady) {
+			// Preview-only: do not stop/start an already-live capture.
+			this.sidecar.requestVideo();
+			return;
+		}
+		this.sidecar.startCamera();
 	}
 
 	/** Soft-pause camera during fullscreen without clearing isTracking. */
@@ -249,6 +254,28 @@ export class ReminderService {
 		if (this.state.cameraMonitoringInterval) {
 			clearInterval(this.state.cameraMonitoringInterval);
 		}
+
+		// Already capturing — arm reminder loops without DSHOW reopen thrash.
+		if (this.sidecar.isRunning && this.sidecar.isCameraReady) {
+			this.resetFaceTracking();
+			if (showStarting) {
+				this.sound.play("starting");
+				const popup = this.windows.showReminder("starting");
+				setTimeout(() => {
+					this.windows.closeReminderIfCurrent(popup);
+				}, REMINDER_POPUP_VISIBLE_MS);
+			}
+			this.coaching?.start();
+			this.sidecar.requestVideo();
+			this.creditBlink("camera-ready");
+			if (this.preferences.mgdMode) {
+				this.startMgdLoop();
+			} else {
+				this.startFaceAwareLoop();
+			}
+			return;
+		}
+
 		this.sidecar.markCameraUnavailable();
 		this.resetFaceTracking();
 		if (showStarting) {

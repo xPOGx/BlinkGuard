@@ -16,7 +16,13 @@ from blink_detector_package.domain import (
 	select_largest_face,
 )
 from blink_detector_package.domain.ear import calculate_ear_fast
-from blink_detector_package.infrastructure.camera import OpenCVCamera
+from blink_detector_package.infrastructure.camera import (
+	BLACK_STREAK_S,
+	HEALTH_INTERVAL_S,
+	OpenCVCamera,
+	is_black_frame,
+	mean_luma,
+)
 from blink_detector_package.infrastructure.models import load_models
 from blink_detector_package.infrastructure.transport import NdjsonTransport
 from blink_detector_package.infrastructure.vision import (
@@ -54,6 +60,90 @@ class BlinkDetectorApplication:
 		self._cached_face = None
 		self._frames_since_face_detect = 0
 		self._last_skip_debug_time = 0.0
+		self._reset_capture_health()
+
+	def _reset_capture_health(self):
+		self._health_window_start = time.time()
+		self._health_frames = 0
+		self._health_black = 0
+		self._health_luma_sum = 0.0
+		self._health_face_ok = 0
+		self._health_face_none = 0
+		self._health_face_too_far = 0
+		self._black_streak_start = None
+		self._last_health_emit = 0.0
+
+	def _note_frame_health(self, frame, face_status, current_time):
+		luma = mean_luma(frame)
+		black = is_black_frame(frame)
+		self._health_frames += 1
+		self._health_luma_sum += luma
+		if black:
+			self._health_black += 1
+			if self._black_streak_start is None:
+				self._black_streak_start = current_time
+		else:
+			self._black_streak_start = None
+
+		if face_status == "ok":
+			self._health_face_ok += 1
+		elif face_status == "too_far":
+			self._health_face_too_far += 1
+		else:
+			self._health_face_none += 1
+
+		if current_time - self._last_health_emit >= HEALTH_INTERVAL_S:
+			self._emit_camera_health(current_time)
+		return black, luma
+
+	def _frame_luma_and_black(self, frame, current_time):
+		"""Track black streak / luma without committing faceStatus counts yet."""
+		luma = mean_luma(frame)
+		black = is_black_frame(frame)
+		if black:
+			if self._black_streak_start is None:
+				self._black_streak_start = current_time
+		else:
+			self._black_streak_start = None
+		return black, luma
+
+	def _commit_frame_health(self, luma, black, face_status, current_time):
+		self._health_frames += 1
+		self._health_luma_sum += luma
+		if black:
+			self._health_black += 1
+		if face_status == "ok":
+			self._health_face_ok += 1
+		elif face_status == "too_far":
+			self._health_face_too_far += 1
+		else:
+			self._health_face_none += 1
+		if current_time - self._last_health_emit >= HEALTH_INTERVAL_S:
+			self._emit_camera_health(current_time)
+
+	def _emit_camera_health(self, current_time):
+		frames = max(1, self._health_frames)
+		meta = self.camera.snapshot_meta()
+		self.camera.emit_camera_state(
+			"camera_health",
+			frames=self._health_frames,
+			mean_luma=self._health_luma_sum / frames,
+			black_ratio=self._health_black / frames,
+			face_ok=self._health_face_ok,
+			face_none=self._health_face_none,
+			face_too_far=self._health_face_too_far,
+			send_video=self.send_video,
+			window_s=round(current_time - self._health_window_start, 3),
+			**meta,
+		)
+		self._health_window_start = current_time
+		self._health_frames = 0
+		self._health_black = 0
+		self._health_luma_sum = 0.0
+		self._health_face_ok = 0
+		self._health_face_none = 0
+		self._health_face_too_far = 0
+		self._last_health_emit = current_time
 
 	def process_commands(self):
 		while not self.transport.command_queue.empty():
@@ -164,6 +254,7 @@ class BlinkDetectorApplication:
 					if self.camera.start(self.detection.reset):
 						self._cached_face = None
 						self._frames_since_face_detect = 0
+						self._reset_capture_health()
 						self.transport.send(
 							{"status": "Camera started successfully"}
 						)
@@ -172,9 +263,10 @@ class BlinkDetectorApplication:
 							{"error": "Failed to start camera"}
 						)
 				elif "stop_camera" in data:
-					self.camera.stop()
+					self.camera.stop(reason="stop_camera")
 					self.send_video = False
 					self._cached_face = None
+					self._reset_capture_health()
 					self.transport.send({"status": "Camera stopped"})
 			except json.JSONDecodeError as error:
 				self.transport.send(
@@ -579,7 +671,7 @@ class BlinkDetectorApplication:
 				last_frame_time = current_time
 
 				ret, frame = self.camera.capture.read()
-				if not ret:
+				if not ret or frame is None:
 					self.transport.send({"error": "Failed to read frame"})
 					time.sleep(0.1)
 					continue
@@ -593,6 +685,44 @@ class BlinkDetectorApplication:
 					)
 
 				face_data = default_face_data.copy()
+				# Black / empty capture: skip HOG (avoids junk mouth boxes) but
+				# still stream preview + health so diagnostics stay honest.
+				black, luma = self._frame_luma_and_black(frame, current_time)
+				if black:
+					self._commit_frame_health(
+						luma, True, "none", current_time
+					)
+					if (
+						self._black_streak_start is not None
+						and current_time - self._black_streak_start
+						>= BLACK_STREAK_S
+					):
+						streak_ms = int(
+							(current_time - self._black_streak_start) * 1000
+						)
+						self.camera.recover_from_black_frames(
+							self.detection.reset,
+							streak_ms,
+							luma,
+						)
+						self._cached_face = None
+						self._reset_capture_health()
+						continue
+
+					self._cached_face = None
+					had_candidate = self.detection.cancel_on_face_lost()
+					self._emit_face_lost(current_time, had_candidate)
+					self.transport.send_serialized(NO_FACE_DATA)
+					if self.send_video:
+						if self.camera.processing_resolution == (640, 480):
+							frame_base64 = encode_frame(frame)
+						else:
+							display_frame = cv2.resize(frame, (640, 480))
+							frame_base64 = encode_frame(display_frame)
+						self.transport.send({"videoStream": frame_base64})
+					frame_count += 1
+					continue
+
 				frame_width = frame.shape[1]
 				frame_height = frame.shape[0]
 				face = None
@@ -684,6 +814,13 @@ class BlinkDetectorApplication:
 					had_candidate = self.detection.cancel_on_face_lost()
 					self._emit_face_lost(current_time, had_candidate)
 
+				self._commit_frame_health(
+					luma,
+					False,
+					face_data.get("faceStatus") or "none",
+					current_time,
+				)
+
 				if face_data.get("faceStatus") == "none":
 					self.transport.send_serialized(NO_FACE_DATA)
 				else:
@@ -704,7 +841,7 @@ class BlinkDetectorApplication:
 				{"status": "Stopping blink detector..."}
 			)
 		finally:
-			self.camera.stop()
+			self.camera.stop(reason="detector_exit")
 			self.transport.send({"status": "Blink detector stopped"})
 			self.transport.stop()
 

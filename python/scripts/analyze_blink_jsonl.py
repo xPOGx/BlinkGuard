@@ -81,6 +81,80 @@ def load_rows(paths: list[Path], cutoff: datetime | None):
 	return rows
 
 
+def load_camera_states(paths: list[Path], cutoff: datetime | None):
+	rows = []
+	for path in paths:
+		if not path.exists():
+			continue
+		with path.open(encoding="utf-8", errors="replace") as handle:
+			for line in handle:
+				line = line.strip()
+				if not line:
+					continue
+				try:
+					obj = json.loads(line)
+				except json.JSONDecodeError:
+					continue
+				ts = obj.get("ts")
+				state = obj.get("cameraState")
+				if not ts or not isinstance(state, dict):
+					continue
+				try:
+					t = parse_ts(ts)
+				except ValueError:
+					continue
+				if cutoff is not None and t < cutoff:
+					continue
+				rows.append((t, state))
+	rows.sort(key=lambda item: item[0])
+	return rows
+
+
+def _print_camera_state_summary(states: list) -> None:
+	if not states:
+		print("--- cameraState: n=0 ---")
+		return
+	kinds = Counter((s.get("kind") or "?") for _, s in states)
+	print("--- cameraState ---")
+	print(f"events={len(states)} kinds={dict(kinds.most_common())}")
+	health = [s for _, s in states if s.get("kind") == "camera_health"]
+	if health:
+		lumas = [float(s["mean_luma"]) for s in health if s.get("mean_luma") is not None]
+		blacks = [
+			float(s["black_ratio"])
+			for s in health
+			if s.get("black_ratio") is not None
+		]
+		backends = Counter(
+			(s.get("backend_name") or s.get("backend") or "?") for s in health
+		)
+		print(f"  health_n={len(health)} backends={dict(backends.most_common())}")
+		if lumas:
+			print(
+				f"  mean_luma: p50={pct(lumas, 0.5):.1f} "
+				f"p90={pct(lumas, 0.9):.1f} last={lumas[-1]:.1f}"
+			)
+		if blacks:
+			print(
+				f"  black_ratio: p50={pct(blacks, 0.5):.3f} "
+				f"p90={pct(blacks, 0.9):.3f} last={blacks[-1]:.3f}"
+			)
+	opens = [s for _, s in states if s.get("kind") == "camera_open_result"]
+	if opens:
+		ok = sum(1 for s in opens if s.get("ok") is True)
+		print(f"  open_result: n={len(opens)} ok={ok} fail={len(opens) - ok}")
+		for s in opens[-3:]:
+			print(
+				f"    ok={s.get('ok')} backend={s.get('backend_name')} "
+				f"luma={s.get('mean_luma')} reject={s.get('reject_reason')}"
+			)
+	streaks = [s for _, s in states if s.get("kind") == "camera_black_streak"]
+	failovers = [s for _, s in states if s.get("kind") == "camera_failover"]
+	if streaks or failovers:
+		print(f"  black_streak={len(streaks)} failover={len(failovers)}")
+
+
+
 def pct(vals: list[float], p: float) -> float:
 	if not vals:
 		return float("nan")
@@ -210,8 +284,10 @@ def main() -> int:
 		cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.minutes)
 
 	rows = load_rows(paths, cutoff)
+	camera_states = load_camera_states(paths, cutoff)
 	print(f"log={path}")
 	print(f"events={len(rows)}")
+	_print_camera_state_summary(camera_states)
 	if not rows:
 		return 0
 

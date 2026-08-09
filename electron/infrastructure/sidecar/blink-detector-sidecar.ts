@@ -151,6 +151,8 @@ export class BlinkDetectorSidecar {
 			console.error("Blink detector not running");
 			return false;
 		}
+		// Quality/EAR before start so CAP_PROP uses the preset, not 320×240 defaults.
+		this.applySessionConfig();
 		this.write({ start_camera: true });
 		return true;
 	}

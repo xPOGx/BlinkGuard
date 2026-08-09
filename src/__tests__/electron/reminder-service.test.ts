@@ -92,6 +92,7 @@ function createSidecar(
 		start: vi.fn(),
 		startCamera: vi.fn(() => true),
 		stopCamera: vi.fn(),
+		requestVideo: vi.fn(),
 		markCameraUnavailable: vi.fn(),
 		...overrides,
 	};
