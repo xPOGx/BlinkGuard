@@ -4,6 +4,24 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-08-09
+
+### Added
+
+- Settings Progress section with fixed tabs for stats / goals / rewards
+- Share card preview with toggles
+- Editable look-away popup title and hint
+- Camera settings copy explaining timer mode leaves blink features inactive
+- Silent update install on quit without a Restart prompt
+
+### Fixed
+
+- Camera: stop silent blink misses and center credit loops
+- Camera: harden Windows open for legacy UVC cams
+- Camera: smooth face overlay jitter in preview
+- Eye-care popups: less click-steal and fewer timer clashes
+- CI: Windows Python bat scripts cmd-safe; blink binary smoke test no longer hangs on readline
+
 ## [2.2.0] - 2026-08-09
 
 ### Added

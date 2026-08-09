@@ -12,18 +12,17 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 - **MGD mode** — when camera detection is on, show timed popups even while blinking; the popup still closes when a blink is detected
 - **Camera visualization** — optional live preview window with face/eye landmarks and EAR status
 - **Eye exercise reminders** — configurable interval (5–60 minutes); rotating prompts with Skip and Snooze (5 min); auto-close after 30 seconds
-- **20-20-20 look-away breaks** — independent timer alongside exercises
+- **20-20-20 look-away breaks** — independent timer alongside exercises; editable title/hint
 - **Customizable reminder popup** — drag to reposition, resize with edge handles, custom message, colors, and transparency
 - **Global keyboard shortcut** — start/stop reminders (default `Ctrl+I`; rebindable)
 - **Sounds** — optional notification sounds for blink and exercise popups (per-kind volume)
 - **Quiet hours & fullscreen soft-pause** — hide popups when you ask for quiet time or go fullscreen
-- **Local blink statistics** — session stats, live blinks-per-minute (camera mode), goals and streaks
-- **Blink levels & rewards shop** — level-up cheer, share card, and optional shop upgrades
+- **Progress** — stats, goals/streaks, blink levels, rewards shop, and share-card preview in one nav section
 - **Backup** — export/import local prefs and stats as JSON
 - **Dark / light mode** · **EN / UK** localization
 - **Persistent preferences** — saved locally via `electron-store` (reset-to-defaults supported)
 - **Sleep / wake handling** — pauses on suspend and auto-resumes if tracking was active
-- **In-app updates (Windows & macOS)** — checks GitHub Releases; About can open Release Notes
+- **In-app updates (Windows & macOS)** — GitHub Releases; silent install on quit; About opens Release Notes
 - **Diagnostics export** — local logs and interaction trail for support
 - **Cross-platform packaging** — Windows and macOS (Electron Builder)
 
