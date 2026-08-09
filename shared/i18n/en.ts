@@ -7,7 +7,7 @@ export const en: MessageCatalog = {
 	"app.navNeedsAttention": "Needs attention",
 	"app.section.reminders": "Reminders",
 	"app.section.reminders.desc":
-		"Interval and start/stop controls for blink reminders.",
+		"Interval, start/stop, quiet hours, and fullscreen pause for blink reminders.",
 	"app.section.camera": "Camera",
 	"app.section.camera.desc":
 		"Detection, quality, calibration, and MGD mode.",
@@ -17,17 +17,15 @@ export const en: MessageCatalog = {
 	"app.section.appearance": "Appearance",
 	"app.section.appearance.desc":
 		"Popup message, colors, size, and notification sound.",
-	"app.section.statistics": "Statistics",
-	"app.section.statistics.desc":
-		"Local blink counts, tracking time, goals, streaks, and charts.",
-	"app.section.profile": "Profile",
-	"app.section.profile.desc":
-		"Your blink identity, level, and shareable card.",
-	"app.section.rewards": "Rewards",
-	"app.section.rewards.desc":
-		"Spend Available blinks on cheers, flair, streak shields, and shop discounts.",
-	"app.section.system": "System",
-	"app.section.system.desc":
+	"app.section.progress": "Progress",
+	"app.section.progress.desc":
+		"Statistics, goals, profile, and the rewards shop.",
+	"app.progress.tabsAria": "Progress views",
+	"app.progress.tab.statistics": "Statistics",
+	"app.progress.tab.profile": "Profile",
+	"app.progress.tab.rewards": "Rewards",
+	"app.section.settings": "Settings",
+	"app.section.settings.desc":
 		"Shortcut, language, launch at login, backup, and reset.",
 	"app.section.about": "About",
 	"app.section.about.desc":
@@ -405,7 +403,7 @@ export const en: MessageCatalog = {
 	"stats.goals.weeklyBlinks": "Weekly blinks",
 	"stats.goals.weeklyTracking": "Weekly tracking",
 	"stats.goals.met": "Met",
-	"stats.goals.off": "Goals are off — enable them in System settings.",
+	"stats.goals.off": "Goals are off — enable them in the Goals panel above.",
 	"stats.streak": "Streak",
 	"stats.streakDesc":
 		"Consecutive local days meeting all enabled daily goals. A streak shield covers one miss.",

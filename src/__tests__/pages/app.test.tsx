@@ -90,13 +90,17 @@ describe("settings shell", () => {
 		expect(screen.getByRole("heading", { name: "BlinkGuard" })).toBeDefined();
 		expect(screen.getByRole("button", { name: "Start" })).toBeDefined();
 
-		fireEvent.click(screen.getByRole("button", { name: "System" }));
+		fireEvent.click(screen.getByRole("button", { name: "Settings" }));
 		expect(screen.getByText("Keyboard Shortcut")).toBeDefined();
+		expect(screen.queryByText("Quiet hours")).toBeNull();
+
+		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
 		expect(screen.getByText("Quiet hours")).toBeDefined();
 		expect(screen.getByText("Pause while fullscreen")).toBeDefined();
 
-		fireEvent.click(screen.getByRole("button", { name: "Statistics" }));
+		fireEvent.click(screen.getByRole("button", { name: "Progress" }));
 		expect(screen.getByText("Blink chart")).toBeDefined();
+		expect(screen.getAllByText("Goals").length).toBeGreaterThanOrEqual(1);
 		expect(
 			screen.getByRole("button", { name: "Clear statistics" }),
 		).toBeDefined();
@@ -127,7 +131,7 @@ describe("settings shell", () => {
 	it("disables fullscreen pause toggle when detection is unsupported", () => {
 		render(<App />);
 		hydratePreferences({ hasCompletedOnboarding: true });
-		fireEvent.click(screen.getByRole("button", { name: "System" }));
+		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
 
 		const toggle = screen.getByRole("switch", {
 			name: "Toggle pause while fullscreen",
@@ -245,7 +249,7 @@ describe("settings shell", () => {
 	it("records and sends a keyboard shortcut", () => {
 		render(<App />);
 
-		fireEvent.click(screen.getByRole("button", { name: "System" }));
+		fireEvent.click(screen.getByRole("button", { name: "Settings" }));
 		fireEvent.click(screen.getByRole("button", { name: "Change" }));
 		fireEvent.keyDown(window, { key: "k", ctrlKey: true });
 		fireEvent.keyDown(window, { key: "Enter" });
@@ -260,11 +264,11 @@ describe("settings shell", () => {
 		render(<App />);
 		hydratePreferences({ hasCompletedOnboarding: true, locale: "en" });
 
-		fireEvent.click(screen.getByRole("button", { name: "System" }));
+		fireEvent.click(screen.getByRole("button", { name: "Settings" }));
 		const select = screen.getByLabelText("Select language");
 		fireEvent.change(select, { target: { value: "uk" } });
 
-		expect(screen.getByRole("button", { name: "Система" })).toBeDefined();
+		expect(screen.getByRole("button", { name: "Налаштування" })).toBeDefined();
 		expect(screen.getByText("Мова")).toBeDefined();
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "uk");
 	});
@@ -324,7 +328,7 @@ describe("settings shell", () => {
 		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
 		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateDarkMode, true);
 
-		fireEvent.click(screen.getByRole("button", { name: "System" }));
+		fireEvent.click(screen.getByRole("button", { name: "Settings" }));
 		send.mockClear();
 		fireEvent.click(
 			screen.getByRole("switch", { name: "Toggle launch at login" }),
@@ -335,6 +339,7 @@ describe("settings shell", () => {
 			true,
 		);
 
+		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
 		send.mockClear();
 		fireEvent.click(screen.getByRole("switch", { name: "Toggle quiet hours" }));
 		expect(send).toHaveBeenCalledWith(

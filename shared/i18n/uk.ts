@@ -7,7 +7,7 @@ export const uk: MessageCatalog = {
 	"app.navNeedsAttention": "Потрібна увага",
 	"app.section.reminders": "Нагадування",
 	"app.section.reminders.desc":
-		"Інтервал і керування запуском нагадувань про моргання.",
+		"Інтервал, запуск/зупинка, тихі години та пауза в повноекранному режимі.",
 	"app.section.camera": "Камера",
 	"app.section.camera.desc":
 		"Виявлення, якість, калібрування та режим MGD.",
@@ -17,17 +17,15 @@ export const uk: MessageCatalog = {
 	"app.section.appearance": "Вигляд",
 	"app.section.appearance.desc":
 		"Текст спливаючого вікна, кольори, розмір і звук сповіщень.",
-	"app.section.statistics": "Статистика",
-	"app.section.statistics.desc":
-		"Локальні моргання, час відстеження, цілі, серії та графіки.",
-	"app.section.profile": "Профіль",
-	"app.section.profile.desc":
-		"Твоя кліп-ідентичність, рівень і картка для шеру.",
-	"app.section.rewards": "Нагороди",
-	"app.section.rewards.desc":
-		"Витрачайте доступні моргання на «ура», значок, щит серії та знижку.",
-	"app.section.system": "Система",
-	"app.section.system.desc":
+	"app.section.progress": "Прогрес",
+	"app.section.progress.desc":
+		"Статистика, цілі, профіль і магазин нагород.",
+	"app.progress.tabsAria": "Перегляди прогресу",
+	"app.progress.tab.statistics": "Статистика",
+	"app.progress.tab.profile": "Профіль",
+	"app.progress.tab.rewards": "Нагороди",
+	"app.section.settings": "Налаштування",
+	"app.section.settings.desc":
 		"Гаряча клавіша, мова, автозапуск, резервна копія і скидання.",
 	"app.section.about": "Про застосунок",
 	"app.section.about.desc":
@@ -413,7 +411,7 @@ export const uk: MessageCatalog = {
 	"stats.goals.weeklyBlinks": "Моргання за тиждень",
 	"stats.goals.weeklyTracking": "Відстеження за тиждень",
 	"stats.goals.met": "Досягнуто",
-	"stats.goals.off": "Цілі вимкнено — увімкніть їх у системних налаштуваннях.",
+	"stats.goals.off": "Цілі вимкнено — увімкніть їх у панелі «Цілі» вище.",
 	"stats.streak": "Серія",
 	"stats.streakDesc":
 		"Поспіль локальні дні з виконаними денними цілями. Щит серії покриває один пропуск.",

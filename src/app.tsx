@@ -4,14 +4,13 @@ import {
 	Camera,
 	Dumbbell,
 	Info,
-	Keyboard,
 	Palette,
-	ShoppingBag,
+	Settings,
 	Timer,
-	User,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { dismissBootSplash } from "@/boot-splash";
+import { SectionTabs } from "@/components/section-tabs";
 import { useAutoUpdate } from "@/features/about/model/use-auto-update";
 import { AboutPanel } from "@/features/about/ui/about-panel";
 import { UpdateDialog } from "@/features/about/ui/update-dialog";
@@ -54,12 +53,12 @@ type SectionId =
 	| "camera"
 	| "exercises"
 	| "appearance"
-	| "statistics"
-	| "profile"
-	| "rewards"
-	| "system"
+	| "progress"
+	| "settings"
 	| "about"
 	| "debug";
+
+type ProgressTabId = "statistics" | "profile" | "rewards";
 
 export default function BlinkGuardHomepage() {
 	const {
@@ -111,6 +110,7 @@ function SettingsShell({
 	const t = useT();
 	const autoUpdate = useAutoUpdate();
 	const [section, setSection] = useState<SectionId>("reminders");
+	const [progressTab, setProgressTab] = useState<ProgressTabId>("statistics");
 	const sections: {
 		id: SectionId;
 		label: string;
@@ -142,28 +142,16 @@ function SettingsShell({
 			icon: Palette,
 		},
 		{
-			id: "statistics",
-			label: t("app.section.statistics"),
-			description: t("app.section.statistics.desc"),
+			id: "progress",
+			label: t("app.section.progress"),
+			description: t("app.section.progress.desc"),
 			icon: BarChart3,
 		},
 		{
-			id: "profile",
-			label: t("app.section.profile"),
-			description: t("app.section.profile.desc"),
-			icon: User,
-		},
-		{
-			id: "rewards",
-			label: t("app.section.rewards"),
-			description: t("app.section.rewards.desc"),
-			icon: ShoppingBag,
-		},
-		{
-			id: "system",
-			label: t("app.section.system"),
-			description: t("app.section.system.desc"),
-			icon: Keyboard,
+			id: "settings",
+			label: t("app.section.settings"),
+			description: t("app.section.settings.desc"),
+			icon: Settings,
 		},
 		{
 			id: "about",
@@ -182,6 +170,11 @@ function SettingsShell({
 					},
 				]
 			: []),
+	];
+	const progressTabs = [
+		{ id: "statistics" as const, label: t("app.progress.tab.statistics") },
+		{ id: "profile" as const, label: t("app.progress.tab.profile") },
+		{ id: "rewards" as const, label: t("app.progress.tab.rewards") },
 	];
 	const active = sections.find((item) => item.id === section) ?? sections[0];
 	const showOnboarding = prefsHydrated && !preferences.hasCompletedOnboarding;
@@ -286,107 +279,131 @@ function SettingsShell({
 					</div>
 				</header>
 
-				<main className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] px-4 py-4 sm:px-6 sm:py-5">
-					<div className="mx-auto flex max-w-3xl flex-col gap-4">
-						{section === "reminders" && (
-							<ReminderControls
-								preferences={preferences}
-								onIntervalChange={changeReminderInterval}
-								onToggleTracking={toggleTracking}
-							/>
-						)}
-
-						{section === "camera" && (
-							<>
-								<CameraErrorBanner
-									error={camera.error}
-									onDismiss={() => camera.setError(null)}
-								/>
-								<CameraControls
-									preferences={preferences}
-									setPreferences={setPreferences}
-									isWindowOpen={camera.isWindowOpen}
-									setIsWindowOpen={camera.setIsWindowOpen}
-								/>
-							</>
-						)}
-
-						{section === "exercises" && (
-							<>
-								<EyePromptsDisabledNotice
-									eyeExercisesEnabled={preferences.eyeExercisesEnabled}
-									lookAwayEnabled={preferences.lookAwayEnabled}
-								/>
-								<ExerciseSettings
-									preferences={preferences}
-									setPreferences={setPreferences}
-								/>
-								<LookAwaySettings
-									preferences={preferences}
-									setPreferences={setPreferences}
-								/>
-							</>
-						)}
-
-						{section === "appearance" && (
-							<>
-								<PopupSettings
-									preferences={preferences}
-									setPreferences={setPreferences}
-								/>
-								<SoundSettings
-									preferences={preferences}
-									setPreferences={setPreferences}
-								/>
-							</>
-						)}
-
-						{section === "statistics" && <StatisticsPanel />}
-
-						{section === "profile" && <ProfilePanel />}
-
-						{section === "rewards" && <RewardsShopPanel />}
-
-						{section === "system" && (
-							<>
-								<ShortcutSettings
-									shortcut={preferences.keyboardShortcut}
-									isRecording={shortcuts.isRecording}
-									temporaryShortcut={shortcuts.temporaryShortcut}
-									error={shortcuts.error}
-									onStartRecording={shortcuts.startRecording}
-									onSave={shortcuts.save}
-									onCancel={shortcuts.cancel}
-								/>
-								<GoalsSettings
-									preferences={preferences}
-									setPreferences={setPreferences}
-								/>
-								<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-									<LanguageSettings
-										preferences={preferences}
-										setPreferences={setPreferences}
+				<main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+					{section === "progress" ? (
+						<>
+							<div className="shrink-0 border-b border-border bg-background px-4 pt-4 pb-3 sm:px-6 sm:pt-5">
+								<div className="mx-auto max-w-4xl">
+									<SectionTabs
+										aria-label={t("app.progress.tabsAria")}
+										items={progressTabs}
+										value={progressTab}
+										onChange={setProgressTab}
 									/>
-									<LaunchAtLoginSettings
-										preferences={preferences}
-										setPreferences={setPreferences}
-									/>
-									<ResetPreferencesButton />
 								</div>
-								<BackupSettings />
-								<QuietHoursFocusSettings
-									preferences={preferences}
-									setPreferences={setPreferences}
-								/>
-							</>
-						)}
+							</div>
+							<div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] px-4 py-4 sm:px-6 sm:py-5">
+								<div className="mx-auto flex max-w-4xl flex-col gap-4">
+									{progressTab === "statistics" && (
+										<>
+											<GoalsSettings
+												preferences={preferences}
+												setPreferences={setPreferences}
+											/>
+											<StatisticsPanel />
+										</>
+									)}
+									{progressTab === "profile" && <ProfilePanel />}
+									{progressTab === "rewards" && <RewardsShopPanel />}
+								</div>
+							</div>
+						</>
+					) : (
+						<div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] px-4 py-4 sm:px-6 sm:py-5">
+							<div className="mx-auto flex max-w-3xl flex-col gap-4">
+								{section === "reminders" && (
+									<>
+										<ReminderControls
+											preferences={preferences}
+											onIntervalChange={changeReminderInterval}
+											onToggleTracking={toggleTracking}
+										/>
+										<QuietHoursFocusSettings
+											preferences={preferences}
+											setPreferences={setPreferences}
+										/>
+									</>
+								)}
 
-						{section === "about" && <AboutPanel autoUpdate={autoUpdate} />}
+								{section === "camera" && (
+									<>
+										<CameraErrorBanner
+											error={camera.error}
+											onDismiss={() => camera.setError(null)}
+										/>
+										<CameraControls
+											preferences={preferences}
+											setPreferences={setPreferences}
+											isWindowOpen={camera.isWindowOpen}
+											setIsWindowOpen={camera.setIsWindowOpen}
+										/>
+									</>
+								)}
 
-						{section === "debug" && import.meta.env.DEV ? (
-							<DebugPanel setPreferences={setPreferences} />
-						) : null}
-					</div>
+								{section === "exercises" && (
+									<>
+										<EyePromptsDisabledNotice
+											eyeExercisesEnabled={preferences.eyeExercisesEnabled}
+											lookAwayEnabled={preferences.lookAwayEnabled}
+										/>
+										<ExerciseSettings
+											preferences={preferences}
+											setPreferences={setPreferences}
+										/>
+										<LookAwaySettings
+											preferences={preferences}
+											setPreferences={setPreferences}
+										/>
+									</>
+								)}
+
+								{section === "appearance" && (
+									<>
+										<PopupSettings
+											preferences={preferences}
+											setPreferences={setPreferences}
+										/>
+										<SoundSettings
+											preferences={preferences}
+											setPreferences={setPreferences}
+										/>
+									</>
+								)}
+
+								{section === "settings" && (
+									<>
+										<ShortcutSettings
+											shortcut={preferences.keyboardShortcut}
+											isRecording={shortcuts.isRecording}
+											temporaryShortcut={shortcuts.temporaryShortcut}
+											error={shortcuts.error}
+											onStartRecording={shortcuts.startRecording}
+											onSave={shortcuts.save}
+											onCancel={shortcuts.cancel}
+										/>
+										<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+											<LanguageSettings
+												preferences={preferences}
+												setPreferences={setPreferences}
+											/>
+											<LaunchAtLoginSettings
+												preferences={preferences}
+												setPreferences={setPreferences}
+											/>
+										</div>
+										<BackupSettings />
+										<ResetPreferencesButton />
+									</>
+								)}
+
+								{section === "about" && <AboutPanel autoUpdate={autoUpdate} />}
+
+								{section === "debug" && import.meta.env.DEV ? (
+									<DebugPanel setPreferences={setPreferences} />
+								) : null}
+							</div>
+						</div>
+					)}
 				</main>
 			</div>
 		</div>
