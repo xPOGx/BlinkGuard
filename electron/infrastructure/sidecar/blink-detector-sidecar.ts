@@ -27,6 +27,8 @@ interface SidecarCallbacks {
 	onError: (message: string) => void;
 	onCameraReady: () => void;
 	shouldRetryCamera: () => boolean;
+	/** True while the camera preview BrowserWindow is open. */
+	isCameraWindowOpen?: () => boolean;
 	onCalibrationProgress?: (payload: {
 		elapsedMs: number;
 		sampleCount: number;
@@ -229,6 +231,15 @@ export class BlinkDetectorSidecar {
 			// Quality/EAR before start so CAP_PROP uses the preset, not 320×240.
 			this.applySessionConfig();
 			this.write({ start_camera: true });
+			// stop_camera clears Python send_video; restore preview if window open.
+			this.requestVideoIfPreviewOpen();
+		}
+	}
+
+	/** Re-enable JPEG preview after stop→start without forcing encode when closed. */
+	private requestVideoIfPreviewOpen(): void {
+		if (this.callbacks.isCameraWindowOpen?.()) {
+			this.requestVideo();
 		}
 	}
 
@@ -381,6 +392,8 @@ export class BlinkDetectorSidecar {
 			) {
 				this.cameraReady = true;
 				this.retryCount = 0;
+				// Cover races where stop cleared send_video after an earlier request_video.
+				this.requestVideoIfPreviewOpen();
 				this.callbacks.onCameraReady();
 			}
 			return;

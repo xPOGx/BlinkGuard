@@ -131,6 +131,7 @@ function bootstrap(): void {
 			onCameraReady: () => {
 				windows.sendToMain(IPC_CHANNELS.cameraReady);
 			},
+			isCameraWindowOpen: () => windows.isCameraOpen(),
 			shouldRetryCamera: () =>
 				preferences.isTracking &&
 				preferences.cameraEnabled &&

@@ -554,6 +554,10 @@ export class WindowManager {
 		return true;
 	}
 
+	isCameraOpen(): boolean {
+		return Boolean(this.camera && !this.camera.isDestroyed());
+	}
+
 	showCamera(onClosed: () => void): BrowserWindow {
 		if (this.camera && !this.camera.isDestroyed()) {
 			this.camera.focus();
