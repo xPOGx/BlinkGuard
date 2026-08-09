@@ -217,6 +217,8 @@ describe("PreferenceActions", () => {
 				unlockedRewardIds: [],
 				streakShieldCharges: 0,
 				streakShieldUsedDates: [],
+				rewardPurchaseCounts: {},
+				shopDiscountLevel: 0,
 			},
 		});
 

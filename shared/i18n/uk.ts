@@ -21,7 +21,7 @@ export const uk: MessageCatalog = {
 		"Локальні моргання, час відстеження, цілі, серії та графіки.",
 	"app.section.rewards": "Нагороди",
 	"app.section.rewards.desc":
-		"Витрачайте доступні моргання на «ура», значок і щит серії.",
+		"Витрачайте доступні моргання на «ура», значок, щит серії та знижку.",
 	"app.section.system": "Система",
 	"app.section.system.desc":
 		"Гаряча клавіша, мова, автозапуск, резервна копія і скидання.",
@@ -92,12 +92,18 @@ export const uk: MessageCatalog = {
 	"debug.sound.cheer": "Ура",
 	"debug.shop.title": "Нагороди магазину",
 	"debug.shop.desc":
-		"Увімкнути або вимкнути те, що дає купівля в магазині, без витрати моргань. «Ура» — лише перегляд тоста і звуку.",
+		"Увімкнути або вимкнути те, що дає купівля в магазині, без витрати моргань. «Ура» — лише перегляд тоста і звуку. Знижку можна змінювати кроками.",
 	"debug.shop.statsFlairDesc": "Надати або зняти значок у статистиці.",
 	"debug.shop.streakShieldDesc": "Надати або зняти заряд щита серії.",
+	"debug.shop.shopDiscountDesc":
+		"Виставити рівень знижки без витрати моргань. Clear = 0%, Max = 50%.",
+	"debug.shop.clear": "Скинути",
+	"debug.shop.plusOne": "+1",
 	"debug.shop.previewCheer": "Перегляд «Ура»",
 	"debug.shop.previewCheerDesc":
 		"Показати тост і звук «Ура» без купівлі та витрати моргань.",
+	"debug.shop.discountStatus": "Зараз: {percent}% ({level}/10)",
+	"debug.shop.discountStatusMax": "Зараз: 50% (MAX)",
 	"debug.onboarding.title": "Онбординг",
 	"debug.onboarding.desc":
 		"Знову відкрити майстер першого запуску без скидання інших налаштувань.",
@@ -412,9 +418,12 @@ export const uk: MessageCatalog = {
 		"«Доступно» — це всі зараховані моргання мінус покупки.",
 	"rewards.shop": "Магазин",
 	"rewards.shopDesc":
-		"Ціни розраховані на повний робочий день з камерою — не дріб’язок.",
+		"Ціни розраховані на повний робочий день з камерою — не дріб’язок. Знижка зменшує інші ціни.",
 	"rewards.buy": "Купити ({cost})",
 	"rewards.owned": "Відкрито",
+	"rewards.purchaseCount": "×{count}",
+	"rewards.discountProgress": "{count}/{max}",
+	"rewards.max": "MAX",
 	"rewards.cheer": "Ура",
 	"rewards.cheerDesc": "Коротке святкове сповіщення і звук.",
 	"rewards.statsFlair": "Значок статистики",
@@ -422,6 +431,9 @@ export const uk: MessageCatalog = {
 	"rewards.streakShield": "Щит серії",
 	"rewards.streakShieldDesc":
 		"Захищає серію на один пропущений день (макс. 1 заряд).",
+	"rewards.shopDiscount": "Знижка магазину",
+	"rewards.shopDiscountDesc":
+		"Постійна знижка на всі покупки, крім самої знижки. Зараз {percent}% (макс. 50%).",
 	"stats.liveRate": "Жива частота моргання",
 	"stats.liveRateDesc":
 		"Зараховані моргання за останню хвилину під час відстеження. Перша хвилина — розігрів.",

@@ -1,6 +1,11 @@
 import {
+	BLINK_REWARD_IDS,
 	BLINK_REWARDS,
+	discountedRewardCost,
 	isBlinkRewardId,
+	shopDiscountPercent,
+	shopDiscountUpgradeCost,
+	SHOP_DISCOUNT_MAX_LEVEL,
 	type BlinkRewardId,
 } from "./blink-rewards";
 import {
@@ -40,6 +45,10 @@ export type BlinkStatsState = {
 	streakShieldCharges: number;
 	/** Local dates where a streak shield already covered a miss. */
 	streakShieldUsedDates: string[];
+	/** Lifetime purchase counts per reward id. */
+	rewardPurchaseCounts: Partial<Record<BlinkRewardId, number>>;
+	/** Shop discount upgrade level (0…10 → 0%…50%). */
+	shopDiscountLevel: number;
 };
 
 export type GoalMetricProgress = {
@@ -66,10 +75,17 @@ export type StreakSummary = {
 
 export type RewardOffer = {
 	id: BlinkRewardId;
+	/** Effective cost of the next purchase (discount applied except for shopDiscount). */
 	cost: number;
 	owned: boolean;
 	charges: number;
 	canBuy: boolean;
+	purchaseCount: number;
+	/** Cap for progress UI; null when unlimited (cheer). */
+	maxPurchases: number | null;
+	/** Current shop-wide discount percent from state. */
+	discountPercent: number;
+	atMax: boolean;
 };
 
 export type ChartBucket = {
@@ -100,6 +116,8 @@ export const DEFAULT_BLINK_STATS: BlinkStatsState = {
 	unlockedRewardIds: [],
 	streakShieldCharges: 0,
 	streakShieldUsedDates: [],
+	rewardPurchaseCounts: {},
+	shopDiscountLevel: 0,
 };
 
 export function emptyHourlyBlinks(): number[] {
@@ -143,6 +161,8 @@ function cloneState(state: BlinkStatsState): BlinkStatsState {
 		unlockedRewardIds: [...state.unlockedRewardIds],
 		streakShieldCharges: state.streakShieldCharges,
 		streakShieldUsedDates: [...state.streakShieldUsedDates],
+		rewardPurchaseCounts: { ...state.rewardPurchaseCounts },
+		shopDiscountLevel: state.shopDiscountLevel,
 	};
 }
 
@@ -176,6 +196,8 @@ export function pruneDays(
 		streakShieldUsedDates: state.streakShieldUsedDates.filter(
 			(date) => date >= cutoff,
 		),
+		rewardPurchaseCounts: { ...(state.rewardPurchaseCounts ?? {}) },
+		shopDiscountLevel: state.shopDiscountLevel ?? 0,
 	};
 }
 
@@ -436,8 +458,13 @@ export function rewardOffers(
 	state: BlinkStatsState,
 ): RewardOffer[] {
 	const available = availableBlinks(state);
+	const discountPercent = shopDiscountPercent(state.shopDiscountLevel);
 	return (Object.keys(BLINK_REWARDS) as BlinkRewardId[]).map((id) => {
 		const def = BLINK_REWARDS[id];
+		const purchaseCount =
+			id === "shopDiscount"
+				? state.shopDiscountLevel ?? 0
+				: (state.rewardPurchaseCounts?.[id] ?? 0);
 		const owned =
 			def.oneTime && state.unlockedRewardIds.includes(id);
 		const charges =
@@ -445,20 +472,44 @@ export function rewardOffers(
 		const atMaxCharges =
 			id === "streakShield" &&
 			charges >= (def.maxCharges ?? 1);
-		const canBuy =
-			!owned && !atMaxCharges && available >= def.cost;
+		const atMaxDiscount =
+			id === "shopDiscount" &&
+			state.shopDiscountLevel >= (def.maxLevels ?? SHOP_DISCOUNT_MAX_LEVEL);
+		const atMax = owned || atMaxCharges || atMaxDiscount;
+
+		let maxPurchases: number | null = null;
+		if (id === "shopDiscount") {
+			maxPurchases = def.maxLevels ?? SHOP_DISCOUNT_MAX_LEVEL;
+		} else if (def.oneTime) {
+			maxPurchases = 1;
+		} else if (id === "streakShield") {
+			maxPurchases = def.maxCharges ?? 1;
+		}
+
+		let cost: number;
+		if (id === "shopDiscount") {
+			cost = shopDiscountUpgradeCost(state.shopDiscountLevel) ?? def.cost;
+		} else {
+			cost = discountedRewardCost(def.cost, discountPercent);
+		}
+
+		const canBuy = !atMax && available >= cost;
 		return {
 			id,
-			cost: def.cost,
+			cost,
 			owned,
 			charges,
 			canBuy,
+			purchaseCount,
+			maxPurchases,
+			discountPercent,
+			atMax,
 		};
 	});
 }
 
 /**
- * Spend blinks and apply reward side effects (unlock / shield charge).
+ * Spend blinks and apply reward side effects (unlock / shield charge / discount).
  * Cheer only deducts balance. Returns null when purchase is invalid.
  */
 export function applyRewardPurchase(
@@ -476,7 +527,21 @@ export function applyRewardPurchase(
 	) {
 		return null;
 	}
-	const spent = spendBlinks(state, def.cost);
+	if (
+		rewardId === "shopDiscount" &&
+		state.shopDiscountLevel >= (def.maxLevels ?? SHOP_DISCOUNT_MAX_LEVEL)
+	) {
+		return null;
+	}
+
+	const discountPercent = shopDiscountPercent(state.shopDiscountLevel);
+	const cost =
+		rewardId === "shopDiscount"
+			? shopDiscountUpgradeCost(state.shopDiscountLevel)
+			: discountedRewardCost(def.cost, discountPercent);
+	if (cost == null || cost <= 0) return null;
+
+	const spent = spendBlinks(state, cost);
 	if (!spent) return null;
 	const next = cloneState(spent);
 	if (def.oneTime) {
@@ -487,6 +552,21 @@ export function applyRewardPurchase(
 			def.maxCharges ?? 1,
 			next.streakShieldCharges + 1,
 		);
+	}
+	if (rewardId === "shopDiscount") {
+		next.shopDiscountLevel = Math.min(
+			def.maxLevels ?? SHOP_DISCOUNT_MAX_LEVEL,
+			next.shopDiscountLevel + 1,
+		);
+		next.rewardPurchaseCounts = {
+			...next.rewardPurchaseCounts,
+			shopDiscount: next.shopDiscountLevel,
+		};
+	} else {
+		next.rewardPurchaseCounts = {
+			...next.rewardPurchaseCounts,
+			[rewardId]: (next.rewardPurchaseCounts[rewardId] ?? 0) + 1,
+		};
 	}
 	return next;
 }
@@ -724,6 +804,33 @@ export function normalizeBlinkStatsState(raw: unknown): BlinkStatsState {
 		streakShieldUsedDates.sort();
 	}
 
+	const rewardPurchaseCounts: Partial<Record<BlinkRewardId, number>> = {};
+	if (
+		record.rewardPurchaseCounts &&
+		typeof record.rewardPurchaseCounts === "object" &&
+		!Array.isArray(record.rewardPurchaseCounts)
+	) {
+		const counts = record.rewardPurchaseCounts as Record<string, unknown>;
+		for (const id of BLINK_REWARD_IDS) {
+			const value = nonNegativeInt(counts[id]);
+			if (value != null && value > 0) {
+				rewardPurchaseCounts[id] = value;
+			}
+		}
+	}
+
+	let shopDiscountLevel = nonNegativeInt(record.shopDiscountLevel) ?? 0;
+	shopDiscountLevel = Math.min(SHOP_DISCOUNT_MAX_LEVEL, shopDiscountLevel);
+	if (
+		rewardPurchaseCounts.shopDiscount != null &&
+		rewardPurchaseCounts.shopDiscount !== shopDiscountLevel
+	) {
+		// Prefer explicit level; keep count aligned.
+		rewardPurchaseCounts.shopDiscount = shopDiscountLevel;
+	} else if (shopDiscountLevel > 0) {
+		rewardPurchaseCounts.shopDiscount = shopDiscountLevel;
+	}
+
 	return pruneDays({
 		days,
 		totalBlinks: Math.max(totalBlinks, daysSum),
@@ -731,5 +838,7 @@ export function normalizeBlinkStatsState(raw: unknown): BlinkStatsState {
 		unlockedRewardIds,
 		streakShieldCharges,
 		streakShieldUsedDates,
+		rewardPurchaseCounts,
+		shopDiscountLevel,
 	});
 }

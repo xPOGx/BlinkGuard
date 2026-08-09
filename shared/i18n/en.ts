@@ -21,7 +21,7 @@ export const en: MessageCatalog = {
 		"Local blink counts, tracking time, goals, streaks, and charts.",
 	"app.section.rewards": "Rewards",
 	"app.section.rewards.desc":
-		"Spend Available blinks on cheers, flair, and streak shields.",
+		"Spend Available blinks on cheers, flair, streak shields, and shop discounts.",
 	"app.section.system": "System",
 	"app.section.system.desc":
 		"Shortcut, language, launch at login, backup, and reset.",
@@ -92,12 +92,18 @@ export const en: MessageCatalog = {
 	"debug.sound.cheer": "Cheer",
 	"debug.shop.title": "Shop rewards",
 	"debug.shop.desc":
-		"Toggle unlocks from the rewards shop without spending blinks. Preview Cheer plays the toast and sound only.",
+		"Toggle unlocks from the rewards shop without spending blinks. Preview Cheer plays the toast and sound only. Shop discount can be stepped freely.",
 	"debug.shop.statsFlairDesc": "Grant or revoke the Statistics flair badge.",
 	"debug.shop.streakShieldDesc": "Grant or clear a streak shield charge.",
+	"debug.shop.shopDiscountDesc":
+		"Set shop discount level without spending. Clear = 0%, Max = 50%.",
+	"debug.shop.clear": "Clear",
+	"debug.shop.plusOne": "+1",
 	"debug.shop.previewCheer": "Preview Cheer",
 	"debug.shop.previewCheerDesc":
 		"Play the Cheer toast and sound without buying or spending blinks.",
+	"debug.shop.discountStatus": "Current: {percent}% ({level}/10)",
+	"debug.shop.discountStatusMax": "Current: 50% (MAX)",
 	"debug.onboarding.title": "Onboarding",
 	"debug.onboarding.desc":
 		"Reopen the first-run wizard without resetting other preferences.",
@@ -404,9 +410,12 @@ export const en: MessageCatalog = {
 		"Available blinks come from lifetime credited blinks minus purchases.",
 	"rewards.shop": "Shop",
 	"rewards.shopDesc":
-		"Costs are sized for a full workday of camera tracking — not pocket change.",
+		"Costs are sized for a full workday of camera tracking — not pocket change. Shop discount lowers other prices.",
 	"rewards.buy": "Buy ({cost})",
 	"rewards.owned": "Unlocked",
+	"rewards.purchaseCount": "×{count}",
+	"rewards.discountProgress": "{count}/{max}",
+	"rewards.max": "MAX",
 	"rewards.cheer": "Cheer",
 	"rewards.cheerDesc": "Play a short celebration toast and sound.",
 	"rewards.statsFlair": "Stats flair",
@@ -414,6 +423,9 @@ export const en: MessageCatalog = {
 	"rewards.streakShield": "Streak shield",
 	"rewards.streakShieldDesc":
 		"Protect your streak for one missed day (max 1 charge).",
+	"rewards.shopDiscount": "Shop discount",
+	"rewards.shopDiscountDesc":
+		"Permanent discount on all shop buys except this upgrade. Now {percent}% (max 50%).",
 	"stats.liveRate": "Live blink rate",
 	"stats.liveRateDesc":
 		"Credited blinks over the last minute while tracking is active. The first minute is a warmup.",

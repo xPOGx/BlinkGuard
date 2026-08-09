@@ -171,6 +171,36 @@ describe("BlinkStatsService", () => {
 		service.dispose();
 	});
 
+	it("debug shop discount level applies without spending", () => {
+		const store = createStore();
+		const service = new BlinkStatsService(store, () => "en", () => ({
+			goalsEnabled: false,
+			dailyBlinkGoal: 0,
+			dailyTrackingMinutesGoal: 0,
+			weeklyBlinkGoal: 0,
+			weeklyTrackingMinutesGoal: 0,
+		}));
+
+		service.setDebugShopDiscountLevel(3);
+		const offers = service.getSnapshot().rewards;
+		const discount = offers.find((offer) => offer.id === "shopDiscount");
+		const cheer = offers.find((offer) => offer.id === "cheer");
+		expect(discount?.purchaseCount).toBe(3);
+		expect(discount?.discountPercent).toBe(15);
+		expect(cheer?.cost).toBe(
+			Math.max(1, Math.floor(BLINK_REWARDS.cheer.cost * 0.85)),
+		);
+		expect(service.getSnapshot().totals.spent).toBe(0);
+
+		service.setDebugShopDiscountLevel(0);
+		const cleared = service
+			.getSnapshot()
+			.rewards.find((offer) => offer.id === "shopDiscount");
+		expect(cleared?.purchaseCount).toBe(0);
+		expect(cleared?.discountPercent).toBe(0);
+		service.dispose();
+	});
+
 	it("exposes goal progress from injected prefs", () => {
 		const store = createStore();
 		const service = new BlinkStatsService(
@@ -295,6 +325,8 @@ describe("BlinkStatsService", () => {
 			unlockedRewardIds: ["statsFlair"],
 			streakShieldCharges: 1,
 			streakShieldUsedDates: [],
+			rewardPurchaseCounts: { statsFlair: 1 },
+			shopDiscountLevel: 0,
 		});
 
 		expect(service.getPersistedState().totalBlinks).toBe(40);

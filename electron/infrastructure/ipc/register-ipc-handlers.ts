@@ -270,6 +270,11 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 			windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
 		},
 	);
+	on(IPC_CHANNELS.debugSetShopDiscountLevel, (_event, level: unknown) => {
+		if (typeof level !== "number" || !Number.isFinite(level)) return;
+		blinkStats.setDebugShopDiscountLevel(level);
+		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
+	});
 	on(IPC_CHANNELS.openGithubRepo, () => {
 		void shell.openExternal("https://github.com/xPOGx/BlinkGuard");
 	});

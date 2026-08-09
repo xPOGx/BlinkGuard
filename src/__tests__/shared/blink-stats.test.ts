@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BLINK_REWARDS } from "../../../shared/blink-rewards";
+import {
+	BLINK_REWARDS,
+	discountedRewardCost,
+	shopDiscountPercent,
+	shopDiscountUpgradeCost,
+} from "../../../shared/blink-rewards";
 import {
 	addTrackingMs,
 	applyRewardPurchase,
@@ -15,6 +20,7 @@ import {
 	pruneDays,
 	recordBlink,
 	recordSessionStart,
+	rewardOffers,
 	shiftDateKey,
 	spendBlinks,
 	toDayChart,
@@ -240,6 +246,8 @@ describe("blink-stats helpers", () => {
 		expect(normalized.spentBlinks).toBe(0);
 		expect(normalized.unlockedRewardIds).toEqual([]);
 		expect(normalized.streakShieldCharges).toBe(0);
+		expect(normalized.rewardPurchaseCounts).toEqual({});
+		expect(normalized.shopDiscountLevel).toBe(0);
 	});
 
 	it("computes daily and weekly goal progress", () => {
@@ -326,14 +334,84 @@ describe("blink-stats helpers", () => {
 		const flair = applyRewardPurchase(state, "statsFlair");
 		expect(flair?.spentBlinks).toBe(flairCost);
 		expect(flair?.unlockedRewardIds).toContain("statsFlair");
+		expect(flair?.rewardPurchaseCounts.statsFlair).toBe(1);
 		expect(applyRewardPurchase(flair ?? state, "statsFlair")).toBeNull();
 
 		const shield = applyRewardPurchase(flair ?? state, "streakShield");
 		expect(shield?.streakShieldCharges).toBe(1);
+		expect(shield?.rewardPurchaseCounts.streakShield).toBe(1);
 		expect(applyRewardPurchase(shield ?? state, "streakShield")).toBeNull();
 
 		const cheer = applyRewardPurchase(shield ?? state, "cheer");
 		expect(cheer?.spentBlinks).toBe(total);
+		expect(cheer?.rewardPurchaseCounts.cheer).toBe(1);
 		expect(availableBlinks(cheer ?? state)).toBe(0);
+	});
+
+	it("escalates shop discount upgrades and discounts other buys", () => {
+		const firstUpgrade = shopDiscountUpgradeCost(0);
+		expect(firstUpgrade).toBe(1500);
+		expect(shopDiscountUpgradeCost(1)).toBe(3000);
+		expect(shopDiscountUpgradeCost(9)).toBe(15000);
+		expect(shopDiscountUpgradeCost(10)).toBeNull();
+
+		const budget = 1500 + 3000 + BLINK_REWARDS.cheer.cost;
+		const state = withDays(
+			[{ ...emptyDayStats("2026-08-07"), blinks: budget }],
+			{ totalBlinks: budget },
+		);
+
+		const level1 = applyRewardPurchase(state, "shopDiscount");
+		expect(level1?.shopDiscountLevel).toBe(1);
+		expect(level1?.spentBlinks).toBe(1500);
+		expect(level1?.rewardPurchaseCounts.shopDiscount).toBe(1);
+		expect(shopDiscountPercent(level1?.shopDiscountLevel ?? 0)).toBe(5);
+
+		// Discount does not reduce the next discount upgrade cost.
+		const level2 = applyRewardPurchase(level1 ?? state, "shopDiscount");
+		expect(level2?.shopDiscountLevel).toBe(2);
+		expect(level2?.spentBlinks).toBe(1500 + 3000);
+		expect(shopDiscountPercent(2)).toBe(10);
+
+		const cheerCost = discountedRewardCost(BLINK_REWARDS.cheer.cost, 10);
+		expect(cheerCost).toBe(450);
+		const cheer = applyRewardPurchase(level2 ?? state, "cheer");
+		expect(cheer?.spentBlinks).toBe(1500 + 3000 + cheerCost);
+		expect(cheer?.rewardPurchaseCounts.cheer).toBe(1);
+
+		const offers = rewardOffers(cheer ?? state);
+		const cheerOffer = offers.find((offer) => offer.id === "cheer");
+		expect(cheerOffer?.cost).toBe(cheerCost);
+		expect(cheerOffer?.discountPercent).toBe(10);
+
+		const discountOffer = offers.find((offer) => offer.id === "shopDiscount");
+		expect(discountOffer?.cost).toBe(4500);
+		expect(discountOffer?.purchaseCount).toBe(2);
+		expect(discountOffer?.maxPurchases).toBe(10);
+		expect(discountOffer?.atMax).toBe(false);
+	});
+
+	it("caps shop discount at 50% / 10 levels", () => {
+		const state = {
+			...DEFAULT_BLINK_STATS,
+			totalBlinks: 1_000_000,
+			shopDiscountLevel: 9,
+			rewardPurchaseCounts: { shopDiscount: 9 },
+		};
+		const last = applyRewardPurchase(state, "shopDiscount");
+		expect(last?.shopDiscountLevel).toBe(10);
+		expect(last?.spentBlinks).toBe(15000);
+		expect(applyRewardPurchase(last ?? state, "shopDiscount")).toBeNull();
+
+		const offers = rewardOffers(last ?? state);
+		const discountOffer = offers.find((offer) => offer.id === "shopDiscount");
+		expect(discountOffer?.atMax).toBe(true);
+		expect(discountOffer?.discountPercent).toBe(50);
+		expect(discountOffer?.purchaseCount).toBe(10);
+
+		const cheerOffer = offers.find((offer) => offer.id === "cheer");
+		expect(cheerOffer?.cost).toBe(
+			discountedRewardCost(BLINK_REWARDS.cheer.cost, 50),
+		);
 	});
 });

@@ -165,6 +165,8 @@ export const rendererIpc = {
 		rewardId: "statsFlair" | "streakShield",
 		enabled: boolean,
 	) => send(IPC_CHANNELS.debugSetShopReward, rewardId, enabled),
+	debugSetShopDiscountLevel: (level: number) =>
+		send(IPC_CHANNELS.debugSetShopDiscountLevel, level),
 	openGithubRepo: () => send(IPC_CHANNELS.openGithubRepo),
 	openGithubReleases: () => send(IPC_CHANNELS.openGithubReleases),
 	openExternalUrl: (url: string) => send(IPC_CHANNELS.openExternalUrl, url),

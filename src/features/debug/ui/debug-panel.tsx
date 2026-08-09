@@ -41,6 +41,12 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 	const { snapshot } = useBlinkStats();
 	const hasFlair = snapshot.hasStatsFlair;
 	const hasShield = snapshot.streak.shieldCharges > 0;
+	const discountOffer = snapshot.rewards.find(
+		(reward) => reward.id === "shopDiscount",
+	);
+	const discountLevel = discountOffer?.purchaseCount ?? 0;
+	const discountPercent = discountOffer?.discountPercent ?? 0;
+	const discountAtMax = discountOffer?.atMax ?? false;
 
 	return (
 		<>
@@ -117,6 +123,56 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 									}
 									aria-label={t("rewards.streakShield")}
 								/>
+							}
+						/>
+						<SettingRow
+							title={t("rewards.shopDiscount")}
+							description={`${t("debug.shop.shopDiscountDesc")} ${
+								discountAtMax
+									? t("debug.shop.discountStatusMax")
+									: t("debug.shop.discountStatus", {
+											percent: discountPercent,
+											level: discountLevel,
+										})
+							}`}
+							action={
+								<div className="flex flex-wrap gap-2">
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										disabled={discountLevel === 0}
+										onClick={() =>
+											rendererIpc.debugSetShopDiscountLevel(0)
+										}
+									>
+										{t("debug.shop.clear")}
+									</Button>
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										disabled={discountAtMax}
+										onClick={() =>
+											rendererIpc.debugSetShopDiscountLevel(
+												discountLevel + 1,
+											)
+										}
+									>
+										{t("debug.shop.plusOne")}
+									</Button>
+									<Button
+										type="button"
+										variant="secondary"
+										size="sm"
+										disabled={discountAtMax}
+										onClick={() =>
+											rendererIpc.debugSetShopDiscountLevel(10)
+										}
+									>
+										{t("rewards.max")}
+									</Button>
+								</div>
 							}
 						/>
 						<SettingRow

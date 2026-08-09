@@ -3,6 +3,7 @@ import { SettingPanel, SettingRow } from "@/components/setting-panel";
 import { useBlinkStats } from "@/features/statistics/model/use-blink-stats";
 import { useI18n } from "@/i18n";
 import type { BlinkRewardId } from "../../../../shared/blink-rewards";
+import type { RewardOffer } from "../../../../shared/blink-stats";
 
 const REWARD_COPY: Record<
 	BlinkRewardId,
@@ -20,7 +21,26 @@ const REWARD_COPY: Record<
 		title: "rewards.streakShield",
 		description: "rewards.streakShieldDesc",
 	},
+	shopDiscount: {
+		title: "rewards.shopDiscount",
+		description: "rewards.shopDiscountDesc",
+	},
 };
+
+function rewardCounterLabel(
+	reward: RewardOffer,
+	t: (key: string, vars?: Record<string, string | number>) => string,
+): string | null {
+	if (reward.id === "statsFlair") return null;
+	if (reward.id === "shopDiscount") {
+		if (reward.atMax) return t("rewards.max");
+		return t("rewards.discountProgress", {
+			count: reward.purchaseCount,
+			max: reward.maxPurchases ?? 10,
+		});
+	}
+	return t("rewards.purchaseCount", { count: reward.purchaseCount });
+}
 
 export function RewardsShopPanel() {
 	const { t } = useI18n();
@@ -71,21 +91,44 @@ export function RewardsShopPanel() {
 					<div className="space-y-3">
 						{rewards.map((reward) => {
 							const copy = REWARD_COPY[reward.id];
+							const description =
+								reward.id === "shopDiscount"
+									? t(copy.description, {
+											percent: reward.discountPercent,
+										})
+									: t(copy.description);
+							const counter = rewardCounterLabel(reward, t);
+							const showOwned =
+								reward.owned ||
+								(reward.id === "streakShield" && reward.charges > 0);
+							const showMax =
+								reward.id === "shopDiscount" && reward.atMax;
+
 							return (
 								<div
 									key={reward.id}
 									className="flex flex-col gap-2 rounded-md border border-border bg-background px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
 								>
 									<div>
-										<p className="text-sm font-medium text-foreground">
-											{t(copy.title)}
-										</p>
+										<div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+											<p className="text-sm font-medium text-foreground">
+												{t(copy.title)}
+											</p>
+											{counter ? (
+												<span className="text-xs font-medium tabular-nums text-muted-foreground">
+													{counter}
+												</span>
+											) : null}
+										</div>
 										<p className="text-xs text-muted-foreground">
-											{t(copy.description)}
+											{description}
 										</p>
 									</div>
-									{reward.owned ||
-									(reward.id === "streakShield" && reward.charges > 0) ? (
+									{showMax ? (
+										<span className="text-xs font-medium text-muted-foreground">
+											{t("rewards.max")}
+										</span>
+									) : showOwned ? (
 										<span className="text-xs font-medium text-muted-foreground">
 											{reward.id === "streakShield" && reward.charges > 0
 												? t("stats.streak.shieldReady")

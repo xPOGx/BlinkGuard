@@ -4,7 +4,10 @@ import {
 	pruneBlinkTimestamps,
 } from "../../shared/blink-rate";
 import type { BlinkRewardId } from "../../shared/blink-rewards";
-import { BLINK_REWARDS } from "../../shared/blink-rewards";
+import {
+	BLINK_REWARDS,
+	SHOP_DISCOUNT_MAX_LEVEL,
+} from "../../shared/blink-rewards";
 import {
 	BLINK_STATS_STORE_KEY,
 	DEFAULT_BLINK_STATS,
@@ -99,6 +102,7 @@ export class BlinkStatsService {
 			...this.state,
 			unlockedRewardIds: [...this.state.unlockedRewardIds],
 			streakShieldUsedDates: [...this.state.streakShieldUsedDates],
+			rewardPurchaseCounts: { ...this.state.rewardPurchaseCounts },
 			days: this.state.days,
 		};
 		if (rewardId === "statsFlair") {
@@ -118,6 +122,36 @@ export class BlinkStatsService {
 			const target = enabled ? max : 0;
 			if (next.streakShieldCharges === target) return;
 			next.streakShieldCharges = target;
+		}
+		this.state = next;
+		this.markChartsDirty();
+		this.persist();
+		this.schedulePush(true);
+	}
+
+	/**
+	 * Dev Debug: set shop discount level (0…10) without spending blinks.
+	 * Keeps `rewardPurchaseCounts.shopDiscount` aligned with the level.
+	 */
+	setDebugShopDiscountLevel(level: number): void {
+		if (!Number.isFinite(level)) return;
+		const nextLevel = Math.max(
+			0,
+			Math.min(SHOP_DISCOUNT_MAX_LEVEL, Math.floor(level)),
+		);
+		if (nextLevel === this.state.shopDiscountLevel) return;
+		const next = {
+			...this.state,
+			unlockedRewardIds: [...this.state.unlockedRewardIds],
+			streakShieldUsedDates: [...this.state.streakShieldUsedDates],
+			rewardPurchaseCounts: { ...this.state.rewardPurchaseCounts },
+			days: this.state.days,
+			shopDiscountLevel: nextLevel,
+		};
+		if (nextLevel > 0) {
+			next.rewardPurchaseCounts.shopDiscount = nextLevel;
+		} else {
+			delete next.rewardPurchaseCounts.shopDiscount;
 		}
 		this.state = next;
 		this.markChartsDirty();
