@@ -187,6 +187,112 @@ class PoseTests(unittest.TestCase):
 
 
 class BlinkDetectionTests(unittest.TestCase):
+	def test_resting_pitch_does_not_chase_look_down(self):
+		state = BlinkDetectionState()
+		t = _seed_open_eye(state, ear=0.28)
+		frontal = estimate_head_pose(_frontal_landmarks())
+		down = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = frontal["pitch"]
+		before = state.resting_pitch
+		self.assertGreater(down["pitch"], before + 0.05)
+		for _ in range(40):
+			t += 0.05
+			state.detect(0.28, t, pose=down)
+		self.assertLessEqual(state.resting_pitch, before + 1e-6)
+
+	def test_resting_pitch_still_tracks_when_looking_up(self):
+		state = BlinkDetectionState()
+		t = _seed_open_eye(state, ear=0.28)
+		high = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		low = estimate_head_pose(_frontal_landmarks())
+		state.resting_pitch = high["pitch"]
+		before = state.resting_pitch
+		self.assertLess(low["pitch"], before - 0.05)
+		for _ in range(40):
+			t += 0.05
+			state.detect(0.28, t, pose=low)
+		self.assertLess(state.resting_pitch, before)
+
+	def test_look_down_mild_ear_oscillation_no_credit_storm(self):
+		"""Screen-bottom eyelid drift must not credit ~1 Hz without a blink."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.12
+		self.assertTrue(
+			evaluate_pose_gate(
+				pose, "normal", resting_pitch=state.resting_pitch
+			)["look_down"]
+		)
+		credits = 0
+		# Mild oscillation around look-down "open" (~0.22–0.26 of ~0.28 baseline).
+		for index in range(80):
+			t += 0.05
+			ear = 0.26 if index % 2 == 0 else 0.22
+			credited, _info = state.detect(ear, t, pose=pose)
+			if credited:
+				credits += 1
+		self.assertLessEqual(credits, 1)
+
+	def test_ear_depressed_mid_band_oscillation_no_credit_without_pitch(self):
+		"""After live_open adapts to look-down height, mid-band jitter ≠ blink."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks())
+		state.resting_pitch = pose["pitch"]
+		# Let live_open fall to screen-bottom open height (~0.22).
+		for _ in range(40):
+			t += 0.05
+			state.detect(0.22, t, pose=pose)
+		self.assertLess(state.live_open_ear, 0.25)
+		self.assertTrue(state.ear_depressed)
+		credits = 0
+		for index in range(80):
+			t += 0.05
+			ear = 0.23 if index % 2 == 0 else 0.21
+			credited, _info = state.detect(ear, t, pose=pose)
+			if credited:
+				credits += 1
+		self.assertEqual(credits, 0)
+
+	def test_ear_depressed_real_deep_blink_still_credited(self):
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks())
+		state.resting_pitch = pose["pitch"]
+		# Adapt live open to look-down height.
+		for _ in range(40):
+			t += 0.05
+			state.detect(0.22, t, pose=pose)
+		self.assertTrue(state.ear_depressed)
+		self.assertFalse(state.eyes_closed)
+		steps = (
+			(0.05, 0.12),
+			(0.05, 0.08),
+			(0.05, 0.06),
+			(0.05, 0.18),
+			(0.05, 0.22),
+			(0.05, 0.22),
+			(0.05, 0.22),
+		)
+		credited_any, _t, _info, phases = _feed(state, t, steps, pose=pose)
+		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+		self.assertFalse(state.eyes_closed)
+
+	def test_live_open_ear_adapts_down_then_up(self):
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		frontal_open = state.live_open_ear
+		for _ in range(40):
+			t += 0.05
+			state.detect(0.21, t)
+		self.assertLess(state.live_open_ear, frontal_open * 0.9)
+		for _ in range(20):
+			t += 0.05
+			state.detect(0.28, t)
+		self.assertGreater(state.live_open_ear, 0.25)
+
 	def test_adaptive_threshold_bounds(self):
 		low = get_adaptive_ear_drop_threshold(0.15)
 		high = get_adaptive_ear_drop_threshold(0.35)
@@ -202,8 +308,9 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertAlmostEqual(short_frontal_velocity(10), 0.50, places=3)
 
 	def test_short_look_down_velocity_fps_bands(self):
-		self.assertAlmostEqual(short_look_down_velocity(20), 0.42, places=3)
-		self.assertAlmostEqual(short_look_down_velocity(15), 0.47, places=3)
+		# Flat 0.50 floor for look-down short blinks (anti eyelid-drift FP).
+		self.assertAlmostEqual(short_look_down_velocity(20), 0.50, places=3)
+		self.assertAlmostEqual(short_look_down_velocity(15), 0.50, places=3)
 		self.assertAlmostEqual(short_look_down_velocity(10), 0.50, places=3)
 		# Look-down short floor stays ≥ frontal at each band.
 		self.assertGreaterEqual(
@@ -426,14 +533,14 @@ class BlinkDetectionTests(unittest.TestCase):
 			pose, "normal", resting_pitch=state.resting_pitch
 		)
 		self.assertTrue(gate["look_down"])
-		# Soft close held below look-down recovery; velocity under 0.50 gate.
+		# Deep enough to start under LOOK_DOWN_EAR_START_RATIO, but soft close
+		# velocity stays under the 0.50 look-down short gate.
 		steps = (
-			(0.12, 0.24),
-			(0.12, 0.21),
-			(0.12, 0.19),
-			(0.12, 0.17),
+			(0.12, 0.20),
 			(0.12, 0.16),
-			(0.12, 0.16),
+			(0.12, 0.13),
+			(0.12, 0.12),
+			(0.12, 0.12),
 			(0.12, 0.22),
 			(0.12, 0.26),
 			(0.12, 0.28),
