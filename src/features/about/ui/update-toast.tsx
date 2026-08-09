@@ -21,7 +21,13 @@ export function UpdateToast({ status, dismiss }: AutoUpdateApi) {
 		) {
 			return;
 		}
-		if (status.state !== "upToDate" && status.state !== "error") return;
+		if (
+			status.state !== "upToDate" &&
+			status.state !== "error" &&
+			status.state !== "ready"
+		) {
+			return;
+		}
 		const timer = window.setTimeout(() => dismiss(), AUTO_DISMISS_MS);
 		return () => window.clearTimeout(timer);
 	}, [status, visible, dismiss]);
@@ -57,6 +63,10 @@ export function UpdateToast({ status, dismiss }: AutoUpdateApi) {
 		case "error":
 			title = t("updates.error.title");
 			message = t("updates.error.message");
+			break;
+		case "ready":
+			title = t("updates.readyOnQuit.title");
+			message = t("updates.readyOnQuit.message", { version: status.version });
 			break;
 		default:
 			return null;

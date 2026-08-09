@@ -122,7 +122,7 @@ describe("AutoUpdateService", () => {
 		]);
 	});
 
-	it("silent download uses toast until ready escalates to dialog", () => {
+	it("silent download keeps ready as toast without ensureVisible", () => {
 		const service = createService();
 		service.start();
 		service.checkForUpdates();
@@ -135,9 +135,9 @@ describe("AutoUpdateService", () => {
 			{ state: "checking", surface: "toast" },
 			{ state: "available", version: "2.1.0", surface: "toast" },
 			{ state: "downloading", version: "2.1.0", percent: 10, surface: "toast" },
-			{ state: "ready", version: "2.1.0", surface: "dialog" },
+			{ state: "ready", version: "2.1.0", surface: "toast" },
 		]);
-		expect(ensureVisibleCalls).toBe(1);
+		expect(ensureVisibleCalls).toBe(0);
 	});
 
 	it("installUpdate calls quitAndInstall after download", () => {
@@ -149,7 +149,7 @@ describe("AutoUpdateService", () => {
 		expect(quitAndInstall).toHaveBeenCalledWith(false, true);
 	});
 
-	it("re-presents ready dialog when already downloaded", () => {
+	it("re-presents ready dialog when already downloaded interactively", () => {
 		const service = createService();
 		service.start();
 		service.checkForUpdates({ interactive: true });
@@ -161,6 +161,20 @@ describe("AutoUpdateService", () => {
 			{ state: "ready", version: "3.0.0", surface: "dialog" },
 		]);
 		expect(ensureVisibleCalls).toBe(1);
+	});
+
+	it("re-presents ready toast when already downloaded on silent check", () => {
+		const service = createService();
+		service.start();
+		service.checkForUpdates();
+		autoUpdater.emit("update-downloaded", { version: "3.0.0" });
+		emitted.length = 0;
+		ensureVisibleCalls = 0;
+		service.checkForUpdates();
+		expect(emitted).toEqual([
+			{ state: "ready", version: "3.0.0", surface: "toast" },
+		]);
+		expect(ensureVisibleCalls).toBe(0);
 	});
 
 	it("uses native dialog fallback when main window cannot host UI", () => {

@@ -26,8 +26,8 @@ export type AutoUpdateUiPort = {
  * unsupported platform, or when the build has no embedded feed
  * (`app-update.yml` from publish config).
  *
- * Silent launch → toast surface (ephemeral). Manual About/tray → dialog.
- * `ready` always uses dialog so Restart stays explicit.
+ * Silent launch → toast surface (ephemeral); install on quit via autoInstallOnAppQuit.
+ * Manual About/tray → dialog; `ready` Restart only for interactive checks.
  */
 export class AutoUpdateService {
 	private enabled = false;
@@ -110,6 +110,7 @@ export class AutoUpdateService {
 
 			autoUpdater.on("update-downloaded", (info) => {
 				this.checking = false;
+				const wasInteractive = this.interactivePending;
 				this.interactivePending = false;
 				const version =
 					typeof info?.version === "string" && info.version.length > 0
@@ -117,11 +118,7 @@ export class AutoUpdateService {
 						: (this.availableVersion ?? "…");
 				this.downloadedVersion = version;
 				this.availableVersion = version;
-				// Always dialog for Restart — not an ephemeral toast.
-				this.present(
-					{ state: "ready", version, surface: "dialog" },
-					true,
-				);
+				this.presentReady(version, wasInteractive);
 			});
 
 			this.enabled = true;
@@ -149,15 +146,9 @@ export class AutoUpdateService {
 			}
 
 			if (this.downloadedVersion) {
+				const wasInteractive = this.interactivePending;
 				this.interactivePending = false;
-				this.present(
-					{
-						state: "ready",
-						version: this.downloadedVersion,
-						surface: "dialog",
-					},
-					true,
-				);
+				this.presentReady(this.downloadedVersion, wasInteractive);
 				return;
 			}
 
@@ -205,9 +196,20 @@ export class AutoUpdateService {
 		return interactive ? "dialog" : "toast";
 	}
 
+	/** Interactive → Restart dialog; silent → toast (install on quit). */
+	private presentReady(version: string, interactive: boolean): void {
+		this.present(
+			{
+				state: "ready",
+				version,
+				surface: this.surfaceFor(interactive),
+			},
+			interactive,
+		);
+	}
+
 	private present(status: AutoUpdateStatus, bringToFront: boolean): void {
-		const shouldShow =
-			bringToFront === true || status.state === "ready";
+		const shouldShow = bringToFront === true;
 
 		if (this.ui.canHostInAppUi()) {
 			if (shouldShow) {
@@ -259,6 +261,8 @@ export class AutoUpdateService {
 				});
 				return;
 			case "ready":
+				// Toast-only silent ready: no native prompt; autoInstallOnAppQuit handles it.
+				if (status.surface !== "dialog") return;
 				void dialog
 					.showMessageBox({
 						type: "info",

@@ -538,6 +538,9 @@ export const en: MessageCatalog = {
 		"BlinkGuard {version} has been downloaded. Restart to install.",
 	"updates.ready.restart": "Restart",
 	"updates.ready.later": "Later",
+	"updates.readyOnQuit.title": "Update downloaded",
+	"updates.readyOnQuit.message":
+		"BlinkGuard {version} will install when you quit the app.",
 
 	// Popup chrome
 	"popup.blink.title": "Blink Reminder",

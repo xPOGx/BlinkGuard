@@ -546,6 +546,9 @@ export const uk: MessageCatalog = {
 		"BlinkGuard {version} завантажено. Перезапустіть, щоб встановити.",
 	"updates.ready.restart": "Перезапустити",
 	"updates.ready.later": "Пізніше",
+	"updates.readyOnQuit.title": "Оновлення завантажено",
+	"updates.readyOnQuit.message":
+		"BlinkGuard {version} встановиться, коли ви закриєте застосунок.",
 
 	// Popup chrome
 	"popup.blink.title": "Нагадування проморгати",

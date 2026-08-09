@@ -83,4 +83,23 @@ describe("UpdateToast", () => {
 		});
 		expect(dismiss).not.toHaveBeenCalled();
 	});
+
+	it("shows ready-on-quit copy and auto-dismisses", () => {
+		vi.useFakeTimers();
+		const { dismiss } = renderToast({
+			state: "ready",
+			version: "2.2.0",
+			surface: "toast",
+		});
+		expect(
+			screen.getByRole("status", { name: "Update downloaded" }),
+		).toBeDefined();
+		expect(
+			screen.getByText("BlinkGuard 2.2.0 will install when you quit the app."),
+		).toBeDefined();
+		act(() => {
+			vi.advanceTimersByTime(4000);
+		});
+		expect(dismiss).toHaveBeenCalledOnce();
+	});
 });
