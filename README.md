@@ -17,11 +17,14 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 - **Global keyboard shortcut** — start/stop reminders (default `Ctrl+I`; rebindable)
 - **Sounds** — optional notification sounds for blink and exercise popups (per-kind volume)
 - **Quiet hours & fullscreen soft-pause** — hide popups when you ask for quiet time or go fullscreen
-- **Local blink statistics** — session stats and live blinks-per-minute (camera mode)
+- **Local blink statistics** — session stats, live blinks-per-minute (camera mode), goals and streaks
+- **Blink levels & rewards shop** — level-up cheer, share card, and optional shop upgrades
+- **Backup** — export/import local prefs and stats as JSON
 - **Dark / light mode** · **EN / UK** localization
 - **Persistent preferences** — saved locally via `electron-store` (reset-to-defaults supported)
 - **Sleep / wake handling** — pauses on suspend and auto-resumes if tracking was active
-- **In-app updates (Windows & macOS)** — checks GitHub Releases for this repo
+- **In-app updates (Windows & macOS)** — checks GitHub Releases; About can open Release Notes
+- **Diagnostics export** — local logs and interaction trail for support
 - **Cross-platform packaging** — Windows and macOS (Electron Builder)
 
 ## Screenshots

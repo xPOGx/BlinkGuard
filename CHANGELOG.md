@@ -4,6 +4,28 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-08-09
+
+### Added
+
+- Blink levels, share card, and level-up cheer in profile/statistics
+- Rewards shop: purchase counters, discount upgrades, Cheer FX, Debug shop grants
+- In-app GitHub Release Notes view on the About page
+- Branded Windows NSIS installer visuals
+- Ephemeral updater toasts for silent checks (dialog kept for manual checks)
+
+### Fixed
+
+- Camera: track blinks against live open-eye EAR; stop mid-band latch ignoring post-credit blinks
+- Camera: scope errors to Camera and clear when ready; app icon on preview window
+- Camera: harden Windows OpenCV capture against black frames; quiet MSMF cold-start probe spam
+- Popup card corners: clear html background bleed; restore frosted fill on exercise/look-away cards
+
+### Changed
+
+- CI: faster builds, drop duplicate landmark model download
+- CI: also trigger release builds on `release: published` (not only tag push)
+
 ## [2.1.0] - 2026-08-09
 
 ### Added
