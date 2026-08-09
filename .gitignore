@@ -36,9 +36,12 @@ __pycache__/
 *$py.class
 *.so
 .Python
-# Ignore generated build dirs, but keep electron-builder entitlements tracked.
+# Ignore generated build dirs, but keep electron-builder entitlements and NSIS bitmaps tracked.
 build/*
 !build/entitlements.mac.plist
+!build/installerHeader.bmp
+!build/installerSidebar.bmp
+!build/uninstallerSidebar.bmp
 # PyInstaller workdir (pattern above only matches repo-root build/)
 python/build/
 develop-eggs/
