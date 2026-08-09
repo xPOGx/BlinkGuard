@@ -74,3 +74,10 @@ electron/assets/models/*.dat
 # Blink detector binary (built during CI)
 electron/resources/blink_detector
 electron/resources/blink_detector.exe
+
+# Blink JSONL agent probes — reusable tools live in python/log_tools/;
+# keep one-offs out of git (and out of python/scripts/).
+python/log_tools/_scratch/**
+!python/log_tools/_scratch/README.md
+python/scripts/_tmp_*.py
+python/log_tools/_tmp_*.py

@@ -1,6 +1,8 @@
 import json
+import os
 import sys
 import time
+from pathlib import Path
 
 import cv2
 
@@ -61,6 +63,8 @@ class BlinkDetectorApplication:
 		self._cached_face = None
 		self._frames_since_face_detect = 0
 		self._last_skip_debug_time = 0.0
+		self._last_skip_debug_phase = None
+		self._last_near_miss_debug_time = 0.0
 		self._reset_capture_health()
 
 	def _reset_capture_health(self):
@@ -377,10 +381,22 @@ class BlinkDetectorApplication:
 		ok = area >= MIN_FACE_AREA_PX and interocular >= MIN_INTEROCULAR_PX
 		return ok, area, interocular
 
+	def _should_emit_skip(self, phase, current_time):
+		"""Emit immediately on phase change; throttle repeats of same skip."""
+		if phase != self._last_skip_debug_phase:
+			self._last_skip_debug_phase = phase
+			self._last_skip_debug_time = current_time
+			return True
+		if current_time - self._last_skip_debug_time >= 0.5:
+			self._last_skip_debug_time = current_time
+			return True
+		return False
+
 	def _emit_face_lost(self, current_time, had_candidate):
 		"""Emit skip_face_lost only when an in-progress candidate was cancelled."""
 		if not had_candidate:
 			return
+		self._last_skip_debug_phase = "skip_face_lost"
 		self._last_skip_debug_time = current_time
 		self._emit_blink_outcome(
 			{
@@ -403,6 +419,9 @@ class BlinkDetectorApplication:
 				"pitch": 0.0,
 				"pitch_delta": 0.0,
 				"look_down": False,
+				"ear_depressed": self.detection.ear_depressed,
+				"treat_as_look_down": False,
+				"live_open_ear": self.detection.live_open_ear,
 				"pose_strictness": self.pose_strictness,
 				"resting_pitch": self.detection.resting_pitch,
 			},
@@ -460,6 +479,11 @@ class BlinkDetectorApplication:
 			"pitch_delta": float(blink_info.get("pitch_delta") or 0.0),
 			"resting_pitch": float(resting) if resting is not None else None,
 			"look_down": bool(blink_info.get("look_down", False)),
+			"ear_depressed": bool(blink_info.get("ear_depressed", False)),
+			"treat_as_look_down": bool(
+				blink_info.get("treat_as_look_down", False)
+			),
+			"live_open_ear": _opt_float("live_open_ear"),
 			"pose_strictness": blink_info.get("pose_strictness")
 			or self.pose_strictness,
 			"peak_velocity": float(
@@ -616,6 +640,13 @@ class BlinkDetectorApplication:
 				credited=False,
 			)
 			face_data["blinkDebug"] = debug_payload
+		elif phase == "start":
+			debug_payload = self._emit_blink_outcome(
+				blink_info,
+				face=face,
+				credited=False,
+			)
+			face_data["blinkDebug"] = debug_payload
 		elif phase in (
 			"skip_yaw",
 			"skip_degraded",
@@ -624,9 +655,7 @@ class BlinkDetectorApplication:
 			"skip_cooldown",
 			"skip_face_quality",
 		):
-			# Rate-limit continuous skip spam while pose / quality is bad.
-			if current_time - self._last_skip_debug_time >= 0.5:
-				self._last_skip_debug_time = current_time
+			if self._should_emit_skip(phase, current_time):
 				debug_payload = self._emit_blink_outcome(
 					{
 						**blink_info,
@@ -636,9 +665,43 @@ class BlinkDetectorApplication:
 						"pose_strictness": self.pose_strictness,
 						"resting_pitch": self.detection.resting_pitch,
 						"look_down": blink_info.get("look_down", False),
-						"min_velocity": 0.0,
+						"min_velocity": blink_info.get("min_velocity", 0.0),
 						"duration": 0.0,
-						"absolute_drop": 0.0,
+						"absolute_drop": blink_info.get("absolute_drop", 0.0),
+					},
+					face=face,
+					credited=False,
+				)
+				face_data["blinkDebug"] = debug_payload
+		elif phase == "monitoring" and blink_info:
+			vel = float(blink_info.get("velocity") or 0.0)
+			min_vel = float(blink_info.get("min_velocity") or 0.35)
+			ref = float(
+				blink_info.get("live_open_ear")
+				or blink_info.get("baseline")
+				or 0.0
+			)
+			close_band = blink_info.get("close_band_ear")
+			ear_s = float(blink_info.get("ear_smooth") or avg_ear)
+			near_band = (
+				close_band is not None
+				and ref > 0
+				and ear_s <= float(close_band) * 1.02
+				and ear_s > float(close_band)
+			)
+			near_vel = vel >= min_vel * 0.75
+			if (near_band or near_vel) and (
+				current_time - self._last_near_miss_debug_time >= 0.5
+			):
+				self._last_near_miss_debug_time = current_time
+				debug_payload = self._emit_blink_outcome(
+					{
+						**blink_info,
+						"phase": "near_miss",
+						"ear": avg_ear,
+						"left_ear": left_ear,
+						"right_ear": right_ear,
+						"duration": 0.0,
 					},
 					face=face,
 					credited=False,
@@ -705,6 +768,20 @@ class BlinkDetectorApplication:
 				)
 			}
 		)
+		try:
+			exe_path = Path(sys.executable)
+			if getattr(sys, "frozen", False):
+				mtime = os.path.getmtime(exe_path)
+				self.transport.send(
+					{
+						"debug": (
+							f"Blink binary: {exe_path} "
+							f"mtime_utc={time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(mtime))}"
+						)
+					}
+				)
+		except OSError:
+			pass
 
 		frame_count = 0
 		last_frame_time = time.time()
@@ -817,8 +894,9 @@ class BlinkDetectorApplication:
 						landmarks,
 					)
 					if not quality_ok:
+						had_candidate = False
 						if self.detection.blink_in_progress:
-							self.detection.cancel_on_face_lost()
+							had_candidate = self.detection.cancel_on_face_lost()
 						face_data["faceDetected"] = False
 						face_data["faceStatus"] = "too_far"
 						face_data["faceRect"] = {
@@ -827,8 +905,14 @@ class BlinkDetectorApplication:
 							"width": float(face.width() / frame_width),
 							"height": float(face.height() / frame_height),
 						}
-						if current_time - self._last_skip_debug_time >= 0.5:
-							self._last_skip_debug_time = current_time
+						# Always emit once when a candidate was cancelled.
+						if had_candidate or self._should_emit_skip(
+							"skip_face_quality",
+							current_time,
+						):
+							if had_candidate:
+								self._last_skip_debug_phase = "skip_face_quality"
+								self._last_skip_debug_time = current_time
 							self._emit_blink_outcome(
 								{
 									"phase": "skip_face_quality",
@@ -838,6 +922,8 @@ class BlinkDetectorApplication:
 									"face_area": face_area,
 									"interocular": interocular,
 									"look_down": False,
+									"ear_depressed": self.detection.ear_depressed,
+									"live_open_ear": self.detection.live_open_ear,
 									"pose_strictness": self.pose_strictness,
 									"resting_pitch": self.detection.resting_pitch,
 									"min_velocity": 0.0,
