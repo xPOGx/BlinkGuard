@@ -352,6 +352,46 @@ class BlinkDetectionTests(unittest.TestCase):
 			state.detect(0.19, t)
 		self.assertFalse(state.eyes_closed)
 
+	def test_walk_away_clears_eyes_closed_and_reseeds_live_open(self):
+		"""Face gap ≥1.5s (leave desk) must not stick skip_eyes_closed on return."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		state.live_open_ear = 0.425
+		state.eyes_closed = True
+		state.awaiting_reopen = True
+		state.awaiting_reopen_since = t
+		state.cancel_on_face_lost(t)
+		self.assertIsNotNone(state._face_absent_since)
+		# <1s flicker: keep latches
+		t += 0.5
+		state.detect(0.29, t)
+		self.assertTrue(state.eyes_closed)
+		self.assertAlmostEqual(state.live_open_ear, 0.425, places=3)
+		# Sustained absence then return at look-down open height.
+		state.cancel_on_face_lost(t)
+		t += 2.0
+		state.detect(0.29, t)
+		self.assertFalse(state.eyes_closed)
+		self.assertFalse(state.awaiting_reopen)
+		self.assertIsNone(state._face_absent_since)
+		self.assertAlmostEqual(state.live_open_ear, 0.29, places=3)
+		# Next deep blink should be able to start (not skip_eyes_closed).
+		t += 0.05
+		_c, info = state.detect(0.12, t)
+		self.assertNotEqual(info.get("phase"), "skip_eyes_closed")
+
+	def test_eyes_closed_mid_band_allows_live_open_fall(self):
+		"""Sticky mid-band closed latch must not freeze an inflated live_open."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		state.live_open_ear = 0.42
+		state.eyes_closed = True
+		# Mid-band vs inflated live (not clearly shut <0.52×).
+		for _ in range(40):
+			t += 0.05
+			state.detect(0.29, t)
+		self.assertLess(state.live_open_ear, 0.36)
+
 	def test_adaptive_threshold_bounds(self):
 		low = get_adaptive_ear_drop_threshold(0.15)
 		high = get_adaptive_ear_drop_threshold(0.35)
@@ -911,14 +951,15 @@ class BlinkDetectionTests(unittest.TestCase):
 		state.detect(0.12, t)
 		self.assertTrue(state.blink_in_progress)
 		baseline = state.current_baseline_ear
-		self.assertTrue(state.cancel_on_face_lost())
+		self.assertTrue(state.cancel_on_face_lost(t))
 		self.assertFalse(state.blink_in_progress)
 		self.assertIsNone(state.prev_ear)
 		self.assertEqual(len(state._ear_window), 0)
 		self.assertAlmostEqual(state.ear_calibration, 0.30, places=5)
 		self.assertAlmostEqual(state.current_baseline_ear, baseline, places=5)
+		self.assertIsNotNone(state._face_absent_since)
 		# Second call with no candidate is a no-op cancel.
-		self.assertFalse(state.cancel_on_face_lost())
+		self.assertFalse(state.cancel_on_face_lost(t + 0.1))
 
 	def test_completion_logs_measured_and_effective_peak(self):
 		state = BlinkDetectionState(target_fps=15)

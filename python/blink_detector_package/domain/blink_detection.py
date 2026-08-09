@@ -76,6 +76,10 @@ EYES_OPEN_SOFT_HOLD_S = 0.10
 # Safety: drop awaiting after this; latch eyes_closed only if clearly shut
 # (mid-band must not latch — skip_cooldown covers bounce; POG 2026-08-09).
 AWAITING_REOPEN_MAX_S = 0.35
+# Walk-away: after face missing this long, clear eyes_closed/await on return
+# and re-seed live_open (POG 2026-08-09: <2 min away → sticky skip_eyes_closed).
+FACE_ABSENT_CLEAR_GATES_S = 1.0
+FACE_ABSENT_RESEED_LIVE_S = 1.5
 
 # Opening waive when effective close peak is strong but reopen velocity missed.
 # Applies frontal *and* look-down / ear_depressed (POG 2026-08-09 reject_opening).
@@ -222,6 +226,8 @@ class BlinkDetectionState:
 		self.ear_depressed = False
 		self._live_open_stable_since = None
 		self._prev_ear_for_live = None
+		# Wall-clock when usable face EAR stopped (walk-away / too-far).
+		self._face_absent_since = None
 
 	def set_target_fps(self, fps):
 		"""Update expected camera FPS for duration / short-velocity gates."""
@@ -278,10 +284,17 @@ class BlinkDetectionState:
 			self._prev_ear_for_live = ear
 			self._live_open_stable_since = current_time
 			return
-		# Freeze during an active candidate or hard closed latch. Allow fall
-		# while awaiting_reopen so mid-band posture can adapt (otherwise a
-		# stuck-high live_open + mid EAR loops credits forever; POG 2026-08-09).
-		if self.blink_in_progress or self.eyes_closed:
+		# Freeze only during an active candidate, or while lids are *clearly*
+		# shut. Mid-band eyes_closed must still let live_open fall — otherwise
+		# walk-away leaves a stale-high ref and skip_eyes_closed forever.
+		if self.blink_in_progress:
+			self._live_open_stable_since = None
+			self._prev_ear_for_live = ear
+			return
+		if (
+			self.eyes_closed
+			and ear < self.live_open_ear * EYES_CLOSED_RATIO
+		):
 			self._live_open_stable_since = None
 			self._prev_ear_for_live = ear
 			return
@@ -463,12 +476,13 @@ class BlinkDetectionState:
 		self.max_right_drop = 0.0
 		self.max_drop_percentage = 0.0
 
-	def cancel_on_face_lost(self):
+	def cancel_on_face_lost(self, current_time=None):
 		"""
 		Cancel an in-progress blink when the face disappears mid-candidate.
 
 		Keeps baseline + EAR calibration. Clears velocity / EAR smooth so the
 		next face frame does not inherit stale ΔEAR/Δt.
+		Marks face absence so a longer walk-away can clear eyes_closed on return.
 		Returns True when a candidate was cancelled.
 		"""
 		had_candidate = self.blink_in_progress
@@ -479,7 +493,40 @@ class BlinkDetectionState:
 		self._smoothed_closing_velocity = 0.0
 		self._closing_history.clear()
 		self._ear_window.clear()
+		if current_time is not None:
+			self.mark_face_absent(current_time)
 		return had_candidate
+
+	def mark_face_absent(self, current_time):
+		"""Start / keep face-absence timer (walk-away, too-far, black frame)."""
+		if self._face_absent_since is None:
+			self._face_absent_since = float(current_time)
+
+	def _maybe_clear_after_face_return(self, current_time, ear_smooth):
+		"""
+		After a sustained face gap, drop presence gates and re-seed live_open.
+
+		Short flicker (< FACE_ABSENT_CLEAR_GATES_S) keeps anti-FP latches.
+		"""
+		absent_since = self._face_absent_since
+		if absent_since is None:
+			return False
+		gap = float(current_time) - float(absent_since)
+		self._face_absent_since = None
+		if gap < FACE_ABSENT_CLEAR_GATES_S:
+			return False
+		self.eyes_closed = False
+		self.awaiting_reopen = False
+		self.awaiting_reopen_since = None
+		self._open_ear_since = None
+		self._low_ear_since = None
+		ear = float(ear_smooth) if ear_smooth is not None else 0.0
+		if gap >= FACE_ABSENT_RESEED_LIVE_S and ear > 0:
+			self.live_open_ear = ear
+			self._prev_ear_for_live = ear
+			self._live_open_stable_since = current_time
+			self._refresh_ear_depressed()
+		return True
 
 	def _eye_drop(self, eye_ear):
 		ref = self._ref_ear()
@@ -605,6 +652,7 @@ class BlinkDetectionState:
 		"""
 		ear_raw = float(current_ear)
 		ear_smooth = self._smooth_ear(ear_raw)
+		self._maybe_clear_after_face_return(current_time, ear_smooth)
 
 		# Pre-drop estimate for resting-pitch updates (uses current baseline).
 		pre_drop = 0.0
@@ -1040,6 +1088,7 @@ class BlinkDetectionState:
 		self.ear_depressed = False
 		self._live_open_stable_since = None
 		self._prev_ear_for_live = None
+		self._face_absent_since = None
 		self.blink_in_progress = False
 		self.blink_start_time = 0.0
 		self.last_blink_time = 0.0

@@ -858,7 +858,9 @@ class BlinkDetectorApplication:
 						continue
 
 					self._cached_face = None
-					had_candidate = self.detection.cancel_on_face_lost()
+					had_candidate = self.detection.cancel_on_face_lost(
+						current_time
+					)
 					self._emit_face_lost(current_time, had_candidate)
 					self.transport.send_serialized(NO_FACE_DATA)
 					if self.send_video:
@@ -896,7 +898,11 @@ class BlinkDetectorApplication:
 					if not quality_ok:
 						had_candidate = False
 						if self.detection.blink_in_progress:
-							had_candidate = self.detection.cancel_on_face_lost()
+							had_candidate = self.detection.cancel_on_face_lost(
+								current_time
+							)
+						else:
+							self.detection.mark_face_absent(current_time)
 						face_data["faceDetected"] = False
 						face_data["faceStatus"] = "too_far"
 						face_data["faceRect"] = {
@@ -968,7 +974,9 @@ class BlinkDetectorApplication:
 						)
 				else:
 					self._cached_face = None
-					had_candidate = self.detection.cancel_on_face_lost()
+					had_candidate = self.detection.cancel_on_face_lost(
+						current_time
+					)
 					self._emit_face_lost(current_time, had_candidate)
 
 				self._commit_frame_health(
