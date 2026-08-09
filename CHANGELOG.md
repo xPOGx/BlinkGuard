@@ -4,6 +4,27 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-08-10
+
+### Added
+
+- Camera: L1 blink ROI gates, face continuity, and Phase 0 acceptance
+- Camera: Ultra 30 FPS path and preview sync hardening
+- Camera: parked L2-A face CLAHE path for landmarks
+- Camera: OS camera device names in diagnostics
+- About: thank-you page for early testers
+
+### Fixed
+
+- Camera: re-request preview video after camera restart
+- Reminders: stop eye-care timers when tracking stops
+- About: pin Release Notes toolbar like Progress tabs
+- IPC: unblock tsc and tighten preload channel gates
+
+### Changed
+
+- Docs: agent stack versions (Electron 43, React 19, Vite 8)
+
 ## [2.4.1] - 2026-08-09
 
 ### Fixed
