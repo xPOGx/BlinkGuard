@@ -60,6 +60,15 @@ export const uk: MessageCatalog = {
 	"about.meta.version": "Версія {version}",
 	"about.meta.author": "Автор: {name}",
 	"about.checkForUpdates": "Перевірити оновлення",
+	"about.releaseNotes.button": "Що нового",
+	"about.releaseNotes.title": "Що нового",
+	"about.releaseNotes.back": "Назад",
+	"about.releaseNotes.viewOnGithub": "Відкрити на GitHub",
+	"about.releaseNotes.loading": "Завантаження нотаток до релізу…",
+	"about.releaseNotes.error": "Не вдалося завантажити нотатки: {message}",
+	"about.releaseNotes.empty": "Релізів не знайдено.",
+	"about.releaseNotes.emptyBody": "Для цього релізу немає нотаток.",
+	"about.releaseNotes.prerelease": "Попередній реліз",
 
 	// Debug
 	"debug.overlays.title": "Перегляд оверлеїв",

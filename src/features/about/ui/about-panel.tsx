@@ -1,8 +1,9 @@
-import { Download, ExternalLink } from "lucide-react";
+import { Download, ExternalLink, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/button";
 import { SettingPanel, SettingRow } from "@/components/setting-panel";
 import type { useAutoUpdate } from "@/features/about/model/use-auto-update";
+import { ReleaseNotesPanel } from "@/features/about/ui/release-notes-panel";
 import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import { author, version } from "../../../../package.json";
@@ -15,6 +16,7 @@ type AboutPanelProps = {
 
 export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 	const t = useT();
+	const [view, setView] = useState<"about" | "release-notes">("about");
 	const [exportBusy, setExportBusy] = useState(false);
 	const [exportStatus, setExportStatus] = useState<string | null>(null);
 
@@ -49,6 +51,10 @@ export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 			setExportBusy(false);
 		}
 	};
+
+	if (view === "release-notes") {
+		return <ReleaseNotesPanel onBack={() => setView("about")} />;
+	}
 
 	return (
 		<>
@@ -129,14 +135,24 @@ export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 				<SettingRow
 					title="BlinkGuard"
 					action={
-						<Button
-							type="button"
-							variant="secondary"
-							disabled={autoUpdate.busy}
-							onClick={() => autoUpdate.check()}
-						>
-							{t("about.checkForUpdates")}
-						</Button>
+						<div className="flex flex-wrap items-center justify-end gap-2">
+							<Button
+								type="button"
+								variant="secondary"
+								onClick={() => setView("release-notes")}
+							>
+								<ScrollText className="mr-2 h-4 w-4" aria-hidden />
+								{t("about.releaseNotes.button")}
+							</Button>
+							<Button
+								type="button"
+								variant="secondary"
+								disabled={autoUpdate.busy}
+								onClick={() => autoUpdate.check()}
+							>
+								{t("about.checkForUpdates")}
+							</Button>
+						</div>
 					}
 				>
 					<p className="select-text text-sm text-muted-foreground">

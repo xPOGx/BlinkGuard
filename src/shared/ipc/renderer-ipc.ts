@@ -16,6 +16,7 @@ import type {
 	PopupColors,
 	RendererPreferences,
 } from "../../../shared/preferences";
+import type { GetReleaseNotesResult } from "../../../shared/release-notes";
 
 type Listener = (...args: unknown[]) => void;
 
@@ -160,10 +161,28 @@ export const rendererIpc = {
 	debugPreviewSound: (kind: DebugSoundKind, volume?: number) =>
 		send(IPC_CHANNELS.debugPreviewSound, kind, volume),
 	openGithubRepo: () => send(IPC_CHANNELS.openGithubRepo),
+	openGithubReleases: () => send(IPC_CHANNELS.openGithubReleases),
+	openExternalUrl: (url: string) => send(IPC_CHANNELS.openExternalUrl, url),
 	checkForUpdates: () => send(IPC_CHANNELS.checkForUpdates),
 	installUpdate: () => send(IPC_CHANNELS.installUpdate),
 	onAutoUpdateStatus: (listener: (status: AutoUpdateStatus) => void) =>
 		subscribe(IPC_CHANNELS.autoUpdateStatus, listener),
+	getReleaseNotes: async (): Promise<GetReleaseNotesResult> => {
+		const result = await bridge()?.invoke(IPC_CHANNELS.getReleaseNotes);
+		if (
+			result &&
+			typeof result === "object" &&
+			"status" in result &&
+			((result as GetReleaseNotesResult).status === "ok" ||
+				(result as GetReleaseNotesResult).status === "error")
+		) {
+			return result as GetReleaseNotesResult;
+		}
+		return {
+			status: "error",
+			message: "Release notes are unavailable in this environment",
+		};
+	},
 	exportDiagnostics: async (): Promise<ExportDiagnosticsResult> => {
 		const result = await bridge()?.invoke(IPC_CHANNELS.exportDiagnostics);
 		if (

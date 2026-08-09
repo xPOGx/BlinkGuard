@@ -52,6 +52,25 @@ beforeEach(() => {
 		configurable: true,
 		value: {
 			send,
+			invoke: vi.fn(async (channel: string) => {
+				if (channel === IPC_CHANNELS.getReleaseNotes) {
+					return {
+						status: "ok",
+						releases: [
+							{
+								tagName: "v2.1.0",
+								name: "BlinkGuard 2.1.0",
+								body: "## Added\n- Goals",
+								publishedAt: "2026-08-09T12:00:00Z",
+								htmlUrl:
+									"https://github.com/xPOGx/BlinkGuard/releases/tag/v2.1.0",
+								prerelease: false,
+							},
+						],
+					};
+				}
+				return { status: "error", message: "unexpected" };
+			}),
 			on: vi.fn((channel: string, listener: (...args: unknown[]) => void) => {
 				const set = listeners.get(channel) ?? new Set();
 				set.add(listener);
@@ -65,7 +84,7 @@ beforeEach(() => {
 });
 
 describe("settings shell", () => {
-	it("renders the main settings controls", () => {
+	it("renders the main settings controls", async () => {
 		render(<App />);
 
 		expect(screen.getByRole("heading", { name: "BlinkGuard" })).toBeDefined();
@@ -91,6 +110,15 @@ describe("settings shell", () => {
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.openGithubRepo);
 		fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.checkForUpdates);
+
+		fireEvent.click(screen.getByRole("button", { name: "Release notes" }));
+		expect(await screen.findByRole("button", { name: "Back" })).toBeDefined();
+		expect(await screen.findByText("BlinkGuard 2.1.0")).toBeDefined();
+		expect(screen.getByText("Goals")).toBeDefined();
+		fireEvent.click(screen.getByRole("button", { name: "View on GitHub" }));
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.openGithubReleases);
+		fireEvent.click(screen.getByRole("button", { name: "Back" }));
+		expect(screen.getByText("What it is")).toBeDefined();
 
 		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.unsubscribeBlinkStats);

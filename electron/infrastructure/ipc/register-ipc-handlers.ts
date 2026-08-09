@@ -23,9 +23,14 @@ import {
 import { exportDiagnosticsBundle } from "../logging/diagnostics-export";
 import type { InteractionLogger } from "../logging/interaction-logger";
 import { applyLaunchAtLogin } from "../lifecycle/login-item";
+import { fetchGithubReleases } from "../github/fetch-github-releases";
 import type { BlinkDetectorSidecar } from "../sidecar/blink-detector-sidecar";
 import type { ShortcutController } from "../shortcuts/shortcut-controller";
 import type { WindowManager } from "../windows/window-manager";
+import {
+	GITHUB_RELEASES_PAGE_URL,
+	isAllowedExternalUrl,
+} from "../../../shared/release-notes";
 
 interface IpcDependencies {
 	preferences: PreferencesService;
@@ -257,6 +262,13 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	on(IPC_CHANNELS.openGithubRepo, () => {
 		void shell.openExternal("https://github.com/xPOGx/BlinkGuard");
 	});
+	on(IPC_CHANNELS.openGithubReleases, () => {
+		void shell.openExternal(GITHUB_RELEASES_PAGE_URL);
+	});
+	on(IPC_CHANNELS.openExternalUrl, (_event, urlRaw: unknown) => {
+		if (typeof urlRaw !== "string" || !isAllowedExternalUrl(urlRaw)) return;
+		void shell.openExternal(urlRaw);
+	});
 	on(IPC_CHANNELS.checkForUpdates, () => {
 		checkForUpdates();
 	});
@@ -305,6 +317,14 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 			windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
 		}
 	});
+
+	ipcMain.handle(
+		IPC_CHANNELS.getReleaseNotes,
+		async (_event: IpcMainInvokeEvent) => {
+			interactions.logIpc(IPC_CHANNELS.getReleaseNotes, []);
+			return fetchGithubReleases();
+		},
+	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.exportDiagnostics,

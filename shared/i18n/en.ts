@@ -60,6 +60,15 @@ export const en: MessageCatalog = {
 	"about.meta.version": "Version {version}",
 	"about.meta.author": "Made by {name}",
 	"about.checkForUpdates": "Check for updates",
+	"about.releaseNotes.button": "Release notes",
+	"about.releaseNotes.title": "Release notes",
+	"about.releaseNotes.back": "Back",
+	"about.releaseNotes.viewOnGithub": "View on GitHub",
+	"about.releaseNotes.loading": "Loading release notes…",
+	"about.releaseNotes.error": "Could not load release notes: {message}",
+	"about.releaseNotes.empty": "No releases found.",
+	"about.releaseNotes.emptyBody": "No notes for this release.",
+	"about.releaseNotes.prerelease": "Pre-release",
 
 	// Debug
 	"debug.overlays.title": "Preview overlays",
