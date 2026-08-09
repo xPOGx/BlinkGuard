@@ -6,6 +6,7 @@ Install script for copying the blink detector binary to Electron resources
 import shutil
 import os
 import platform
+import sys
 from pathlib import Path
 
 def get_executable_name():
@@ -109,6 +110,7 @@ def main():
         print("```")
     else:
         print("\nERROR: Installation failed. Please check the build process.")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main() 

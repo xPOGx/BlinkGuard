@@ -44,12 +44,12 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           lfs: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: 'npm'
@@ -58,7 +58,7 @@ jobs:
         run: npm ci
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -68,320 +68,69 @@ jobs:
           $modelUrl = "https://github.com/davisking/dlib-models/raw/master/shape_predictor_68_face_landmarks.dat.bz2"
           $modelDir = "electron/assets/models"
           $modelPath = "$modelDir/shape_predictor_68_face_landmarks.dat"
-          
-          # Create directory if it doesn't exist
+
           New-Item -ItemType Directory -Force -Path $modelDir | Out-Null
-          
-          # Download and extract the model
           Invoke-WebRequest -Uri $modelUrl -OutFile "$modelPath.bz2"
-          
-          # Extract using PowerShell (if 7zip is available) or use Python
+
           try {
-            # Try using 7zip if available
             & "C:\Program Files\7-Zip\7z.exe" e "$modelPath.bz2" -o"$modelDir" -y
             Remove-Item "$modelPath.bz2"
           } catch {
             Write-Host "7zip not available, using Python to extract..."
             python -c "import bz2; import shutil; import os; os.makedirs('$modelDir', exist_ok=True); shutil.copyfileobj(bz2.open('$modelPath.bz2', 'rb'), open('$modelPath', 'wb')); os.remove('$modelPath.bz2')"
           }
-          
-          Write-Host "Model downloaded and extracted successfully!"
-          Write-Host "Model size: $((Get-Item $modelPath).Length / 1MB) MB"
 
-      - name: Verify shape predictor file exists
-        run: |
-          if (!(Test-Path "electron/assets/models/shape_predictor_68_face_landmarks.dat")) {
-            Write-Error "Shape predictor file not found!"
-            Write-Host "Current directory: $(Get-Location)"
-            Write-Host "Contents of electron/assets/models/:"
-            Get-ChildItem "electron/assets/models/" -ErrorAction SilentlyContinue
+          if (!(Test-Path $modelPath)) {
+            Write-Error "Shape predictor file not found after download"
             exit 1
           }
-          Write-Host "Shape predictor file found successfully"
-          Write-Host "File size: $((Get-Item 'electron/assets/models/shape_predictor_68_face_landmarks.dat').Length) bytes"
+          Write-Host "Model size: $((Get-Item $modelPath).Length / 1MB) MB"
 
       - name: Cache pip wheels
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
-            ~/.cache/pip
-            %LOCALAPPDATA%\pip\Cache
+            ~/AppData/Local/pip/Cache
             python/venv
           key: ${{ runner.os }}-pip-${{ hashFiles('python/requirements.txt') }}-${{ hashFiles('python/setup.bat') }}
           restore-keys: |
             ${{ runner.os }}-pip-${{ hashFiles('python/requirements.txt') }}-
             ${{ runner.os }}-pip-
 
-      - name: Debug cache status
-        run: |
-          Write-Host "Cache debugging information:"
-          Write-Host "Checking if virtual environment exists:"
-          if (Test-Path "python/venv") {
-            Write-Host "OK: Virtual environment exists"
-            Write-Host "Virtual environment size: $((Get-ChildItem 'python/venv' -Recurse | Measure-Object -Property Length -Sum).Sum) bytes"
-          } else {
-            Write-Host "Virtual environment does not exist"
-          }
-          Write-Host "Checking pip cache directories:"
-          if (Test-Path "$env:LOCALAPPDATA\pip\Cache") {
-            Write-Host "OK: Pip cache exists"
-            Write-Host "Pip cache size: $((Get-ChildItem '$env:LOCALAPPDATA\pip\Cache' -Recurse | Measure-Object -Property Length -Sum).Sum) bytes"
-          } else {
-            Write-Host "Pip cache does not exist"
-          }
-
       - name: Cache PyInstaller
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             python/build/
             python/dist/
-            %LOCALAPPDATA%\pyinstaller
+            ~/AppData/Local/pyinstaller
           key: ${{ runner.os }}-pyinstaller-${{ hashFiles('python/blink_detector.py', 'python/blink_detector.spec') }}
           restore-keys: |
             ${{ runner.os }}-pyinstaller-
 
       - name: Setup Python environment
-        run: |
-          Write-Host "Setting up blink detector Python environment..."
-          
-          # Check if Python is available
-          try {
-            python --version
-          } catch {
-            Write-Error "Python is not installed or not in PATH"
-            Write-Host "Please install Python 3.8+ and try again"
-            exit 1
-          }
-          
-          # Check if virtual environment already exists (from cache)
-          if (Test-Path "python\venv") {
-            Write-Host "Virtual environment already exists, checking if it's complete..."
-            
-            # Activate virtual environment to test
-            & "python\venv\Scripts\Activate.ps1"
-            
-            # Test if key packages are installed
-            try {
-              python -c "import cv2, numpy, dlib, PyInstaller"
-              Write-Host "OK: Virtual environment is complete and ready to use"
-              Write-Host "SUCCESS: Setup complete (using cached environment)!"
-              return
-            } catch {
-              Write-Host "Virtual environment exists but packages are missing, reinstalling..."
-              deactivate
-              Remove-Item -Recurse -Force "python\venv"
-            }
-          }
-          
-          # Create virtual environment
-          Write-Host "Creating virtual environment..."
-          python -m venv "python\venv"
-          
-          # Activate virtual environment
-          Write-Host "Activating virtual environment..."
-          & "python\venv\Scripts\Activate.ps1"
-          
-          # Upgrade pip
-          Write-Host "Upgrading pip..."
-          python -m pip install --upgrade pip
-          
-          # Install dependencies
-          Write-Host "Installing dependencies..."
-          pip install -r "python\requirements.txt"
-          
-          Write-Host "SUCCESS: Setup complete!"
-          Write-Host ""
-          Write-Host "Next steps:"
-          Write-Host "1. Run build_and_install.bat to build the standalone binary"
-          Write-Host "2. Test the binary with test_binary.py"
-          Write-Host "3. The binary will be installed to electron/resources/"
+        working-directory: python
+        shell: cmd
+        run: setup.bat
 
-      - name: Debug before build
-        run: |
-          Write-Host "Debugging before build..."
-          Write-Host "Current directory: $(Get-Location)"
-          Write-Host "Python version:"
-          python --version
-          Write-Host "Contents of python directory:"
-          Get-ChildItem "python/" -ErrorAction SilentlyContinue
-          Write-Host "Contents of python/dist/ (if exists):"
-          Get-ChildItem "python/dist/" -ErrorAction SilentlyContinue
-          Write-Host "Contents of electron/assets/models/:"
-          Get-ChildItem "electron/assets/models/" -ErrorAction SilentlyContinue
+      - name: Build and install Python binary
+        working-directory: python
+        shell: cmd
+        run: build_and_install.bat
 
-      - name: Build Python binary
+      - name: Verify Python binary installed
         run: |
-          Write-Host "Building and installing blink detector standalone binary..."
-          
-          # Check if virtual environment exists
-          if (!(Test-Path "python\venv")) {
-            Write-Error "Virtual environment not found. Please run setup first."
-            exit 1
-          }
-          
-          # Activate virtual environment
-          Write-Host "Activating virtual environment..."
-          & "python\venv\Scripts\Activate.ps1"
-          
-          # Verify virtual environment is active
-          Write-Host "Verifying virtual environment..."
-          $pythonPath = (Get-Command python).Source
-          Write-Host "Python executable: $pythonPath"
-          
-          if ($pythonPath -notlike "*\venv\Scripts\*") {
-            Write-Error "Virtual environment not properly activated!"
-            Write-Host "Expected: python\venv"
-            Write-Host "Actual: $pythonPath"
-            exit 1
-          }
-          Write-Host "OK: Virtual environment activated successfully"
-          
-          # Install PyInstaller if not already installed
-          Write-Host "Checking PyInstaller installation..."
-          try {
-            python -c "import PyInstaller"
-            Write-Host "PyInstaller is already installed"
-          } catch {
-            Write-Host "Installing PyInstaller..."
-            pip install pyinstaller
-          }
-          
-          # Test build environment
-          Write-Host "Testing build environment..."
-          python "python\test_build.py"
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "Build environment test failed!"
-            exit 1
-          }
-          
-          # Build the binary
-          Write-Host "Building binary..."
-          python "python\build_binary.py"
-          
-          # Add debugging to see what happened
-          Write-Host "Build completed, checking results..."
-          Write-Host "Current directory: $(Get-Location)"
-          Write-Host "Contents of python directory:"
-          Get-ChildItem "python\" -ErrorAction SilentlyContinue
-          Write-Host "Contents of python\dist directory:"
-          Get-ChildItem "python\dist\" -ErrorAction SilentlyContinue
-          Write-Host "Contents of python\build directory:"
-          Get-ChildItem "python\build\" -ErrorAction SilentlyContinue
-          
-          # Check if build was successful
-          if (!(Test-Path "python\dist\blink_detector.exe")) {
-            Write-Error "Binary build failed! Checking for errors..."
-            Write-Host ""
-            Write-Host "Checking dist directory contents:"
-            if (Test-Path "python\dist") {
-              Get-ChildItem "python\dist"
-            } else {
-              Write-Host "Dist directory does not exist!"
-            }
-            Write-Host ""
-            Write-Host "Checking build directory contents:"
-            if (Test-Path "python\build") {
-              Get-ChildItem "python\build"
-            } else {
-              Write-Host "Build directory does not exist!"
-            }
-            Write-Host ""
-            Write-Host "Checking PyInstaller cache:"
-            if (Test-Path "$env:LOCALAPPDATA\pyinstaller") {
-              Get-ChildItem "$env:LOCALAPPDATA\pyinstaller"
-            }
-            exit 1
-          }
-          
-          Write-Host "OK: Binary built successfully!"
-          
-          # Test the binary
-          Write-Host "Testing binary..."
-          try {
-            python "python\test_binary.py"
-          } catch {
-            Write-Host "WARNING: Binary test failed, but continuing..."
-          }
-          
-          # Install the binary to Electron resources
-          Write-Host "Installing binary to Electron resources..."
-          try {
-            python "python\install_binary.py"
-          } catch {
-            Write-Host "WARNING: Binary installation failed, but continuing..."
-          }
-          
-          Write-Host "SUCCESS: Build and installation complete!"
-          Write-Host ""
-          Write-Host "Your blink detector is now ready for distribution!"
-          Write-Host ""
-          Write-Host "Summary:"
-          Write-Host "- Standalone binary created: python/dist/blink_detector.exe"
-          Write-Host "- Binary installed to: electron/resources/blink_detector.exe"
-          Write-Host "- Binary size: ~117MB (includes Python + all dependencies)"
-
-      - name: Debug after build
-        run: |
-          Write-Host "🔍 Debugging after build..."
-          Write-Host "Contents of python/dist/:"
-          Get-ChildItem "python/dist/" -ErrorAction SilentlyContinue
-          Write-Host "Contents of electron/resources/:"
-          Get-ChildItem "electron/resources/" -ErrorAction SilentlyContinue
-
-      - name: Verify binary was built correctly
-        run: |
-          Write-Host "🔍 Verifying binary build..."
-          
-          # Check if binary exists
-          if (!(Test-Path "python/dist/blink_detector.exe")) {
-            Write-Error "Binary not found at python/dist/blink_detector.exe"
-            Get-ChildItem "python/dist/" -ErrorAction SilentlyContinue
-            exit 1
-          }
-          
-          # Check binary size (should be around 117MB)
-          $BINARY_SIZE = (Get-Item "python/dist/blink_detector.exe").Length
-          Write-Host "📦 Binary size: $BINARY_SIZE bytes ($([math]::Round($BINARY_SIZE / 1MB, 2))MB)"
-          
-          if ($BINARY_SIZE -lt 50000000) {
-            Write-Error "Binary seems too small (less than 50MB). Build may have failed."
-            exit 1
-          }
-          
-          # Check if binary was installed to Electron resources
           if (!(Test-Path "electron/resources/blink_detector.exe")) {
             Write-Error "Binary not installed to electron/resources/blink_detector.exe"
             Get-ChildItem "electron/resources/" -ErrorAction SilentlyContinue
             exit 1
           }
-          
-          Write-Host "✅ Binary verification passed!"
-
-      - name: Test binary functionality
-        run: |
-          Write-Host "🧪 Testing binary functionality..."
-          cd python
-          
-          # Copy the model file to the expected location for testing
-          New-Item -ItemType Directory -Force -Path "dist\assets\models" | Out-Null
-          Copy-Item "..\electron\assets\models\shape_predictor_68_face_landmarks.dat" "dist\assets\models\"
-          
-          # Test that binary can start and doesn't crash immediately
-          $process = Start-Process -FilePath ".\dist\blink_detector.exe" -ArgumentList @() -PassThru -NoNewWindow
-          
-          # Wait a bit to see if it crashes
-          Start-Sleep -Seconds 3
-          
-          if ($process.HasExited) {
-            $exitCode = $process.ExitCode
-            Write-Error "Binary exited with code: $exitCode"
+          $BINARY_SIZE = (Get-Item "electron/resources/blink_detector.exe").Length
+          Write-Host "Binary size: $BINARY_SIZE bytes ($([math]::Round($BINARY_SIZE / 1MB, 2))MB)"
+          if ($BINARY_SIZE -lt 50000000) {
+            Write-Error "Binary seems too small (less than 50MB)"
             exit 1
           }
-          
-          # Kill the process
-          $process.Kill()
-          Write-Host "✅ Binary functionality test passed!"
 
       # Optional Windows code signing (scripts/publish-windows.js):
       #   CSC_LINK, CSC_KEY_PASSWORD — when unset, tag releases stay unsigned.
@@ -452,7 +201,7 @@ jobs:
           Write-Host "Windows app artifacts verification passed!"
 
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: BlinkGuard-Windows
           if-no-files-found: error
@@ -462,18 +211,12 @@ jobs:
 
       - name: Upload updater metadata
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish_to_tag != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: BlinkGuard-Windows-updater
           path: |
             dist/latest.yml
             dist/*.blockmap
-
-      - name: Upload EXE artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: BlinkGuard.Setup.exe
-          path: dist/BlinkGuard.Setup.exe
 
   build-macos:
     if: >-
@@ -485,12 +228,12 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           lfs: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: 'npm'
@@ -499,7 +242,7 @@ jobs:
         run: npm ci
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -522,7 +265,7 @@ jobs:
           test -s "$MODEL_PATH"
 
       - name: Cache pip / venv
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/Library/Caches/pip
@@ -533,7 +276,7 @@ jobs:
             ${{ runner.os }}-pip-
 
       - name: Cache PyInstaller
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             python/build/
@@ -643,7 +386,7 @@ jobs:
           echo "macOS app artifacts verification passed!"
 
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: BlinkGuard-macOS
           if-no-files-found: error
@@ -653,7 +396,7 @@ jobs:
 
       - name: Upload macOS updater metadata
         if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish_to_tag != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: BlinkGuard-macOS-updater
           path: |

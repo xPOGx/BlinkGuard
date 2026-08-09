@@ -87,14 +87,12 @@
 			"!dist/*.zip",
 			"!dist/*.yml",
 			"dist-electron/**/*",
-			"electron/assets/models/**/*",
 			"electron/resources/**/*",
 			"assets/icons/**/*",
 			"build/**/*",
 			"public/sounds/**/*"
 		],
 		"asarUnpack": [
-			"electron/assets/models/**/*",
 			"electron/resources/**/*",
 			"public/sounds/**/*"
 		],

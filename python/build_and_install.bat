@@ -79,10 +79,18 @@ echo OK: Binary built successfully!
 REM Test the binary
 echo Testing binary...
 python "%SCRIPT_DIR%test_binary.py"
+if errorlevel 1 (
+    echo ERROR: Binary test failed!
+    exit /b 1
+)
 
 REM Install the binary to Electron resources
 echo Installing binary to Electron resources...
 python "%SCRIPT_DIR%install_binary.py"
+if errorlevel 1 (
+    echo ERROR: Binary installation failed!
+    exit /b 1
+)
 
 echo SUCCESS: Build and installation complete!
 echo.
