@@ -71,6 +71,11 @@ export const uk: MessageCatalog = {
 	"about.releaseNotes.empty": "Релізів не знайдено.",
 	"about.releaseNotes.emptyBody": "Для цього релізу немає нотаток.",
 	"about.releaseNotes.prerelease": "Попередній реліз",
+	"about.thanks.button": "Подяка",
+	"about.thanks.title": "Подяка",
+	"about.thanks.back": "Назад",
+	"about.thanks.intro":
+		"Дякуємо першим користувачам і тестувальникам, які пробують BlinkGuard і діляться відгуками.",
 
 	// Debug
 	"debug.overlays.title": "Перегляд оверлеїв",

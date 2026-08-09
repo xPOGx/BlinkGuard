@@ -71,6 +71,11 @@ export const en: MessageCatalog = {
 	"about.releaseNotes.empty": "No releases found.",
 	"about.releaseNotes.emptyBody": "No notes for this release.",
 	"about.releaseNotes.prerelease": "Pre-release",
+	"about.thanks.button": "Thank you",
+	"about.thanks.title": "Thank you",
+	"about.thanks.back": "Back",
+	"about.thanks.intro":
+		"Thanks to the early users and testers who try BlinkGuard and share feedback.",
 
 	// Debug
 	"debug.overlays.title": "Preview overlays",

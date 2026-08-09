@@ -1,9 +1,10 @@
-import { Download, ExternalLink, ScrollText } from "lucide-react";
+import { Download, ExternalLink, Heart, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/button";
 import { SettingPanel, SettingRow } from "@/components/setting-panel";
 import type { useAutoUpdate } from "@/features/about/model/use-auto-update";
 import { ReleaseNotesPanel } from "@/features/about/ui/release-notes-panel";
+import { ThanksPanel } from "@/features/about/ui/thanks-panel";
 import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import { author, version } from "../../../../package.json";
@@ -16,7 +17,9 @@ type AboutPanelProps = {
 
 export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 	const t = useT();
-	const [view, setView] = useState<"about" | "release-notes">("about");
+	const [view, setView] = useState<"about" | "release-notes" | "thanks">(
+		"about",
+	);
 	const [exportBusy, setExportBusy] = useState(false);
 	const [exportStatus, setExportStatus] = useState<string | null>(null);
 
@@ -54,6 +57,10 @@ export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 
 	if (view === "release-notes") {
 		return <ReleaseNotesPanel onBack={() => setView("about")} />;
+	}
+
+	if (view === "thanks") {
+		return <ThanksPanel onBack={() => setView("about")} />;
 	}
 
 	return (
@@ -144,6 +151,14 @@ export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 								>
 									<ScrollText className="mr-2 h-4 w-4" aria-hidden />
 									{t("about.releaseNotes.button")}
+								</Button>
+								<Button
+									type="button"
+									variant="secondary"
+									onClick={() => setView("thanks")}
+								>
+									<Heart className="mr-2 h-4 w-4" aria-hidden />
+									{t("about.thanks.button")}
 								</Button>
 								<Button
 									type="button"
