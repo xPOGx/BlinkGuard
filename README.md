@@ -72,6 +72,12 @@ optional Python package: domain → application → infrastructure
 
 ## Development
 
+The desktop app runs **without** the camera sidecar. Reminders, exercises, look-away, progress, and settings all work with Node/npm only. Camera blink detection is optional and off by default (`cameraEnabled: false`); when you enable it, frames stay on-device (see [PRIVACY.md](PRIVACY.md)).
+
+### Core app
+
+Requires **Node.js 22+** (LTS is fine).
+
 ```bash
 npm install
 npm run dev          # Vite + Electron (needs a display)
@@ -80,15 +86,33 @@ npm run coverage     # Vitest one-shot
 npm run build:electron
 ```
 
-Optional camera sidecar (needs Python toolchain + webcam + Git LFS model):
+On startup you may see `Blink detector binary not found …` — that is expected until you build the optional sidecar below. Timer-mode reminders still work.
+
+See `AGENTS.md` for Cursor Cloud–specific notes.
+
+### Optional camera sidecar
+
+Only needed if you want OpenCV/dlib blink detection or the live camera preview. You need a webcam, [Git LFS](https://git-lfs.com/) for the landmarks model, and a Python toolchain that can install `dlib`.
+
+**Python version:** use **3.11** (same as CI). Very new releases (e.g. **3.14**) often have no prebuilt `dlib` wheel on Windows; `pip` then tries to compile from source and fails without a C++ toolchain.
+
+**Windows C++ toolchain:** Visual Studio Code is an editor only — it does **not** include a compiler. Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (or Visual Studio) with the **Desktop development with C++** workload before `pip install dlib`.
 
 ```bash
+git lfs pull   # ~99 MB model: electron/assets/models/shape_predictor_68_face_landmarks.dat
+
+# macOS / Linux
 cd python
 ./setup.sh
 ./build_and_install.sh
+
+# Windows (cmd)
+cd python
+setup.bat
+build_and_install.bat
 ```
 
-See `AGENTS.md` for Cursor Cloud–specific notes.
+That installs deps into `python/venv`, builds a PyInstaller binary, and copies it to `electron/resources/`. Restart `npm run dev` afterward. Without the binary, leave camera detection off — the rest of the app is unaffected.
 
 ### Sharper UI text (Windows + NVIDIA)
 
