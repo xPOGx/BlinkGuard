@@ -201,7 +201,7 @@ export const en: MessageCatalog = {
 	"camera.quality.ultra": "Ultra",
 	"camera.calibration": "Open-eye Calibration",
 	"camera.calibrationDesc":
-		"Keep eyes open and look at the camera for about 8 seconds. This tunes blink thresholds to your face.",
+		"Keep eyes open and look at the camera for about 8 seconds. This tunes blink thresholds to your face. Calibration can gently adapt when lighting drifts; use Calibrate for a hard reset.",
 	"camera.calibrate": "Calibrate",
 	"camera.cancelCalibration": "Cancel ({n}s)",
 	"camera.calibrationProgress": "Samples {n}/{min}",

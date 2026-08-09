@@ -20,6 +20,8 @@ from blink_detector_package.domain import (
 from blink_detector_package.domain.blink_detection import (
 	DEFAULT_TARGET_FPS,
 	FACE_MISS_HOLD_FRAMES,
+	FACE_QUALITY_HOLD_FRAMES,
+	FACE_REACQUIRE_FRAMES,
 )
 from blink_detector_package.domain.ear import calculate_ear_fast
 from blink_detector_package.infrastructure.camera import (
@@ -67,6 +69,8 @@ class BlinkDetectorApplication:
 		self._cached_face = None
 		self._frames_since_face_detect = 0
 		self._face_miss_streak = 0
+		self._quality_miss_streak = 0
+		self._face_reacquire_frames = 0
 		self._last_skip_debug_time = 0.0
 		self._last_skip_debug_phase = None
 		self._last_near_miss_debug_time = 0.0
@@ -437,15 +441,17 @@ class BlinkDetectorApplication:
 
 		While a blink candidate is active, re-detect every frame so a stale
 		bbox (performance face_detect_interval>1) cannot poison mid-blink EAR.
-		Do not force every-frame detect merely because preview is on — HOG
-		flicker while talking showed face-missing UI (POG 2026-08-09).
-		Brief miss hold keeps last bbox across 1–2 HOG fails.
+		After a hard face loss, force every-frame HOG for FACE_REACQUIRE_FRAMES
+		so performance presets re-lock quickly. Do not force every-frame detect
+		merely because preview is on — HOG flicker while talking showed
+		face-missing UI (POG 2026-08-09). Brief miss hold keeps last bbox.
 		"""
 		interval = self.face_detect_interval
 		should_detect = (
 			self._cached_face is None
 			or self._frames_since_face_detect >= interval
 			or self.detection.blink_in_progress
+			or self._face_reacquire_frames > 0
 		)
 		if should_detect:
 			faces = detector(gray, 0)
@@ -454,6 +460,8 @@ class BlinkDetectorApplication:
 				self._cached_face = face
 				self._face_miss_streak = 0
 				self._frames_since_face_detect = 1
+				if self._face_reacquire_frames > 0:
+					self._face_reacquire_frames -= 1
 				return face
 			self._face_miss_streak += 1
 			if (
@@ -463,10 +471,13 @@ class BlinkDetectorApplication:
 				self._frames_since_face_detect = 1
 				return self._cached_face
 			self._cached_face = None
+			self._face_reacquire_frames = FACE_REACQUIRE_FRAMES
 			self._frames_since_face_detect = 1
 			return None
 
 		self._frames_since_face_detect += 1
+		if self._face_reacquire_frames > 0:
+			self._face_reacquire_frames -= 1
 		return self._cached_face
 
 	def _face_quality_ok(self, face, landmarks):
@@ -475,6 +486,70 @@ class BlinkDetectorApplication:
 		interocular = interocular_distance_px(landmarks)
 		ok = area >= MIN_FACE_AREA_PX and interocular >= MIN_INTEROCULAR_PX
 		return ok, area, interocular
+
+	def _emit_soft_face_quality_skip(
+		self,
+		face_data,
+		face,
+		frame_width,
+		frame_height,
+		current_time,
+		face_area,
+		interocular,
+	):
+		"""Skip EAR on quality blip; hold face; cancel only after hold expires."""
+		self._quality_miss_streak += 1
+		soft_hold = self._quality_miss_streak <= FACE_QUALITY_HOLD_FRAMES
+		face_data["faceRect"] = {
+			"x": float(face.left() / frame_width),
+			"y": float(face.top() / frame_height),
+			"width": float(face.width() / frame_width),
+			"height": float(face.height() / frame_height),
+		}
+		had_candidate = False
+		if soft_hold:
+			# Keep bbox / faceDetected — do not cancel mid-blink on 1–2 frame
+			# quality noise (POG L1 Phase C).
+			face_data["faceDetected"] = True
+			face_data["faceStatus"] = "ok"
+		else:
+			if self.detection.blink_in_progress:
+				had_candidate = self.detection.cancel_on_face_lost(current_time)
+			else:
+				self.detection.mark_face_absent(current_time)
+			face_data["faceDetected"] = False
+			face_data["faceStatus"] = "too_far"
+
+		if had_candidate or self._should_emit_skip(
+			"skip_face_quality",
+			current_time,
+		):
+			if had_candidate:
+				self._last_skip_debug_phase = "skip_face_quality"
+				self._last_skip_debug_time = current_time
+			self._emit_blink_outcome(
+				{
+					"phase": "skip_face_quality",
+					"baseline": self.detection.current_baseline_ear,
+					"drop": 0.0,
+					"ear": 0.0,
+					"face_area": face_area,
+					"interocular": interocular,
+					"quality_miss_streak": self._quality_miss_streak,
+					"soft_hold": soft_hold,
+					"look_down": False,
+					"ear_depressed": self.detection.ear_depressed,
+					"live_open_ear": self.detection.live_open_ear,
+					"pose_strictness": self.pose_strictness,
+					"resting_pitch": self.detection.resting_pitch,
+					"min_velocity": 0.0,
+					"duration": 0.0,
+					"cooldown_remaining": 0.0,
+					"absolute_drop": 0.0,
+				},
+				face=face,
+				credited=False,
+			)
 
 	def _should_emit_skip(self, phase, current_time):
 		"""Emit immediately on phase change; throttle repeats of same skip."""
@@ -742,6 +817,13 @@ class BlinkDetectorApplication:
 				credited=False,
 			)
 			face_data["blinkDebug"] = debug_payload
+		elif phase == "baseline_drift_nudge":
+			debug_payload = self._emit_blink_outcome(
+				blink_info,
+				face=face,
+				credited=False,
+			)
+			face_data["blinkDebug"] = debug_payload
 		elif phase in (
 			"skip_yaw",
 			"skip_degraded",
@@ -998,53 +1080,17 @@ class BlinkDetectorApplication:
 						landmarks,
 					)
 					if not quality_ok:
-						had_candidate = False
-						if self.detection.blink_in_progress:
-							had_candidate = self.detection.cancel_on_face_lost(
-								current_time
-							)
-						else:
-							self.detection.mark_face_absent(current_time)
-						face_data["faceDetected"] = False
-						face_data["faceStatus"] = "too_far"
-						face_data["faceRect"] = {
-							"x": float(face.left() / frame_width),
-							"y": float(face.top() / frame_height),
-							"width": float(face.width() / frame_width),
-							"height": float(face.height() / frame_height),
-						}
-						# Always emit once when a candidate was cancelled.
-						if had_candidate or self._should_emit_skip(
-							"skip_face_quality",
+						self._emit_soft_face_quality_skip(
+							face_data,
+							face,
+							frame_width,
+							frame_height,
 							current_time,
-						):
-							if had_candidate:
-								self._last_skip_debug_phase = "skip_face_quality"
-								self._last_skip_debug_time = current_time
-							self._emit_blink_outcome(
-								{
-									"phase": "skip_face_quality",
-									"baseline": self.detection.current_baseline_ear,
-									"drop": 0.0,
-									"ear": 0.0,
-									"face_area": face_area,
-									"interocular": interocular,
-									"look_down": False,
-									"ear_depressed": self.detection.ear_depressed,
-									"live_open_ear": self.detection.live_open_ear,
-									"pose_strictness": self.pose_strictness,
-									"resting_pitch": self.detection.resting_pitch,
-									"min_velocity": 0.0,
-									"duration": 0.0,
-									"cooldown_remaining": 0.0,
-									"absolute_drop": 0.0,
-								},
-								face=face,
-								credited=False,
-							)
-						# Keep HOG bbox — clearing forced face-missing flicker
-						# when landmarks briefly fail quality (POG 2026-08-09).
+							face_area,
+							interocular,
+						)
 					else:
+						self._quality_miss_streak = 0
 						left_ear = calculate_ear_fast(left_eye, buffers)
 						right_ear = calculate_ear_fast(right_eye, buffers)
 						avg_ear = (left_ear + right_ear) * 0.5
@@ -1077,26 +1123,23 @@ class BlinkDetectorApplication:
 						)
 				else:
 					if face is not None:
-						# HOG ok but landmarks missing this frame — keep bbox,
-						# avoid "no face" UI flash (POG static sit face-missing).
-						face_data["faceDetected"] = True
-						face_data["faceStatus"] = "ok"
-						face_data["faceRect"] = {
-							"x": float(face.left() / frame_width),
-							"y": float(face.top() / frame_height),
-							"width": float(face.width() / frame_width),
-							"height": float(face.height() / frame_height),
-						}
-						if self.detection.blink_in_progress:
-							had_candidate = self.detection.cancel_on_face_lost(
-								current_time
-							)
-							self._emit_face_lost(current_time, had_candidate)
-						else:
-							self.detection.mark_face_absent(current_time)
+						# HOG ok but landmarks missing — same soft hold as
+						# quality floors (area/IOD). Keep bbox; avoid UI flash.
+						area = face_bbox_area(face)
+						self._emit_soft_face_quality_skip(
+							face_data,
+							face,
+							frame_width,
+							frame_height,
+							current_time,
+							area,
+							0.0,
+						)
 					else:
 						self._cached_face = None
 						self._face_miss_streak = 0
+						self._quality_miss_streak = 0
+						self._face_reacquire_frames = FACE_REACQUIRE_FRAMES
 						had_candidate = self.detection.cancel_on_face_lost(
 							current_time
 						)

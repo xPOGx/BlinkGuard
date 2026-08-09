@@ -76,9 +76,9 @@ EYES_OPEN_SOFT_RATIO = 0.85
 # skip_await_open sticky while looking at screen bottom (POG 2026-08-09).
 LOOK_DOWN_AWAIT_CLEAR_RATIO = 0.70
 # Credit recovery for look-down (stricter than await-clear). 0.70 credited
-# talk-jaw EAR dips; 0.80 was harsh in dark/slow reopen (POG reject_duration
-# timeouts). 0.78 keeps talk FP down while allowing chat reopen.
-LOOK_DOWN_CREDIT_RECOVERY_RATIO = 0.78
+# talk-jaw EAR dips; 0.80/0.78 still timed out real chat blinks stuck at
+# ear/live≈0.70–0.73 with strong peak+openV (POG 2026-08-09 post-L1 logs).
+LOOK_DOWN_CREDIT_RECOVERY_RATIO = 0.74
 EYES_CLOSED_HOLD_S = 0.18
 # Must stay near-open this long to clear eyes_closed (noise while lids shut).
 EYES_OPEN_HOLD_S = 0.12
@@ -99,6 +99,10 @@ LOOK_DOWN_SHORT_WAIVE_ABS = 0.10
 # Look-down short without reopen: need deeper trough than talk jitter (~drop 0.25).
 LOOK_DOWN_SHORT_OPEN_DROP = 0.35
 LOOK_DOWN_SHORT_OPEN_CLOSED = 3
+# Dark/Ultra shortish LD: strong measured close can waive reopen
+# (POG 2026-08-09 post-0.74: reject_opening peak p50≈1.17, bin 1.2–1.5).
+LOOK_DOWN_SHORT_STRONG_PEAK = 1.2
+LOOK_DOWN_SHORT_STRONG_DROP = 0.16
 # Synthetic peak must beat measured by this to count as "invented" (needs V-shape).
 SYNTHETIC_PEAK_EPS = 0.20
 # Short shallow dips without a strong measured close → reject (POG FP).
@@ -173,6 +177,14 @@ MIN_FACE_AREA_PX = 1600  # ~40×40
 MIN_INTEROCULAR_PX = 12.0
 # HOG can miss several frames while talking / expression; hold last bbox.
 FACE_MISS_HOLD_FRAMES = 8
+# Landmark quality blip mid-blink: skip EAR but do not cancel yet.
+FACE_QUALITY_HOLD_FRAMES = 2
+# After face loss, force every-frame HOG for this many frames (re-acquire).
+FACE_REACQUIRE_FRAMES = 15
+# Session baseline drift vs live_open → gentle auto-recalibrate (frontal only).
+BASELINE_DRIFT_RATIO = 0.12
+BASELINE_DRIFT_HOLD_S = 60.0
+BASELINE_DRIFT_NUDGE_ALPHA = 0.15
 
 
 def min_blink_duration_s(fps):
@@ -265,6 +277,8 @@ class BlinkDetectionState:
 		self._prev_ear_for_live = None
 		# Wall-clock when usable face EAR stopped (walk-away / too-far).
 		self._face_absent_since = None
+		# Sustained |live_open - session baseline| → gentle nudge clock.
+		self._baseline_drift_since = None
 		# Pose at candidate start for head-motion reject.
 		self._candidate_yaw = None
 		self._candidate_pitch = None
@@ -413,6 +427,64 @@ class BlinkDetectionState:
 	def _smooth_ear(self, raw_ear):
 		self._ear_window.append(float(raw_ear))
 		return sum(self._ear_window) / len(self._ear_window)
+
+	def maybe_drift_recalibrate(self, current_time, look_down=False):
+		"""
+		Nudge session baseline toward live_open after sustained frontal drift.
+
+		No multi-profile UI — soft adapt when lighting / distance shifts.
+		Returns a debug dict when a nudge is applied, else None.
+		"""
+		if (
+			look_down
+			or self.ear_depressed
+			or self.blink_in_progress
+			or self.eyes_closed
+			or self.awaiting_reopen
+		):
+			self._baseline_drift_since = None
+			return None
+
+		session = float(self.current_baseline_ear or 0.0)
+		live = float(self.live_open_ear or 0.0)
+		if session <= 0 or live <= 0:
+			self._baseline_drift_since = None
+			return None
+
+		rel = abs(live - session) / session
+		if rel < BASELINE_DRIFT_RATIO:
+			self._baseline_drift_since = None
+			return None
+
+		now = float(current_time)
+		if self._baseline_drift_since is None:
+			self._baseline_drift_since = now
+			return None
+
+		if now - self._baseline_drift_since < BASELINE_DRIFT_HOLD_S:
+			return None
+
+		alpha = BASELINE_DRIFT_NUDGE_ALPHA
+		before = session
+		nudged = (1.0 - alpha) * session + alpha * live
+		self.current_baseline_ear = nudged
+		if self.ear_calibration and self.ear_calibration > 0:
+			cal = (1.0 - alpha) * float(self.ear_calibration) + alpha * live
+			self.ear_calibration = max(
+				EAR_CALIBRATION_MIN,
+				min(EAR_CALIBRATION_MAX, cal),
+			)
+		self._baseline_drift_since = None
+		return {
+			"phase": "baseline_drift_nudge",
+			"baseline_before": before,
+			"baseline": nudged,
+			"live_open_ear": live,
+			"ear_calibration": self.ear_calibration,
+			"drift_ratio": rel,
+			"drop": 0.0,
+			"threshold": 0.0,
+		}
 
 	def _update_baseline(self, current_ear, look_down=False):
 		"""Append/smooth open-eye baseline only when not blinking / not closed."""
@@ -793,6 +865,22 @@ class BlinkDetectionState:
 			current_time,
 			look_down=treat_as_look_down,
 		)
+		# Tick every usable frame so eyes_closed / look_down clear the hold
+		# (do not nudge after a long skip_* gap with a stale timer).
+		drift_nudge = self.maybe_drift_recalibrate(
+			current_time,
+			look_down=treat_as_look_down,
+		)
+		if drift_nudge is not None:
+			return False, {
+				**drift_nudge,
+				"yaw": gate["yaw"],
+				"pitch": gate["pitch"],
+				"pitch_delta": gate.get("pitch_delta", 0.0),
+				"look_down": treat_as_look_down,
+				"ear_depressed": self.ear_depressed,
+				**ear_fields,
+			}
 
 		ear_drop_percentage = (ref - ear_smooth) / ref
 		ear_drop_absolute = ref - ear_smooth
@@ -994,12 +1082,10 @@ class BlinkDetectionState:
 			# Must leave the close band to complete. recovery_threshold (0.7) sits
 			# *below* close≈0.84 — mid-band EAR credited every cooldown (POG
 			# 2026-08-09 center-screen ~1 Hz storm).
-			# Look-down: credit recovery is stricter than await-clear (talk FP).
+			# Look-down credit recovery is LOOK_DOWN_CREDIT_RECOVERY_RATIO only
+			# (pose look_down_recovery is unused for credit — was always overridden).
 			if treat_as_look_down:
-				recovery_level = max(
-					ref * recovery_threshold,
-					ref * LOOK_DOWN_CREDIT_RECOVERY_RATIO,
-				)
+				recovery_level = ref * LOOK_DOWN_CREDIT_RECOVERY_RATIO
 			else:
 				recovery_level = max(ref * recovery_threshold, close_band_ear)
 			recovered = ear_smooth > recovery_level
@@ -1068,6 +1154,11 @@ class BlinkDetectionState:
 							self.closed_frames >= LOOK_DOWN_SHORT_OPEN_CLOSED
 							and self.max_drop_percentage
 							>= LOOK_DOWN_SHORT_OPEN_DROP
+						)
+						or (
+							measured_peak >= LOOK_DOWN_SHORT_STRONG_PEAK
+							and self.max_drop_percentage
+							>= LOOK_DOWN_SHORT_STRONG_DROP
 						)
 					)
 				if (
@@ -1226,7 +1317,8 @@ class BlinkDetectionState:
 				if not duration_ok:
 					reason = "reject_duration"
 				elif not recovered:
-					reason = "reject_duration"
+					# Distinct from too-short duration (Phase 0 was mixing these).
+					reason = "reject_recovery"
 				elif not velocity_ok:
 					reason = "reject_velocity"
 				elif not opening_ok:
@@ -1262,6 +1354,7 @@ class BlinkDetectionState:
 		self._live_open_stable_since = None
 		self._prev_ear_for_live = None
 		self._face_absent_since = None
+		self._baseline_drift_since = None
 		self._candidate_yaw = None
 		self._candidate_pitch = None
 		self._candidate_pose_delta = 0.0

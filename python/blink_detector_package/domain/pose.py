@@ -12,21 +12,22 @@ POSE_PROFILES = {
 		"pitch_look_down_delta": 0.05,
 		"look_down_threshold_mult": 0.85,
 		"look_down_velocity_mult": 1.0,
-		"look_down_recovery": 0.62,
+		# Unused for credit (LOOK_DOWN_CREDIT_RECOVERY_RATIO owns reopen).
+		"look_down_recovery": 0.74,
 	},
 	"normal": {
 		"yaw_extreme": 1.10,
 		"pitch_look_down_delta": 0.06,
 		"look_down_threshold_mult": 0.88,
 		"look_down_velocity_mult": 1.05,
-		"look_down_recovery": 0.65,
+		"look_down_recovery": 0.74,
 	},
 	"strict": {
 		"yaw_extreme": 0.95,
 		"pitch_look_down_delta": 0.07,
 		"look_down_threshold_mult": 0.90,
 		"look_down_velocity_mult": 1.1,
-		"look_down_recovery": 0.68,
+		"look_down_recovery": 0.74,
 	},
 }
 

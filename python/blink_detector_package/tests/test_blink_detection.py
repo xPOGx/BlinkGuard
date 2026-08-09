@@ -172,7 +172,8 @@ class PoseTests(unittest.TestCase):
 		self.assertTrue(gate["look_down"])
 		self.assertLess(gate["threshold_mult"], 1.0)
 		self.assertGreaterEqual(gate["velocity_mult"], 1.0)
-		self.assertLess(gate["recovery_threshold"], 0.7)
+		# Aligned with LOOK_DOWN_CREDIT_RECOVERY_RATIO (credit path uses that).
+		self.assertAlmostEqual(gate["recovery_threshold"], 0.74, places=2)
 		self.assertTrue(gate["allow_credit"])
 
 	def test_resting_pitch_avoids_false_look_down(self):
@@ -853,8 +854,9 @@ class BlinkDetectionTests(unittest.TestCase):
 		state.blink_in_progress = True
 		state.blink_start_time = t
 		state.closed_frames = 2
-		state.peak_closing_velocity = 1.2
-		state.peak_closing_velocity_measured = 1.2
+		# Below LOOK_DOWN_SHORT_STRONG_PEAK (1.2) — talk jitter, not blink.
+		state.peak_closing_velocity = 1.15
+		state.peak_closing_velocity_measured = 1.15
 		state.peak_opening_velocity = 0.0
 		state.max_drop_percentage = 0.25
 		state._candidate_pose_delta = 0.0
@@ -869,6 +871,53 @@ class BlinkDetectionTests(unittest.TestCase):
 			info["phase"],
 			("reject_opening", "reject_velocity", "reject_threshold"),
 		)
+
+	def test_look_down_shortish_strong_peak_waives_opening(self):
+		"""Dark/Ultra shortish LD with peak≥1.2 can credit without openV."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.12
+		state.blink_in_progress = True
+		state.blink_start_time = t
+		state.closed_frames = 1
+		state.peak_closing_velocity = 1.25
+		state.peak_closing_velocity_measured = 1.25
+		state.peak_opening_velocity = 0.0
+		state.max_drop_percentage = 0.19
+		state._candidate_pose_delta = 0.0
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.235)
+		# ≈ one frame @ 20 FPS (below that → reject_duration vs frame floor).
+		t += 0.05
+		# Reopen past look-down credit recovery (0.74 * live) with openV=0.
+		credited, info = state.detect(0.26, t, pose=pose)
+		self.assertTrue(credited, msg=info)
+		self.assertEqual(info["phase"], "complete")
+
+	def test_look_down_credits_at_074_recovery(self):
+		"""Chat reopen ear/live≈0.75 must credit (0.78 timed out real blinks)."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.32)
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.12
+		state.blink_in_progress = True
+		state.blink_start_time = t
+		state.closed_frames = 4
+		state.peak_closing_velocity = 2.4
+		state.peak_closing_velocity_measured = 2.4
+		state.peak_opening_velocity = 1.2
+		state.max_drop_percentage = 0.45
+		state._candidate_pose_delta = 0.0
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.24)
+		t += 0.20
+		# 0.75 * live_open(0.32) = 0.24; use 0.242 > 0.74*0.32.
+		credited, info = state.detect(0.242, t, pose=pose)
+		self.assertTrue(credited, msg=info)
+		self.assertEqual(info["phase"], "complete")
 
 	def test_synthetic_short_shallow_rejected(self):
 		"""Invented peak + shallow drop (rawV≈0) must not credit."""
@@ -1264,6 +1313,39 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertAlmostEqual(state.ear_calibration, 0.45, places=5)
 		self.assertFalse(state.set_ear_calibration("bad"))
 		self.assertFalse(state.set_ear_calibration(0))
+
+	def test_baseline_drift_nudge_after_hold(self):
+		state = BlinkDetectionState()
+		state.current_baseline_ear = 0.30
+		state.live_open_ear = 0.36
+		state._baseline_drift_since = 0.0
+		out = state.maybe_drift_recalibrate(61.0, look_down=False)
+		self.assertIsNotNone(out)
+		self.assertEqual(out["phase"], "baseline_drift_nudge")
+		self.assertGreater(state.current_baseline_ear, 0.30)
+		self.assertLess(state.current_baseline_ear, 0.36)
+
+	def test_baseline_drift_clears_on_look_down(self):
+		state = BlinkDetectionState()
+		state.current_baseline_ear = 0.30
+		state.live_open_ear = 0.36
+		state._baseline_drift_since = 0.0
+		self.assertIsNone(
+			state.maybe_drift_recalibrate(61.0, look_down=True)
+		)
+		self.assertIsNone(state._baseline_drift_since)
+
+	def test_baseline_drift_waits_for_hold(self):
+		state = BlinkDetectionState()
+		state.current_baseline_ear = 0.30
+		state.live_open_ear = 0.36
+		self.assertIsNone(
+			state.maybe_drift_recalibrate(1.0, look_down=False)
+		)
+		self.assertIsNotNone(state._baseline_drift_since)
+		self.assertIsNone(
+			state.maybe_drift_recalibrate(30.0, look_down=False)
+		)
 
 
 if __name__ == "__main__":
