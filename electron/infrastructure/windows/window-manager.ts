@@ -542,6 +542,7 @@ export class WindowManager {
 			width: Math.min(640, width * 0.8),
 			height: Math.min(480, height * 0.8),
 			title: t(locale, "window.cameraTitle"),
+			icon: path.join(this.paths.root, "assets", "icons", "icon.png"),
 			webPreferences: {
 				nodeIntegration: false,
 				contextIsolation: true,
