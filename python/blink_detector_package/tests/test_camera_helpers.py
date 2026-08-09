@@ -43,6 +43,24 @@ class CameraHelperTests(unittest.TestCase):
 		code = cv2.VideoWriter_fourcc(*"MJPG")
 		self.assertEqual(fourcc_to_str(code), "MJPG")
 
+	def test_candidate_pairs_index_major_before_empty_indices(self):
+		import cv2
+
+		from blink_detector_package.infrastructure.camera import OpenCVCamera
+
+		class _SilentTransport:
+			def send(self, _payload):
+				return None
+
+		cam = OpenCVCamera(_SilentTransport())
+		# Force Windows-like backend list regardless of host OS.
+		cam._platform_backends = lambda: [cv2.CAP_MSMF, cv2.CAP_DSHOW]
+		pairs = cam._candidate_pairs()
+		self.assertEqual(pairs[0], (0, cv2.CAP_MSMF))
+		self.assertEqual(pairs[1], (0, cv2.CAP_DSHOW))
+		# DSHOW@0 must appear before probing MSMF on index 1.
+		self.assertLess(pairs.index((0, cv2.CAP_DSHOW)), pairs.index((1, cv2.CAP_MSMF)))
+
 
 if __name__ == "__main__":
 	unittest.main()

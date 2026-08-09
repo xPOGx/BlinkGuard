@@ -1,5 +1,6 @@
 import sys
 import time
+from contextlib import contextmanager
 
 import cv2
 import numpy as np
@@ -53,6 +54,22 @@ def fourcc_to_str(value) -> str:
 	return chars.strip("\x00") or ""
 
 
+@contextmanager
+def opencv_quiet_warnings():
+	"""Drop OpenCV WARN spam (e.g. MSMF initStream) during probe/open."""
+	getter = getattr(cv2, "getLogLevel", None)
+	setter = getattr(cv2, "setLogLevel", None)
+	if getter is None or setter is None:
+		yield
+		return
+	previous = getter()
+	try:
+		setter(getattr(cv2, "LOG_LEVEL_ERROR", 2))
+		yield
+	finally:
+		setter(previous)
+
+
 class OpenCVCamera:
 	def __init__(self, transport):
 		self.transport = transport
@@ -75,13 +92,19 @@ class OpenCVCamera:
 	def _platform_backends(self):
 		if sys.platform == "win32":
 			# Prefer MSMF (closer to Discord/Windows Camera); DSHOW failover.
-			return [cv2.CAP_MSMF, cv2.CAP_DSHOW, cv2.CAP_ANY]
+			# Skip CAP_ANY — it often re-enters MSMF and duplicates init WARN spam.
+			return [cv2.CAP_MSMF, cv2.CAP_DSHOW]
 		if sys.platform == "darwin":
 			return [cv2.CAP_AVFOUNDATION, cv2.CAP_ANY]
 		return [cv2.CAP_V4L2, cv2.CAP_ANY]
 
 	def _candidate_pairs(self):
-		"""Ordered (index, backend) attempts: preferred first, then scan."""
+		"""Ordered (index, backend) attempts: preferred first, then scan.
+
+		Index-major order: try camera 0 on every backend before probing 1–4.
+		Cold start otherwise hammers MSMF on empty indices (Failed to select
+		stream 0 × N) before DSHOW@0 would have succeeded.
+		"""
 		backends = self._platform_backends()
 		pairs = []
 		seen = set()
@@ -99,8 +122,8 @@ class OpenCVCamera:
 		):
 			add(self._preferred_index, self._preferred_backend)
 
-		for backend in backends:
-			for index in range(5):
+		for index in range(5):
+			for backend in backends:
 				add(index, backend)
 		return pairs
 
@@ -312,46 +335,47 @@ class OpenCVCamera:
 
 		max_retries = 10
 		retry_delay = 2
-		for attempt in range(max_retries):
-			self.transport.send(
-				{
-					"debug": (
-						f"Camera start attempt {attempt + 1}/{max_retries}"
-					)
-				}
-			)
-			self.transport.send({"debug": "Starting camera detection..."})
-			opened = None
-			for index, backend in self._candidate_pairs():
-				opened = self._try_open_pair(index, backend)
-				if opened is not None:
-					break
-
-			if opened is None:
+		with opencv_quiet_warnings():
+			for attempt in range(max_retries):
 				self.transport.send(
 					{
 						"debug": (
-							"No working camera found on attempt "
-							f"{attempt + 1}"
+							f"Camera start attempt {attempt + 1}/{max_retries}"
 						)
 					}
 				)
-				if attempt < max_retries - 1:
-					time.sleep(retry_delay)
-					continue
-				self.transport.send(
-					{"error": "No working camera found after all attempts"}
-				)
-				return False
+				self.transport.send({"debug": "Starting camera detection..."})
+				opened = None
+				for index, backend in self._candidate_pairs():
+					opened = self._try_open_pair(index, backend)
+					if opened is not None:
+						break
 
-			self.capture = opened
-			self.active = True
-			self._preferred_index = self.camera_index
-			self._preferred_backend = self.backend
-			self._failover_cursor = 0
-			self.transport.send({"status": "Camera opened successfully"})
-			reset_detection()
-			return True
+				if opened is None:
+					self.transport.send(
+						{
+							"debug": (
+								"No working camera found on attempt "
+								f"{attempt + 1}"
+							)
+						}
+					)
+					if attempt < max_retries - 1:
+						time.sleep(retry_delay)
+						continue
+					self.transport.send(
+						{"error": "No working camera found after all attempts"}
+					)
+					return False
+
+				self.capture = opened
+				self.active = True
+				self._preferred_index = self.camera_index
+				self._preferred_backend = self.backend
+				self._failover_cursor = 0
+				self.transport.send({"status": "Camera opened successfully"})
+				reset_detection()
+				return True
 
 		return False
 
@@ -423,28 +447,29 @@ class OpenCVCamera:
 		self._release_capture()
 		self.active = False
 
-		for index, backend in ordered:
-			opened = self._try_open_pair(index, backend)
-			if opened is None:
-				continue
-			to_name = backend_name(backend)
-			self.emit_camera_state(
-				"camera_failover",
-				from_index=from_meta.get("index"),
-				from_backend=from_meta.get("backend"),
-				from_backend_name=from_meta.get("backend_name"),
-				to_index=index,
-				to_backend=backend,
-				to_backend_name=to_name,
-				reason="black_streak",
-			)
-			self.capture = opened
-			self.active = True
-			self._preferred_index = index
-			self._preferred_backend = backend
-			reset_detection()
-			self.transport.send({"status": "Camera opened successfully"})
-			return True
+		with opencv_quiet_warnings():
+			for index, backend in ordered:
+				opened = self._try_open_pair(index, backend)
+				if opened is None:
+					continue
+				to_name = backend_name(backend)
+				self.emit_camera_state(
+					"camera_failover",
+					from_index=from_meta.get("index"),
+					from_backend=from_meta.get("backend"),
+					from_backend_name=from_meta.get("backend_name"),
+					to_index=index,
+					to_backend=backend,
+					to_backend_name=to_name,
+					reason="black_streak",
+				)
+				self.capture = opened
+				self.active = True
+				self._preferred_index = index
+				self._preferred_backend = backend
+				reset_detection()
+				self.transport.send({"status": "Camera opened successfully"})
+				return True
 
 		self.transport.send(
 			{"error": "Camera black-frame failover exhausted all backends"}
