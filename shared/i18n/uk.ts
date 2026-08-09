@@ -259,6 +259,8 @@ export const uk: MessageCatalog = {
 	"exercises.promptAria": "Текст вправи {n}",
 	"exercises.removeAria": "Видалити текст вправи {n}",
 	"exercises.hint": "Нагадування про вправи з’являтимуться періодично",
+	"exercises.overlapHint":
+		"Вправи та «подивіться вдалину» мають окремі таймери. Якщо обидва збігаються, показується лише одне нагадування (пріоритет — погляд у далечінь).",
 	"exercises.disabledNotice.title": "Ризик перенапруження очей",
 	"exercises.disabledNotice.body":
 		"Вправи для очей і перерви 20-20-20 вимкнені. Довгі сесії без перерв можуть сприяти цифровому перенапруженню очей — увімкніть хоча б одне нагадування.",
@@ -293,6 +295,10 @@ export const uk: MessageCatalog = {
 	"popup.transparencyAria": "Прозорість панелі",
 	"popup.transparencyHint":
 		"Більші значення роблять фон панелі прозорішим. Текст лишається повністю непрозорим — так гліфи чіткіші.",
+	"popup.clickThrough": "Пропускати кліки крізь попап моргання",
+	"popup.clickThroughDescription":
+		"Нагадування про моргання лишається видимим, але не перехоплює кліки (як водяний знак). Відкласти можна з меню в треї.",
+	"popup.clickThroughAria": "Пропускати кліки крізь попап моргання",
 	"popup.colorPickerAria": "Вибір кольору: {label}",
 
 	// Sound / launch / reset / quiet hours
@@ -514,6 +520,7 @@ export const uk: MessageCatalog = {
 
 	// Tray / window titles
 	"tray.show": "Показати BlinkGuard",
+	"tray.snoozeBlink": "Відкласти моргання (5 хв)",
 	"tray.checkForUpdates": "Перевірити оновлення",
 	"tray.quit": "Вийти",
 	"window.cameraTitle": "Візуалізація камери",

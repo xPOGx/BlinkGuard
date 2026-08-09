@@ -204,4 +204,27 @@ describe("LookAwayService", () => {
 		vi.advanceTimersByTime(5 * 60 * 1000);
 		expect(windows.showLookAway).toHaveBeenCalledTimes(2);
 	});
+
+	it("does not show while an exercise popup is open", () => {
+		const preferences = createPreferences({ lookAwayInterval: 1 });
+		const state = new AppRuntimeState();
+		state.isExerciseShowing = true;
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const sound = createSound();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			sound,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(windows.showLookAway).not.toHaveBeenCalled();
+		expect(sound.play).not.toHaveBeenCalled();
+	});
 });

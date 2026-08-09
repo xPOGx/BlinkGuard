@@ -52,6 +52,7 @@ export function sameRendererPrefs(
 		a.lookAwayInterval === b.lookAwayInterval &&
 		a.lookAwayDuration === b.lookAwayDuration &&
 		a.popupMessage === b.popupMessage &&
+		a.blinkPopupClickThrough === b.blinkPopupClickThrough &&
 		samePopupColors(a.popupColors, b.popupColors) &&
 		samePoint(a.popupPosition, b.popupPosition) &&
 		sameSize(a.popupSize, b.popupSize) &&
@@ -131,6 +132,12 @@ export function pushPreferenceDiff(
 	}
 	if (!previous || previous.popupMessage !== next.popupMessage) {
 		rendererIpc.updatePopupMessage(next.popupMessage);
+	}
+	if (
+		!previous ||
+		previous.blinkPopupClickThrough !== next.blinkPopupClickThrough
+	) {
+		rendererIpc.updateBlinkPopupClickThrough(next.blinkPopupClickThrough);
 	}
 	if (!previous || previous.keyboardShortcut !== next.keyboardShortcut) {
 		rendererIpc.updateKeyboardShortcut(next.keyboardShortcut);

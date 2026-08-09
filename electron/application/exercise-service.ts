@@ -72,6 +72,8 @@ export class ExerciseService {
 
 	private show(): void {
 		if (this.state.isExerciseShowing) return;
+		if (this.state.isLookAwayShowing) return;
+		if (this.shouldDeferForLookAway()) return;
 		if (!this.notificationGate.notificationsAllowed()) return;
 		this.sound.play("exercise");
 		this.state.isExerciseShowing = true;
@@ -102,6 +104,14 @@ export class ExerciseService {
 				this.state.isExerciseShowing = false;
 			}
 		}, EXERCISE_POPUP_VISIBLE_MS);
+	}
+
+	/** Prefer 20-20-20 when both eye-care prompts are due in the same tick. */
+	private shouldDeferForLookAway(): boolean {
+		if (!this.preferences.lookAwayEnabled) return false;
+		const elapsed =
+			Date.now() - this.store.get("lastLookAwayTime", 0);
+		return elapsed >= this.preferences.lookAwayInterval * 60 * 1000;
 	}
 
 	private closePopup(): void {

@@ -55,6 +55,9 @@ contextBridge.exposeInMainWorld('popupAPI', {
   onCameraMode: (callback: (isEnabled: boolean) => void) => {
     ipcRenderer.on(IPC_CHANNELS.cameraMode, (_event, isEnabled) => callback(isEnabled));
   },
+  onBlinkClickThrough: (callback: (enabled: boolean) => void) => {
+    ipcRenderer.on(IPC_CHANNELS.blinkClickThrough, (_event, enabled) => callback(enabled));
+  },
   
   // For sound player (file MP3 or procedural cheer)
   onPlaySound: (callback: (payload: { volume: number; path?: string; mode?: "file" | "cheer" }) => void) => {
@@ -130,6 +133,7 @@ declare global {
       onUpdateColors: (callback: (colors: any) => void) => void;
       onUpdateMessage: (callback: (message: string) => void) => void;
       onCameraMode: (callback: (isEnabled: boolean) => void) => void;
+      onBlinkClickThrough: (callback: (enabled: boolean) => void) => void;
       onPlaySound: (callback: (payload: { volume: number; path?: string; mode?: "file" | "cheer" }) => void) => void;
       notifyAudioFinished: () => void;
       onFaceTrackingData: (callback: (data: any) => void) => void;

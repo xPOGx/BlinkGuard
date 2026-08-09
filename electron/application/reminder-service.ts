@@ -356,9 +356,10 @@ export class ReminderService {
 		}, CAMERA_POLL_INTERVAL_MS);
 	}
 
-	/** Soft-suppress blink popups while look-away / quiet hours / fullscreen / snooze. */
+	/** Soft-suppress blink popups while eye-care / quiet hours / fullscreen / snooze. */
 	private showBlinkReminder(): unknown | null {
 		if (this.state.isLookAwayShowing) return null;
+		if (this.state.isExerciseShowing) return null;
 		if (Date.now() < this.state.blinkSnoozeUntil) return null;
 		if (!this.notificationGate.notificationsAllowed()) return null;
 		this.windows.hideBlinkRateCoach();

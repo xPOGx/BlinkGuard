@@ -107,6 +107,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	on(IPC_CHANNELS.updatePopupMessage, (_event, message: unknown) => {
 		preferences.set("popupMessage", message as string);
 	});
+	on(IPC_CHANNELS.updateBlinkPopupClickThrough, (_event, enabled: unknown) => {
+		preferences.set("blinkPopupClickThrough", Boolean(enabled));
+	});
 	on(IPC_CHANNELS.updateDarkMode, (_event, enabled: unknown) => {
 		preferences.set("darkMode", enabled as boolean);
 	});

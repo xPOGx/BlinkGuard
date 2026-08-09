@@ -4,6 +4,13 @@ function snoozeBlink() {
 	window.popupAPI.snoozeBlink();
 }
 
+function applyBlinkClickThrough(enabled) {
+	const snoozeBtn = document.getElementById("snooze-blink");
+	if (!snoozeBtn) return;
+	snoozeBtn.hidden = Boolean(enabled);
+	snoozeBtn.style.display = enabled ? "none" : "";
+}
+
 function initReminderPopup() {
 	updateColors({
 		background: "#0F172A",
@@ -14,6 +21,7 @@ function initReminderPopup() {
 	window.popupAPI.onUpdateColors(updateColors);
 	window.popupAPI.onUpdateMessage(updateMessage);
 	window.popupAPI.onCameraMode(updateCameraMode);
+	window.popupAPI.onBlinkClickThrough(applyBlinkClickThrough);
 
 	const snoozeBtn = document.getElementById("snooze-blink");
 	if (snoozeBtn) {

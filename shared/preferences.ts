@@ -199,6 +199,8 @@ export interface PersistedPreferences {
 	popupSize: Size;
 	popupColors: PopupColors;
 	popupMessage: string;
+	/** When true, blink popup ignores mouse (watermark); snooze via tray. */
+	blinkPopupClickThrough: boolean;
 	keyboardShortcut: string;
 	mgdMode: boolean;
 	soundEnabled: boolean;
@@ -268,7 +270,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	blinkRateThresholdPerMin: BLINK_RATE_LOW_MAX,
 	earCalibration: null,
 	eyeExercisesEnabled: true,
-	exerciseInterval: 20,
+	exerciseInterval: 40,
 	exercisePrompts: [...DEFAULT_EXERCISE_PROMPTS],
 	lookAwayEnabled: true,
 	lookAwayInterval: 20,
@@ -281,6 +283,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 		transparency: 0.15,
 	},
 	popupMessage: defaultPopupMessage("en"),
+	blinkPopupClickThrough: true,
 	keyboardShortcut: "Ctrl+I",
 	mgdMode: false,
 	soundEnabled: false,
@@ -510,6 +513,10 @@ export function sanitizePersistedPreferences(
 			typeof record.popupMessage === "string" && record.popupMessage.trim()
 				? record.popupMessage
 				: defaults.popupMessage,
+		blinkPopupClickThrough: asBoolean(
+			record.blinkPopupClickThrough,
+			defaults.blinkPopupClickThrough,
+		),
 		keyboardShortcut:
 			typeof record.keyboardShortcut === "string" &&
 			record.keyboardShortcut.trim()

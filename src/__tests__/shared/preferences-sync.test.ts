@@ -23,6 +23,7 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updatePopupColors: vi.fn(),
 		updatePopupTransparency: vi.fn(),
 		updatePopupMessage: vi.fn(),
+		updateBlinkPopupClickThrough: vi.fn(),
 		updateKeyboardShortcut: vi.fn(),
 		updateMgdMode: vi.fn(),
 		updateSoundEnabled: vi.fn(),
@@ -159,6 +160,19 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateSoundVolume).toHaveBeenCalledWith(55);
 		expect(rendererIpc.updateSoundEnabled).not.toHaveBeenCalled();
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+	});
+
+	it("pushes only blink click-through when it changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = { ...previous, blinkPopupClickThrough: false };
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateBlinkPopupClickThrough).toHaveBeenCalledWith(
+			false,
+		);
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+		expect(rendererIpc.updatePopupMessage).not.toHaveBeenCalled();
 	});
 
 	it("pushes goals config once when any goal field changes", () => {

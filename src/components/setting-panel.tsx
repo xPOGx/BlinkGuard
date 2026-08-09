@@ -49,7 +49,7 @@ export function SettingRow({
 				</div>
 				{action ? <div className="shrink-0">{action}</div> : null}
 			</div>
-			{children ? <div className="mt-3">{children}</div> : null}
+			{children ? <div className="mt-4">{children}</div> : null}
 		</div>
 	);
 }

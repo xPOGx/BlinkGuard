@@ -166,6 +166,11 @@ export function ExerciseSettings({
 						<div className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">
 							{t("exercises.hint")}
 						</div>
+						{preferences.lookAwayEnabled ? (
+							<p className="text-xs text-muted-foreground">
+								{t("exercises.overlapHint")}
+							</p>
+						) : null}
 					</div>
 				) : null}
 			</SettingRow>

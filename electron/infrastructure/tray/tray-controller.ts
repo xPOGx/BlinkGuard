@@ -15,6 +15,7 @@ export class TrayController {
 		private readonly getLocale: () => Locale = () => "en",
 		private readonly onCheckForUpdates: (() => void) | null = null,
 		private readonly interactions: InteractionLogger | null = null,
+		private readonly onSnoozeBlink: (() => void) | null = null,
 	) {}
 
 	create(): void {
@@ -47,6 +48,18 @@ export class TrayController {
 				},
 			},
 		];
+		if (this.onSnoozeBlink) {
+			items.push({
+				label: t(locale, "tray.snoozeBlink"),
+				click: () => {
+					this.interactions?.append({
+						source: "tray",
+						action: "menu-snooze-blink",
+					});
+					this.onSnoozeBlink?.();
+				},
+			});
+		}
 		if (this.onCheckForUpdates) {
 			items.push({
 				label: t(locale, "tray.checkForUpdates"),

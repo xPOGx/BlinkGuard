@@ -436,10 +436,10 @@ export function BackupSettings() {
 		<SettingPanel>
 			<SettingRow title={t("backup.title")} description={t("backup.body")}>
 				<fieldset
-					className="m-0 space-y-1.5 border-0 p-0"
+					className="m-0 space-y-1.5 border-0 p-0 pt-1"
 					disabled={busy !== null}
 				>
-					<legend className="mb-0 px-0 text-xs font-medium text-muted-foreground">
+					<legend className="mb-2 px-0 text-xs font-medium text-muted-foreground">
 						{t("backup.scope.legend")}
 					</legend>
 					{BACKUP_SCOPES.map((value) => {

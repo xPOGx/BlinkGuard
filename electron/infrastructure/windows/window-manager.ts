@@ -148,7 +148,8 @@ export class WindowManager {
 		}
 		this.closeReminder();
 		const position = this.ensurePopupPosition();
-		const interactive = kind === "blink";
+		const interactive =
+			kind === "blink" && !this.preferences.blinkPopupClickThrough;
 		const popup = createPanelWindow({
 			width: this.preferences.popupSize.width,
 			height: this.preferences.popupSize.height,
@@ -174,6 +175,10 @@ export class WindowManager {
 				popup.webContents.send(
 					IPC_CHANNELS.cameraMode,
 					this.preferences.cameraEnabled,
+				);
+				popup.webContents.send(
+					IPC_CHANNELS.blinkClickThrough,
+					this.preferences.blinkPopupClickThrough,
 				);
 			}
 			if (!interactive) {

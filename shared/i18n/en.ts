@@ -252,6 +252,8 @@ export const en: MessageCatalog = {
 	"exercises.promptAria": "Exercise prompt {n}",
 	"exercises.removeAria": "Remove exercise prompt {n}",
 	"exercises.hint": "Exercise reminders will appear periodically",
+	"exercises.overlapHint":
+		"Exercises and look-away use separate timers. If both are due, only one prompt shows at a time (look-away preferred).",
 	"exercises.disabledNotice.title": "Eye strain risk",
 	"exercises.disabledNotice.body":
 		"Eye exercises and 20-20-20 look-away breaks are both turned off. Long screen sessions without breaks can contribute to digital eye strain — consider enabling at least one reminder.",
@@ -286,6 +288,10 @@ export const en: MessageCatalog = {
 	"popup.transparencyAria": "Panel transparency",
 	"popup.transparencyHint":
 		"Higher values make the panel background more see-through. Text stays fully opaque for sharper glyphs.",
+	"popup.clickThrough": "Pass clicks through blink popup",
+	"popup.clickThroughDescription":
+		"Blink reminder stays visible but does not steal clicks (like a watermark). Snooze from the tray menu.",
+	"popup.clickThroughAria": "Pass clicks through blink popup",
 	"popup.colorPickerAria": "{label} picker",
 
 	// Sound / launch / reset / quiet hours
@@ -506,6 +512,7 @@ export const en: MessageCatalog = {
 
 	// Tray / window titles
 	"tray.show": "Show BlinkGuard",
+	"tray.snoozeBlink": "Snooze blink (5 min)",
 	"tray.checkForUpdates": "Check for updates",
 	"tray.quit": "Quit",
 	"window.cameraTitle": "Camera Visualization",

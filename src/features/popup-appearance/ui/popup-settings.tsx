@@ -1,7 +1,11 @@
 import { Palette, Settings } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "@/components/button";
-import { SettingPanel, SettingRow } from "@/components/setting-panel";
+import {
+	SettingPanel,
+	SettingRow,
+	ToggleSwitch,
+} from "@/components/setting-panel";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { useT } from "@/i18n";
@@ -36,7 +40,7 @@ export function PopupSettings({
 	};
 
 	return (
-		<SettingPanel>
+		<SettingPanel className="space-y-4">
 			<SettingRow
 				title={
 					<>
@@ -190,6 +194,23 @@ export function PopupSettings({
 					</div>
 				) : null}
 			</SettingRow>
+
+			<SettingRow
+				title={t("popup.clickThrough")}
+				description={t("popup.clickThroughDescription")}
+				action={
+					<ToggleSwitch
+						aria-label={t("popup.clickThroughAria")}
+						checked={preferences.blinkPopupClickThrough}
+						onChange={() =>
+							setPreferences((current) => ({
+								...current,
+								blinkPopupClickThrough: !current.blinkPopupClickThrough,
+							}))
+						}
+					/>
+				}
+			/>
 		</SettingPanel>
 	);
 }

@@ -106,6 +106,8 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updatePopupTransparency, transparency),
 	updatePopupMessage: (message: string) =>
 		send(IPC_CHANNELS.updatePopupMessage, message),
+	updateBlinkPopupClickThrough: (enabled: boolean) =>
+		send(IPC_CHANNELS.updateBlinkPopupClickThrough, enabled),
 	updateKeyboardShortcut: (shortcut: string) =>
 		send(IPC_CHANNELS.updateKeyboardShortcut, shortcut),
 	updateSoundEnabled: (enabled: boolean) =>

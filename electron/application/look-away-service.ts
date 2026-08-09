@@ -67,6 +67,7 @@ export class LookAwayService {
 
 	private show(): void {
 		if (this.state.isLookAwayShowing) return;
+		if (this.state.isExerciseShowing) return;
 		if (!this.notificationGate.notificationsAllowed()) return;
 		this.sound.play("lookAway");
 		this.state.isLookAwayShowing = true;

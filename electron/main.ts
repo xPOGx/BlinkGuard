@@ -240,6 +240,7 @@ function bootstrap(): void {
 			autoUpdates.checkForUpdates({ interactive: true });
 		},
 		interactionLogger,
+		() => reminders.snooze(),
 	);
 	lifecycle.attachTray(tray);
 
