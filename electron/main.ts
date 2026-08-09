@@ -12,6 +12,7 @@ import { PreferenceActions } from "./application/preference-actions";
 import { PreferencesService } from "./application/preferences-service";
 import { DeferredTrackingRestore } from "./application/deferred-tracking-restore";
 import { ReminderService } from "./application/reminder-service";
+import { startTrackingSession } from "./application/tracking-session";
 import { createFocusEnvironment } from "./infrastructure/focus/create-focus-environment";
 import { FocusEnvironmentMonitor } from "./infrastructure/focus/focus-environment-monitor";
 import { registerIpcHandlers } from "./infrastructure/ipc/register-ipc-handlers";
@@ -201,6 +202,8 @@ function bootstrap(): void {
 		preferences,
 		state,
 		reminders,
+		exercises,
+		lookAway,
 		windows,
 		interactionLogger,
 	);
@@ -262,7 +265,13 @@ function bootstrap(): void {
 	const trackingRestore = new DeferredTrackingRestore({
 		pending: preferences.isTracking,
 		isTracking: () => preferences.isTracking,
-		start: () => reminders.start(preferences.reminderInterval),
+		start: () =>
+			startTrackingSession({
+				reminders,
+				exercises,
+				lookAway,
+				preferences,
+			}),
 	});
 
 	registerIpcHandlers({

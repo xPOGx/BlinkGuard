@@ -12,7 +12,7 @@ Pragmatic Clean Architecture with a thin `electron/main.ts` composition root. Fe
 |---|---|
 | `shared/` | IPC channel constants/whitelists + preference types/defaults, backup envelope (`backup.ts`), diagnostics export result, profile image export (`profile-export.ts`), auto-update status (`auto-update.ts`), GitHub release notes (`release-notes.ts`), camera quality / EAR, blink-rate / blink-stats / blink-rewards / blink-profile (level math), `i18n/` (no Electron imports) |
 | `electron/domain/` | Pure policies (`reminder-policy`, `focus-policy`, `blink-rate-coaching`) |
-| `electron/application/` | Runtime state + preferences / reminder / exercise / look-away / blink-stats / blink-rate-coaching / focus-pause / preference-actions / deferred-tracking-restore and ports |
+| `electron/application/` | Runtime state + preferences / reminder / exercise / look-away / tracking-session (Start/Stop also pauses eye-care timers) / blink-stats / blink-rate-coaching / focus-pause / preference-actions / deferred-tracking-restore and ports |
 | `electron/infrastructure/` | IPC, windows, lifecycle/power, sidecar, shortcuts, sound, store, process cleanup, paths/logging, profile PNG export, focus (Win+Mac fullscreen detectors; stub elsewhere) |
 | `electron/main.ts` | Vite entry/composition root only: constructs collaborators, connects callbacks, starts lifecycle; cold-start tracking restore waits for renderer `shellReady` (after boot splash) |
 | `electron/preload.ts` | `contextBridge`; whitelists from `shared/ipc-channels` |

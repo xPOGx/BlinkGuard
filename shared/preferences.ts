@@ -191,7 +191,7 @@ export interface PersistedPreferences {
 	exerciseInterval: number;
 	/** Rotating eye-exercise instruction texts shown in the exercise popup. */
 	exercisePrompts: string[];
-	/** Periodic 20-20-20 style look-away breaks (independent of blink tracking). */
+	/** Periodic 20-20-20 style look-away breaks (own pref; timers pause while tracking is stopped). */
 	lookAwayEnabled: boolean;
 	/** Minutes between look-away prompts. */
 	lookAwayInterval: number;

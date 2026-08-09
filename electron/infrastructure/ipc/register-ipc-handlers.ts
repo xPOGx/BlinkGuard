@@ -13,6 +13,10 @@ import type { LookAwayService } from "../../application/look-away-service";
 import type { PreferenceActions } from "../../application/preference-actions";
 import type { PreferencesService } from "../../application/preferences-service";
 import type { ReminderService } from "../../application/reminder-service";
+import {
+	startTrackingSession,
+	stopTrackingSession,
+} from "../../application/tracking-session";
 import type { NotificationSoundPort } from "../../application/ports/runtime-ports";
 import { normalizeQuietHoursTime } from "../../domain/focus-policy";
 import { isBackupScope } from "../../../shared/backup";
@@ -83,9 +87,17 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	};
 
 	on(IPC_CHANNELS.startBlinkReminders, (_event, interval: unknown) => {
-		reminders.start(interval as number);
+		startTrackingSession(
+			{ reminders, exercises, lookAway, preferences: current },
+			interval as number,
+		);
 	});
-	on(IPC_CHANNELS.stopBlinkReminders, () => reminders.stop(true));
+	on(IPC_CHANNELS.stopBlinkReminders, () =>
+		stopTrackingSession(
+			{ reminders, exercises, lookAway, preferences: current },
+			true,
+		),
+	);
 	on(IPC_CHANNELS.shellReady, () => {
 		onShellReady?.();
 	});
@@ -191,11 +203,21 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		shortcuts.register(shortcut as string);
 	});
 	on(IPC_CHANNELS.startCameraTracking, () => {
-		if (current.isTracking) reminders.stop(true);
+		if (current.isTracking) {
+			stopTrackingSession(
+				{ reminders, exercises, lookAway, preferences: current },
+				true,
+			);
+		}
 		preferences.set("cameraEnabled", true);
 	});
 	on(IPC_CHANNELS.stopCameraTracking, () => {
-		if (current.isTracking) reminders.stop(true);
+		if (current.isTracking) {
+			stopTrackingSession(
+				{ reminders, exercises, lookAway, preferences: current },
+				true,
+			);
+		}
 		preferences.set("cameraEnabled", false);
 	});
 	on(IPC_CHANNELS.skipExercise, () => exercises.skip());
