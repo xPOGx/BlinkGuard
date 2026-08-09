@@ -32,6 +32,8 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 
 ![Camera settings](docs/screenshots/settings-camera.png)
 
+![Progress](docs/screenshots/settings-progress.png)
+
 ![Blink reminder popup](docs/screenshots/popup-blink.png)
 
 ![Exercise reminder popup](docs/screenshots/popup-exercise.png)
