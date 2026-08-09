@@ -71,6 +71,7 @@ class BlinkDetectorApplication:
 		self._face_miss_streak = 0
 		self._quality_miss_streak = 0
 		self._face_reacquire_frames = 0
+		self._last_clahe_roi_count = 0
 		self._last_skip_debug_time = 0.0
 		self._last_skip_debug_phase = None
 		self._last_near_miss_debug_time = 0.0
@@ -686,6 +687,8 @@ class BlinkDetectorApplication:
 			"face_detect_interval": int(self.face_detect_interval),
 			"processing_resolution": list(self.camera.processing_resolution),
 			"detector_backend": "dlib",
+			"clahe": self._last_clahe_roi_count > 0,
+			"clahe_roi_count": int(self._last_clahe_roi_count),
 		}
 
 		phase = payload["phase"] or "?"
@@ -1065,6 +1068,7 @@ class BlinkDetectorApplication:
 				landmarks = None
 
 				gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+				# HOG on raw gray — CLAHE only for shape_predictor (L2-A).
 				face = self._resolve_face(detector, gray)
 				if face is not None:
 					landmarks, left_eye, right_eye = get_face_landmarks(
@@ -1072,6 +1076,9 @@ class BlinkDetectorApplication:
 						gray,
 						face,
 						buffers,
+					)
+					self._last_clahe_roi_count = int(
+						buffers.clahe_roi_count or 0
 					)
 
 				if face is not None and left_eye is not None:
@@ -1140,6 +1147,7 @@ class BlinkDetectorApplication:
 						self._face_miss_streak = 0
 						self._quality_miss_streak = 0
 						self._face_reacquire_frames = FACE_REACQUIRE_FRAMES
+						self._last_clahe_roi_count = 0
 						had_candidate = self.detection.cancel_on_face_lost(
 							current_time
 						)
