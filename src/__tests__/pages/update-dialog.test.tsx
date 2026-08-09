@@ -40,8 +40,13 @@ describe("UpdateDialog", () => {
 		expect(screen.queryByRole("dialog")).toBeNull();
 	});
 
+	it("ignores toast-surface statuses", () => {
+		renderDialog({ state: "checking", surface: "toast" });
+		expect(screen.queryByRole("dialog")).toBeNull();
+	});
+
 	it("shows unavailable copy in unpackaged/dev messaging", () => {
-		renderDialog({ state: "unavailable" });
+		renderDialog({ state: "unavailable", surface: "dialog" });
 		expect(
 			screen.getByRole("dialog", { name: "Updates unavailable" }),
 		).toBeDefined();
@@ -56,6 +61,7 @@ describe("UpdateDialog", () => {
 		const { install, dismiss } = renderDialog({
 			state: "ready",
 			version: "1.2.3",
+			surface: "dialog",
 		});
 		expect(
 			screen.getByText(
@@ -73,6 +79,7 @@ describe("UpdateDialog", () => {
 			state: "downloading",
 			version: "2.0.0",
 			percent: 55,
+			surface: "dialog",
 		});
 		expect(screen.getByText("Downloading BlinkGuard 2.0.0… 55%")).toBeDefined();
 		expect(screen.queryByRole("button", { name: "OK" })).toBeNull();

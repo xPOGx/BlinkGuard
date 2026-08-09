@@ -10,7 +10,7 @@ export function UpdateDialog({ status, install, dismiss }: AutoUpdateApi) {
 	const t = useT();
 
 	useEffect(() => {
-		if (status.state === "idle") return;
+		if (status.state === "idle" || status.surface !== "dialog") return;
 		const onKeyDown = (event: KeyboardEvent) => {
 			if (event.key !== "Escape") return;
 			if (
@@ -26,7 +26,7 @@ export function UpdateDialog({ status, install, dismiss }: AutoUpdateApi) {
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [status, dismiss]);
 
-	if (status.state === "idle") return null;
+	if (status.state === "idle" || status.surface !== "dialog") return null;
 
 	const titleId = "auto-update-title";
 	let title = "";

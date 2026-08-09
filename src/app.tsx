@@ -14,6 +14,7 @@ import { dismissBootSplash } from "@/boot-splash";
 import { useAutoUpdate } from "@/features/about/model/use-auto-update";
 import { AboutPanel } from "@/features/about/ui/about-panel";
 import { UpdateDialog } from "@/features/about/ui/update-dialog";
+import { UpdateToast } from "@/features/about/ui/update-toast";
 import { useCameraStatus } from "@/features/camera/model/use-camera-status";
 import {
 	CameraControls,
@@ -194,6 +195,7 @@ function SettingsShell({
 					shortcut={shortcuts}
 				/>
 			) : null}
+			<UpdateToast {...autoUpdate} />
 			<UpdateDialog {...autoUpdate} />
 			<aside className="flex shrink-0 flex-col border-b border-border bg-sidebar min-[721px]:w-56 min-[721px]:border-r min-[721px]:border-b-0">
 				<div className="flex items-center gap-2.5 px-4 py-3 min-[721px]:px-5 min-[721px]:py-5">

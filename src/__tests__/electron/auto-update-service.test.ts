@@ -67,10 +67,10 @@ describe("AutoUpdateService", () => {
 		});
 	}
 
-	it("emits unavailable for interactive check when disabled", () => {
+	it("emits unavailable dialog for interactive check when disabled", () => {
 		const service = createService();
 		service.checkForUpdates({ interactive: true });
-		expect(emitted).toEqual([{ state: "unavailable" }]);
+		expect(emitted).toEqual([{ state: "unavailable", surface: "dialog" }]);
 		expect(ensureVisibleCalls).toBeGreaterThan(0);
 		expect(checkForUpdatesMock).not.toHaveBeenCalled();
 	});
@@ -79,26 +79,35 @@ describe("AutoUpdateService", () => {
 		const service = createService();
 		service.checkForUpdates();
 		expect(emitted).toEqual([]);
+		expect(ensureVisibleCalls).toBe(0);
 	});
 
-	it("interactive check emits checking then upToDate", () => {
+	it("interactive check emits dialog surface and brings window forward", () => {
 		const service = createService();
 		service.start();
 		service.checkForUpdates({ interactive: true });
-		expect(emitted).toEqual([{ state: "checking" }]);
+		expect(emitted).toEqual([{ state: "checking", surface: "dialog" }]);
+		expect(ensureVisibleCalls).toBe(1);
 		autoUpdater.emit("update-not-available");
-		expect(emitted.at(-1)).toEqual({ state: "upToDate" });
+		expect(emitted.at(-1)).toEqual({ state: "upToDate", surface: "dialog" });
+		expect(ensureVisibleCalls).toBe(2);
 	});
 
-	it("quiet check skips upToDate emit", () => {
+	it("silent check emits toast surface without ensureVisible", () => {
 		const service = createService();
 		service.start();
 		service.checkForUpdates();
+		expect(emitted).toEqual([{ state: "checking", surface: "toast" }]);
+		expect(ensureVisibleCalls).toBe(0);
 		autoUpdater.emit("update-not-available");
-		expect(emitted).toEqual([]);
+		expect(emitted).toEqual([
+			{ state: "checking", surface: "toast" },
+			{ state: "upToDate", surface: "toast" },
+		]);
+		expect(ensureVisibleCalls).toBe(0);
 	});
 
-	it("emits available, downloading, then ready for interactive download", () => {
+	it("interactive download uses dialog surface throughout", () => {
 		const service = createService();
 		service.start();
 		service.checkForUpdates({ interactive: true });
@@ -106,21 +115,29 @@ describe("AutoUpdateService", () => {
 		autoUpdater.emit("download-progress", { percent: 42.6 });
 		autoUpdater.emit("update-downloaded", { version: "2.0.0" });
 		expect(emitted).toEqual([
-			{ state: "checking" },
-			{ state: "available", version: "2.0.0" },
-			{ state: "downloading", version: "2.0.0", percent: 43 },
-			{ state: "ready", version: "2.0.0" },
+			{ state: "checking", surface: "dialog" },
+			{ state: "available", version: "2.0.0", surface: "dialog" },
+			{ state: "downloading", version: "2.0.0", percent: 43, surface: "dialog" },
+			{ state: "ready", version: "2.0.0", surface: "dialog" },
 		]);
 	});
 
-	it("quiet path emits ready on download complete", () => {
+	it("silent download uses toast until ready escalates to dialog", () => {
 		const service = createService();
 		service.start();
 		service.checkForUpdates();
+		expect(ensureVisibleCalls).toBe(0);
 		autoUpdater.emit("update-available", { version: "2.1.0" });
 		autoUpdater.emit("download-progress", { percent: 10 });
+		expect(ensureVisibleCalls).toBe(0);
 		autoUpdater.emit("update-downloaded", { version: "2.1.0" });
-		expect(emitted).toEqual([{ state: "ready", version: "2.1.0" }]);
+		expect(emitted).toEqual([
+			{ state: "checking", surface: "toast" },
+			{ state: "available", version: "2.1.0", surface: "toast" },
+			{ state: "downloading", version: "2.1.0", percent: 10, surface: "toast" },
+			{ state: "ready", version: "2.1.0", surface: "dialog" },
+		]);
+		expect(ensureVisibleCalls).toBe(1);
 	});
 
 	it("installUpdate calls quitAndInstall after download", () => {
@@ -132,17 +149,18 @@ describe("AutoUpdateService", () => {
 		expect(quitAndInstall).toHaveBeenCalledWith(false, true);
 	});
 
-	it("re-presents ready when already downloaded", () => {
+	it("re-presents ready dialog when already downloaded", () => {
 		const service = createService();
 		service.start();
 		service.checkForUpdates({ interactive: true });
 		autoUpdater.emit("update-downloaded", { version: "3.0.0" });
 		emitted.length = 0;
+		ensureVisibleCalls = 0;
 		service.checkForUpdates({ interactive: true });
 		expect(emitted).toEqual([
-			{ state: "checking" },
-			{ state: "ready", version: "3.0.0" },
+			{ state: "ready", version: "3.0.0", surface: "dialog" },
 		]);
+		expect(ensureVisibleCalls).toBe(1);
 	});
 
 	it("uses native dialog fallback when main window cannot host UI", () => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import type { AutoUpdateStatus } from "../../../../shared/auto-update";
 
@@ -13,6 +13,10 @@ export function useAutoUpdate() {
 		});
 	}, []);
 
+	const dismiss = useCallback(() => {
+		setStatus(idleStatus);
+	}, []);
+
 	const busy =
 		status.state === "checking" ||
 		status.state === "available" ||
@@ -23,6 +27,6 @@ export function useAutoUpdate() {
 		busy,
 		check: () => rendererIpc.checkForUpdates(),
 		install: () => rendererIpc.installUpdate(),
-		dismiss: () => setStatus(idleStatus),
+		dismiss,
 	};
 }
