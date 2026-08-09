@@ -11,6 +11,7 @@ from blink_detector_package.infrastructure.camera import (
 	MAX_NO_FACE_FAILOVERS,
 	NO_FACE_FAILOVER_S,
 	backend_name,
+	enumerate_camera_device_names,
 	fourcc_to_str,
 	is_black_frame,
 	is_mjpg_fourcc,
@@ -59,7 +60,7 @@ class CameraHelperTests(unittest.TestCase):
 				return None
 
 		cam = OpenCVCamera(_SilentTransport())
-		# Windows order: MSMF first (C170 working path), then DSHOW.
+		# Windows order: MSMF first (laptop-cam working path), then DSHOW.
 		cam._platform_backends = lambda: [cv2.CAP_MSMF, cv2.CAP_DSHOW]
 		pairs = cam._candidate_pairs()
 		self.assertEqual(pairs[0], (0, cv2.CAP_MSMF))
@@ -97,6 +98,62 @@ class CameraHelperTests(unittest.TestCase):
 		self.assertEqual(cam.processing_resolution, (480, 360))
 		cam.processing_resolution = (640, 480)
 		self.assertEqual(cam.processing_resolution, (640, 480))
+
+	def test_device_name_for_index_soft_match(self):
+		from blink_detector_package.infrastructure.camera import OpenCVCamera
+
+		class _SilentTransport:
+			def send(self, _payload):
+				return None
+
+		cam = OpenCVCamera(_SilentTransport())
+		cam._device_names = ["Integrated Camera", "USB Webcam"]
+		self.assertEqual(cam._device_name_for_index(0), "Integrated Camera")
+		self.assertEqual(cam._device_name_for_index(1), "USB Webcam")
+		self.assertIsNone(cam._device_name_for_index(2))
+		self.assertIsNone(cam._device_name_for_index(None))
+
+	def test_refresh_device_inventory_emits_camera_devices(self):
+		from blink_detector_package.infrastructure.camera import OpenCVCamera
+
+		events = []
+
+		class _Transport:
+			def send(self, payload):
+				events.append(payload)
+
+		cam = OpenCVCamera(_Transport())
+		cam._device_names = []
+		# Avoid real PowerShell / system_profiler in unit tests.
+		import blink_detector_package.infrastructure.camera as camera_mod
+
+		original = camera_mod.enumerate_camera_device_names
+		camera_mod.enumerate_camera_device_names = lambda: [
+			"Integrated Camera",
+			"Logitech C170",
+		]
+		try:
+			cam._refresh_device_inventory()
+		finally:
+			camera_mod.enumerate_camera_device_names = original
+
+		states = [
+			e.get("cameraState")
+			for e in events
+			if isinstance(e.get("cameraState"), dict)
+		]
+		devices_event = next(s for s in states if s.get("kind") == "camera_devices")
+		self.assertEqual(devices_event["count"], 2)
+		self.assertEqual(
+			devices_event["names"],
+			["Integrated Camera", "Logitech C170"],
+		)
+		self.assertEqual(cam._device_name_for_index(1), "Logitech C170")
+
+	def test_enumerate_camera_device_names_returns_list(self):
+		# Smoke: never raises; may be empty in CI/headless.
+		names = enumerate_camera_device_names()
+		self.assertIsInstance(names, list)
 
 	def test_no_face_failover_constants(self):
 		self.assertGreaterEqual(NO_FACE_FAILOVER_S, 3.0)

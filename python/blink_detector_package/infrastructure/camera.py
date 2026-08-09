@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 import time
 from contextlib import contextmanager
@@ -7,7 +8,7 @@ import cv2
 import numpy as np
 
 # OpenCV MSMF + HW transforms often fails stream selection on Win10/11;
-# disable unless the user already set the env (legacy C170 / Frame Server).
+# disable unless the user already set the env.
 if sys.platform == "win32":
 	os.environ.setdefault("OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS", "0")
 
@@ -70,6 +71,84 @@ def is_mjpg_fourcc(code: str) -> bool:
 	return normalized in ("MJPG", "GPJM")
 
 
+def enumerate_camera_device_names() -> list[str]:
+	"""Best-effort friendly camera names for diagnostics (OS APIs, not OpenCV).
+
+	Index order may not match OpenCV's CAP_* enumeration — treat as a device
+	inventory, and only as a soft hint when using the same numeric index.
+	"""
+	if sys.platform == "win32":
+		return _enumerate_windows_camera_names()
+	if sys.platform == "darwin":
+		return _enumerate_darwin_camera_names()
+	return []
+
+
+def _enumerate_windows_camera_names() -> list[str]:
+	# PnP Camera/Image class — no extra Python deps (PyInstaller-friendly).
+	creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+	try:
+		completed = subprocess.run(
+			[
+				"powershell",
+				"-NoProfile",
+				"-NonInteractive",
+				"-Command",
+				(
+					"Get-CimInstance Win32_PnPEntity | "
+					"Where-Object { $_.PNPClass -eq 'Camera' -or $_.PNPClass -eq 'Image' } | "
+					"Select-Object -ExpandProperty Name"
+				),
+			],
+			capture_output=True,
+			text=True,
+			timeout=8,
+			creationflags=creationflags,
+		)
+	except Exception:
+		return []
+	if completed.returncode != 0:
+		return []
+	names = []
+	seen = set()
+	for line in (completed.stdout or "").splitlines():
+		name = line.strip()
+		if not name or name in seen:
+			continue
+		seen.add(name)
+		names.append(name)
+	return names
+
+
+def _enumerate_darwin_camera_names() -> list[str]:
+	try:
+		completed = subprocess.run(
+			["system_profiler", "SPCameraDataType", "-json"],
+			capture_output=True,
+			text=True,
+			timeout=8,
+		)
+	except Exception:
+		return []
+	if completed.returncode != 0 or not completed.stdout:
+		return []
+	try:
+		import json
+
+		payload = json.loads(completed.stdout)
+	except Exception:
+		return []
+	names = []
+	seen = set()
+	for item in payload.get("SPCameraDataType") or []:
+		name = (item.get("_name") or item.get("name") or "").strip()
+		if not name or name in seen:
+			continue
+		seen.add(name)
+		names.append(name)
+	return names
+
+
 @contextmanager
 def opencv_quiet_warnings():
 	"""Drop OpenCV WARN spam (e.g. MSMF initStream) during probe/open."""
@@ -101,6 +180,8 @@ class OpenCVCamera:
 		self._preferred_backend = None
 		self._failover_cursor = 0
 		self._no_face_failovers = 0
+		# Soft device inventory for diagnostics (may not match OpenCV indices).
+		self._device_names: list[str] = []
 
 	def emit_camera_state(self, kind, **fields):
 		payload = {"kind": kind, **fields}
@@ -113,12 +194,40 @@ class OpenCVCamera:
 			}
 		)
 
+	def _device_name_for_index(self, index) -> str | None:
+		if index is None or index < 0 or index >= len(self._device_names):
+			return None
+		return self._device_names[index]
+
+	def _refresh_device_inventory(self):
+		self._device_names = enumerate_camera_device_names()
+		devices = [
+			{"index": i, "name": name}
+			for i, name in enumerate(self._device_names)
+		]
+		self.emit_camera_state(
+			"camera_devices",
+			devices=devices,
+			names=list(self._device_names),
+			count=len(self._device_names),
+			index_match="soft",
+		)
+		if self._device_names:
+			joined = "; ".join(
+				f"{i}={name}" for i, name in enumerate(self._device_names)
+			)
+			self.transport.send({"debug": f"Camera devices: {joined}"})
+		else:
+			self.transport.send({"debug": "Camera devices: (none enumerated)"})
+
 	def _platform_backends(self):
 		if sys.platform == "win32":
-			# Prefer MSMF first — matches the path that worked for Logitech C170
-			# (diagnostics: MSMF @ ~640x360, usable luma). DSHOW+forced MJPG at
-			# snapped 320x240 produced sustained black frames (luma≈0.3) after
-			# 2.4.0. DSHOW remains failover. Skip CAP_ANY (re-enters MSMF).
+			# LOCKED (field-validated, built-in laptop cam / “Паша”, post-2.4.0):
+			# Prefer MSMF first. Do NOT switch back to DSHOW-first without new
+			# Export diagnostics — DSHOW + forced MJPG + 4:3 snap produced
+			# sustained black frames (luma≈0.3) on that machine; MSMF worked.
+			# (Separate tester uses Logitech C170 — different failure mode.)
+			# DSHOW remains failover. Skip CAP_ANY (re-enters MSMF).
 			return [cv2.CAP_MSMF, cv2.CAP_DSHOW]
 		if sys.platform == "darwin":
 			return [cv2.CAP_AVFOUNDATION, cv2.CAP_ANY]
@@ -165,15 +274,17 @@ class OpenCVCamera:
 		if cap is None:
 			return
 		# Request the processing preset size; accept whatever the driver
-		# negotiates (C170 often lands on 640x360 — do not snap to 4:3).
+		# negotiates (built-in cams often land on 640x360 — do not snap to 4:3).
+		# LOCKED with _platform_backends: no 4:3 snap / no Windows FOURCC force
+		# without fresh field diagnostics (2.4.0 regression on laptop webcam).
 		width, height = self.processing_resolution
 		fourcc_requested = None
 		fourcc_actual = fourcc_to_str(cap.get(cv2.CAP_PROP_FOURCC))
 
 		if sys.platform == "win32":
-			# Leave FOURCC to the driver/Frame Server. Forcing MJPG on DSHOW
-			# opened 320x240 black streams on C170; working sessions used MSMF
-			# with the default negotiated format.
+			# LOCKED: leave FOURCC to the driver/Frame Server. Forcing MJPG on
+			# DSHOW opened 320x240 black streams on a built-in laptop cam;
+			# working sessions used MSMF with the default negotiated format.
 			fourcc_requested = None
 		else:
 			fourcc_requested = "MJPG"
@@ -243,12 +354,13 @@ class OpenCVCamera:
 
 	def _try_open_pair(self, index, backend):
 		name = backend_name(backend)
+		device_name = self._device_name_for_index(index)
 		self.emit_camera_state(
 			"camera_open_attempt",
 			index=index,
 			backend=backend,
 			backend_name=name,
-			fourcc="MJPG",
+			device_name=device_name,
 			requested_wh=list(self.processing_resolution),
 			requested_fps=self.target_fps,
 		)
@@ -256,6 +368,7 @@ class OpenCVCamera:
 			{
 				"debug": (
 					f"Trying camera index {index} with backend {backend} ({name})"
+					+ (f" device={device_name!r}" if device_name else "")
 				)
 			}
 		)
@@ -269,6 +382,7 @@ class OpenCVCamera:
 					index=index,
 					backend=backend,
 					backend_name=name,
+					device_name=device_name,
 					reject_reason="not_opened",
 				)
 				capture.release()
@@ -292,6 +406,7 @@ class OpenCVCamera:
 					index=index,
 					backend=backend,
 					backend_name=name,
+					device_name=device_name,
 					actual_wh=actual_wh,
 					actual_fps=actual_fps,
 					mean_luma=luma,
@@ -302,7 +417,13 @@ class OpenCVCamera:
 					{
 						"debug": (
 							f"Camera {index}/{name} rejected: {reject} "
-							f"(luma={luma:.1f})"
+							f"(luma={luma:.1f}"
+							+ (
+								f", device={device_name!r}"
+								if device_name
+								else ""
+							)
+							+ ")"
 						)
 					}
 				)
@@ -317,6 +438,7 @@ class OpenCVCamera:
 				index=index,
 				backend=backend,
 				backend_name=name,
+				device_name=device_name,
 				actual_wh=actual_wh,
 				actual_fps=actual_fps,
 				mean_luma=luma,
@@ -328,6 +450,7 @@ class OpenCVCamera:
 					"debug": (
 						f"Success! Camera {index} working with backend "
 						f"{backend} ({name}), luma={luma:.1f}"
+						+ (f", device={device_name!r}" if device_name else "")
 					)
 				}
 			)
@@ -346,6 +469,7 @@ class OpenCVCamera:
 				index=index,
 				backend=backend,
 				backend_name=name,
+				device_name=device_name,
 				reject_reason=f"exception:{error}",
 			)
 			self.transport.send(
@@ -379,6 +503,7 @@ class OpenCVCamera:
 			self.transport.send({"debug": "Camera already active"})
 			return True
 
+		self._refresh_device_inventory()
 		self._release_capture()
 		self.active = False
 
@@ -442,6 +567,7 @@ class OpenCVCamera:
 				backend_name=backend_name(self.backend)
 				if self.backend is not None
 				else None,
+				device_name=self._device_name_for_index(self.camera_index),
 			)
 		self.transport.send({"status": "Camera released"})
 
@@ -470,6 +596,7 @@ class OpenCVCamera:
 			"backend_name": backend_name(self.backend)
 			if self.backend is not None
 			else None,
+			"device_name": self._device_name_for_index(self.camera_index),
 			"fourcc": self.fourcc,
 			"capture_wh": wh,
 			"capture_fps": fps,
