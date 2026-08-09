@@ -81,3 +81,12 @@ python/log_tools/_scratch/**
 !python/log_tools/_scratch/README.md
 python/scripts/_tmp_*.py
 python/log_tools/_tmp_*.py
+
+# README screenshot agent probes — reusable tools live in scripts/screenshot_tools/;
+# keep one-offs out of git (and out of docs/screenshots/).
+scripts/screenshot_tools/_scratch/**
+!scripts/screenshot_tools/_scratch/README.md
+docs/screenshots/_*.ps1
+docs/screenshots/_*.png
+docs/screenshots/_*.txt
+
