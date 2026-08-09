@@ -5,12 +5,93 @@ let lastBlinkTime = 0;
 let blinkDisplayTimer = null;
 let currentThreshold = 0.2;
 let thresholdUpdateTimer = null;
+/** EMA display state — HOG face boxes jitter every frame even when still. */
+let smoothedFaceRect = null;
+let smoothedEyeLandmarks = null;
+const FACE_OVERLAY_SMOOTH = 0.28;
+/** Normalized jump above this snaps (re-acquire / large head move). */
+const FACE_OVERLAY_SNAP = 0.12;
 
 function tr(key, vars) {
 	if (window.__i18n && typeof window.__i18n.t === "function") {
 		return window.__i18n.t(key, vars);
 	}
 	return key;
+}
+
+function lerp(a, b, t) {
+	return a + (b - a) * t;
+}
+
+function resetSmoothedOverlay() {
+	smoothedFaceRect = null;
+	smoothedEyeLandmarks = null;
+}
+
+function smoothFaceRect(next) {
+	if (!next || !next.width || !next.height) {
+		smoothedFaceRect = null;
+		return null;
+	}
+	if (!smoothedFaceRect) {
+		smoothedFaceRect = {
+			x: next.x,
+			y: next.y,
+			width: next.width,
+			height: next.height,
+		};
+		return smoothedFaceRect;
+	}
+	const jump =
+		Math.abs(next.x - smoothedFaceRect.x) +
+		Math.abs(next.y - smoothedFaceRect.y) +
+		Math.abs(next.width - smoothedFaceRect.width) +
+		Math.abs(next.height - smoothedFaceRect.height);
+	if (jump > FACE_OVERLAY_SNAP) {
+		smoothedFaceRect = {
+			x: next.x,
+			y: next.y,
+			width: next.width,
+			height: next.height,
+		};
+		return smoothedFaceRect;
+	}
+	const a = FACE_OVERLAY_SMOOTH;
+	smoothedFaceRect = {
+		x: lerp(smoothedFaceRect.x, next.x, a),
+		y: lerp(smoothedFaceRect.y, next.y, a),
+		width: lerp(smoothedFaceRect.width, next.width, a),
+		height: lerp(smoothedFaceRect.height, next.height, a),
+	};
+	return smoothedFaceRect;
+}
+
+function smoothEyeLandmarks(points) {
+	if (!points || !points.length) {
+		smoothedEyeLandmarks = null;
+		return null;
+	}
+	if (
+		!smoothedEyeLandmarks ||
+		smoothedEyeLandmarks.length !== points.length
+	) {
+		smoothedEyeLandmarks = points.map((p) => ({ x: p.x, y: p.y }));
+		return smoothedEyeLandmarks;
+	}
+	const a = FACE_OVERLAY_SMOOTH;
+	for (let i = 0; i < points.length; i++) {
+		const prev = smoothedEyeLandmarks[i];
+		const next = points[i];
+		const jump = Math.abs(next.x - prev.x) + Math.abs(next.y - prev.y);
+		if (jump > FACE_OVERLAY_SNAP) {
+			prev.x = next.x;
+			prev.y = next.y;
+		} else {
+			prev.x = lerp(prev.x, next.x, a);
+			prev.y = lerp(prev.y, next.y, a);
+		}
+	}
+	return smoothedEyeLandmarks;
 }
 
 function setFaceMissingOverlay(visible, faceStatus) {
@@ -103,12 +184,14 @@ function drawOverlays(faceData) {
 
 	const ctx = canvas.getContext("2d");
 	if (faceData.faceDetected) {
-		drawFaceRect(ctx, canvas, faceData.faceRect, "#00FF00");
+		const rect = smoothFaceRect(faceData.faceRect);
+		drawFaceRect(ctx, canvas, rect, "#00FF00");
 
-		if (faceData.eyeLandmarks) {
+		const landmarks = smoothEyeLandmarks(faceData.eyeLandmarks);
+		if (landmarks) {
 			ctx.save();
 			ctx.fillStyle = "#00FF00";
-			faceData.eyeLandmarks.forEach((point) => {
+			landmarks.forEach((point) => {
 				ctx.beginPath();
 				ctx.arc(point.x * canvas.width, point.y * canvas.height, 2, 0, Math.PI * 2);
 				ctx.fill();
@@ -134,7 +217,10 @@ function drawOverlays(faceData) {
 		setFaceMissingOverlay(false);
 	} else {
 		if (faceData.faceStatus === "too_far") {
-			drawFaceRect(ctx, canvas, faceData.faceRect, "#FACC15");
+			const rect = smoothFaceRect(faceData.faceRect);
+			drawFaceRect(ctx, canvas, rect, "#FACC15");
+		} else {
+			resetSmoothedOverlay();
 		}
 
 		const status = document.getElementById("status");
@@ -168,6 +254,9 @@ function applyFaceTrackingUi(data) {
 		updateInfoDisplay(eyeSize, isBlinking);
 		setFaceMissingOverlay(false);
 	} else {
+		if (data.faceStatus !== "too_far") {
+			resetSmoothedOverlay();
+		}
 		const status = document.getElementById("status");
 		if (status) {
 			status.textContent = tr("popup.camera.noFace");
