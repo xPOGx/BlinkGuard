@@ -89,6 +89,15 @@ export const en: MessageCatalog = {
 	"debug.sound.lookAway": "Look away",
 	"debug.sound.starting": "Starting",
 	"debug.sound.stopped": "Stopped",
+	"debug.sound.cheer": "Cheer",
+	"debug.shop.title": "Shop rewards",
+	"debug.shop.desc":
+		"Toggle unlocks from the rewards shop without spending blinks. Preview Cheer plays the toast and sound only.",
+	"debug.shop.statsFlairDesc": "Grant or revoke the Statistics flair badge.",
+	"debug.shop.streakShieldDesc": "Grant or clear a streak shield charge.",
+	"debug.shop.previewCheer": "Preview Cheer",
+	"debug.shop.previewCheerDesc":
+		"Play the Cheer toast and sound without buying or spending blinks.",
 	"debug.onboarding.title": "Onboarding",
 	"debug.onboarding.desc":
 		"Reopen the first-run wizard without resetting other preferences.",

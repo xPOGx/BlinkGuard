@@ -140,6 +140,37 @@ describe("BlinkStatsService", () => {
 		service.dispose();
 	});
 
+	it("debug reward grants and previewCheer skip spend", () => {
+		const store = createStore();
+		const onCheer = vi.fn();
+		const service = new BlinkStatsService(store, () => "en", () => ({
+			goalsEnabled: false,
+			dailyBlinkGoal: 0,
+			dailyTrackingMinutesGoal: 0,
+			weeklyBlinkGoal: 0,
+			weeklyTrackingMinutesGoal: 0,
+		}));
+		service.setCheerEffects({ onCheer });
+
+		expect(service.getSnapshot().hasStatsFlair).toBe(false);
+		service.setDebugRewardGrant("statsFlair", true);
+		expect(service.getSnapshot().hasStatsFlair).toBe(true);
+		expect(service.getSnapshot().totals.spent).toBe(0);
+
+		service.setDebugRewardGrant("streakShield", true);
+		expect(service.getSnapshot().streak.shieldCharges).toBe(1);
+
+		service.setDebugRewardGrant("statsFlair", false);
+		service.setDebugRewardGrant("streakShield", false);
+		expect(service.getSnapshot().hasStatsFlair).toBe(false);
+		expect(service.getSnapshot().streak.shieldCharges).toBe(0);
+
+		service.previewCheer();
+		expect(onCheer).toHaveBeenCalledTimes(1);
+		expect(service.getSnapshot().totals.spent).toBe(0);
+		service.dispose();
+	});
+
 	it("exposes goal progress from injected prefs", () => {
 		const store = createStore();
 		const service = new BlinkStatsService(

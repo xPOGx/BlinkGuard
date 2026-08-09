@@ -13,14 +13,30 @@ export type NotificationSoundKind =
 	| "exercise"
 	| "lookAway"
 	| "starting"
-	| "stopped";
+	| "stopped"
+	| "cheer";
 
-const SOUND_FILES: Record<NotificationSoundKind, string> = {
+export type PlaySoundPayload = {
+	volume: number;
+	path?: string;
+	mode?: "file" | "cheer";
+};
+
+const SOUND_FILES: Record<Exclude<NotificationSoundKind, "cheer">, string> = {
 	blink: "notification.mp3",
 	exercise: "exercisePopup.mp3",
 	lookAway: "lookAwayPopup.mp3",
 	starting: "startingPopup.mp3",
 	stopped: "stoppedPopup.mp3",
+};
+
+const CLOSE_TIMEOUT_MS: Record<NotificationSoundKind, number> = {
+	blink: 3000,
+	exercise: 3000,
+	lookAway: 3000,
+	starting: 3000,
+	stopped: 3000,
+	cheer: 4000,
 };
 
 export class NotificationSoundPlayer {
@@ -42,22 +58,30 @@ export class NotificationSoundPlayer {
 				: this.preferences.soundVolume;
 		if (volumePercent <= 0) return;
 
-		const soundPath = this.isProd
-			? path.join(
-					process.resourcesPath,
-					"app.asar.unpacked",
-					"public",
-					"sounds",
-					SOUND_FILES[kind],
-				)
-			: path.join(this.paths.root, "public", "sounds", SOUND_FILES[kind]);
+		const volume = Math.min(1, Math.max(0, volumePercent / 100));
+		let payload: PlaySoundPayload;
 
-		if (!fs.existsSync(soundPath)) {
-			console.warn(`Notification sound missing: ${soundPath}`);
-			return;
+		if (kind === "cheer") {
+			payload = { mode: "cheer", volume };
+		} else {
+			const soundPath = this.isProd
+				? path.join(
+						process.resourcesPath,
+						"app.asar.unpacked",
+						"public",
+						"sounds",
+						SOUND_FILES[kind],
+					)
+				: path.join(this.paths.root, "public", "sounds", SOUND_FILES[kind]);
+
+			if (!fs.existsSync(soundPath)) {
+				console.warn(`Notification sound missing: ${soundPath}`);
+				return;
+			}
+
+			payload = { mode: "file", path: soundPath, volume };
 		}
 
-		const volume = Math.min(1, Math.max(0, volumePercent / 100));
 		const window = new BrowserWindow({
 			width: 1,
 			height: 1,
@@ -70,10 +94,7 @@ export class NotificationSoundPlayer {
 		});
 		void window.loadFile(path.join(this.paths.publicDir, "sound-player.html"));
 		window.webContents.on("did-finish-load", () => {
-			window.webContents.send(IPC_CHANNELS.playSound, {
-				path: soundPath,
-				volume,
-			});
+			window.webContents.send(IPC_CHANNELS.playSound, payload);
 		});
 		window.webContents.on("ipc-message", (_event, channel) => {
 			if (channel === IPC_CHANNELS.audioFinished && !window.isDestroyed()) {
@@ -82,6 +103,6 @@ export class NotificationSoundPlayer {
 		});
 		setTimeout(() => {
 			if (!window.isDestroyed()) window.close();
-		}, 3000);
+		}, CLOSE_TIMEOUT_MS[kind]);
 	}
 }

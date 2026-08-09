@@ -47,7 +47,7 @@ export interface LookAwayWindowPort {
 
 export interface NotificationSoundPort {
 	play(
-		kind: "blink" | "exercise" | "lookAway" | "starting" | "stopped",
+		kind: "blink" | "exercise" | "lookAway" | "starting" | "stopped" | "cheer",
 		options?: { force?: boolean; volume?: number },
 	): void;
 }

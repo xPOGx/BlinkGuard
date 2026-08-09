@@ -25,6 +25,7 @@ export const DEBUG_SOUND_KINDS = [
 	"lookAway",
 	"starting",
 	"stopped",
+	"cheer",
 ] as const;
 
 export type DebugSoundKind = (typeof DEBUG_SOUND_KINDS)[number];

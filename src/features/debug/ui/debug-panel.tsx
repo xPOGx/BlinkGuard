@@ -1,6 +1,11 @@
 import { Button } from "@/components/button";
-import { SettingPanel, SettingRow } from "@/components/setting-panel";
+import {
+	SettingPanel,
+	SettingRow,
+	ToggleSwitch,
+} from "@/components/setting-panel";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
+import { useBlinkStats } from "@/features/statistics/model/use-blink-stats";
 import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 import type {
@@ -28,10 +33,14 @@ const SOUND_BUTTONS: { kind: DebugSoundKind; labelKey: string }[] = [
 	{ kind: "lookAway", labelKey: "debug.sound.lookAway" },
 	{ kind: "starting", labelKey: "debug.sound.starting" },
 	{ kind: "stopped", labelKey: "debug.sound.stopped" },
+	{ kind: "cheer", labelKey: "debug.sound.cheer" },
 ];
 
 export function DebugPanel({ setPreferences }: DebugPanelProps) {
 	const t = useT();
+	const { snapshot } = useBlinkStats();
+	const hasFlair = snapshot.hasStatsFlair;
+	const hasShield = snapshot.streak.shieldCharges > 0;
 
 	return (
 		<>
@@ -71,6 +80,58 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 								{t(labelKey)}
 							</Button>
 						))}
+					</div>
+				</SettingRow>
+			</SettingPanel>
+
+			<SettingPanel>
+				<SettingRow
+					title={t("debug.shop.title")}
+					description={t("debug.shop.desc")}
+				>
+					<div className="space-y-3">
+						<SettingRow
+							title={t("rewards.statsFlair")}
+							description={t("debug.shop.statsFlairDesc")}
+							action={
+								<ToggleSwitch
+									checked={hasFlair}
+									onChange={() =>
+										rendererIpc.debugSetShopReward("statsFlair", !hasFlair)
+									}
+									aria-label={t("rewards.statsFlair")}
+								/>
+							}
+						/>
+						<SettingRow
+							title={t("rewards.streakShield")}
+							description={t("debug.shop.streakShieldDesc")}
+							action={
+								<ToggleSwitch
+									checked={hasShield}
+									onChange={() =>
+										rendererIpc.debugSetShopReward(
+											"streakShield",
+											!hasShield,
+										)
+									}
+									aria-label={t("rewards.streakShield")}
+								/>
+							}
+						/>
+						<SettingRow
+							title={t("debug.shop.previewCheer")}
+							description={t("debug.shop.previewCheerDesc")}
+							action={
+								<Button
+									type="button"
+									variant="secondary"
+									onClick={() => rendererIpc.debugPreviewCheer()}
+								>
+									{t("debug.shop.previewCheer")}
+								</Button>
+							}
+						/>
 					</div>
 				</SettingRow>
 			</SettingPanel>

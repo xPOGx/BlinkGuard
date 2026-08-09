@@ -259,6 +259,17 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		}
 		sound.play(kind, options);
 	});
+	on(IPC_CHANNELS.debugPreviewCheer, () => {
+		blinkStats.previewCheer();
+	});
+	on(
+		IPC_CHANNELS.debugSetShopReward,
+		(_event, rewardId: unknown, enabled: unknown) => {
+			if (rewardId !== "statsFlair" && rewardId !== "streakShield") return;
+			blinkStats.setDebugRewardGrant(rewardId, enabled === true);
+			windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
+		},
+	);
 	on(IPC_CHANNELS.openGithubRepo, () => {
 		void shell.openExternal("https://github.com/xPOGx/BlinkGuard");
 	});

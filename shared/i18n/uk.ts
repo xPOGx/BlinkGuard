@@ -89,6 +89,15 @@ export const uk: MessageCatalog = {
 	"debug.sound.lookAway": "Подивіться вдалину",
 	"debug.sound.starting": "Запуск",
 	"debug.sound.stopped": "Зупинка",
+	"debug.sound.cheer": "Ура",
+	"debug.shop.title": "Нагороди магазину",
+	"debug.shop.desc":
+		"Увімкнути або вимкнути те, що дає купівля в магазині, без витрати моргань. «Ура» — лише перегляд тоста і звуку.",
+	"debug.shop.statsFlairDesc": "Надати або зняти значок у статистиці.",
+	"debug.shop.streakShieldDesc": "Надати або зняти заряд щита серії.",
+	"debug.shop.previewCheer": "Перегляд «Ура»",
+	"debug.shop.previewCheerDesc":
+		"Показати тост і звук «Ура» без купівлі та витрати моргань.",
 	"debug.onboarding.title": "Онбординг",
 	"debug.onboarding.desc":
 		"Знову відкрити майстер першого запуску без скидання інших налаштувань.",

@@ -88,7 +88,7 @@ function bootstrap(): void {
 	});
 	blinkStats.setCheerEffects({
 		onCheer: () => {
-			sound.play("blink", { force: true });
+			sound.play("cheer", { force: true });
 			windows.showCheerToast();
 		},
 	});

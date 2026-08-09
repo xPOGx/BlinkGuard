@@ -160,6 +160,11 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.debugPreviewOverlay, kind),
 	debugPreviewSound: (kind: DebugSoundKind, volume?: number) =>
 		send(IPC_CHANNELS.debugPreviewSound, kind, volume),
+	debugPreviewCheer: () => send(IPC_CHANNELS.debugPreviewCheer),
+	debugSetShopReward: (
+		rewardId: "statsFlair" | "streakShield",
+		enabled: boolean,
+	) => send(IPC_CHANNELS.debugSetShopReward, rewardId, enabled),
 	openGithubRepo: () => send(IPC_CHANNELS.openGithubRepo),
 	openGithubReleases: () => send(IPC_CHANNELS.openGithubReleases),
 	openExternalUrl: (url: string) => send(IPC_CHANNELS.openExternalUrl, url),

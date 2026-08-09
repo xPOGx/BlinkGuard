@@ -316,12 +316,13 @@ export class WindowManager {
 		if (this.cheerToast && !this.cheerToast.isDestroyed()) {
 			this.hideCheerToast();
 		}
-		const width = 280;
+		const width = 360;
+		const height = 120;
 		const { x, y } = getTopCenterPopupPosition(width);
 		const popup = createPanelWindow(
 			{
 				width,
-				height: 48,
+				height,
 				x,
 				y,
 				focusable: false,

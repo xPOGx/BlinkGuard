@@ -4,6 +4,7 @@ import {
 	pruneBlinkTimestamps,
 } from "../../shared/blink-rate";
 import type { BlinkRewardId } from "../../shared/blink-rewards";
+import { BLINK_REWARDS } from "../../shared/blink-rewards";
 import {
 	BLINK_STATS_STORE_KEY,
 	DEFAULT_BLINK_STATS,
@@ -79,6 +80,49 @@ export class BlinkStatsService {
 
 	setCheerEffects(effects: CheerRewardEffects): void {
 		this.cheerEffects = effects;
+	}
+
+	/** Dev Debug: play Cheer FX without spending blinks. */
+	previewCheer(): void {
+		this.cheerEffects.onCheer?.();
+	}
+
+	/**
+	 * Dev Debug: grant/revoke persistent shop unlocks without spending.
+	 * Only `statsFlair` and `streakShield` (Cheer has no unlock state).
+	 */
+	setDebugRewardGrant(
+		rewardId: "statsFlair" | "streakShield",
+		enabled: boolean,
+	): void {
+		const next = {
+			...this.state,
+			unlockedRewardIds: [...this.state.unlockedRewardIds],
+			streakShieldUsedDates: [...this.state.streakShieldUsedDates],
+			days: this.state.days,
+		};
+		if (rewardId === "statsFlair") {
+			const has = next.unlockedRewardIds.includes("statsFlair");
+			if (enabled && !has) {
+				next.unlockedRewardIds = [...next.unlockedRewardIds, "statsFlair"];
+			} else if (!enabled && has) {
+				next.unlockedRewardIds = next.unlockedRewardIds.filter(
+					(id) => id !== "statsFlair",
+				);
+			} else {
+				return;
+			}
+		} else {
+			const max =
+				BLINK_REWARDS.streakShield.maxCharges ?? 1;
+			const target = enabled ? max : 0;
+			if (next.streakShieldCharges === target) return;
+			next.streakShieldCharges = target;
+		}
+		this.state = next;
+		this.markChartsDirty();
+		this.persist();
+		this.schedulePush(true);
 	}
 
 	invalidateCharts(): void {
