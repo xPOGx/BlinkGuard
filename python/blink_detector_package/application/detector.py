@@ -19,6 +19,7 @@ from blink_detector_package.domain.ear import calculate_ear_fast
 from blink_detector_package.infrastructure.camera import (
 	BLACK_STREAK_S,
 	HEALTH_INTERVAL_S,
+	NO_FACE_FAILOVER_S,
 	OpenCVCamera,
 	is_black_frame,
 	mean_luma,
@@ -71,6 +72,9 @@ class BlinkDetectorApplication:
 		self._health_face_none = 0
 		self._health_face_too_far = 0
 		self._black_streak_start = None
+		self._no_face_streak_start = None
+		self._session_face_ok = 0
+		self._session_frames = 0
 		self._last_health_emit = 0.0
 
 	def _note_frame_health(self, frame, face_status, current_time):
@@ -110,31 +114,70 @@ class BlinkDetectorApplication:
 	def _commit_frame_health(self, luma, black, face_status, current_time):
 		self._health_frames += 1
 		self._health_luma_sum += luma
+		self._session_frames += 1
 		if black:
 			self._health_black += 1
 		if face_status == "ok":
 			self._health_face_ok += 1
+			self._session_face_ok += 1
+			self._no_face_streak_start = None
 		elif face_status == "too_far":
 			self._health_face_too_far += 1
+			# too_far still means capture works — do not count as no-face failover.
+			self._no_face_streak_start = None
 		else:
 			self._health_face_none += 1
+			if not black and self._session_face_ok == 0:
+				if self._no_face_streak_start is None:
+					self._no_face_streak_start = current_time
 		if current_time - self._last_health_emit >= HEALTH_INTERVAL_S:
 			self._emit_camera_health(current_time)
+
+	def _maybe_failover_no_face(self, current_time):
+		"""MSMF can report Success yet never yield a detectable face — try DSHOW."""
+		if self._session_face_ok > 0:
+			return False
+		if self._no_face_streak_start is None:
+			return False
+		if current_time - self._no_face_streak_start < NO_FACE_FAILOVER_S:
+			return False
+		if self._session_frames < 5:
+			return False
+		streak_ms = int((current_time - self._no_face_streak_start) * 1000)
+		ok = self.camera.recover_from_no_face(self.detection.reset, streak_ms)
+		self._cached_face = None
+		self._reset_capture_health()
+		return ok
 
 	def _emit_camera_health(self, current_time):
 		frames = max(1, self._health_frames)
 		meta = self.camera.snapshot_meta()
+		black_ratio = self._health_black / frames
+		face_ok = self._health_face_ok
+		face_none = self._health_face_none
+		mean = self._health_luma_sum / frames
 		self.camera.emit_camera_state(
 			"camera_health",
 			frames=self._health_frames,
-			mean_luma=self._health_luma_sum / frames,
-			black_ratio=self._health_black / frames,
-			face_ok=self._health_face_ok,
-			face_none=self._health_face_none,
+			mean_luma=mean,
+			black_ratio=black_ratio,
+			face_ok=face_ok,
+			face_none=face_none,
 			face_too_far=self._health_face_too_far,
 			send_video=self.send_video,
 			window_s=round(current_time - self._health_window_start, 3),
 			**meta,
+		)
+		self.transport.send(
+			{
+				"debug": (
+					"camera_health "
+					f"frames={self._health_frames} "
+					f"luma={mean:.1f} black={black_ratio:.2f} "
+					f"face_ok={face_ok} face_none={face_none} "
+					f"backend={meta.get('backend_name')}"
+				)
+			}
 		)
 		self._health_window_start = current_time
 		self._health_frames = 0
@@ -146,136 +189,165 @@ class BlinkDetectorApplication:
 		self._last_health_emit = current_time
 
 	def process_commands(self):
+		"""Drain stdin batch: apply config before stop/start to avoid MSMF thrash."""
+		batch = []
 		while not self.transport.command_queue.empty():
 			try:
 				line = self.transport.command_queue.get_nowait()
-				data = json.loads(line)
-				self.transport.send(
-					{"debug": f"Processing command: {data}"}
-				)
-
-				# Config keys are independent so a multi-key quality preset
-				# message can set FPS, resolution, interval, and pose together.
-				if "target_fps" in data:
-					self.camera.update_target_fps(data["target_fps"])
-					self.detection.set_target_fps(self.camera.target_fps)
-					self.transport.send(
-						{
-							"status": (
-								"Updated target FPS to "
-								f"{self.camera.target_fps}"
-							)
-						}
-					)
-				if "processing_resolution" in data:
-					self.camera.update_processing_resolution(
-						data["processing_resolution"]
-					)
-					self.transport.send(
-						{
-							"status": (
-								"Updated processing resolution to "
-								f"{self.camera.processing_resolution}"
-							)
-						}
-					)
-				if "face_detect_interval" in data:
-					try:
-						interval = int(data["face_detect_interval"])
-					except (TypeError, ValueError):
-						interval = 1
-					self.face_detect_interval = max(1, interval)
-					self._frames_since_face_detect = 0
-					self.transport.send(
-						{
-							"status": (
-								"Updated face detect interval to "
-								f"{self.face_detect_interval}"
-							)
-						}
-					)
-				if "pose_strictness" in data:
-					value = data["pose_strictness"]
-					if value in ("loose", "normal", "strict"):
-						self.pose_strictness = value
-						self.detection.pose_strictness = value
-						self.transport.send(
-							{
-								"status": (
-									"Updated pose strictness to "
-									f"{self.pose_strictness}"
-								)
-							}
-						)
-					else:
-						self.transport.send(
-							{
-								"debug": (
-									"Ignored invalid pose_strictness: "
-									f"{value}"
-								)
-							}
-						)
-
-				if "ear_calibration" in data:
-					value = data["ear_calibration"]
-					if value is None or value == 0:
-						self.detection.set_ear_calibration(None)
-						self.transport.send(
-							{"status": "Cleared EAR calibration"}
-						)
-					else:
-						applied = self.detection.set_ear_calibration(value)
-						if applied:
-							self.transport.send(
-								{
-									"status": (
-										"Applied EAR calibration "
-										f"{self.detection.ear_calibration:.4f}"
-									)
-								}
-							)
-						else:
-							self.transport.send(
-								{
-									"debug": (
-										"Ignored invalid ear_calibration: "
-										f"{value}"
-									)
-								}
-							)
-
-				if "request_video" in data:
-					self.send_video = True
-					self.transport.send(
-						{"status": "Video streaming enabled"}
-					)
-				elif "start_camera" in data:
-					if self.camera.start(self.detection.reset):
-						self._cached_face = None
-						self._frames_since_face_detect = 0
-						self._reset_capture_health()
-						self.transport.send(
-							{"status": "Camera started successfully"}
-						)
-					else:
-						self.transport.send(
-							{"error": "Failed to start camera"}
-						)
-				elif "stop_camera" in data:
-					self.camera.stop(reason="stop_camera")
-					self.send_video = False
-					self._cached_face = None
-					self._reset_capture_health()
-					self.transport.send({"status": "Camera stopped"})
+				batch.append(json.loads(line))
 			except json.JSONDecodeError as error:
 				self.transport.send(
 					{"debug": f"JSON decode error: {str(error)}"}
 				)
 			except Exception as error:
 				self.transport.send(
-					{"debug": f"Command processing error: {str(error)}"}
+					{"debug": f"Command read error: {str(error)}"}
 				)
+
+		if not batch:
+			return
+
+		for data in batch:
+			self.transport.send({"debug": f"Processing command: {data}"})
+
+		merged = {}
+		want_stop = False
+		want_start = False
+		want_video = False
+		for data in batch:
+			for key in (
+				"target_fps",
+				"processing_resolution",
+				"face_detect_interval",
+				"pose_strictness",
+				"ear_calibration",
+			):
+				if key in data:
+					merged[key] = data[key]
+			if "stop_camera" in data:
+				want_stop = True
+				want_start = False
+			if "start_camera" in data:
+				want_start = True
+			if "request_video" in data:
+				want_video = True
+
+		try:
+			self._apply_config_dict(merged)
+
+			if want_stop:
+				self.camera.stop(reason="stop_camera")
+				self.send_video = False
+				self._cached_face = None
+				self._reset_capture_health()
+				self.transport.send({"status": "Camera stopped"})
+
+			if want_start:
+				if self.camera.start(self.detection.reset):
+					self._cached_face = None
+					self._frames_since_face_detect = 0
+					self._reset_capture_health()
+					self.transport.send(
+						{"status": "Camera started successfully"}
+					)
+				else:
+					self.transport.send({"error": "Failed to start camera"})
+
+			if want_video:
+				self.send_video = True
+				self.transport.send({"status": "Video streaming enabled"})
+		except Exception as error:
+			self.transport.send(
+				{"debug": f"Command processing error: {str(error)}"}
+			)
+
+	def _apply_config_dict(self, data):
+		if "target_fps" in data:
+			self.camera.update_target_fps(data["target_fps"])
+			self.detection.set_target_fps(self.camera.target_fps)
+			self.transport.send(
+				{
+					"status": (
+						"Updated target FPS to "
+						f"{self.camera.target_fps}"
+					)
+				}
+			)
+		if "processing_resolution" in data:
+			self.camera.update_processing_resolution(
+				data["processing_resolution"]
+			)
+			self.transport.send(
+				{
+					"status": (
+						"Updated processing resolution to "
+						f"{self.camera.processing_resolution}"
+					)
+				}
+			)
+		if "face_detect_interval" in data:
+			try:
+				interval = int(data["face_detect_interval"])
+			except (TypeError, ValueError):
+				interval = 1
+			self.face_detect_interval = max(1, interval)
+			self._frames_since_face_detect = 0
+			self.transport.send(
+				{
+					"status": (
+						"Updated face detect interval to "
+						f"{self.face_detect_interval}"
+					)
+				}
+			)
+		if "pose_strictness" in data:
+			value = data["pose_strictness"]
+			if value in ("loose", "normal", "strict"):
+				self.pose_strictness = value
+				self.detection.pose_strictness = value
+				self.transport.send(
+					{
+						"status": (
+							"Updated pose strictness to "
+							f"{self.pose_strictness}"
+						)
+					}
+				)
+			else:
+				self.transport.send(
+					{
+						"debug": (
+							"Ignored invalid pose_strictness: "
+							f"{value}"
+						)
+					}
+				)
+
+		if "ear_calibration" in data:
+			value = data["ear_calibration"]
+			if value is None or value == 0:
+				self.detection.set_ear_calibration(None)
+				self.transport.send({"status": "Cleared EAR calibration"})
+			else:
+				applied = self.detection.set_ear_calibration(value)
+				if applied:
+					self.transport.send(
+						{
+							"status": (
+								"Applied EAR calibration "
+								f"{self.detection.ear_calibration:.4f}"
+							)
+						}
+					)
+				else:
+					self.transport.send(
+						{
+							"debug": (
+								"Ignored invalid ear_calibration: "
+								f"{value}"
+							)
+						}
+					)
 
 	def _resolve_face(self, detector, gray):
 		"""Run HOG face detect on interval; otherwise reuse largest bbox.
@@ -819,6 +891,9 @@ class BlinkDetectorApplication:
 					face_data.get("faceStatus") or "none",
 					current_time,
 				)
+				if self._maybe_failover_no_face(current_time):
+					frame_count += 1
+					continue
 
 				if face_data.get("faceStatus") == "none":
 					self.transport.send_serialized(NO_FACE_DATA)

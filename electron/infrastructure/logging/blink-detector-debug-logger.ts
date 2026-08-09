@@ -66,9 +66,8 @@ export class BlinkDetectorDebugLogger {
 					? { message: message.debug }
 					: {}),
 			});
-			// cameraState may share a line with debug in future; still allow
-			// blinkDebug handling below when both are present.
-			if (!hasBlinkDebug && !hasDebug) return;
+			// Dual-channel cameraState+debug is one JSONL row; avoid a twin debug line.
+			if (!hasBlinkDebug) return;
 		}
 
 		if (hasBlinkDebug) {

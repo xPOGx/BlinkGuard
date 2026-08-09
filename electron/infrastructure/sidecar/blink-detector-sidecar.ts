@@ -60,6 +60,10 @@ export class BlinkDetectorSidecar {
 	private calibrationProgressTimer: ReturnType<typeof setInterval> | null =
 		null;
 	private calibrationFaceDetected = false;
+	/** Coalesce stop/start so quality+restart land in one Python command batch. */
+	private cameraFlushTimer: ReturnType<typeof setTimeout> | null = null;
+	private pendingCameraStop = false;
+	private pendingCameraStart = false;
 
 	constructor(
 		private readonly paths: AppPaths,
@@ -114,6 +118,14 @@ export class BlinkDetectorSidecar {
 		this.running = true;
 		const child = spawn(executablePath, [], {
 			stdio: ["pipe", "pipe", "pipe"],
+			env: {
+				...process.env,
+				// Softens OpenCV MSMF init on Win10/11 (Frame Server / old UVC).
+				...(process.platform === "win32" &&
+				process.env.OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS === undefined
+					? { OPENCV_VIDEOIO_MSMF_ENABLE_HW_TRANSFORMS: "0" }
+					: {}),
+			},
 			...(process.platform === "win32" && {
 				windowsHide: true,
 				detached: false,
@@ -128,6 +140,7 @@ export class BlinkDetectorSidecar {
 			if (this.process === child) this.process = null;
 			this.running = false;
 			this.cameraReady = false;
+			this.clearCameraFlush();
 			this.cancelEarCalibration("Blink detector stopped");
 		});
 		child.on("error", (error) => {
@@ -137,6 +150,7 @@ export class BlinkDetectorSidecar {
 			if (this.process === child) this.process = null;
 			this.running = false;
 			this.cameraReady = false;
+			this.clearCameraFlush();
 			this.cancelEarCalibration("Blink detector error");
 		});
 		this.readStdout(child);
@@ -152,17 +166,26 @@ export class BlinkDetectorSidecar {
 			console.error("Blink detector not running");
 			return false;
 		}
-		// Quality/EAR before start so CAP_PROP uses the preset, not 320×240 defaults.
-		this.applySessionConfig();
-		this.write({ start_camera: true });
+		// Already live — refresh config + video without stop/start thrash.
+		if (this.cameraReady && !this.pendingCameraStop) {
+			this.applySessionConfig();
+			this.requestVideo();
+			return true;
+		}
+		this.pendingCameraStart = true;
+		this.scheduleCameraFlush();
 		return true;
 	}
 
 	stopCamera(): void {
-		if (this.running && this.process?.stdin) {
-			this.write({ stop_camera: true });
+		if (!this.running || !this.process?.stdin) {
+			this.cameraReady = false;
+			return;
 		}
+		this.pendingCameraStart = false;
+		this.pendingCameraStop = true;
 		this.cameraReady = false;
+		this.scheduleCameraFlush();
 	}
 
 	requestVideo(): void {
@@ -174,6 +197,39 @@ export class BlinkDetectorSidecar {
 		const resolved = quality ?? this.preferences.cameraQuality;
 		if (!isCameraQuality(resolved)) return;
 		this.write(toSidecarCameraQualityMessage(resolved));
+	}
+
+	private clearCameraFlush(): void {
+		if (this.cameraFlushTimer) {
+			clearTimeout(this.cameraFlushTimer);
+			this.cameraFlushTimer = null;
+		}
+		this.pendingCameraStop = false;
+		this.pendingCameraStart = false;
+	}
+
+	private scheduleCameraFlush(): void {
+		if (this.cameraFlushTimer) return;
+		this.cameraFlushTimer = setTimeout(() => {
+			this.cameraFlushTimer = null;
+			this.flushCameraIntent();
+		}, 75);
+	}
+
+	private flushCameraIntent(): void {
+		const stop = this.pendingCameraStop;
+		const start = this.pendingCameraStart;
+		this.pendingCameraStop = false;
+		this.pendingCameraStart = false;
+		if (!this.running || !this.process?.stdin) return;
+		if (stop) {
+			this.write({ stop_camera: true });
+		}
+		if (start) {
+			// Quality/EAR before start so CAP_PROP uses the preset, not 320×240.
+			this.applySessionConfig();
+			this.write({ start_camera: true });
+		}
 	}
 
 	/** Push personal open-eye EAR baseline (or clear with null). */
