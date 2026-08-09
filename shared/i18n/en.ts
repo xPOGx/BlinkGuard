@@ -186,6 +186,8 @@ export const en: MessageCatalog = {
 	"camera.error": "Camera Error:",
 	"camera.dismissError": "Dismiss camera error",
 	"camera.detection": "Camera Detection",
+	"camera.detectionDesc":
+		"Turn this on to unlock blink-aware reminders, live stats, coaching, and rewards. Off = timer reminders only; those camera features stay inactive.",
 	"camera.toggleAria": "Toggle camera detection",
 	"camera.show": "Show Camera",
 	"camera.stopShowing": "Stop Showing",
@@ -380,6 +382,8 @@ export const en: MessageCatalog = {
 	"onboarding.camera": "Camera",
 	"onboarding.cameraDesc":
 		"Blink-aware reminders when you forget to blink (webcam required).",
+	"onboarding.modeCameraNote":
+		"Without camera blink tracking, blink-aware reminders, live blink stats, coaching, and rewards stay inactive. Timer reminders and eye-care popups still work.",
 	"onboarding.shortcutHint":
 		"Use this shortcut anytime to start or stop blink reminders.",
 	"onboarding.launchDesc":

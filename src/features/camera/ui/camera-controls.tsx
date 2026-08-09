@@ -1,4 +1,4 @@
-import { Activity, Camera, Crosshair, Gauge, UserRoundX } from "lucide-react";
+import { Activity, Camera, Crosshair, Gauge, Info, UserRoundX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/button";
 import {
@@ -231,38 +231,46 @@ export function CameraControls({
 					}
 					action={
 						<div className="flex items-center gap-2">
-							{preferences.cameraEnabled ? (
-								isWindowOpen ? (
-									<Button
-										type="button"
-										size="sm"
-										variant="destructive"
-										onClick={() => {
-											rendererIpc.closeCameraWindow();
-											setIsWindowOpen(false);
-										}}
-									>
-										{t("camera.stopShowing")}
-									</Button>
-								) : (
-									<Button
-										type="button"
-										size="sm"
-										onClick={() => {
-											if (!preferences.isTracking) {
-												setPreferences((current) => ({
-													...current,
-													isTracking: true,
-												}));
-											}
-											rendererIpc.showCameraWindow();
-											setIsWindowOpen(true);
-										}}
-									>
-										{t("camera.show")}
-									</Button>
-								)
-							) : null}
+							{isWindowOpen ? (
+								<Button
+									type="button"
+									size="sm"
+									variant="destructive"
+									disabled={!preferences.cameraEnabled}
+									className={cn(
+										!preferences.cameraEnabled &&
+											"invisible pointer-events-none",
+									)}
+									onClick={() => {
+										rendererIpc.closeCameraWindow();
+										setIsWindowOpen(false);
+									}}
+								>
+									{t("camera.stopShowing")}
+								</Button>
+							) : (
+								<Button
+									type="button"
+									size="sm"
+									disabled={!preferences.cameraEnabled}
+									className={cn(
+										!preferences.cameraEnabled &&
+											"invisible pointer-events-none",
+									)}
+									onClick={() => {
+										if (!preferences.isTracking) {
+											setPreferences((current) => ({
+												...current,
+												isTracking: true,
+											}));
+										}
+										rendererIpc.showCameraWindow();
+										setIsWindowOpen(true);
+									}}
+								>
+									{t("camera.show")}
+								</Button>
+							)}
 							<ToggleSwitch
 								aria-label={t("camera.toggleAria")}
 								checked={preferences.cameraEnabled}
@@ -272,6 +280,19 @@ export function CameraControls({
 					}
 				/>
 			</SettingPanel>
+
+			{!preferences.cameraEnabled ? (
+				<div
+					role="status"
+					className="flex gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-100 sm:text-sm"
+				>
+					<Info
+						className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-200"
+						aria-hidden
+					/>
+					<p>{t("camera.detectionDesc")}</p>
+				</div>
+			) : null}
 
 			{preferences.cameraEnabled ? (
 				<>
@@ -339,33 +360,37 @@ export function CameraControls({
 								/>
 							}
 						>
-							{preferences.autoStopNoFaceEnabled ? (
-								<div className="flex items-center gap-2">
-									<input
-										aria-label={t("camera.autoStopNoFaceIntervalAria")}
-										type="range"
-										min="1"
-										max="30"
-										value={autoStopMinutes}
-										onChange={(event) =>
-											setPreferences((current) => ({
-												...current,
-												autoStopNoFaceMinutes: Number.parseInt(
-													event.target.value,
-													10,
-												),
-											}))
-										}
-										className="h-1.5 flex-1 cursor-pointer appearance-none rounded-lg bg-muted"
-										style={{
-											background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${autoStopProgress}%, ${trackColor} ${autoStopProgress}%, ${trackColor} 100%)`,
-										}}
-									/>
-									<div className="min-w-[2.5rem] text-center text-xs font-medium text-primary">
-										{autoStopMinutes}m
-									</div>
+							<div
+								className={cn(
+									"flex items-center gap-2",
+									!preferences.autoStopNoFaceEnabled && "opacity-50",
+								)}
+							>
+								<input
+									aria-label={t("camera.autoStopNoFaceIntervalAria")}
+									type="range"
+									min="1"
+									max="30"
+									value={autoStopMinutes}
+									disabled={!preferences.autoStopNoFaceEnabled}
+									onChange={(event) =>
+										setPreferences((current) => ({
+											...current,
+											autoStopNoFaceMinutes: Number.parseInt(
+												event.target.value,
+												10,
+											),
+										}))
+									}
+									className="h-1.5 flex-1 appearance-none rounded-lg bg-muted disabled:cursor-not-allowed"
+									style={{
+										background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${autoStopProgress}%, ${trackColor} ${autoStopProgress}%, ${trackColor} 100%)`,
+									}}
+								/>
+								<div className="min-w-[2.5rem] text-center text-xs font-medium text-primary">
+									{autoStopMinutes}m
 								</div>
-							) : null}
+							</div>
 						</SettingRow>
 					</SettingPanel>
 
@@ -533,11 +558,14 @@ export function CameraControls({
 										? t("common.hideInfo")
 										: t("common.learnMore")}
 								</button>
-								{preferences.mgdMode ? (
-									<span className="rounded bg-primary/10 px-2 py-0.5 text-xs text-primary">
-										{t("camera.mgdActive")}
-									</span>
-								) : null}
+								<span
+									className={cn(
+										"rounded bg-primary/10 px-2 py-0.5 text-xs text-primary",
+										!preferences.mgdMode && "invisible",
+									)}
+								>
+									{t("camera.mgdActive")}
+								</span>
 							</div>
 							{preferences.showMgdInfo ? (
 								<div className="mt-2 rounded-md bg-accent/60 p-3 text-xs text-muted-foreground sm:text-sm">

@@ -1,4 +1,5 @@
 import {
+	ChevronDown,
 	Download,
 	Gamepad2,
 	LogIn,
@@ -213,30 +214,36 @@ export function LanguageSettings({
 				title={t("language.title")}
 				description={t("language.description")}
 				action={
-					<select
-						aria-label={t("language.toggleAria")}
-						value={preferences.locale}
-						onChange={(event) => {
-							const locale = event.target.value as Locale;
-							setPreferences((current) => {
-								const next: SettingsPreferences = {
-									...current,
-									locale,
-								};
-								if (isBuiltInPopupMessage(current.popupMessage)) {
-									next.popupMessage = defaultPopupMessage(locale);
-								}
-								if (isBuiltInExercisePrompts(current.exercisePrompts)) {
-									next.exercisePrompts = defaultExercisePrompts(locale);
-								}
-								return next;
-							});
-						}}
-						className="rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground"
-					>
-						<option value="en">{t("language.en")}</option>
-						<option value="uk">{t("language.uk")}</option>
-					</select>
+					<div className="relative">
+						<select
+							aria-label={t("language.toggleAria")}
+							value={preferences.locale}
+							onChange={(event) => {
+								const locale = event.target.value as Locale;
+								setPreferences((current) => {
+									const next: SettingsPreferences = {
+										...current,
+										locale,
+									};
+									if (isBuiltInPopupMessage(current.popupMessage)) {
+										next.popupMessage = defaultPopupMessage(locale);
+									}
+									if (isBuiltInExercisePrompts(current.exercisePrompts)) {
+										next.exercisePrompts = defaultExercisePrompts(locale);
+									}
+									return next;
+								});
+							}}
+							className="appearance-none rounded-md border border-border bg-background py-1.5 pl-2.5 pr-9 text-sm text-foreground"
+						>
+							<option value="en">{t("language.en")}</option>
+							<option value="uk">{t("language.uk")}</option>
+						</select>
+						<ChevronDown
+							className="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+							aria-hidden
+						/>
+					</div>
 				}
 			/>
 		</SettingPanel>

@@ -98,57 +98,62 @@ export function OnboardingWizard({
 
 				<div className="min-h-40">
 					{step.id === "mode" ? (
-						<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-							<button
-								type="button"
-								onClick={() =>
-									setPreferences((current) => ({
-										...current,
-										cameraEnabled: false,
-									}))
-								}
-								className={cn(
-									"rounded-lg border p-4 text-left transition-colors",
-									!preferences.cameraEnabled
-										? "border-primary bg-primary/10"
-										: "border-border hover:bg-muted",
-								)}
-								aria-pressed={!preferences.cameraEnabled}
-							>
-								<Timer
-									className="mb-2 h-5 w-5 text-muted-foreground"
-									aria-hidden
-								/>
-								<p className="text-sm font-medium">{t("onboarding.timer")}</p>
-								<p className="mt-1 text-xs text-muted-foreground">
-									{t("onboarding.timerDesc")}
-								</p>
-							</button>
-							<button
-								type="button"
-								onClick={() =>
-									setPreferences((current) => ({
-										...current,
-										cameraEnabled: true,
-									}))
-								}
-								className={cn(
-									"rounded-lg border p-4 text-left transition-colors",
-									preferences.cameraEnabled
-										? "border-primary bg-primary/10"
-										: "border-border hover:bg-muted",
-								)}
-								aria-pressed={preferences.cameraEnabled}
-							>
-								<Camera
-									className="mb-2 h-5 w-5 text-muted-foreground"
-									aria-hidden
-								/>
-								<p className="text-sm font-medium">{t("onboarding.camera")}</p>
-								<p className="mt-1 text-xs text-muted-foreground">
-									{t("onboarding.cameraDesc")}
-								</p>
-							</button>
+						<div className="space-y-3">
+							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+								<button
+									type="button"
+									onClick={() =>
+										setPreferences((current) => ({
+											...current,
+											cameraEnabled: false,
+										}))
+									}
+									className={cn(
+										"rounded-lg border p-4 text-left transition-colors",
+										!preferences.cameraEnabled
+											? "border-primary bg-primary/10"
+											: "border-border hover:bg-muted",
+									)}
+									aria-pressed={!preferences.cameraEnabled}
+								>
+									<Timer
+										className="mb-2 h-5 w-5 text-muted-foreground"
+										aria-hidden
+									/>
+									<p className="text-sm font-medium">{t("onboarding.timer")}</p>
+									<p className="mt-1 text-xs text-muted-foreground">
+										{t("onboarding.timerDesc")}
+									</p>
+								</button>
+								<button
+									type="button"
+									onClick={() =>
+										setPreferences((current) => ({
+											...current,
+											cameraEnabled: true,
+										}))
+									}
+									className={cn(
+										"rounded-lg border p-4 text-left transition-colors",
+										preferences.cameraEnabled
+											? "border-primary bg-primary/10"
+											: "border-border hover:bg-muted",
+									)}
+									aria-pressed={preferences.cameraEnabled}
+								>
+									<Camera
+										className="mb-2 h-5 w-5 text-muted-foreground"
+										aria-hidden
+									/>
+									<p className="text-sm font-medium">{t("onboarding.camera")}</p>
+									<p className="mt-1 text-xs text-muted-foreground">
+										{t("onboarding.cameraDesc")}
+									</p>
+								</button>
+							</div>
+							<p className="text-xs text-muted-foreground">
+								{t("onboarding.modeCameraNote")}
+							</p>
 						</div>
 					) : null}
 
