@@ -1,5 +1,6 @@
 /* Blink / starting / stopped reminder popups */
 
+html:has(.reminder-card),
 body:has(.reminder-card) {
 	background: transparent !important;
 }
