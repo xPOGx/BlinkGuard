@@ -4,6 +4,8 @@ import type { DebugOverlayKind } from "../../../shared/debug-preview";
 import {
 	resolveCatalog,
 	resolveExercisePrompts,
+	resolveLookAwayHint,
+	resolveLookAwayTitle,
 	resolvePopupMessage,
 	t,
 } from "../../../shared/i18n";
@@ -11,6 +13,8 @@ import type { AppPreferences, Point, Size } from "../../../shared/preferences";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import {
 	sanitizeExercisePrompts,
+	sanitizeLookAwayHint,
+	sanitizeLookAwayTitle,
 	toRendererPreferences,
 } from "../../../shared/preferences";
 import { BLINK_RATE_COACH_DISMISS_MS } from "../../domain/blink-rate-coaching";
@@ -516,7 +520,21 @@ export class WindowManager {
 				duration: String(Math.max(1, this.preferences.lookAwayDuration)),
 			},
 		});
-		popup.webContents.on("did-finish-load", () => this.sendI18n(popup));
+		popup.webContents.on("did-finish-load", () => {
+			this.sendI18n(popup);
+			const locale =
+				this.preferences.locale === "uk" ? "uk" : "en";
+			popup.webContents.send(IPC_CHANNELS.updateLookAwayCopy, {
+				title: resolveLookAwayTitle(
+					sanitizeLookAwayTitle(this.preferences.lookAwayTitle, locale),
+					locale,
+				),
+				hint: resolveLookAwayHint(
+					sanitizeLookAwayHint(this.preferences.lookAwayHint, locale),
+					locale,
+				),
+			});
+		});
 		// Same as blink: show without stealing focus (games / mouse capture).
 		popup.once("ready-to-show", () => popup.showInactive());
 		popup.on("closed", () => {

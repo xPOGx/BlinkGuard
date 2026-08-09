@@ -280,6 +280,12 @@ export const uk: MessageCatalog = {
 	"lookAway.durationAria": "Тривалість перерви",
 	"lookAway.hint":
 		"Нагадування про моргання паузяться, поки відкрите вікно «подивіться вдалину»",
+	"lookAway.copy": "Текст спливаючого вікна",
+	"lookAway.copyTitle": "Заголовок",
+	"lookAway.copyHint": "Підказка",
+	"lookAway.copyTitleAria": "Заголовок вікна «подивіться вдалину»",
+	"lookAway.copyHintAria": "Підказка вікна «подивіться вдалину»",
+	"lookAway.resetCopy": "Скинути за замовчуванням",
 
 	// Appearance / popup settings
 	"popup.settings": "Налаштування спливаючого вікна",
@@ -511,6 +517,8 @@ export const uk: MessageCatalog = {
 
 	// Defaults (persisted content)
 	"defaults.popupMessage": "Моргни!",
+	"defaults.lookAwayTitle": "Подивіться вдалину",
+	"defaults.lookAwayHint": "Сфокусуйтесь на чомусь ~6 м / 20 футів далі",
 	"defaults.exercisePrompt1":
 		"Закрийте очі й повільно зробіть кругові рухи 10 секунд. Потім у зворотному напрямку.",
 	"defaults.exercisePrompt2":

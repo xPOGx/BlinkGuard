@@ -15,6 +15,8 @@ import {
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
+	sanitizeLookAwayHint,
+	sanitizeLookAwayTitle,
 	sanitizeSoundVolume,
 	toRendererPreferences,
 } from "../../../shared/preferences";
@@ -118,6 +120,8 @@ describe("look-away / 20-20-20 preference defaults", () => {
 		expect(DEFAULT_PREFERENCES.exerciseInterval).toBe(40);
 		expect(DEFAULT_PREFERENCES.blinkPopupClickThrough).toBe(true);
 		expect(DEFAULT_PREFERENCES.lookAwayDuration).toBe(20);
+		expect(DEFAULT_PREFERENCES.lookAwayTitle).toBe("Look away");
+		expect(DEFAULT_PREFERENCES.lookAwayHint).toContain("20 feet");
 	});
 });
 
@@ -199,5 +203,20 @@ describe("sanitizeExercisePrompts", () => {
 		expect(
 			sanitizeExercisePrompts(["  Blink slowly  ", "", 42, "Look far"]),
 		).toEqual(["Blink slowly", "Look far"]);
+	});
+});
+
+describe("sanitizeLookAwayTitle / Hint", () => {
+	it("falls back to defaults for empty input", () => {
+		expect(sanitizeLookAwayTitle("")).toBe(DEFAULT_PREFERENCES.lookAwayTitle);
+		expect(sanitizeLookAwayHint("  ")).toBe(DEFAULT_PREFERENCES.lookAwayHint);
+		expect(sanitizeLookAwayTitle(null, "uk")).not.toBe(
+			DEFAULT_PREFERENCES.lookAwayTitle,
+		);
+	});
+
+	it("trims non-empty values", () => {
+		expect(sanitizeLookAwayTitle("  Hello  ")).toBe("Hello");
+		expect(sanitizeLookAwayHint("  Far away  ")).toBe("Far away");
 	});
 });

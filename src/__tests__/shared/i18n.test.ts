@@ -1,15 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
 	defaultExercisePrompts,
+	defaultLookAwayHint,
+	defaultLookAwayTitle,
 	defaultPopupMessage,
 	pluralKey,
 	pluralSuffix,
 	resolveExercisePrompts,
+	resolveLookAwayHint,
+	resolveLookAwayTitle,
 	resolvePopupMessage,
 	sanitizeLocale,
 	t,
 } from "../../../shared/i18n";
-import { sanitizeExercisePrompts } from "../../../shared/preferences";
+import {
+	sanitizeExercisePrompts,
+	sanitizeLookAwayHint,
+	sanitizeLookAwayTitle,
+} from "../../../shared/preferences";
 
 describe("i18n t()", () => {
 	it("returns Ukrainian copy for known keys", () => {
@@ -101,5 +109,30 @@ describe("locale-aware defaults", () => {
 			defaultExercisePrompts("uk"),
 		);
 		expect(resolveExercisePrompts(["Custom"], "uk")).toEqual(["Custom"]);
+	});
+
+	it("defaultLookAway copy follows locale", () => {
+		expect(defaultLookAwayTitle("en")).toBe("Look away");
+		expect(defaultLookAwayTitle("uk")).toBe("Подивіться вдалину");
+		expect(defaultLookAwayHint("en")).toContain("20 feet");
+		expect(defaultLookAwayHint("uk")).toContain("6 м");
+	});
+
+	it("resolves built-in look-away copy to the active locale", () => {
+		expect(resolveLookAwayTitle("Look away", "uk")).toBe("Подивіться вдалину");
+		expect(resolveLookAwayTitle("Подивіться вдалину", "en")).toBe("Look away");
+		expect(resolveLookAwayTitle("Custom title", "uk")).toBe("Custom title");
+		expect(
+			resolveLookAwayHint("Focus on something ~20 feet / 6 m away", "uk"),
+		).toBe(defaultLookAwayHint("uk"));
+		expect(resolveLookAwayHint("Custom hint", "uk")).toBe("Custom hint");
+	});
+
+	it("sanitizeLookAway title/hint fall back to locale defaults", () => {
+		expect(sanitizeLookAwayTitle("", "uk")).toBe(defaultLookAwayTitle("uk"));
+		expect(sanitizeLookAwayTitle("  ", "en")).toBe(defaultLookAwayTitle("en"));
+		expect(sanitizeLookAwayTitle("  My title  ", "uk")).toBe("My title");
+		expect(sanitizeLookAwayHint(null, "uk")).toBe(defaultLookAwayHint("uk"));
+		expect(sanitizeLookAwayHint("  My hint  ", "en")).toBe("My hint");
 	});
 });

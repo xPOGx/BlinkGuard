@@ -18,6 +18,17 @@ function snoozeLookAway() {
 }
 
 function initLookAwayPopup() {
+	const titleEl = document.getElementById("look-away-title");
+	const hintEl = document.getElementById("look-away-hint");
+	window.popupAPI.onUpdateLookAwayCopy((copy) => {
+		if (titleEl && typeof copy?.title === "string") {
+			titleEl.textContent = copy.title;
+		}
+		if (hintEl && typeof copy?.hint === "string") {
+			hintEl.textContent = copy.hint;
+		}
+	});
+
 	const countdownEl = document.getElementById("countdown");
 	let remaining = readDurationSeconds();
 

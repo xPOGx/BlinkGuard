@@ -99,6 +99,9 @@ contextBridge.exposeInMainWorld('popupAPI', {
   },
 
   // For look-away / 20-20-20 popups
+  onUpdateLookAwayCopy: (callback: (copy: { title: string; hint: string }) => void) => {
+    ipcRenderer.on(IPC_CHANNELS.updateLookAwayCopy, (_event, copy) => callback(copy));
+  },
   skipLookAway: () => {
     ipcRenderer.send(IPC_CHANNELS.skipLookAway);
   },
@@ -142,6 +145,7 @@ declare global {
       onThresholdUpdated: (callback: (threshold: number) => void) => void;
       requestVideoStream: () => void;
       onUpdateExercisePrompt: (callback: (prompt: string) => void) => void;
+      onUpdateLookAwayCopy: (callback: (copy: { title: string; hint: string }) => void) => void;
       onApplyI18n: (callback: (payload: { locale: string; messages: Record<string, string> }) => void) => void;
       skipExercise: () => void;
       snoozeExercise: () => void;

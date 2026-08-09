@@ -20,6 +20,8 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updateLookAwayEnabled: vi.fn(),
 		updateLookAwayInterval: vi.fn(),
 		updateLookAwayDuration: vi.fn(),
+		updateLookAwayTitle: vi.fn(),
+		updateLookAwayHint: vi.fn(),
 		updatePopupColors: vi.fn(),
 		updatePopupTransparency: vi.fn(),
 		updatePopupMessage: vi.fn(),
@@ -60,6 +62,18 @@ describe("sameRendererPrefs", () => {
 			sameRendererPrefs(base, {
 				...base,
 				exercisePrompts: [...base.exercisePrompts, "extra"],
+			}),
+		).toBe(false);
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				lookAwayTitle: "Custom title",
+			}),
+		).toBe(false);
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				lookAwayHint: "Custom hint",
 			}),
 		).toBe(false);
 		expect(
@@ -173,6 +187,26 @@ describe("pushPreferenceDiff", () => {
 		);
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 		expect(rendererIpc.updatePopupMessage).not.toHaveBeenCalled();
+	});
+
+	it("pushes only look-away copy when title or hint change", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = {
+			...previous,
+			lookAwayTitle: "Rest your eyes",
+			lookAwayHint: "Look at a distant tree",
+		};
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateLookAwayTitle).toHaveBeenCalledWith(
+			"Rest your eyes",
+		);
+		expect(rendererIpc.updateLookAwayHint).toHaveBeenCalledWith(
+			"Look at a distant tree",
+		);
+		expect(rendererIpc.updateLookAwayDuration).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 	});
 
 	it("pushes goals config once when any goal field changes", () => {

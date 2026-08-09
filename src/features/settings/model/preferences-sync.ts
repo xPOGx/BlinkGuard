@@ -51,6 +51,8 @@ export function sameRendererPrefs(
 		a.lookAwayEnabled === b.lookAwayEnabled &&
 		a.lookAwayInterval === b.lookAwayInterval &&
 		a.lookAwayDuration === b.lookAwayDuration &&
+		a.lookAwayTitle === b.lookAwayTitle &&
+		a.lookAwayHint === b.lookAwayHint &&
 		a.popupMessage === b.popupMessage &&
 		a.blinkPopupClickThrough === b.blinkPopupClickThrough &&
 		samePopupColors(a.popupColors, b.popupColors) &&
@@ -125,6 +127,12 @@ export function pushPreferenceDiff(
 	}
 	if (!previous || previous.lookAwayDuration !== next.lookAwayDuration) {
 		rendererIpc.updateLookAwayDuration(next.lookAwayDuration);
+	}
+	if (!previous || previous.lookAwayTitle !== next.lookAwayTitle) {
+		rendererIpc.updateLookAwayTitle(next.lookAwayTitle);
+	}
+	if (!previous || previous.lookAwayHint !== next.lookAwayHint) {
+		rendererIpc.updateLookAwayHint(next.lookAwayHint);
 	}
 	if (!previous || !samePopupColors(previous.popupColors, next.popupColors)) {
 		rendererIpc.updatePopupColors(next.popupColors);

@@ -150,9 +150,13 @@ function sanitizeValue(value: unknown): unknown {
 			if (
 				key === "popupMessage" ||
 				key === "exercisePrompts" ||
+				key === "lookAwayTitle" ||
+				key === "lookAwayHint" ||
 				key === "message" ||
 				key === "prompt" ||
-				key === "prompts"
+				key === "prompts" ||
+				key === "title" ||
+				key === "hint"
 			) {
 				if (typeof nested === "string") {
 					out[key] = { present: nested.length > 0, length: nested.length };

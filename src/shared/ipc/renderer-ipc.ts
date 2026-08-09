@@ -100,6 +100,10 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateLookAwayInterval, minutes),
 	updateLookAwayDuration: (seconds: number) =>
 		send(IPC_CHANNELS.updateLookAwayDuration, seconds),
+	updateLookAwayTitle: (title: string) =>
+		send(IPC_CHANNELS.updateLookAwayTitle, title),
+	updateLookAwayHint: (hint: string) =>
+		send(IPC_CHANNELS.updateLookAwayHint, hint),
 	updatePopupColors: (colors: PopupColors) =>
 		send(IPC_CHANNELS.updatePopupColors, colors),
 	updatePopupTransparency: (transparency: number) =>

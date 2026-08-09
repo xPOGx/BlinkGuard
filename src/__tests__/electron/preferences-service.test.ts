@@ -151,6 +151,25 @@ describe("PreferencesService", () => {
 		);
 	});
 
+	it("sanitizes lookAwayTitle and lookAwayHint on set()", () => {
+		const store = new FakePreferenceStore();
+		const service = new PreferencesService(store);
+
+		service.set("lookAwayTitle", "  Far focus  ");
+		service.set("lookAwayHint", "  Soft gaze  ");
+		expect(service.current.lookAwayTitle).toBe("Far focus");
+		expect(service.current.lookAwayHint).toBe("Soft gaze");
+
+		service.set("lookAwayTitle", "   ");
+		service.set("lookAwayHint", "");
+		expect(service.current.lookAwayTitle).toBe(
+			DEFAULT_PREFERENCES.lookAwayTitle,
+		);
+		expect(service.current.lookAwayHint).toBe(
+			DEFAULT_PREFERENCES.lookAwayHint,
+		);
+	});
+
 	it("sanitizes blinkRateThresholdPerMin on load and set()", () => {
 		const store = new FakePreferenceStore();
 		store.set("blinkRateThresholdPerMin", 100);

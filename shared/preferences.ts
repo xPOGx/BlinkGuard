@@ -2,6 +2,8 @@ import { BLINK_RATE_LOW_MAX } from "./blink-rate";
 import { isValidEarCalibration } from "./ear-calibration";
 import {
 	defaultExercisePrompts,
+	defaultLookAwayHint,
+	defaultLookAwayTitle,
 	defaultPopupMessage,
 	sanitizeLocale,
 	type Locale,
@@ -195,6 +197,10 @@ export interface PersistedPreferences {
 	lookAwayInterval: number;
 	/** Seconds to look away (countdown in popup). */
 	lookAwayDuration: number;
+	/** Look-away popup title (user-editable; built-ins localize). */
+	lookAwayTitle: string;
+	/** Look-away popup hint (user-editable; built-ins localize). */
+	lookAwayHint: string;
 	popupPosition: Point | null;
 	popupSize: Size;
 	popupColors: PopupColors;
@@ -259,6 +265,28 @@ export function sanitizeExercisePrompts(
 	return cleaned.length > 0 ? cleaned : [...fallback];
 }
 
+/** Coerce stored/IPC look-away title; empty → locale default. */
+export function sanitizeLookAwayTitle(
+	input: unknown,
+	locale: Locale = "en",
+): string {
+	if (typeof input === "string" && input.trim()) {
+		return input.trim();
+	}
+	return defaultLookAwayTitle(sanitizeLocale(locale));
+}
+
+/** Coerce stored/IPC look-away hint; empty → locale default. */
+export function sanitizeLookAwayHint(
+	input: unknown,
+	locale: Locale = "en",
+): string {
+	if (typeof input === "string" && input.trim()) {
+		return input.trim();
+	}
+	return defaultLookAwayHint(sanitizeLocale(locale));
+}
+
 export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	darkMode: true,
 	reminderInterval: 3000,
@@ -275,6 +303,8 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	lookAwayEnabled: true,
 	lookAwayInterval: 20,
 	lookAwayDuration: 20,
+	lookAwayTitle: defaultLookAwayTitle("en"),
+	lookAwayHint: defaultLookAwayHint("en"),
 	popupPosition: null,
 	popupSize: { width: 300, height: 120 },
 	popupColors: {
@@ -506,6 +536,8 @@ export function sanitizePersistedPreferences(
 			record.lookAwayDuration,
 			defaults.lookAwayDuration,
 		),
+		lookAwayTitle: sanitizeLookAwayTitle(record.lookAwayTitle, locale),
+		lookAwayHint: sanitizeLookAwayHint(record.lookAwayHint, locale),
 		popupPosition: sanitizePopupPosition(record.popupPosition),
 		popupSize: sanitizePopupSize(record.popupSize, defaults.popupSize),
 		popupColors: sanitizePopupColors(record.popupColors, defaults.popupColors),

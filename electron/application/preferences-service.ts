@@ -3,6 +3,8 @@ import {
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
+	sanitizeLookAwayHint,
+	sanitizeLookAwayTitle,
 	sanitizePersistedPreferences,
 	sanitizeSoundVolume,
 	type AppPreferences,
@@ -91,6 +93,16 @@ export class PreferencesService {
 			next = sanitizeLocale(value) as PersistedPreferences[K];
 		} else if (key === "exercisePrompts") {
 			next = sanitizeExercisePrompts(
+				value,
+				this.current.locale,
+			) as PersistedPreferences[K];
+		} else if (key === "lookAwayTitle") {
+			next = sanitizeLookAwayTitle(
+				value,
+				this.current.locale,
+			) as PersistedPreferences[K];
+		} else if (key === "lookAwayHint") {
+			next = sanitizeLookAwayHint(
 				value,
 				this.current.locale,
 			) as PersistedPreferences[K];

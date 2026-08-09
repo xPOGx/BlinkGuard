@@ -28,6 +28,38 @@ export function resolvePopupMessage(stored: string, locale: Locale): string {
 		: stored;
 }
 
+export function defaultLookAwayTitle(locale: Locale): string {
+	return t(locale, "defaults.lookAwayTitle");
+}
+
+export function defaultLookAwayHint(locale: Locale): string {
+	return t(locale, "defaults.lookAwayHint");
+}
+
+/** True when title matches a built-in default in any locale (not custom). */
+export function isBuiltInLookAwayTitle(title: string): boolean {
+	return LOCALES.some((locale) => defaultLookAwayTitle(locale) === title);
+}
+
+/** True when hint matches a built-in default in any locale (not custom). */
+export function isBuiltInLookAwayHint(hint: string): boolean {
+	return LOCALES.some((locale) => defaultLookAwayHint(locale) === hint);
+}
+
+/** Use localized default when the stored title is still a built-in. */
+export function resolveLookAwayTitle(stored: string, locale: Locale): string {
+	return isBuiltInLookAwayTitle(stored)
+		? defaultLookAwayTitle(locale)
+		: stored;
+}
+
+/** Use localized default when the stored hint is still a built-in. */
+export function resolveLookAwayHint(stored: string, locale: Locale): string {
+	return isBuiltInLookAwayHint(stored)
+		? defaultLookAwayHint(locale)
+		: stored;
+}
+
 function samePromptList(a: readonly string[], b: readonly string[]): boolean {
 	return a.length === b.length && a.every((item, index) => item === b[index]);
 }

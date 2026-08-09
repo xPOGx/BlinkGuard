@@ -179,6 +179,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	on(IPC_CHANNELS.updateLookAwayDuration, (_event, duration: unknown) => {
 		preferences.set("lookAwayDuration", duration as number);
 	});
+	on(IPC_CHANNELS.updateLookAwayTitle, (_event, title: unknown) => {
+		preferences.set("lookAwayTitle", title as string);
+	});
+	on(IPC_CHANNELS.updateLookAwayHint, (_event, hint: unknown) => {
+		preferences.set("lookAwayHint", hint as string);
+	});
 	on(IPC_CHANNELS.updateKeyboardShortcut, (_event, shortcut: unknown) => {
 		preferences.set("keyboardShortcut", shortcut as string);
 		shortcuts.register(shortcut as string);

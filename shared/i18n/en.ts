@@ -273,6 +273,12 @@ export const en: MessageCatalog = {
 	"lookAway.durationAria": "Look-away duration",
 	"lookAway.hint":
 		"Blink reminders pause while the look-away popup is open",
+	"lookAway.copy": "Popup copy",
+	"lookAway.copyTitle": "Title",
+	"lookAway.copyHint": "Hint",
+	"lookAway.copyTitleAria": "Look-away popup title",
+	"lookAway.copyHintAria": "Look-away popup hint",
+	"lookAway.resetCopy": "Reset defaults",
 
 	// Appearance / popup settings
 	"popup.settings": "Popup Settings",
@@ -503,6 +509,8 @@ export const en: MessageCatalog = {
 
 	// Defaults (persisted content)
 	"defaults.popupMessage": "Blink!",
+	"defaults.lookAwayTitle": "Look away",
+	"defaults.lookAwayHint": "Focus on something ~20 feet / 6 m away",
 	"defaults.exercisePrompt1":
 		"Close your eyes and gently roll them in a circular motion for 10 seconds. Then reverse direction.",
 	"defaults.exercisePrompt2":
