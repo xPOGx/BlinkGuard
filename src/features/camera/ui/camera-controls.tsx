@@ -81,6 +81,7 @@ export function CameraControls({
 		performance: t("camera.quality.performance"),
 		medium: t("camera.quality.medium"),
 		high: t("camera.quality.high"),
+		ultra: t("camera.quality.ultra"),
 	};
 
 	const autoStopMinutes = preferences.autoStopNoFaceMinutes;

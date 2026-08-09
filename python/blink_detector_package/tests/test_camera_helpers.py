@@ -17,6 +17,7 @@ from blink_detector_package.infrastructure.camera import (
 	is_mjpg_fourcc,
 	mean_luma,
 )
+from blink_detector_package.infrastructure.vision import prepare_preview_frame
 
 
 class CameraHelperTests(unittest.TestCase):
@@ -34,6 +35,14 @@ class CameraHelperTests(unittest.TestCase):
 		self.assertEqual(mean_luma(None), 0.0)
 		empty = np.zeros((0, 0, 3), dtype=np.uint8)
 		self.assertEqual(mean_luma(empty), 0.0)
+
+	def test_prepare_preview_frame_downscales_wide(self):
+		frame = np.zeros((480, 640, 3), dtype=np.uint8)
+		out = prepare_preview_frame(frame, max_width=480)
+		self.assertEqual(out.shape[1], 480)
+		self.assertEqual(out.shape[0], 360)
+		small = np.zeros((240, 320, 3), dtype=np.uint8)
+		self.assertIs(prepare_preview_frame(small, max_width=480), small)
 
 	def test_backend_name_known(self):
 		import cv2

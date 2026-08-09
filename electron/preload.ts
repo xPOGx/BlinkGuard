@@ -74,7 +74,7 @@ contextBridge.exposeInMainWorld('popupAPI', {
   onBlinkDetected: (callback: (blinkData: any) => void) => {
     ipcRenderer.on(IPC_CHANNELS.blinkDetected, (_event, blinkData) => callback(blinkData));
   },
-  onVideoStream: (callback: (streamData: string) => void) => {
+  onVideoStream: (callback: (streamData: string | Record<string, unknown>) => void) => {
     ipcRenderer.on(IPC_CHANNELS.videoStream, (_event, streamData) => callback(streamData));
   },
   onThresholdUpdated: (callback: (threshold: number) => void) => {
@@ -141,7 +141,7 @@ declare global {
       notifyAudioFinished: () => void;
       onFaceTrackingData: (callback: (data: any) => void) => void;
       onBlinkDetected: (callback: (blinkData: any) => void) => void;
-      onVideoStream: (callback: (streamData: string) => void) => void;
+      onVideoStream: (callback: (streamData: string | Record<string, unknown>) => void) => void;
       onThresholdUpdated: (callback: (threshold: number) => void) => void;
       requestVideoStream: () => void;
       onUpdateExercisePrompt: (callback: (prompt: string) => void) => void;

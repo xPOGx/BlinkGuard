@@ -40,7 +40,7 @@ describe("toRendererPreferences", () => {
 });
 
 describe("camera quality presets", () => {
-	it("maps performance / medium / high to the quality table", () => {
+	it("maps performance / medium / high / ultra to the quality table", () => {
 		expect(CAMERA_QUALITY_PRESETS.performance).toEqual({
 			targetFps: 10,
 			processingResolution: [320, 240],
@@ -59,6 +59,12 @@ describe("camera quality presets", () => {
 			faceDetectInterval: 1,
 			poseStrictness: "normal",
 		});
+		expect(CAMERA_QUALITY_PRESETS.ultra).toEqual({
+			targetFps: 30,
+			processingResolution: [640, 480],
+			faceDetectInterval: 1,
+			poseStrictness: "normal",
+		});
 	});
 
 	it("defaults cameraQuality to medium in DEFAULT_PREFERENCES", () => {
@@ -72,11 +78,17 @@ describe("camera quality presets", () => {
 			face_detect_interval: 1,
 			pose_strictness: "normal",
 		});
+		expect(toSidecarCameraQualityMessage("ultra")).toEqual({
+			target_fps: 30,
+			processing_resolution: [640, 480],
+			face_detect_interval: 1,
+			pose_strictness: "normal",
+		});
 	});
 
 	it("validates camera quality values", () => {
 		expect(isCameraQuality("medium")).toBe(true);
-		expect(isCameraQuality("ultra")).toBe(false);
+		expect(isCameraQuality("ultra")).toBe(true);
 		expect(isCameraQuality("max")).toBe(false);
 	});
 });

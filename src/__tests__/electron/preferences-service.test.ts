@@ -362,7 +362,7 @@ describe("PreferencesService", () => {
 			...DEFAULT_PREFERENCES,
 			autoStopNoFaceMinutes: 99,
 			soundVolume: -5,
-			cameraQuality: "ultra" as never,
+			cameraQuality: "turbo" as never,
 		});
 
 		expect(service.current.autoStopNoFaceMinutes).toBe(30);

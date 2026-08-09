@@ -5,12 +5,15 @@ let lastBlinkTime = 0;
 let blinkDisplayTimer = null;
 let currentThreshold = 0.2;
 let thresholdUpdateTimer = null;
-/** EMA display state — HOG face boxes jitter every frame even when still. */
+/** EMA for face box only — HOG boxes jitter; keep light tracking lag. */
 let smoothedFaceRect = null;
-let smoothedEyeLandmarks = null;
-const FACE_OVERLAY_SMOOTH = 0.28;
+const FACE_OVERLAY_SMOOTH = 0.85;
 /** Normalized jump above this snaps (re-acquire / large head move). */
 const FACE_OVERLAY_SNAP = 0.12;
+/** Reused decode target; drop stale JPEGs so preview does not queue lag. */
+const previewImage = new window.Image();
+let previewDecodeBusy = false;
+let pendingPreview = null;
 
 function tr(key, vars) {
 	if (window.__i18n && typeof window.__i18n.t === "function") {
@@ -25,7 +28,6 @@ function lerp(a, b, t) {
 
 function resetSmoothedOverlay() {
 	smoothedFaceRect = null;
-	smoothedEyeLandmarks = null;
 }
 
 function smoothFaceRect(next) {
@@ -67,31 +69,11 @@ function smoothFaceRect(next) {
 }
 
 function smoothEyeLandmarks(points) {
+	// Frame-synced preview draws raw dots (no EMA float vs video).
 	if (!points || !points.length) {
-		smoothedEyeLandmarks = null;
 		return null;
 	}
-	if (
-		!smoothedEyeLandmarks ||
-		smoothedEyeLandmarks.length !== points.length
-	) {
-		smoothedEyeLandmarks = points.map((p) => ({ x: p.x, y: p.y }));
-		return smoothedEyeLandmarks;
-	}
-	const a = FACE_OVERLAY_SMOOTH;
-	for (let i = 0; i < points.length; i++) {
-		const prev = smoothedEyeLandmarks[i];
-		const next = points[i];
-		const jump = Math.abs(next.x - prev.x) + Math.abs(next.y - prev.y);
-		if (jump > FACE_OVERLAY_SNAP) {
-			prev.x = next.x;
-			prev.y = next.y;
-		} else {
-			prev.x = lerp(prev.x, next.x, a);
-			prev.y = lerp(prev.y, next.y, a);
-		}
-	}
-	return smoothedEyeLandmarks;
+	return points.map((p) => ({ x: p.x, y: p.y }));
 }
 
 function setFaceMissingOverlay(visible, faceStatus) {
@@ -304,20 +286,60 @@ function initCameraPopup() {
 		}, 200);
 	});
 
+	function paintPreviewFrame(jpeg, overlayFace) {
+		const canvas = document.getElementById("canvas");
+		if (!canvas || !jpeg) {
+			return;
+		}
+		const ctx = canvas.getContext("2d");
+		if (previewDecodeBusy) {
+			// Keep only the newest frame — backlog = visible delay.
+			pendingPreview = { jpeg, overlayFace };
+			return;
+		}
+		previewDecodeBusy = true;
+		previewImage.onload = function () {
+			canvas.width = previewImage.width;
+			canvas.height = previewImage.height;
+			ctx.drawImage(
+				previewImage,
+				0,
+				0,
+				previewImage.width,
+				previewImage.height,
+			);
+			drawOverlays(overlayFace);
+			previewDecodeBusy = false;
+			if (pendingPreview) {
+				const next = pendingPreview;
+				pendingPreview = null;
+				paintPreviewFrame(next.jpeg, next.overlayFace);
+			}
+		};
+		previewImage.onerror = function () {
+			previewDecodeBusy = false;
+			pendingPreview = null;
+		};
+		previewImage.src = "data:image/jpeg;base64," + jpeg;
+	}
+
 	window.popupAPI.onVideoStream((streamData) => {
 		try {
-			const canvas = document.getElementById("canvas");
-			if (canvas) {
-				const ctx = canvas.getContext("2d");
-				const img = new window.Image();
-				img.onload = function () {
-					canvas.width = img.width;
-					canvas.height = img.height;
-					ctx.drawImage(img, 0, 0, img.width, img.height);
-					drawOverlays(lastFaceData);
+			// Prefer frame-synced overlay payload; fall back to legacy base64 string.
+			let jpeg = streamData;
+			let overlayFace = lastFaceData;
+			if (streamData && typeof streamData === "object") {
+				jpeg = streamData.jpeg || streamData.videoStream || "";
+				overlayFace = {
+					faceDetected: Boolean(streamData.faceDetected),
+					faceStatus: streamData.faceStatus || "none",
+					faceRect: streamData.faceRect,
+					eyeLandmarks: streamData.eyeLandmarks || [],
+					ear: lastFaceData ? lastFaceData.ear : undefined,
+					blink: lastFaceData ? lastFaceData.blink : false,
 				};
-				img.src = "data:image/jpeg;base64," + streamData;
 			}
+			paintPreviewFrame(jpeg, overlayFace);
 		} catch (error) {
 			console.error("Error handling video stream:", error);
 			const status = document.getElementById("status");

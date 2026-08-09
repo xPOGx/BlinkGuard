@@ -27,7 +27,7 @@ export interface PopupColors {
 	transparency: number;
 }
 
-export type CameraQuality = "performance" | "medium" | "high";
+export type CameraQuality = "performance" | "medium" | "high" | "ultra";
 
 const BLINK_RATE_THRESHOLD_MIN = 1;
 const BLINK_RATE_THRESHOLD_MAX = 60;
@@ -372,7 +372,10 @@ function normalizeQuietHoursTime(value: string): string | null {
 
 function isCameraQualityValue(value: unknown): value is CameraQuality {
 	return (
-		value === "performance" || value === "medium" || value === "high"
+		value === "performance" ||
+		value === "medium" ||
+		value === "high" ||
+		value === "ultra"
 	);
 }
 

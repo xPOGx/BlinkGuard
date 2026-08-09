@@ -35,17 +35,29 @@ export const CAMERA_QUALITY_PRESETS: Readonly<
 		faceDetectInterval: 1,
 		poseStrictness: "normal",
 	},
+	// Ultra = 30 FPS at High resolution — needs a strong machine / good light;
+	// preview JPEG stays throttled in the sidecar so UI encode does not cap the loop.
+	ultra: {
+		targetFps: 30,
+		processingResolution: [640, 480],
+		faceDetectInterval: 1,
+		poseStrictness: "normal",
+	},
 };
 
 export const CAMERA_QUALITY_OPTIONS = [
 	"performance",
 	"medium",
 	"high",
+	"ultra",
 ] as const satisfies readonly CameraQuality[];
 
 export function isCameraQuality(value: unknown): value is CameraQuality {
 	return (
-		value === "performance" || value === "medium" || value === "high"
+		value === "performance" ||
+		value === "medium" ||
+		value === "high" ||
+		value === "ultra"
 	);
 }
 

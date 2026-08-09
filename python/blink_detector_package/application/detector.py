@@ -17,6 +17,10 @@ from blink_detector_package.domain import (
 	interocular_distance_px,
 	select_largest_face,
 )
+from blink_detector_package.domain.blink_detection import (
+	DEFAULT_TARGET_FPS,
+	FACE_MISS_HOLD_FRAMES,
+)
 from blink_detector_package.domain.ear import calculate_ear_fast
 from blink_detector_package.infrastructure.camera import (
 	BLACK_STREAK_S,
@@ -62,9 +66,16 @@ class BlinkDetectorApplication:
 		self.pose_strictness = DEFAULT_POSE_STRICTNESS
 		self._cached_face = None
 		self._frames_since_face_detect = 0
+		self._face_miss_streak = 0
 		self._last_skip_debug_time = 0.0
 		self._last_skip_debug_phase = None
 		self._last_near_miss_debug_time = 0.0
+		# Preview follows target_fps (Ultra=30); encode stays light via size/q.
+		self._last_video_emit = 0.0
+		self._video_min_interval = 1.0 / max(8, int(self.camera.target_fps or 10))
+		self._loop_dt_ema = 0.0
+		self._last_gate_fps_update = 0.0
+		self._last_processed_frame_time = 0.0
 		self._reset_capture_health()
 
 	def _reset_capture_health(self):
@@ -160,6 +171,9 @@ class BlinkDetectorApplication:
 		face_ok = self._health_face_ok
 		face_none = self._health_face_none
 		mean = self._health_luma_sum / frames
+		loop_fps = (
+			round(1.0 / self._loop_dt_ema, 2) if self._loop_dt_ema > 0 else None
+		)
 		self.camera.emit_camera_state(
 			"camera_health",
 			frames=self._health_frames,
@@ -170,6 +184,8 @@ class BlinkDetectorApplication:
 			face_too_far=self._health_face_too_far,
 			send_video=self.send_video,
 			window_s=round(current_time - self._health_window_start, 3),
+			loop_fps=loop_fps,
+			gate_fps=round(float(self.detection.target_fps), 2),
 			**meta,
 		)
 		self.transport.send(
@@ -179,6 +195,7 @@ class BlinkDetectorApplication:
 					f"frames={self._health_frames} "
 					f"luma={mean:.1f} black={black_ratio:.2f} "
 					f"face_ok={face_ok} face_none={face_none} "
+					f"loop_fps={loop_fps} gate_fps={self.detection.target_fps:.1f} "
 					f"backend={meta.get('backend_name')}"
 				)
 			}
@@ -243,12 +260,14 @@ class BlinkDetectorApplication:
 				self.camera.stop(reason="stop_camera")
 				self.send_video = False
 				self._cached_face = None
+				self._face_miss_streak = 0
 				self._reset_capture_health()
 				self.transport.send({"status": "Camera stopped"})
 
 			if want_start:
 				if self.camera.start(self.detection.reset):
 					self._cached_face = None
+					self._face_miss_streak = 0
 					self._frames_since_face_detect = 0
 					self._reset_capture_health()
 					self.transport.send(
@@ -259,16 +278,39 @@ class BlinkDetectorApplication:
 
 			if want_video:
 				self.send_video = True
+				self._sync_video_emit_interval()
 				self.transport.send({"status": "Video streaming enabled"})
 		except Exception as error:
 			self.transport.send(
 				{"debug": f"Command processing error: {str(error)}"}
 			)
 
+	def _sync_video_emit_interval(self):
+		"""Match preview cadence to quality preset (not a hard 10 FPS cap)."""
+		try:
+			fps = int(self.camera.target_fps)
+		except (TypeError, ValueError):
+			fps = 15
+		fps = max(8, min(fps, 30))
+		self._video_min_interval = 1.0 / float(fps)
+
+	def _preview_encode_options(self):
+		"""Lighter JPEG at higher target FPS so encode does not add lag."""
+		try:
+			fps = int(self.camera.target_fps)
+		except (TypeError, ValueError):
+			fps = 15
+		if fps >= 25:
+			return {"max_width": 400, "quality": 40}
+		if fps >= 18:
+			return {"max_width": 480, "quality": 45}
+		return {"max_width": 480, "quality": 50}
+
 	def _apply_config_dict(self, data):
 		if "target_fps" in data:
 			self.camera.update_target_fps(data["target_fps"])
 			self.detection.set_target_fps(self.camera.target_fps)
+			self._sync_video_emit_interval()
 			self.transport.send(
 				{
 					"status": (
@@ -353,23 +395,76 @@ class BlinkDetectorApplication:
 						}
 					)
 
+	def _emit_video_stream(self, frame, face_data=None):
+		"""JPEG plus same-frame overlay so preview dots/box stay locked to video.
+
+		Cadence tracks target_fps (Ultra → 30). Encode is downscaled/quality-
+		scaled so high presets stay responsive without a fixed 10 FPS cap.
+		"""
+		now = time.time()
+		# Half-interval slack: avoid skipping a paced loop frame on tiny jitter.
+		if now - self._last_video_emit < self._video_min_interval * 0.5:
+			return
+		self._last_video_emit = now
+		frame_base64 = encode_frame(frame, **self._preview_encode_options())
+		payload = {"jpeg": frame_base64}
+		if face_data:
+			payload["faceRect"] = face_data.get("faceRect")
+			payload["eyeLandmarks"] = face_data.get("eyeLandmarks")
+			payload["faceStatus"] = face_data.get("faceStatus")
+			payload["faceDetected"] = face_data.get("faceDetected")
+		self.transport.send({"videoStream": payload})
+
+	def _update_measured_gate_fps(self, current_time, frame_dt):
+		"""Drive blink gates from achieved loop rate, not just the quality preset."""
+		if frame_dt <= 0 or frame_dt > 1.0:
+			return
+		if self._loop_dt_ema <= 0:
+			self._loop_dt_ema = frame_dt
+		else:
+			self._loop_dt_ema = (0.85 * self._loop_dt_ema) + (0.15 * frame_dt)
+		if current_time - self._last_gate_fps_update < 1.0:
+			return
+		self._last_gate_fps_update = current_time
+		measured = 1.0 / max(self._loop_dt_ema, 1e-3)
+		# Never invent a higher rate than the configured target.
+		configured = float(self.camera.target_fps or DEFAULT_TARGET_FPS)
+		gate_fps = max(8.0, min(configured, measured))
+		self.detection.set_target_fps(gate_fps)
+
 	def _resolve_face(self, detector, gray):
 		"""Run HOG face detect on interval; otherwise reuse largest bbox.
 
 		While a blink candidate is active, re-detect every frame so a stale
 		bbox (performance face_detect_interval>1) cannot poison mid-blink EAR.
+		Do not force every-frame detect merely because preview is on — HOG
+		flicker while talking showed face-missing UI (POG 2026-08-09).
+		Brief miss hold keeps last bbox across 1–2 HOG fails.
 		"""
+		interval = self.face_detect_interval
 		should_detect = (
 			self._cached_face is None
-			or self._frames_since_face_detect >= self.face_detect_interval
+			or self._frames_since_face_detect >= interval
 			or self.detection.blink_in_progress
 		)
 		if should_detect:
 			faces = detector(gray, 0)
 			face = select_largest_face(faces)
-			self._cached_face = face
+			if face is not None:
+				self._cached_face = face
+				self._face_miss_streak = 0
+				self._frames_since_face_detect = 1
+				return face
+			self._face_miss_streak += 1
+			if (
+				self._cached_face is not None
+				and self._face_miss_streak <= FACE_MISS_HOLD_FRAMES
+			):
+				self._frames_since_face_detect = 1
+				return self._cached_face
+			self._cached_face = None
 			self._frames_since_face_detect = 1
-			return face
+			return None
 
 		self._frames_since_face_detect += 1
 		return self._cached_face
@@ -855,6 +950,12 @@ class BlinkDetectorApplication:
 						)
 						self._cached_face = None
 						self._reset_capture_health()
+						if self._last_processed_frame_time > 0:
+							self._update_measured_gate_fps(
+								current_time,
+								current_time - self._last_processed_frame_time,
+							)
+						self._last_processed_frame_time = current_time
 						continue
 
 					self._cached_face = None
@@ -864,12 +965,13 @@ class BlinkDetectorApplication:
 					self._emit_face_lost(current_time, had_candidate)
 					self.transport.send_serialized(NO_FACE_DATA)
 					if self.send_video:
-						if self.camera.processing_resolution == (640, 480):
-							frame_base64 = encode_frame(frame)
-						else:
-							display_frame = cv2.resize(frame, (640, 480))
-							frame_base64 = encode_frame(display_frame)
-						self.transport.send({"videoStream": frame_base64})
+						self._emit_video_stream(frame)
+					if self._last_processed_frame_time > 0:
+						self._update_measured_gate_fps(
+							current_time,
+							current_time - self._last_processed_frame_time,
+						)
+					self._last_processed_frame_time = current_time
 					frame_count += 1
 					continue
 
@@ -940,7 +1042,8 @@ class BlinkDetectorApplication:
 								face=face,
 								credited=False,
 							)
-						self._cached_face = None
+						# Keep HOG bbox — clearing forced face-missing flicker
+						# when landmarks briefly fail quality (POG 2026-08-09).
 					else:
 						left_ear = calculate_ear_fast(left_eye, buffers)
 						right_ear = calculate_ear_fast(right_eye, buffers)
@@ -973,11 +1076,31 @@ class BlinkDetectorApplication:
 							face,
 						)
 				else:
-					self._cached_face = None
-					had_candidate = self.detection.cancel_on_face_lost(
-						current_time
-					)
-					self._emit_face_lost(current_time, had_candidate)
+					if face is not None:
+						# HOG ok but landmarks missing this frame — keep bbox,
+						# avoid "no face" UI flash (POG static sit face-missing).
+						face_data["faceDetected"] = True
+						face_data["faceStatus"] = "ok"
+						face_data["faceRect"] = {
+							"x": float(face.left() / frame_width),
+							"y": float(face.top() / frame_height),
+							"width": float(face.width() / frame_width),
+							"height": float(face.height() / frame_height),
+						}
+						if self.detection.blink_in_progress:
+							had_candidate = self.detection.cancel_on_face_lost(
+								current_time
+							)
+							self._emit_face_lost(current_time, had_candidate)
+						else:
+							self.detection.mark_face_absent(current_time)
+					else:
+						self._cached_face = None
+						self._face_miss_streak = 0
+						had_candidate = self.detection.cancel_on_face_lost(
+							current_time
+						)
+						self._emit_face_lost(current_time, had_candidate)
 
 				self._commit_frame_health(
 					luma,
@@ -995,14 +1118,13 @@ class BlinkDetectorApplication:
 					self.transport.send({"faceData": face_data})
 
 				if self.send_video:
-					if self.camera.processing_resolution == (640, 480):
-						frame_base64 = encode_frame(frame)
-					else:
-						display_frame = cv2.resize(frame, (640, 480))
-						frame_base64 = encode_frame(display_frame)
-					self.transport.send(
-						{"videoStream": frame_base64}
+					self._emit_video_stream(frame, face_data)
+				if self._last_processed_frame_time > 0:
+					self._update_measured_gate_fps(
+						current_time,
+						current_time - self._last_processed_frame_time,
 					)
+				self._last_processed_frame_time = current_time
 				frame_count += 1
 		except KeyboardInterrupt:
 			self.transport.send(

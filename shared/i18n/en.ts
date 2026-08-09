@@ -193,11 +193,12 @@ export const en: MessageCatalog = {
 	"camera.stopShowing": "Stop Showing",
 	"camera.quality": "Camera Quality",
 	"camera.qualityDesc":
-		"Medium is recommended. Performance saves CPU (may miss short blinks); High improves blink timing accuracy if rejects spike on Performance.",
+		"Medium is recommended. Performance saves CPU (may miss short blinks); High / Ultra improve blink timing — Ultra targets 30 FPS and needs more CPU and light.",
 	"camera.qualityAria": "Camera quality",
 	"camera.quality.performance": "Performance",
 	"camera.quality.medium": "Medium",
 	"camera.quality.high": "High",
+	"camera.quality.ultra": "Ultra",
 	"camera.calibration": "Open-eye Calibration",
 	"camera.calibrationDesc":
 		"Keep eyes open and look at the camera for about 8 seconds. This tunes blink thresholds to your face.",

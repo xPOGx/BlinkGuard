@@ -338,6 +338,7 @@ def main() -> int:
 		"skip_cooldown",
 		"reject_opening",
 		"reject_bilateral",
+		"reject_motion",
 		"skip_face_lost",
 		"skip_face_quality",
 	):

@@ -407,10 +407,10 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertAlmostEqual(short_frontal_velocity(10), 0.50, places=3)
 
 	def test_short_look_down_velocity_fps_bands(self):
-		# 0.45 floor for look-down short blinks (above frontal@20, below old 0.50).
-		self.assertAlmostEqual(short_look_down_velocity(20), 0.45, places=3)
-		self.assertAlmostEqual(short_look_down_velocity(15), 0.45, places=3)
-		self.assertAlmostEqual(short_look_down_velocity(10), 0.45, places=3)
+		# Raised after talk-jaw FP (was flat 0.45).
+		self.assertAlmostEqual(short_look_down_velocity(20), 0.75, places=3)
+		self.assertAlmostEqual(short_look_down_velocity(15), 0.70, places=3)
+		self.assertAlmostEqual(short_look_down_velocity(10), 0.65, places=3)
 		# Look-down short floor stays ≥ frontal at each band.
 		self.assertGreaterEqual(
 			short_look_down_velocity(20),
@@ -633,7 +633,7 @@ class BlinkDetectionTests(unittest.TestCase):
 			pose, "normal", resting_pitch=state.resting_pitch
 		)
 		self.assertTrue(gate["look_down"])
-		# Soft close under look-down short gate (0.45); reopen past close band.
+		# Soft close under look-down short gate; reopen past close band.
 		steps = (
 			(0.1, 0.22),
 			(0.1, 0.20),
@@ -702,6 +702,219 @@ class BlinkDetectionTests(unittest.TestCase):
 			info.get("peak_velocity_raw", info["peak_velocity"]),
 			FRONTAL_OPENING_PEAK_WAIVE,
 		)
+
+	def test_synthetic_short_without_reopen_rejected(self):
+		"""Invented synthetic peak + openVel≈0 + 1 closed → reject_opening."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks())
+		state.blink_in_progress = True
+		state.blink_start_time = t - 0.05
+		state.closed_frames = 1
+		state.peak_closing_velocity = 0.25
+		state.peak_closing_velocity_measured = 0.25
+		state.peak_opening_velocity = 0.0
+		state.max_drop_percentage = 0.18
+		state._candidate_yaw = 0.0
+		state._candidate_pitch = 0.0
+		state._candidate_pose_delta = 0.0
+		state.prev_ear = 0.26
+		state.prev_time = t
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.26)
+		t += 0.05
+		# Exit close band with tiny ΔEAR so opening velocity stays ≈0.
+		credited, info = state.detect(0.261, t, pose=pose)
+		self.assertFalse(credited)
+		self.assertIn(info["phase"], ("reject_opening", "reject_velocity", "reject_threshold"))
+
+	def test_look_down_one_frame_ok_with_strong_peak(self):
+		"""Look-down short duration credits when measured peak clears gate."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.12
+		self.assertTrue(
+			evaluate_pose_gate(
+				pose, "normal", resting_pitch=state.resting_pitch
+			)["look_down"]
+		)
+		steps = (
+			(0.05, 0.10),
+			(0.05, 0.22),
+			(0.05, 0.28),
+			(0.05, 0.28),
+		)
+		credited_any, _t, info, phases = _feed(state, t, steps, pose=pose)
+		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+		self.assertLess(float(info.get("duration") or 1), 0.2)
+
+	def test_head_motion_rejects_credit(self):
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks())
+		state.blink_in_progress = True
+		state.blink_start_time = t
+		state.closed_frames = 2
+		# Below motion waive (peak/drop) so pose Δ alone rejects.
+		state.peak_closing_velocity = 0.8
+		state.peak_closing_velocity_measured = 0.8
+		state.peak_opening_velocity = 0.2
+		state.max_drop_percentage = 0.25
+		state._candidate_yaw = 0.0
+		state._candidate_pitch = 0.0
+		state._candidate_pose_delta = 0.35
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.28)
+		t += 0.2
+		credited, info = state.detect(0.28, t, pose=pose)
+		self.assertFalse(credited)
+		self.assertEqual(info["phase"], "reject_motion")
+		self.assertAlmostEqual(float(info.get("pose_delta") or 0), 0.35, places=3)
+
+	def test_strong_blink_waives_motion_reject(self):
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks())
+		state.blink_in_progress = True
+		state.blink_start_time = t
+		state.closed_frames = 3
+		state.peak_closing_velocity = 2.5
+		state.peak_closing_velocity_measured = 2.5
+		state.peak_opening_velocity = 0.2
+		state.max_drop_percentage = 0.45
+		state._candidate_yaw = 0.0
+		state._candidate_pitch = 0.0
+		state._candidate_pose_delta = 0.30
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.28)
+		t += 0.25
+		credited, info = state.detect(0.28, t, pose=pose)
+		self.assertTrue(credited)
+		self.assertEqual(info["phase"], "complete")
+
+	def test_duration_timeout_credits_strong_blink(self):
+		"""Past BLINK_DURATION_MAX still credits if lids reopened (recovery)."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks())
+		state.blink_in_progress = True
+		state.blink_start_time = t
+		state.closed_frames = 8
+		state.peak_closing_velocity = 2.0
+		state.peak_closing_velocity_measured = 2.0
+		state.peak_opening_velocity = 0.15
+		state.max_drop_percentage = 0.45
+		state._candidate_pose_delta = 0.0
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.28)
+		t += 0.65
+		# Open again (above frontal close-band recovery).
+		credited, info = state.detect(0.28, t, pose=pose)
+		self.assertTrue(credited)
+		self.assertEqual(info["phase"], "complete")
+		self.assertGreater(float(info.get("duration") or 0), 0.6)
+
+	def test_look_down_mid_open_recovers_without_close_band(self):
+		"""Look-down chat open (~0.82 live) must complete — not timeout."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.12
+		# Soft look-down blink: dip then settle above credit recovery (0.80)
+		# but below frontal close-band (~0.84).
+		steps = (
+			(0.05, 0.12),
+			(0.05, 0.12),
+			(0.05, 0.14),
+			(0.05, 0.235),
+			(0.05, 0.235),
+			(0.05, 0.235),
+		)
+		credited_any, _t, info, phases = _feed(state, t, steps, pose=pose)
+		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+		self.assertLess(float(info.get("duration") or 1), 0.55)
+		# Frontal close band would block this reopen (~0.84 of live).
+		close_band = float(info.get("close_band_ear") or 0)
+		self.assertGreater(close_band, 0.235)
+
+	def test_look_down_talk_jitter_short_no_credit(self):
+		"""Talk-jaw short look-down: closed=2, openV=0, drop≈0.25 → no credit."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.12
+		state.blink_in_progress = True
+		state.blink_start_time = t
+		state.closed_frames = 2
+		state.peak_closing_velocity = 1.2
+		state.peak_closing_velocity_measured = 1.2
+		state.peak_opening_velocity = 0.0
+		state.max_drop_percentage = 0.25
+		state._candidate_pose_delta = 0.0
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.235)
+		# Just above SHORT_BLINK_DURATION — still shortish talk bounce.
+		t += 0.10
+		credited, info = state.detect(0.235, t, pose=pose)
+		self.assertFalse(credited)
+		self.assertIn(
+			info["phase"],
+			("reject_opening", "reject_velocity", "reject_threshold"),
+		)
+
+	def test_synthetic_short_shallow_rejected(self):
+		"""Invented peak + shallow drop (rawV≈0) must not credit."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.32)
+		pose = estimate_head_pose(_frontal_landmarks())
+		state.blink_in_progress = True
+		state.blink_start_time = t
+		state.closed_frames = 1
+		state.peak_closing_velocity = 0.0
+		state.peak_closing_velocity_measured = 0.0
+		state.peak_opening_velocity = 0.20
+		state.max_drop_percentage = 0.16
+		state._candidate_pose_delta = 0.0
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.32)
+		t += 0.051
+		credited, info = state.detect(0.32, t, pose=pose)
+		self.assertFalse(credited)
+		self.assertIn(
+			info["phase"],
+			("reject_opening", "reject_velocity", "reject_threshold"),
+		)
+
+	def test_look_down_short_shallow_peak_waive_rejected(self):
+		"""Look-down 1-frame + peak waive without depth → reject (openV=0 FP)."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.12
+		state.blink_in_progress = True
+		state.blink_start_time = t
+		state.closed_frames = 1
+		state.peak_closing_velocity = 1.05
+		state.peak_closing_velocity_measured = 1.05
+		state.peak_opening_velocity = 0.0
+		state.max_drop_percentage = 0.18  # abs ≈ 0.05 on live~0.28
+		state._candidate_pose_delta = 0.0
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.28)
+		t += 0.05
+		credited, info = state.detect(0.28, t, pose=pose)
+		self.assertFalse(credited)
+		self.assertIn(info["phase"], ("reject_opening", "reject_threshold"))
 
 	def test_center_mid_band_no_credit_storm(self):
 		"""EAR stuck ~0.73–0.80 of live must not credit ~1 Hz (POG center FP)."""
