@@ -1,9 +1,9 @@
 import { Share } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/button";
 import { SettingPanel, SettingRow } from "@/components/setting-panel";
 import { useProfile } from "@/features/profile/model/use-profile";
-import { renderProfileShareCard } from "@/features/profile/ui/profile-share-card";
+import { ProfileShareDialog } from "@/features/profile/ui/profile-share-dialog";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
@@ -18,7 +18,7 @@ function SummaryStat({ label, value }: { label: string; value: string }) {
 }
 
 export function ProfilePanel() {
-	const { t, locale } = useI18n();
+	const { t } = useI18n();
 	const {
 		snapshot,
 		progress,
@@ -28,40 +28,49 @@ export function ProfilePanel() {
 		titleMaxed,
 		milestones,
 	} = useProfile();
-	const [shareBusy, setShareBusy] = useState(false);
+	const [shareOpen, setShareOpen] = useState(false);
 	const [shareStatus, setShareStatus] = useState<string | null>(null);
 
-	const handleShare = async () => {
-		if (shareBusy) return;
-		setShareBusy(true);
+	const shareData = useMemo(
+		() => ({
+			level: progress.level,
+			titleKey,
+			descKey,
+			tierKey,
+			lifetimeBlinks: snapshot.totals.total,
+			streak: snapshot.streak.current,
+			todayBlinks: snapshot.today.blinks,
+			availableBlinks: snapshot.totals.available,
+			hasFlair: snapshot.hasStatsFlair,
+			progressRatio: progress.ratio,
+			progressCurrent: progress.current,
+			progressNeeded: progress.needed,
+		}),
+		[
+			progress.level,
+			progress.ratio,
+			progress.current,
+			progress.needed,
+			titleKey,
+			descKey,
+			tierKey,
+			snapshot.totals.total,
+			snapshot.totals.available,
+			snapshot.streak.current,
+			snapshot.today.blinks,
+			snapshot.hasStatsFlair,
+		],
+	);
+
+	const handleSave = async (bytes: Uint8Array) => {
 		setShareStatus(t("profile.share.busy"));
 		try {
-			const dark = document.documentElement.classList.contains("dark");
-			const dateLabel = new Intl.DateTimeFormat(
-				locale === "uk" ? "uk-UA" : "en-US",
-				{ dateStyle: "medium" },
-			).format(new Date());
-			const png = await renderProfileShareCard({
-				brand: t("profile.share.card.brand"),
-				levelLabel: t("profile.share.card.level", {
-					level: progress.level,
-				}),
-				title: t(titleKey),
-				tier: t(tierKey),
-				blinksLabel: t("profile.share.card.blinks", {
-					n: snapshot.totals.total,
-				}),
-				streakLabel: t("profile.share.card.streak", {
-					n: snapshot.streak.current,
-				}),
-				dateLabel,
-				dark,
-			});
-			const result = await rendererIpc.exportProfileImage(png);
+			const result = await rendererIpc.exportProfileImage(bytes);
 			if (result.status === "cancelled") {
 				setShareStatus(t("profile.share.cancelled"));
 			} else if (result.status === "saved") {
 				setShareStatus(t("profile.share.saved", { path: result.path ?? "" }));
+				setShareOpen(false);
 			} else {
 				setShareStatus(
 					t("profile.share.error", {
@@ -75,8 +84,6 @@ export function ProfilePanel() {
 					message: error instanceof Error ? error.message : String(error),
 				}),
 			);
-		} finally {
-			setShareBusy(false);
 		}
 	};
 
@@ -208,8 +215,7 @@ export function ProfilePanel() {
 						<Button
 							type="button"
 							variant="secondary"
-							disabled={shareBusy}
-							onClick={() => void handleShare()}
+							onClick={() => setShareOpen(true)}
 						>
 							<Share className="mr-2 h-4 w-4" />
 							{t("profile.share.button")}
@@ -223,6 +229,13 @@ export function ProfilePanel() {
 					) : null}
 				</SettingRow>
 			</SettingPanel>
+
+			<ProfileShareDialog
+				open={shareOpen}
+				data={shareData}
+				onClose={() => setShareOpen(false)}
+				onSave={handleSave}
+			/>
 		</>
 	);
 }
