@@ -2,7 +2,7 @@
 
 ## Cursor Cloud specific instructions
 
-BlinkGuard is a single desktop app (not a monorepo): an Electron 30 + React 18 + Vite 5 + TypeScript app, with an **optional** Python (OpenCV/dlib) computer-vision sidecar for camera-based blink detection. There is no web backend, database, or docker. State is local (`electron-store`). Standard commands live in `package.json` scripts; the notes below only cover non-obvious cloud caveats.
+BlinkGuard is a single desktop app (not a monorepo): an Electron 43 + React 19 + Vite 8 + TypeScript app, with an **optional** Python (OpenCV/dlib) computer-vision sidecar for camera-based blink detection. There is no web backend, database, or docker. State is local (`electron-store`). Standard commands live in `package.json` scripts; the notes below only cover non-obvious cloud caveats.
 
 ### Layout (post-refactor)
 
