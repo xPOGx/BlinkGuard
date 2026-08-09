@@ -104,11 +104,11 @@ Tradeoff: less driver AA for that app profile; in-app glass may look slightly le
 ### Packaging notes
 
 - Local Windows package (always unsigned): `npm run build:windows`
-- Tag/CI publish: `npm run build:windows:publish` via `scripts/publish-windows.js`
+- CI publish (GitHub Actions on **Release published**, or manual workflow_dispatch): `npm run build:windows:publish` via `scripts/publish-windows.js`
   - Signs when `CSC_LINK` (and `CSC_KEY_PASSWORD` if needed) are set
   - Otherwise packages unsigned so CI still ships artifacts
 - Local macOS package (unsigned, no notarize): `npm run build:mac`
-- Tag/CI macOS publish: `npm run build:mac:publish` via `scripts/publish-mac.js`
+- CI macOS publish: `npm run build:mac:publish` via `scripts/publish-mac.js`
   - Signs/notarizes when Apple + signing secrets (`CSC_LINK` / `CSC_NAME`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`) are set
   - Otherwise packages **unsigned** so CI still ships DMG/ZIP + `latest-mac.yml` (job does not skip)
 - In-app updates need a **published** build with embedded `app-update.yml` (tag/`build:*:publish`); local `--publish never` packages have no feed. Signed + notarized mac builds are recommended for Gatekeeper; unsigned releases may still publish updater metadata but install can fail at runtime without crashing the app.
