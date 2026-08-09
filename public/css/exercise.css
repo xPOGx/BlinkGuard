@@ -9,6 +9,7 @@
 	font-family: var(--popup-font);
 }
 
+html:has(.exercise-container),
 body:has(.exercise-container) {
 	background: transparent !important;
 }
