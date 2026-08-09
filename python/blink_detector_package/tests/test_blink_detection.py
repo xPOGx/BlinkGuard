@@ -523,10 +523,21 @@ class BlinkDetectionTests(unittest.TestCase):
 		state.awaiting_reopen = True
 		state.awaiting_reopen_since = t
 		t += 0.5
+		# Clearly shut (< EYES_CLOSED_RATIO) after timeout → latch closed.
+		state._update_eyes_closed_state(0.12, t)
+		self.assertFalse(state.awaiting_reopen)
+		self.assertTrue(state.eyes_closed)
+
+	def test_await_reopen_expires_mid_band_does_not_latch(self):
+		state = BlinkDetectionState()
+		t = _seed_open_eye(state, ear=0.28)
+		state.awaiting_reopen = True
+		state.awaiting_reopen_since = t
+		t += 0.5
+		# Mid-band (~0.64×baseline): clear await without eyes_closed latch.
 		state._update_eyes_closed_state(0.18, t)
 		self.assertFalse(state.awaiting_reopen)
-		# Mid/low EAR after timeout must not unlock new blink starts.
-		self.assertTrue(state.eyes_closed)
+		self.assertFalse(state.eyes_closed)
 
 	def test_sustained_low_ear_marks_eyes_closed(self):
 		state = BlinkDetectionState()

@@ -566,7 +566,6 @@ class BlinkDetectorApplication:
 						"look_down": blink_info.get("look_down", False),
 						"min_velocity": 0.0,
 						"duration": 0.0,
-						"cooldown_remaining": 0.0,
 						"absolute_drop": 0.0,
 					},
 					face=face,

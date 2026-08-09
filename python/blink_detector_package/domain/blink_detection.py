@@ -50,14 +50,15 @@ RESTING_PITCH_OPEN_DROP_MAX = 0.12
 
 # Sustained low EAR (look-down / lids closed) — not a stream of micro-blinks.
 # POG look-down "open" sits ~0.73–0.78 of baseline; requiring 0.85 left them
-# stuck in skip_await_open. Reopen ≈ recovery band; closed = clearly shut.
+# stuck in skip_await_open. Keep reopen below that floor (0.74 caused mid-band
+# eyes_closed latch storms — POG 2026-08-09). Closed = clearly shut.
 EYES_CLOSED_RATIO = 0.52
-EYES_OPEN_RATIO = 0.74
+EYES_OPEN_RATIO = 0.70
 EYES_CLOSED_HOLD_S = 0.18
 # Must stay near-open this long to clear eyes_closed (noise while lids shut).
 EYES_OPEN_HOLD_S = 0.12
-# Safety: drop awaiting after this; if lids still not open → latch eyes_closed
-# (clearing unlock while shut caused ~1s credit storms — POG 2026-08-08).
+# Safety: drop awaiting after this; latch eyes_closed only if clearly shut
+# (mid-band must not latch — skip_cooldown covers bounce; POG 2026-08-09).
 AWAITING_REOPEN_MAX_S = 0.35
 
 # Frontal opening waive when effective (history/synthetic) close peak is strong
@@ -429,8 +430,9 @@ class BlinkDetectionState:
 		):
 			self.awaiting_reopen = False
 			self.awaiting_reopen_since = None
-			# Still not clearly open → latch closed (do not unlock for new starts).
-			if open_ratio < EYES_OPEN_RATIO:
+			# Clearly shut → latch closed. Mid-band must not latch or credits
+			# stall until EAR climbs past EYES_OPEN_RATIO (look-down ~0.73–0.78).
+			if open_ratio < EYES_CLOSED_RATIO:
 				self.eyes_closed = True
 				self._open_ear_since = None
 
