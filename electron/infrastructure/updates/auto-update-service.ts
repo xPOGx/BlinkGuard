@@ -10,9 +10,17 @@ import { hasUpdateFeed, isAutoUpdatePlatform } from "./update-feed";
 // electron-updater is CJS; named ESM imports fail under Electron's ESM loader.
 const { autoUpdater } = electronUpdater;
 
+/** How often a packaged app re-checks GitHub Releases while running. */
+export const UPDATE_CHECK_MS = 6 * 60 * 60 * 1000;
+
 export type CheckForUpdatesOptions = {
 	/** When true, use modal dialog UI and bring the main window forward. */
 	interactive?: boolean;
+	/**
+	 * Interval / background poll: suppress checking / upToDate / error toasts.
+	 * Still surfaces available → downloading → ready.
+	 */
+	background?: boolean;
 };
 
 export type AutoUpdateUiPort = {
@@ -28,6 +36,7 @@ export type AutoUpdateUiPort = {
  *
  * Silent launch → toast surface (ephemeral); install on quit via autoInstallOnAppQuit.
  * Manual About/tray → dialog; `ready` Restart only for interactive checks.
+ * Background interval → quiet unless an update is actually available.
  */
 export class AutoUpdateService {
 	private enabled = false;
@@ -36,6 +45,9 @@ export class AutoUpdateService {
 	private availableVersion: string | null = null;
 	/** True while an interactive (About / tray) check is in flight. */
 	private interactivePending = false;
+	/** True while a background interval check is in flight. */
+	private backgroundPending = false;
+	private updateTimer: ReturnType<typeof setInterval> | null = null;
 
 	constructor(
 		private readonly getLocale: () => Locale,
@@ -56,7 +68,9 @@ export class AutoUpdateService {
 				console.error("Auto-update error:", error);
 				this.checking = false;
 				const interactive = this.interactivePending;
-				this.interactivePending = false;
+				const background = this.backgroundPending;
+				this.clearPendingFlags();
+				if (background) return;
 				this.present(
 					{ state: "error", surface: this.surfaceFor(interactive) },
 					interactive,
@@ -66,7 +80,9 @@ export class AutoUpdateService {
 			autoUpdater.on("update-not-available", () => {
 				this.checking = false;
 				const interactive = this.interactivePending;
-				this.interactivePending = false;
+				const background = this.backgroundPending;
+				this.clearPendingFlags();
+				if (background) return;
 				this.present(
 					{ state: "upToDate", surface: this.surfaceFor(interactive) },
 					interactive,
@@ -111,7 +127,7 @@ export class AutoUpdateService {
 			autoUpdater.on("update-downloaded", (info) => {
 				this.checking = false;
 				const wasInteractive = this.interactivePending;
-				this.interactivePending = false;
+				this.clearPendingFlags();
 				const version =
 					typeof info?.version === "string" && info.version.length > 0
 						? info.version
@@ -122,13 +138,24 @@ export class AutoUpdateService {
 			});
 
 			this.enabled = true;
+			this.updateTimer = setInterval(() => {
+				this.checkForUpdates({ background: true });
+			}, UPDATE_CHECK_MS);
 		} catch (error) {
 			console.error("Auto-update init failed:", error);
 			this.enabled = false;
 		}
 	}
 
-	/** Quiet launch check or interactive tray / About check. Never throws. */
+	/** Stop the periodic poll (app shutdown). Safe to call multiple times. */
+	dispose(): void {
+		if (this.updateTimer !== null) {
+			clearInterval(this.updateTimer);
+			this.updateTimer = null;
+		}
+	}
+
+	/** Quiet launch check, background poll, or interactive tray / About. Never throws. */
 	checkForUpdates(options: CheckForUpdatesOptions = {}): void {
 		try {
 			if (!this.enabled) {
@@ -141,22 +168,34 @@ export class AutoUpdateService {
 				return;
 			}
 
-			if (options.interactive) {
+			const interactive = Boolean(options.interactive);
+			const background = Boolean(options.background) && !interactive;
+
+			if (interactive) {
 				this.interactivePending = true;
+				this.backgroundPending = false;
+			} else if (background) {
+				this.backgroundPending = true;
+				this.interactivePending = false;
 			}
 
 			if (this.downloadedVersion) {
+				if (background) {
+					this.clearPendingFlags();
+					return;
+				}
 				const wasInteractive = this.interactivePending;
-				this.interactivePending = false;
+				this.clearPendingFlags();
 				this.presentReady(this.downloadedVersion, wasInteractive);
 				return;
 			}
 
-			const interactive = Boolean(options.interactive);
-			this.present(
-				{ state: "checking", surface: this.surfaceFor(interactive) },
-				interactive,
-			);
+			if (!background) {
+				this.present(
+					{ state: "checking", surface: this.surfaceFor(interactive) },
+					interactive,
+				);
+			}
 
 			if (this.checking) return;
 			this.checking = true;
@@ -165,7 +204,9 @@ export class AutoUpdateService {
 				console.error("Auto-update check failed:", error);
 				this.checking = false;
 				const wasInteractive = this.interactivePending;
-				this.interactivePending = false;
+				const wasBackground = this.backgroundPending;
+				this.clearPendingFlags();
+				if (wasBackground) return;
 				this.present(
 					{ state: "error", surface: this.surfaceFor(wasInteractive) },
 					wasInteractive,
@@ -174,8 +215,8 @@ export class AutoUpdateService {
 		} catch (error) {
 			console.error("Auto-update check failed:", error);
 			this.checking = false;
+			this.clearPendingFlags();
 			if (options.interactive) {
-				this.interactivePending = false;
 				this.present({ state: "error", surface: "dialog" }, true);
 			}
 		}
@@ -190,6 +231,11 @@ export class AutoUpdateService {
 			console.error("Auto-update install failed:", error);
 			this.present({ state: "error", surface: "dialog" }, true);
 		}
+	}
+
+	private clearPendingFlags(): void {
+		this.interactivePending = false;
+		this.backgroundPending = false;
 	}
 
 	private surfaceFor(interactive: boolean): AutoUpdateSurface {

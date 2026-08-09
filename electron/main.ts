@@ -204,6 +204,16 @@ function bootstrap(): void {
 		windows,
 		interactionLogger,
 	);
+	const autoUpdates = new AutoUpdateService(
+		() => preferences.locale,
+		{
+			emit: (status) =>
+				windows.sendToMain(IPC_CHANNELS.autoUpdateStatus, status),
+			ensureVisible: () => windows.showMain(),
+			canHostInAppUi: () =>
+				Boolean(windows.main && !windows.main.isDestroyed()),
+		},
+	);
 	const lifecycle = new AppLifecycle(
 		preferences,
 		state,
@@ -218,16 +228,7 @@ function bootstrap(): void {
 			focusPause.stopQuietHoursWatch();
 			focusEnvironment.dispose?.();
 			blinkRateCoaching.dispose();
-		},
-	);
-	const autoUpdates = new AutoUpdateService(
-		() => preferences.locale,
-		{
-			emit: (status) =>
-				windows.sendToMain(IPC_CHANNELS.autoUpdateStatus, status),
-			ensureVisible: () => windows.showMain(),
-			canHostInAppUi: () =>
-				Boolean(windows.main && !windows.main.isDestroyed()),
+			autoUpdates.dispose();
 		},
 	);
 	const tray = new TrayController(
