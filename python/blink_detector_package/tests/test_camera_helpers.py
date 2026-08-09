@@ -59,15 +59,15 @@ class CameraHelperTests(unittest.TestCase):
 				return None
 
 		cam = OpenCVCamera(_SilentTransport())
-		# Windows order: DSHOW first (legacy UVC), then MSMF.
-		cam._platform_backends = lambda: [cv2.CAP_DSHOW, cv2.CAP_MSMF]
+		# Windows order: MSMF first (C170 working path), then DSHOW.
+		cam._platform_backends = lambda: [cv2.CAP_MSMF, cv2.CAP_DSHOW]
 		pairs = cam._candidate_pairs()
-		self.assertEqual(pairs[0], (0, cv2.CAP_DSHOW))
-		self.assertEqual(pairs[1], (0, cv2.CAP_MSMF))
-		# MSMF@0 must appear before probing DSHOW on index 1.
-		self.assertLess(pairs.index((0, cv2.CAP_MSMF)), pairs.index((1, cv2.CAP_DSHOW)))
+		self.assertEqual(pairs[0], (0, cv2.CAP_MSMF))
+		self.assertEqual(pairs[1], (0, cv2.CAP_DSHOW))
+		# DSHOW@0 must appear before probing MSMF on index 1.
+		self.assertLess(pairs.index((0, cv2.CAP_DSHOW)), pairs.index((1, cv2.CAP_MSMF)))
 
-	def test_failover_order_prefers_msmf_after_dshow(self):
+	def test_failover_order_prefers_dshow_after_msmf(self):
 		import cv2
 
 		from blink_detector_package.infrastructure.camera import OpenCVCamera
@@ -77,14 +77,14 @@ class CameraHelperTests(unittest.TestCase):
 				return None
 
 		cam = OpenCVCamera(_SilentTransport())
-		cam._platform_backends = lambda: [cv2.CAP_DSHOW, cv2.CAP_MSMF]
+		cam._platform_backends = lambda: [cv2.CAP_MSMF, cv2.CAP_DSHOW]
 		cam.camera_index = 0
-		cam.backend = cv2.CAP_DSHOW
+		cam.backend = cv2.CAP_MSMF
 		ordered = cam._failover_order()
-		self.assertEqual(ordered[0], (0, cv2.CAP_MSMF))
-		self.assertNotIn((0, cv2.CAP_DSHOW), ordered)
+		self.assertEqual(ordered[0], (0, cv2.CAP_DSHOW))
+		self.assertNotIn((0, cv2.CAP_MSMF), ordered)
 
-	def test_snap_open_resolution_classic_uvc(self):
+	def test_open_resolution_uses_processing_preset(self):
 		from blink_detector_package.infrastructure.camera import OpenCVCamera
 
 		class _SilentTransport:
@@ -92,14 +92,11 @@ class CameraHelperTests(unittest.TestCase):
 				return None
 
 		cam = OpenCVCamera(_SilentTransport())
-		cam.processing_resolution = (1280, 720)
-		self.assertEqual(cam._snap_open_resolution(), (640, 480))
+		cam.processing_resolution = (480, 360)
+		# No snap helper — open requests the processing preset directly.
+		self.assertEqual(cam.processing_resolution, (480, 360))
 		cam.processing_resolution = (640, 480)
-		self.assertEqual(cam._snap_open_resolution(), (640, 480))
-		cam.processing_resolution = (320, 240)
-		self.assertEqual(cam._snap_open_resolution(), (320, 240))
-		cam.processing_resolution = (160, 120)
-		self.assertEqual(cam._snap_open_resolution(), (160, 120))
+		self.assertEqual(cam.processing_resolution, (640, 480))
 
 	def test_no_face_failover_constants(self):
 		self.assertGreaterEqual(NO_FACE_FAILOVER_S, 3.0)

@@ -115,11 +115,11 @@ class OpenCVCamera:
 
 	def _platform_backends(self):
 		if sys.platform == "win32":
-			# Prefer DirectShow for older UVC cams (Logitech C170 etc.).
-			# Windows Camera / Discord use Media Foundation Frame Server correctly;
-			# OpenCV's MSMF path often negotiates poorly (black/no-face after
-			# "Success"). MSMF remains the failover. Skip CAP_ANY (re-enters MSMF).
-			return [cv2.CAP_DSHOW, cv2.CAP_MSMF]
+			# Prefer MSMF first — matches the path that worked for Logitech C170
+			# (diagnostics: MSMF @ ~640x360, usable luma). DSHOW+forced MJPG at
+			# snapped 320x240 produced sustained black frames (luma≈0.3) after
+			# 2.4.0. DSHOW remains failover. Skip CAP_ANY (re-enters MSMF).
+			return [cv2.CAP_MSMF, cv2.CAP_DSHOW]
 		if sys.platform == "darwin":
 			return [cv2.CAP_AVFOUNDATION, cv2.CAP_ANY]
 		return [cv2.CAP_V4L2, cv2.CAP_ANY]
@@ -152,27 +152,6 @@ class OpenCVCamera:
 				add(index, backend)
 		return pairs
 
-	def _snap_open_resolution(self):
-		"""Map processing preset to a size old UVC cams actually expose.
-
-		Logitech C170-class devices often list 640x480 / 320x240 / 352x288 and
-		odd modes like 640x360; asking for arbitrary High preset sizes makes
-		Windows pick a weird native mode. Prefer classic 4:3 open sizes.
-		"""
-		width, height = self.processing_resolution
-		candidates = (
-			(640, 480),
-			(320, 240),
-			(352, 288),
-			(160, 120),
-		)
-		# Prefer not upsizing beyond what the preset asked for.
-		fitting = [c for c in candidates if c[0] <= width and c[1] <= height]
-		if not fitting:
-			return candidates[-1]
-		# Largest fitting classic size.
-		return max(fitting, key=lambda wh: wh[0] * wh[1])
-
 	def _try_set_fourcc(self, cap, code: str) -> str:
 		"""Best-effort FOURCC; return actual fourcc string after set."""
 		try:
@@ -185,19 +164,17 @@ class OpenCVCamera:
 		cap = capture if capture is not None else self.capture
 		if cap is None:
 			return
-		width, height = self._snap_open_resolution()
+		# Request the processing preset size; accept whatever the driver
+		# negotiates (C170 often lands on 640x360 — do not snap to 4:3).
+		width, height = self.processing_resolution
 		fourcc_requested = None
 		fourcc_actual = fourcc_to_str(cap.get(cv2.CAP_PROP_FOURCC))
 
 		if sys.platform == "win32":
-			# Win10+ Frame Server often hides raw MJPG and offers YUY2/NV12.
-			# Soft-try MJPG; if unset, try YUY2; never clobber a negotiated
-			# NV12/other format (Microsoft Camera Frame Server guidance).
-			fourcc_requested = "MJPG"
-			fourcc_actual = self._try_set_fourcc(cap, "MJPG")
-			if not is_mjpg_fourcc(fourcc_actual) and not fourcc_actual:
-				fourcc_actual = self._try_set_fourcc(cap, "YUY2")
-				fourcc_requested = "YUY2"
+			# Leave FOURCC to the driver/Frame Server. Forcing MJPG on DSHOW
+			# opened 320x240 black streams on C170; working sessions used MSMF
+			# with the default negotiated format.
+			fourcc_requested = None
 		else:
 			fourcc_requested = "MJPG"
 			fourcc_actual = self._try_set_fourcc(cap, "MJPG")

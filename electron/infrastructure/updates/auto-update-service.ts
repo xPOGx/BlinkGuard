@@ -5,6 +5,7 @@ import type {
 	AutoUpdateSurface,
 } from "../../../shared/auto-update";
 import { t, type Locale } from "../../../shared/i18n";
+import { killOrphanedSidecarProcesses } from "../process/process-cleanup";
 import { hasUpdateFeed, isAutoUpdatePlatform } from "./update-feed";
 
 // electron-updater is CJS; named ESM imports fail under Electron's ESM loader.
@@ -226,7 +227,16 @@ export class AutoUpdateService {
 	installUpdate(): void {
 		if (!this.downloadedVersion) return;
 		try {
-			autoUpdater.quitAndInstall(false, true);
+			// quitAndInstall can skip graceful before-quit cleanup; kill the
+			// sidecar first so the camera LED / exclusive lock are released.
+			void killOrphanedSidecarProcesses().finally(() => {
+				try {
+					autoUpdater.quitAndInstall(false, true);
+				} catch (error) {
+					console.error("Auto-update install failed:", error);
+					this.present({ state: "error", surface: "dialog" }, true);
+				}
+			});
 		} catch (error) {
 			console.error("Auto-update install failed:", error);
 			this.present({ state: "error", surface: "dialog" }, true);
