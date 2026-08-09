@@ -16,6 +16,7 @@ import type {
 	PopupColors,
 	RendererPreferences,
 } from "../../../shared/preferences";
+import type { ExportProfileImageResult } from "../../../shared/profile-export";
 import type { GetReleaseNotesResult } from "../../../shared/release-notes";
 
 type Listener = (...args: unknown[]) => void;
@@ -161,6 +162,10 @@ export const rendererIpc = {
 	debugPreviewSound: (kind: DebugSoundKind, volume?: number) =>
 		send(IPC_CHANNELS.debugPreviewSound, kind, volume),
 	debugPreviewCheer: () => send(IPC_CHANNELS.debugPreviewCheer),
+	debugPreviewLevelUp: (level?: number) =>
+		send(IPC_CHANNELS.debugPreviewLevelUp, level),
+	debugSetProfileLevel: (level: number, celebrate = false) =>
+		send(IPC_CHANNELS.debugSetProfileLevel, level, celebrate),
 	debugSetShopReward: (
 		rewardId: "statsFlair" | "streakShield",
 		enabled: boolean,
@@ -203,6 +208,26 @@ export const rendererIpc = {
 		return {
 			status: "error",
 			message: "Diagnostics export is unavailable in this environment",
+		};
+	},
+	exportProfileImage: async (
+		pngBytes: Uint8Array,
+	): Promise<ExportProfileImageResult> => {
+		const result = await bridge()?.invoke(
+			IPC_CHANNELS.exportProfileImage,
+			pngBytes,
+		);
+		if (
+			result &&
+			typeof result === "object" &&
+			"status" in result &&
+			(result as ExportProfileImageResult).status
+		) {
+			return result as ExportProfileImageResult;
+		}
+		return {
+			status: "error",
+			message: "Profile image export is unavailable in this environment",
 		};
 	},
 	exportBackup: async (scope: BackupScope): Promise<ExportBackupResult> => {

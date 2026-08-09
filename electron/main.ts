@@ -87,9 +87,9 @@ function bootstrap(): void {
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, snapshot);
 	});
 	blinkStats.setCheerEffects({
-		onCheer: () => {
+		onCheer: (celebration) => {
 			sound.play("cheer", { force: true });
-			windows.showCheerToast();
+			windows.showCheerToast(celebration);
 		},
 	});
 

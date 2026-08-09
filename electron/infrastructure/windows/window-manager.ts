@@ -312,12 +312,20 @@ export class WindowManager {
 	}
 
 	/** Short celebration toast after spending blinks on Cheer. */
-	showCheerToast(): void {
+	showCheerToast(
+		celebration?: { kind?: "cheer" | "levelUp"; level?: number },
+	): void {
 		if (this.cheerToast && !this.cheerToast.isDestroyed()) {
 			this.hideCheerToast();
 		}
+		const isLevelUp = celebration?.kind === "levelUp";
+		const level =
+			typeof celebration?.level === "number" &&
+			Number.isFinite(celebration.level)
+				? Math.max(1, Math.floor(celebration.level))
+				: 1;
 		const width = 360;
-		const height = 120;
+		const height = isLevelUp ? 140 : 120;
 		const { x, y } = getTopCenterPopupPosition(width);
 		const popup = createPanelWindow(
 			{
@@ -333,6 +341,27 @@ export class WindowManager {
 		void popup.loadFile(path.join(this.paths.publicDir, "cheer.html"));
 		popup.webContents.on("did-finish-load", () => {
 			this.sendI18n(popup);
+			if (isLevelUp) {
+				const locale = this.preferences.locale === "uk" ? "uk" : "en";
+				const message = t(locale, "popup.levelUp.message", { level });
+				const subtitle = t(locale, "popup.levelUp.subtitle");
+				void popup.webContents.executeJavaScript(
+					`(() => {
+						const msg = document.getElementById("cheer-message");
+						const sub = document.getElementById("cheer-subtitle");
+						const stack = document.getElementById("cheer-text");
+						if (msg) {
+							msg.removeAttribute("data-i18n");
+							msg.textContent = ${JSON.stringify(message)};
+						}
+						if (sub) {
+							sub.hidden = false;
+							sub.textContent = ${JSON.stringify(subtitle)};
+						}
+						if (stack) stack.classList.add("cheer-text--stacked");
+					})();`,
+				);
+			}
 			popup.setIgnoreMouseEvents(true);
 		});
 		popup.once("ready-to-show", () => popup.showInactive());

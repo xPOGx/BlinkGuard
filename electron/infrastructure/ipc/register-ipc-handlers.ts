@@ -21,6 +21,7 @@ import {
 	importBackupBundle,
 } from "../backup/backup-io";
 import { exportDiagnosticsBundle } from "../logging/diagnostics-export";
+import { exportProfileImageFile } from "../profile/export-profile-image";
 import type { InteractionLogger } from "../logging/interaction-logger";
 import { applyLaunchAtLogin } from "../lifecycle/login-item";
 import { fetchGithubReleases } from "../github/fetch-github-releases";
@@ -262,6 +263,19 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	on(IPC_CHANNELS.debugPreviewCheer, () => {
 		blinkStats.previewCheer();
 	});
+	on(IPC_CHANNELS.debugPreviewLevelUp, (_event, level: unknown) => {
+		const resolved =
+			typeof level === "number" && Number.isFinite(level) ? level : undefined;
+		blinkStats.previewLevelUp(resolved);
+	});
+	on(
+		IPC_CHANNELS.debugSetProfileLevel,
+		(_event, level: unknown, celebrate: unknown) => {
+			if (typeof level !== "number" || !Number.isFinite(level)) return;
+			blinkStats.setDebugProfileLevel(level, celebrate === true);
+			windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
+		},
+	);
 	on(
 		IPC_CHANNELS.debugSetShopReward,
 		(_event, rewardId: unknown, enabled: unknown) => {
@@ -348,6 +362,37 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 			interactions.logIpc(IPC_CHANNELS.exportDiagnostics, []);
 			return exportDiagnosticsBundle({
 				preferences: current,
+				parentWindow: windows.main && !windows.main.isDestroyed()
+					? windows.main
+					: null,
+			});
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.exportProfileImage,
+		async (_event: IpcMainInvokeEvent, pngRaw: unknown) => {
+			interactions.logIpc(IPC_CHANNELS.exportProfileImage, []);
+			let bytes: Uint8Array | null = null;
+			if (pngRaw instanceof Uint8Array) {
+				bytes = pngRaw;
+			} else if (Buffer.isBuffer(pngRaw)) {
+				bytes = new Uint8Array(pngRaw);
+			} else if (
+				pngRaw &&
+				typeof pngRaw === "object" &&
+				"type" in pngRaw &&
+				(pngRaw as { type?: string }).type === "Buffer" &&
+				"data" in pngRaw &&
+				Array.isArray((pngRaw as { data?: unknown }).data)
+			) {
+				bytes = Uint8Array.from((pngRaw as { data: number[] }).data);
+			}
+			if (!bytes || bytes.byteLength === 0) {
+				return { status: "error", message: "Missing profile image bytes" };
+			}
+			return exportProfileImageFile({
+				pngBytes: bytes,
 				parentWindow: windows.main && !windows.main.isDestroyed()
 					? windows.main
 					: null,

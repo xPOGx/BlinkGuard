@@ -8,6 +8,7 @@ import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { useBlinkStats } from "@/features/statistics/model/use-blink-stats";
 import { useT } from "@/i18n";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
+import { levelFromTotalBlinks } from "../../../../shared/blink-profile";
 import type {
 	DebugOverlayKind,
 	DebugSoundKind,
@@ -39,6 +40,7 @@ const SOUND_BUTTONS: { kind: DebugSoundKind; labelKey: string }[] = [
 export function DebugPanel({ setPreferences }: DebugPanelProps) {
 	const t = useT();
 	const { snapshot } = useBlinkStats();
+	const profileLevel = levelFromTotalBlinks(snapshot.totals.total);
 	const hasFlair = snapshot.hasStatsFlair;
 	const hasShield = snapshot.streak.shieldCharges > 0;
 	const discountOffer = snapshot.rewards.find(
@@ -116,10 +118,7 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 								<ToggleSwitch
 									checked={hasShield}
 									onChange={() =>
-										rendererIpc.debugSetShopReward(
-											"streakShield",
-											!hasShield,
-										)
+										rendererIpc.debugSetShopReward("streakShield", !hasShield)
 									}
 									aria-label={t("rewards.streakShield")}
 								/>
@@ -142,9 +141,7 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 										variant="secondary"
 										size="sm"
 										disabled={discountLevel === 0}
-										onClick={() =>
-											rendererIpc.debugSetShopDiscountLevel(0)
-										}
+										onClick={() => rendererIpc.debugSetShopDiscountLevel(0)}
 									>
 										{t("debug.shop.clear")}
 									</Button>
@@ -154,9 +151,7 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 										size="sm"
 										disabled={discountAtMax}
 										onClick={() =>
-											rendererIpc.debugSetShopDiscountLevel(
-												discountLevel + 1,
-											)
+											rendererIpc.debugSetShopDiscountLevel(discountLevel + 1)
 										}
 									>
 										{t("debug.shop.plusOne")}
@@ -166,9 +161,7 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 										variant="secondary"
 										size="sm"
 										disabled={discountAtMax}
-										onClick={() =>
-											rendererIpc.debugSetShopDiscountLevel(10)
-										}
+										onClick={() => rendererIpc.debugSetShopDiscountLevel(10)}
 									>
 										{t("rewards.max")}
 									</Button>
@@ -186,6 +179,73 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 								>
 									{t("debug.shop.previewCheer")}
 								</Button>
+							}
+						/>
+					</div>
+				</SettingRow>
+			</SettingPanel>
+
+			<SettingPanel>
+				<SettingRow
+					title={t("debug.profile.title")}
+					description={t("debug.profile.desc")}
+				>
+					<div className="space-y-3">
+						<p className="text-sm text-muted-foreground">
+							{t("debug.profile.status", {
+								level: profileLevel,
+								total: snapshot.totals.total,
+							})}
+						</p>
+						<SettingRow
+							title={t("debug.profile.previewLevelUp")}
+							description={t("debug.profile.previewLevelUpDesc")}
+							action={
+								<Button
+									type="button"
+									variant="secondary"
+									onClick={() =>
+										rendererIpc.debugPreviewLevelUp(profileLevel + 1)
+									}
+								>
+									{t("debug.profile.previewLevelUp")}
+								</Button>
+							}
+						/>
+						<SettingRow
+							title={t("debug.profile.plusOne")}
+							description={t("debug.profile.plusOneDesc")}
+							action={
+								<Button
+									type="button"
+									variant="secondary"
+									onClick={() =>
+										rendererIpc.debugSetProfileLevel(profileLevel + 1, true)
+									}
+								>
+									{t("debug.profile.plusOne")}
+								</Button>
+							}
+						/>
+						<SettingRow
+							title={t("debug.profile.jump")}
+							description={t("debug.profile.jumpDesc")}
+							action={
+								<div className="flex flex-wrap gap-2">
+									{[1, 10, 50, 100].map((level) => (
+										<Button
+											key={level}
+											type="button"
+											variant="secondary"
+											size="sm"
+											onClick={() =>
+												rendererIpc.debugSetProfileLevel(level, false)
+											}
+										>
+											{level}
+										</Button>
+									))}
+								</div>
 							}
 						/>
 					</div>

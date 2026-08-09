@@ -8,6 +8,7 @@ import {
 	Palette,
 	ShoppingBag,
 	Timer,
+	User,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { dismissBootSplash } from "@/boot-splash";
@@ -26,6 +27,7 @@ import { EyePromptsDisabledNotice } from "@/features/exercises/ui/eye-prompts-di
 import { LookAwaySettings } from "@/features/look-away/ui/look-away-settings";
 import { OnboardingWizard } from "@/features/onboarding/ui/onboarding-wizard";
 import { PopupSettings } from "@/features/popup-appearance/ui/popup-settings";
+import { ProfilePanel } from "@/features/profile/ui/profile-panel";
 import { ReminderControls } from "@/features/reminders/ui/reminder-controls";
 import { RewardsShopPanel } from "@/features/rewards/ui/rewards-shop-panel";
 import { usePreferences } from "@/features/settings/model/use-preferences";
@@ -53,6 +55,7 @@ type SectionId =
 	| "exercises"
 	| "appearance"
 	| "statistics"
+	| "profile"
 	| "rewards"
 	| "system"
 	| "about"
@@ -143,6 +146,12 @@ function SettingsShell({
 			label: t("app.section.statistics"),
 			description: t("app.section.statistics.desc"),
 			icon: BarChart3,
+		},
+		{
+			id: "profile",
+			label: t("app.section.profile"),
+			description: t("app.section.profile.desc"),
+			icon: User,
 		},
 		{
 			id: "rewards",
@@ -322,6 +331,8 @@ function SettingsShell({
 						)}
 
 						{section === "statistics" && <StatisticsPanel />}
+
+						{section === "profile" && <ProfilePanel />}
 
 						{section === "rewards" && <RewardsShopPanel />}
 

@@ -1,4 +1,8 @@
 import {
+	levelFromTotalBlinks,
+	thresholdForLevel,
+} from "../../shared/blink-profile";
+import {
 	BLINK_RATE_WINDOW_MS,
 	computeBlinksPerMinute,
 	pruneBlinkTimestamps,
@@ -38,8 +42,12 @@ const TRACKING_FLUSH_MS = 15_000;
 const PUSH_THROTTLE_MS = 1_000;
 const RATE_TICK_MS = 1_000;
 
+export type CheerCelebration =
+	| { kind: "cheer" }
+	| { kind: "levelUp"; level: number };
+
 export type CheerRewardEffects = {
-	onCheer?: () => void;
+	onCheer?: (celebration?: CheerCelebration) => void;
 };
 
 export class BlinkStatsService {
@@ -87,7 +95,41 @@ export class BlinkStatsService {
 
 	/** Dev Debug: play Cheer FX without spending blinks. */
 	previewCheer(): void {
-		this.cheerEffects.onCheer?.();
+		this.cheerEffects.onCheer?.({ kind: "cheer" });
+	}
+
+	/** Dev Debug: play level-up celebration without changing stats. */
+	previewLevelUp(level?: number): void {
+		const resolved =
+			typeof level === "number" && Number.isFinite(level)
+				? Math.max(1, Math.floor(level))
+				: levelFromTotalBlinks(this.state.totalBlinks) + 1;
+		this.cheerEffects.onCheer?.({ kind: "levelUp", level: resolved });
+	}
+
+	/**
+	 * Dev Debug: set lifetime blinks to the threshold for `level`.
+	 * When `celebrate` is true, fires level-up FX for that level.
+	 */
+	setDebugProfileLevel(level: number, celebrate = false): void {
+		if (!Number.isFinite(level)) return;
+		const nextLevel = Math.max(1, Math.floor(level));
+		const totalBlinks = thresholdForLevel(nextLevel);
+		this.state = {
+			...this.state,
+			totalBlinks,
+			spentBlinks: Math.min(this.state.spentBlinks, totalBlinks),
+			days: this.state.days,
+			unlockedRewardIds: [...this.state.unlockedRewardIds],
+			streakShieldUsedDates: [...this.state.streakShieldUsedDates],
+			rewardPurchaseCounts: { ...this.state.rewardPurchaseCounts },
+		};
+		this.markChartsDirty();
+		this.persist();
+		this.schedulePush(true);
+		if (celebrate) {
+			this.cheerEffects.onCheer?.({ kind: "levelUp", level: nextLevel });
+		}
 	}
 
 	/**
@@ -283,14 +325,19 @@ export class BlinkStatsService {
 	}
 
 	recordBlink(now: Date = new Date()): void {
+		const prevLevel = levelFromTotalBlinks(this.state.totalBlinks);
 		const nowMs = now.getTime();
 		this.state = recordBlink(this.state, now);
+		const nextLevel = levelFromTotalBlinks(this.state.totalBlinks);
 		this.blinkTimestamps = pruneBlinkTimestamps(
 			[...this.blinkTimestamps, nowMs],
 			nowMs,
 		);
 		this.markChartsDirty();
 		this.persist();
+		if (nextLevel > prevLevel) {
+			this.cheerEffects.onCheer?.({ kind: "levelUp", level: nextLevel });
+		}
 		this.schedulePush();
 	}
 
@@ -316,7 +363,7 @@ export class BlinkStatsService {
 		this.markChartsDirty();
 		this.persist();
 		if (rewardId === "cheer") {
-			this.cheerEffects.onCheer?.();
+			this.cheerEffects.onCheer?.({ kind: "cheer" });
 		}
 		this.schedulePush(true);
 		return true;
