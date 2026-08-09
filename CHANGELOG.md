@@ -4,6 +4,12 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-08-09
+
+### Fixed
+
+- Camera: restore MSMF open path that worked before 2.4.0
+
 ## [2.4.0] - 2026-08-09
 
 ### Added
