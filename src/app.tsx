@@ -308,6 +308,8 @@ function SettingsShell({
 								</div>
 							</div>
 						</>
+					) : section === "about" ? (
+						<AboutPanel autoUpdate={autoUpdate} />
 					) : (
 						<div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] px-4 py-4 sm:px-6 sm:py-5">
 							<div className="mx-auto flex max-w-3xl flex-col gap-4">
@@ -395,8 +397,6 @@ function SettingsShell({
 										<ResetPreferencesButton />
 									</>
 								)}
-
-								{section === "about" && <AboutPanel autoUpdate={autoUpdate} />}
 
 								{section === "debug" && import.meta.env.DEV ? (
 									<DebugPanel setPreferences={setPreferences} />
