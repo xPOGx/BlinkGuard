@@ -196,6 +196,42 @@ export class ReminderService {
 		}
 	}
 
+	/**
+	 * Mid-session reminder-interval change: reschedule loops without stopping
+	 * the camera sidecar. Pref `reminderInterval` must already be updated.
+	 */
+	applyReminderInterval(): void {
+		if (!this.preferences.isTracking) return;
+
+		this.state.clearReminderTimers();
+		this.windows.closeReminder();
+
+		if (!this.preferences.cameraEnabled) {
+			// Re-arm timer cadence without an immediate popup (slider tweak).
+			this.coaching?.stop();
+			this.state.blinkReminderActive = true;
+			this.state.blinkInterval = setInterval(() => {
+				if (this.state.blinkReminderActive && this.preferences.isTracking) {
+					this.showBlinkReminder();
+				} else {
+					this.state.clearReminderTimers();
+				}
+			}, nextTimerReminderDelay(this.preferences.reminderInterval));
+			return;
+		}
+
+		// Still waiting for camera — wait-for-camera path will arm with new pref.
+		if (!this.sidecar.isRunning || !this.sidecar.isCameraReady) {
+			return;
+		}
+
+		if (this.preferences.mgdMode) {
+			this.startMgdLoop();
+		} else {
+			this.startFaceAwareLoop();
+		}
+	}
+
 	/** Ensure camera sidecar is running so preview / face tracking can work. */
 	ensureCameraActive(): void {
 		if (!this.preferences.cameraEnabled) return;

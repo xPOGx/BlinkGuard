@@ -94,6 +94,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	});
 	on(IPC_CHANNELS.updateInterval, (_event, interval: unknown) => {
 		preferences.set("reminderInterval", interval as number);
+		reminders.applyReminderInterval();
 	});
 	on(IPC_CHANNELS.updatePopupColors, (_event, colors: unknown) => {
 		preferences.set("popupColors", colors as PopupColors);

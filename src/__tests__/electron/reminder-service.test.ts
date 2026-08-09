@@ -270,6 +270,95 @@ describe("ReminderService credit semantics", () => {
 		expect(state.blinkInterval).not.toBeNull();
 	});
 
+	it("applyReminderInterval reschedules without stopping the camera", () => {
+		const preferences = createPreferences({
+			reminderInterval: 3000,
+			mgdMode: false,
+		});
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		const windows = createWindows();
+		const sidecar = createSidecar();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+
+		service.syncCameraLoopForMgdMode();
+		const loopBefore = state.cameraMonitoringInterval;
+		expect(loopBefore).not.toBeNull();
+
+		preferences.reminderInterval = 5000;
+		service.applyReminderInterval();
+
+		expect(sidecar.stopCamera).not.toHaveBeenCalled();
+		expect(preferences.isTracking).toBe(true);
+		expect(windows.closeReminder).toHaveBeenCalled();
+		expect(state.cameraMonitoringInterval).not.toBeNull();
+		expect(state.cameraMonitoringInterval).not.toBe(loopBefore);
+	});
+
+	it("applyReminderInterval re-arms timer mode without stopping tracking", () => {
+		const preferences = createPreferences({
+			cameraEnabled: false,
+			reminderInterval: 3000,
+		});
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const sidecar = createSidecar({
+			isRunning: false,
+			isCameraReady: false,
+		});
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+
+		service.start(3000);
+		expect(state.blinkInterval).not.toBeNull();
+		expect(sidecar.stopCamera).toHaveBeenCalled(); // start() ensureStopped first
+		vi.mocked(sidecar.stopCamera).mockClear();
+		windows.showReminder.mockClear();
+
+		preferences.reminderInterval = 5000;
+		service.applyReminderInterval();
+
+		expect(sidecar.stopCamera).not.toHaveBeenCalled();
+		expect(preferences.isTracking).toBe(true);
+		expect(state.blinkInterval).not.toBeNull();
+		expect(state.blinkReminderActive).toBe(true);
+		// Mid-session tweak must not fire an immediate blink popup.
+		expect(windows.showReminder).not.toHaveBeenCalled();
+	});
+
+	it("applyReminderInterval is a no-op when not tracking", () => {
+		const preferences = createPreferences({ isTracking: false });
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const sidecar = createSidecar();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+
+		service.applyReminderInterval();
+		expect(sidecar.stopCamera).not.toHaveBeenCalled();
+		expect(windows.closeReminder).not.toHaveBeenCalled();
+		expect(state.cameraMonitoringInterval).toBeNull();
+	});
+
 	it("markReminderShown does not touch lastBlinkTime", () => {
 		const state = new AppRuntimeState();
 		const service = new ReminderService(

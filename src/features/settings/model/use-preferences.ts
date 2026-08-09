@@ -68,13 +68,15 @@ export function usePreferences() {
 	useEffect(() => {
 		// Same hydrate gate as the prefs sync above — otherwise the default
 		// interval is written to the store before loadPreferences arrives.
-		if (!prefsHydrated || preferences.isTracking) return;
+		// Fires while tracking too so slider changes live-reschedule loops
+		// without stopReminders / camera reopen.
+		if (!prefsHydrated) return;
 		if (lastReminderIntervalRef.current === preferences.reminderInterval) {
 			return;
 		}
 		lastReminderIntervalRef.current = preferences.reminderInterval;
 		rendererIpc.updateReminderInterval(preferences.reminderInterval);
-	}, [prefsHydrated, preferences.isTracking, preferences.reminderInterval]);
+	}, [prefsHydrated, preferences.reminderInterval]);
 
 	const toggleTracking = () => {
 		setPreferences((current) => ({
@@ -89,12 +91,8 @@ export function usePreferences() {
 	};
 
 	const changeReminderInterval = (reminderInterval: number) => {
-		if (preferences.isTracking) {
-			rendererIpc.stopReminders();
-		}
 		setPreferences((current) => ({
 			...current,
-			isTracking: false,
 			reminderInterval,
 		}));
 	};
