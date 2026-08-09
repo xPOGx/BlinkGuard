@@ -22,7 +22,7 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 - **Dark / light mode** · **EN / UK** localization
 - **Persistent preferences** — saved locally via `electron-store` (reset-to-defaults supported)
 - **Sleep / wake handling** — pauses on suspend and auto-resumes if tracking was active
-- **In-app updates (Windows & macOS)** — GitHub Releases; silent install on quit; About opens Release Notes
+- **In-app updates (Windows & macOS)** — GitHub Releases (background check every 6h); silent install on quit; About opens Release Notes
 - **Diagnostics export** — local logs and interaction trail for support
 - **Cross-platform packaging** — Windows and macOS (Electron Builder)
 

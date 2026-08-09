@@ -4,6 +4,23 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-08-09
+
+### Added
+
+- Background GitHub Releases update poll every 6 hours
+- Telegram contact in README Connect section
+
+### Fixed
+
+- Reminders: apply interval changes without stopping the camera
+- Camera: clear sticky eyes_closed after walk-away
+- Camera: clear look-down await without requiring frontal close-band
+
+### Changed
+
+- CI: single automatic trigger on Release published (no duplicate tag-push run)
+
 ## [2.3.0] - 2026-08-09
 
 ### Added
