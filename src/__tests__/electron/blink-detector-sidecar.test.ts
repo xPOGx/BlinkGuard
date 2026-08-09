@@ -1,19 +1,21 @@
 import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ChildProcessRegistry } from "../../../electron/infrastructure/process/child-process-registry";
 import { BlinkDetectorSidecar } from "../../../electron/infrastructure/sidecar/blink-detector-sidecar";
 import { SIDECAR_STATUS } from "../../../electron/infrastructure/sidecar/protocol";
-import { ChildProcessRegistry } from "../../../electron/infrastructure/process/child-process-registry";
 import { DEFAULT_PREFERENCES } from "../../../shared/preferences";
 
-function createFakeChild() {
+type FakeChild = EventEmitter & {
+	pid: number;
+	killed: boolean;
+	stdin: { write: (chunk: string) => boolean };
+	stdout: EventEmitter;
+	stderr: EventEmitter;
+};
+
+function createFakeChild(): { child: FakeChild; stdinChunks: string[] } {
 	const stdinChunks: string[] = [];
-	const child = new EventEmitter() as EventEmitter & {
-		pid: number;
-		killed: boolean;
-		stdin: { write: (chunk: string) => boolean };
-		stdout: EventEmitter;
-		stderr: EventEmitter;
-	};
+	const child = new EventEmitter() as FakeChild;
 	child.pid = 4242;
 	child.killed = false;
 	child.stdin = {
@@ -38,16 +40,16 @@ function parseWrites(chunks: string[]): Record<string, unknown>[] {
 /** Bypass spawn/binary path; attach a fake child as if start() succeeded. */
 function attachRunningProcess(
 	sidecar: BlinkDetectorSidecar,
-	child: ReturnType<typeof createFakeChild>["child"],
+	fakeChild: FakeChild,
 ): void {
 	const internal = sidecar as unknown as {
-		process: typeof child | null;
+		process: FakeChild | null;
 		running: boolean;
-		readStdout: (child: typeof child) => void;
+		readStdout: (process: FakeChild) => void;
 	};
-	internal.process = child;
+	internal.process = fakeChild;
 	internal.running = true;
-	internal.readStdout(child);
+	internal.readStdout(fakeChild);
 }
 
 describe("BlinkDetectorSidecar preview restore", () => {

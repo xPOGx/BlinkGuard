@@ -1,6 +1,7 @@
 import { ipcRenderer, contextBridge } from 'electron'
 import {
   IPC_CHANNELS,
+  MAIN_RENDERER_INVOKE_CHANNELS,
   MAIN_RENDERER_RECEIVE_CHANNELS,
   MAIN_RENDERER_SEND_CHANNELS,
 } from "../shared/ipc-channels";
@@ -39,7 +40,9 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   },
   invoke(...args: Parameters<typeof ipcRenderer.invoke>) {
     const [channel, ...omit] = args
-    return ipcRenderer.invoke(channel, ...omit)
+    if ((MAIN_RENDERER_INVOKE_CHANNELS as readonly string[]).includes(channel)) {
+      return ipcRenderer.invoke(channel, ...omit)
+    }
   },
 })
 
@@ -122,11 +125,6 @@ contextBridge.exposeInMainWorld('popupAPI', {
   savePopupEditor: (data: any) => {
     ipcRenderer.send(IPC_CHANNELS.popupEditorSaved, data);
   },
-  
-  // Utility functions
-  removeAllListeners: (channel: string) => {
-    ipcRenderer.removeAllListeners(channel);
-  }
 })
 
 // Type definitions for TypeScript
@@ -154,7 +152,6 @@ declare global {
       snoozeBlink: () => void;
       onPopupEditorUpdate: (callback: (data: any) => void) => void;
       savePopupEditor: (data: any) => void;
-      removeAllListeners: (channel: string) => void;
     };
   }
 }

@@ -101,9 +101,6 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	on(IPC_CHANNELS.shellReady, () => {
 		onShellReady?.();
 	});
-	on(IPC_CHANNELS.updatePopupPosition, (_event, position: unknown) => {
-		preferences.set("popupPosition", position as Point);
-	});
 	on(IPC_CHANNELS.updateInterval, (_event, interval: unknown) => {
 		preferences.set("reminderInterval", interval as number);
 		reminders.applyReminderInterval();

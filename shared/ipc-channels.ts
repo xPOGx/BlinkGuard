@@ -18,7 +18,6 @@ export const IPC_CHANNELS = {
 	currentPopupState: "current-popup-state",
 	startBlinkReminders: "start-blink-reminders",
 	stopBlinkReminders: "stop-blink-reminders",
-	updatePopupPosition: "update-popup-position",
 	updateInterval: "update-interval",
 	updatePopupColors: "update-popup-colors",
 	updatePopupTransparency: "update-popup-transparency",
@@ -57,8 +56,6 @@ export const IPC_CHANNELS = {
 	showPopupEditor: "show-popup-editor",
 	popupEditorSaved: "popup-editor-saved",
 	resetPreferences: "reset-preferences",
-	showSizeEditor: "show-size-editor",
-	sizeSaved: "size-saved",
 	updateSoundEnabled: "update-sound-enabled",
 	updateSoundVolume: "update-sound-volume",
 	updateLaunchAtLogin: "update-launch-at-login",
@@ -126,7 +123,6 @@ export const MAIN_RENDERER_RECEIVE_CHANNELS = [
 export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.startBlinkReminders,
 	IPC_CHANNELS.stopBlinkReminders,
-	IPC_CHANNELS.updatePopupPosition,
 	IPC_CHANNELS.updateInterval,
 	IPC_CHANNELS.updatePopupColors,
 	IPC_CHANNELS.updatePopupTransparency,
@@ -162,8 +158,6 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.showPopupEditor,
 	IPC_CHANNELS.popupEditorSaved,
 	IPC_CHANNELS.resetPreferences,
-	IPC_CHANNELS.showSizeEditor,
-	IPC_CHANNELS.sizeSaved,
 	IPC_CHANNELS.updateSoundEnabled,
 	IPC_CHANNELS.updateSoundVolume,
 	IPC_CHANNELS.updateLaunchAtLogin,
@@ -196,4 +190,12 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.updateGoalsConfig,
 	IPC_CHANNELS.spendBlinkReward,
 	IPC_CHANNELS.shellReady,
+] as const;
+
+export const MAIN_RENDERER_INVOKE_CHANNELS = [
+	IPC_CHANNELS.getReleaseNotes,
+	IPC_CHANNELS.exportDiagnostics,
+	IPC_CHANNELS.exportProfileImage,
+	IPC_CHANNELS.exportBackup,
+	IPC_CHANNELS.importBackup,
 ] as const;

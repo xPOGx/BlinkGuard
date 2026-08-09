@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { IPC_CHANNELS } from "../shared/ipc-channels";
 import App from "./app.tsx";
 import { mountBootSplash } from "./boot-splash";
 import "./index.css";
@@ -13,6 +14,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 	</React.StrictMode>,
 );
 
-window.ipcRenderer?.on("main-process-message", (message) => {
+window.ipcRenderer?.on(IPC_CHANNELS.mainProcessMessage, (message) => {
 	console.log(message);
 });

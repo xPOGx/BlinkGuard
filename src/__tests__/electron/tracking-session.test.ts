@@ -11,45 +11,33 @@ function createDeps(
 		lookAwayEnabled: boolean;
 		reminderInterval: number;
 	}> = {},
-): TrackingSessionDeps & {
-	reminders: {
-		start: ReturnType<typeof vi.fn>;
-		stop: ReturnType<typeof vi.fn>;
-		ensureStopped: ReturnType<typeof vi.fn>;
+) {
+	const reminders = {
+		start: vi.fn(),
+		stop: vi.fn(),
+		ensureStopped: vi.fn(),
 	};
-	exercises: {
-		start: ReturnType<typeof vi.fn>;
-		stop: ReturnType<typeof vi.fn>;
-		resetTimer: ReturnType<typeof vi.fn>;
+	const exercises = {
+		start: vi.fn(),
+		stop: vi.fn(),
+		resetTimer: vi.fn(),
 	};
-	lookAway: {
-		start: ReturnType<typeof vi.fn>;
-		stop: ReturnType<typeof vi.fn>;
-		resetTimer: ReturnType<typeof vi.fn>;
+	const lookAway = {
+		start: vi.fn(),
+		stop: vi.fn(),
+		resetTimer: vi.fn(),
 	};
-} {
-	return {
-		reminders: {
-			start: vi.fn(),
-			stop: vi.fn(),
-			ensureStopped: vi.fn(),
-		},
-		exercises: {
-			start: vi.fn(),
-			stop: vi.fn(),
-			resetTimer: vi.fn(),
-		},
-		lookAway: {
-			start: vi.fn(),
-			stop: vi.fn(),
-			resetTimer: vi.fn(),
-		},
+	const deps = {
+		reminders,
+		exercises,
+		lookAway,
 		preferences: {
 			eyeExercisesEnabled: overrides.eyeExercisesEnabled ?? true,
 			lookAwayEnabled: overrides.lookAwayEnabled ?? true,
 			reminderInterval: overrides.reminderInterval ?? 5000,
 		},
 	};
+	return deps as TrackingSessionDeps & typeof deps;
 }
 
 describe("tracking-session", () => {
