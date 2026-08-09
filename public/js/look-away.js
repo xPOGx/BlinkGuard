@@ -48,17 +48,12 @@ function initLookAwayPopup() {
 
 function initLookAway() {
 	updateColors({
-		background: "#1E1E1E",
-		text: "#FFFFFF",
-		transparency: 0.3,
+		background: "#0F172A",
+		text: "#F8FAFC",
+		transparency: 0.15,
 	});
 
 	initLookAwayPopup();
-	updateColors({
-		background: "transparent",
-		text: "#FFFFFF",
-		transparency: 0.3,
-	});
 }
 
 if (document.readyState === "loading") {

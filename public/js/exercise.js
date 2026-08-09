@@ -32,18 +32,12 @@ function initExercisePopup() {
 
 function initExercise() {
 	updateColors({
-		background: "#1E1E1E",
-		text: "#FFFFFF",
-		transparency: 0.3,
+		background: "#0F172A",
+		text: "#F8FAFC",
+		transparency: 0.15,
 	});
 
 	initExercisePopup();
-	// Transparent background so the card is not double-darkened
-	updateColors({
-		background: "transparent",
-		text: "#FFFFFF",
-		transparency: 0.3,
-	});
 }
 
 if (document.readyState === "loading") {
