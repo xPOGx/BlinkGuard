@@ -1,4 +1,6 @@
 import { Clock, Eye, RotateCcw } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/button";
 import {
 	SettingPanel,
 	SettingRow,
@@ -22,6 +24,7 @@ export function LookAwaySettings({
 	setPreferences,
 }: LookAwaySettingsProps) {
 	const { t } = useI18n();
+	const [promptOpen, setPromptOpen] = useState(false);
 	const intervalProgress = ((preferences.lookAwayInterval - 5) / 55) * 100;
 	const durationProgress = ((preferences.lookAwayDuration - 10) / 50) * 100;
 	const trackColor = preferences.darkMode
@@ -39,7 +42,7 @@ export function LookAwaySettings({
 					? "lookAway.desc_duration_plural"
 					: "lookAway.desc";
 
-	const resetCopy = () => {
+	const resetPrompt = () => {
 		setPreferences((current) => ({
 			...current,
 			lookAwayTitle: defaultLookAwayTitle(current.locale),
@@ -127,55 +130,87 @@ export function LookAwaySettings({
 							</div>
 						</div>
 
-						<div className="space-y-2 border-t border-border pt-3">
-							<div className="flex items-center justify-between gap-2">
-								<div className="text-xs font-medium text-muted-foreground">
-									{t("lookAway.copy")}
-								</div>
-								<button
-									type="button"
-									onClick={resetCopy}
-									className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-								>
-									<RotateCcw className="h-3 w-3" aria-hidden />
-									{t("lookAway.resetCopy")}
-								</button>
+						<div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+							<div className="text-xs font-medium text-muted-foreground">
+								{t("lookAway.prompt")}
 							</div>
-							<label className="block space-y-1">
-								<span className="text-xs text-muted-foreground">
-									{t("lookAway.copyTitle")}
+							<Button
+								type="button"
+								size="sm"
+								variant="secondary"
+								aria-expanded={promptOpen}
+								onClick={() => setPromptOpen((open) => !open)}
+							>
+								<span className="inline-grid grid-cols-1 grid-rows-1 place-items-center">
+									<span
+										className="invisible col-start-1 row-start-1 whitespace-nowrap"
+										aria-hidden
+									>
+										{t("lookAway.showPrompt")}
+									</span>
+									<span
+										className="invisible col-start-1 row-start-1 whitespace-nowrap"
+										aria-hidden
+									>
+										{t("lookAway.hidePrompt")}
+									</span>
+									<span className="col-start-1 row-start-1 whitespace-nowrap">
+										{promptOpen
+											? t("lookAway.hidePrompt")
+											: t("lookAway.showPrompt")}
+									</span>
 								</span>
-								<input
-									aria-label={t("lookAway.copyTitleAria")}
-									type="text"
-									value={preferences.lookAwayTitle}
-									onChange={(event) =>
-										setPreferences((current) => ({
-											...current,
-											lookAwayTitle: event.target.value,
-										}))
-									}
-									className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-								/>
-							</label>
-							<label className="block space-y-1">
-								<span className="text-xs text-muted-foreground">
-									{t("lookAway.copyHint")}
-								</span>
-								<textarea
-									aria-label={t("lookAway.copyHintAria")}
-									value={preferences.lookAwayHint}
-									rows={2}
-									onChange={(event) =>
-										setPreferences((current) => ({
-											...current,
-											lookAwayHint: event.target.value,
-										}))
-									}
-									className="min-h-[2.5rem] w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-								/>
-							</label>
+							</Button>
 						</div>
+
+						{promptOpen ? (
+							<div className="space-y-2">
+								<div className="flex justify-end">
+									<button
+										type="button"
+										onClick={resetPrompt}
+										className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+									>
+										<RotateCcw className="h-3 w-3" aria-hidden />
+										{t("lookAway.resetDefaults")}
+									</button>
+								</div>
+								<label className="block space-y-1">
+									<span className="text-xs text-muted-foreground">
+										{t("lookAway.promptTitle")}
+									</span>
+									<input
+										aria-label={t("lookAway.promptTitleAria")}
+										type="text"
+										value={preferences.lookAwayTitle}
+										onChange={(event) =>
+											setPreferences((current) => ({
+												...current,
+												lookAwayTitle: event.target.value,
+											}))
+										}
+										className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+									/>
+								</label>
+								<label className="block space-y-1">
+									<span className="text-xs text-muted-foreground">
+										{t("lookAway.promptHint")}
+									</span>
+									<textarea
+										aria-label={t("lookAway.promptHintAria")}
+										value={preferences.lookAwayHint}
+										rows={2}
+										onChange={(event) =>
+											setPreferences((current) => ({
+												...current,
+												lookAwayHint: event.target.value,
+											}))
+										}
+										className="min-h-[2.5rem] w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+									/>
+								</label>
+							</div>
+						) : null}
 
 						<div className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">
 							{t("lookAway.hint")}

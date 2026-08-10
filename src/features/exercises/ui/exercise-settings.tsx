@@ -1,4 +1,6 @@
 import { Clock, Dumbbell, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/button";
 import {
 	SettingPanel,
 	SettingRow,
@@ -19,6 +21,7 @@ export function ExerciseSettings({
 	setPreferences,
 }: ExerciseSettingsProps) {
 	const { t, locale } = useI18n();
+	const [promptsOpen, setPromptsOpen] = useState(false);
 	const progress = ((preferences.exerciseInterval - 5) / 55) * 100;
 	const trackColor = preferences.darkMode
 		? "hsl(217 25% 18%)"
@@ -114,54 +117,90 @@ export function ExerciseSettings({
 							</div>
 						</div>
 
-						<div className="space-y-2 border-t border-border pt-3">
-							<div className="flex items-center justify-between gap-2">
-								<div className="text-xs font-medium text-muted-foreground">
-									{t("exercises.prompts")}
+						<div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+							<div className="text-xs font-medium text-muted-foreground">
+								{t("exercises.prompts")}
+							</div>
+							<Button
+								type="button"
+								size="sm"
+								variant="secondary"
+								aria-expanded={promptsOpen}
+								onClick={() => setPromptsOpen((open) => !open)}
+							>
+								<span className="inline-grid grid-cols-1 grid-rows-1 place-items-center">
+									<span
+										className="invisible col-start-1 row-start-1 whitespace-nowrap"
+										aria-hidden
+									>
+										{t("exercises.showPrompts")}
+									</span>
+									<span
+										className="invisible col-start-1 row-start-1 whitespace-nowrap"
+										aria-hidden
+									>
+										{t("exercises.hidePrompts")}
+									</span>
+									<span className="col-start-1 row-start-1 whitespace-nowrap">
+										{promptsOpen
+											? t("exercises.hidePrompts")
+											: t("exercises.showPrompts")}
+									</span>
+								</span>
+							</Button>
+						</div>
+
+						{promptsOpen ? (
+							<div className="space-y-2">
+								<div className="flex justify-end">
+									<button
+										type="button"
+										onClick={resetPrompts}
+										className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+									>
+										<RotateCcw className="h-3 w-3" aria-hidden />
+										{t("exercises.resetDefaults")}
+									</button>
+								</div>
+								<div className="space-y-2">
+									{prompts.map((prompt, index) => (
+										// biome-ignore lint/suspicious/noArrayIndexKey: editable prefs rows use index as identity
+										<div key={index} className="flex items-start gap-2">
+											<textarea
+												aria-label={t("exercises.promptAria", {
+													n: index + 1,
+												})}
+												value={prompt}
+												rows={2}
+												onChange={(event) =>
+													updatePrompt(index, event.target.value)
+												}
+												className="min-h-[2.5rem] flex-1 resize-y rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+											/>
+											<button
+												type="button"
+												aria-label={t("exercises.removeAria", {
+													n: index + 1,
+												})}
+												disabled={prompts.length <= 1}
+												onClick={() => removePrompt(index)}
+												className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+											>
+												<Trash2 className="h-3.5 w-3.5" aria-hidden />
+											</button>
+										</div>
+									))}
 								</div>
 								<button
 									type="button"
-									onClick={resetPrompts}
+									onClick={addPrompt}
 									className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
 								>
-									<RotateCcw className="h-3 w-3" aria-hidden />
-									{t("exercises.resetDefaults")}
+									<Plus className="h-3 w-3" aria-hidden />
+									{t("exercises.addPrompt")}
 								</button>
 							</div>
-							<div className="space-y-2">
-								{prompts.map((prompt, index) => (
-									// biome-ignore lint/suspicious/noArrayIndexKey: editable prefs rows use index as identity
-									<div key={index} className="flex items-start gap-2">
-										<textarea
-											aria-label={t("exercises.promptAria", { n: index + 1 })}
-											value={prompt}
-											rows={2}
-											onChange={(event) =>
-												updatePrompt(index, event.target.value)
-											}
-											className="min-h-[2.5rem] flex-1 resize-y rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-										/>
-										<button
-											type="button"
-											aria-label={t("exercises.removeAria", { n: index + 1 })}
-											disabled={prompts.length <= 1}
-											onClick={() => removePrompt(index)}
-											className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-										>
-											<Trash2 className="h-3.5 w-3.5" aria-hidden />
-										</button>
-									</div>
-								))}
-							</div>
-							<button
-								type="button"
-								onClick={addPrompt}
-								className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-							>
-								<Plus className="h-3 w-3" aria-hidden />
-								{t("exercises.addPrompt")}
-							</button>
-						</div>
+						) : null}
 
 						<div className="rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">
 							{t("exercises.hint")}

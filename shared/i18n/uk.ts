@@ -259,6 +259,8 @@ export const uk: MessageCatalog = {
 	"exercises.desc_plural":
 		"Нагадування про вправи для очей кожні {n} хвилин, щоб зменшити напругу",
 	"exercises.toggleAria": "Перемкнути вправи для очей",
+	"exercises.showPrompts": "Показати тексти",
+	"exercises.hidePrompts": "Сховати тексти",
 	"exercises.intervalAria": "Інтервал вправ",
 	"exercises.prompts": "Тексти вправ",
 	"exercises.resetDefaults": "Скинути за замовчуванням",
@@ -288,12 +290,14 @@ export const uk: MessageCatalog = {
 	"lookAway.durationAria": "Тривалість перерви",
 	"lookAway.hint":
 		"Нагадування про моргання паузяться, поки відкрите вікно «подивіться вдалину»",
-	"lookAway.copy": "Текст спливаючого вікна",
-	"lookAway.copyTitle": "Заголовок",
-	"lookAway.copyHint": "Підказка",
-	"lookAway.copyTitleAria": "Заголовок вікна «подивіться вдалину»",
-	"lookAway.copyHintAria": "Підказка вікна «подивіться вдалину»",
-	"lookAway.resetCopy": "Скинути за замовчуванням",
+	"lookAway.prompt": "Текст перерви",
+	"lookAway.showPrompt": "Показати текст",
+	"lookAway.hidePrompt": "Сховати текст",
+	"lookAway.promptTitle": "Заголовок",
+	"lookAway.promptHint": "Підказка",
+	"lookAway.promptTitleAria": "Заголовок вікна «подивіться вдалину»",
+	"lookAway.promptHintAria": "Підказка вікна «подивіться вдалину»",
+	"lookAway.resetDefaults": "Скинути за замовчуванням",
 
 	// Appearance / popup settings
 	"popup.settings": "Налаштування спливаючого вікна",
