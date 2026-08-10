@@ -25,14 +25,16 @@ import {
 import type { AppPaths } from "../paths/app-paths";
 import { createPanelWindow } from "./panel-window";
 import {
-	getCenteredPopupPosition,
 	getLeftBiasedPopupPosition,
 	getRightBiasedPopupPosition,
 	getTopCenterPopupPosition,
+	resolveVisiblePopupPosition,
 } from "./window-position";
 
 type ReminderKind = "starting" | "blink" | "stopped";
 type ForceShowOptions = { force?: boolean };
+const DISPLAY_RECOVER_DEBOUNCE_MS = 150;
+
 export class WindowManager {
 	main: BrowserWindow | null = null;
 	reminder: BrowserWindow | null = null;
@@ -47,11 +49,16 @@ export class WindowManager {
 		null;
 	private cheerToastDismissTimer: ReturnType<typeof setTimeout> | null = null;
 	private onMainLoaded: (() => void) | null = null;
+	private displayRecoverTimer: ReturnType<typeof setTimeout> | null = null;
+	private readonly onDisplayLayoutChanged = (): void => {
+		this.scheduleDisplayRecovery();
+	};
 
 	constructor(
 		private readonly paths: AppPaths,
 		private readonly preferences: AppPreferences,
 		private readonly devServerUrl: string | undefined,
+		private readonly persistPopupPosition?: (position: Point) => void,
 	) {}
 
 	setOnMainLoaded(handler: (() => void) | null): void {
@@ -652,14 +659,69 @@ export class WindowManager {
 		}
 	}
 
-	applyPopupGeometry(size: Size, position: Point): void {
+	/**
+	 * Clamp a candidate top-left to a visible workArea.
+	 * When recovered, persists via `persistPopupPosition` (caller echoes prefs).
+	 */
+	clampPopupPosition(candidate: Point | null, size?: Size): Point {
+		const popupSize = size ?? this.preferences.popupSize;
+		const { position, recovered } = resolveVisiblePopupPosition(
+			candidate,
+			popupSize,
+		);
+		if (recovered) {
+			this.persistPopupPosition?.(position);
+		}
+		return position;
+	}
+
+	applyPopupGeometry(size: Size, position: Point): Point {
+		const resolved = this.clampPopupPosition(position, size);
 		if (this.reminder && !this.reminder.isDestroyed()) {
 			this.reminder.setSize(size.width, size.height);
-			this.reminder.setPosition(position.x, position.y);
+			this.reminder.setPosition(resolved.x, resolved.y);
+		}
+		return resolved;
+	}
+
+	/**
+	 * Revalidate saved popupPosition and move open reminder/editor/exercise/look-away
+	 * onto a visible display after hot-plug / metrics changes.
+	 */
+	recoverOpenPopupPositions(): void {
+		const position = this.ensurePopupPosition();
+		this.setWindowPositionIfOpen(this.reminder, position);
+		this.setWindowPositionIfOpen(this.editor, position);
+
+		if (this.exercise && !this.exercise.isDestroyed()) {
+			const next = getLeftBiasedPopupPosition(340, 200);
+			this.setWindowPositionIfOpen(this.exercise, next);
+		}
+		if (this.lookAway && !this.lookAway.isDestroyed()) {
+			const next = getRightBiasedPopupPosition(340, 220);
+			this.setWindowPositionIfOpen(this.lookAway, next);
+		}
+	}
+
+	registerDisplayListeners(): void {
+		screen.on("display-removed", this.onDisplayLayoutChanged);
+		screen.on("display-metrics-changed", this.onDisplayLayoutChanged);
+	}
+
+	disposeDisplayListeners(): void {
+		screen.removeListener("display-removed", this.onDisplayLayoutChanged);
+		screen.removeListener(
+			"display-metrics-changed",
+			this.onDisplayLayoutChanged,
+		);
+		if (this.displayRecoverTimer) {
+			clearTimeout(this.displayRecoverTimer);
+			this.displayRecoverTimer = null;
 		}
 	}
 
 	destroyAll(): void {
+		this.disposeDisplayListeners();
 		for (const window of BrowserWindow.getAllWindows()) {
 			if (!window.isDestroyed()) window.destroy();
 		}
@@ -674,12 +736,36 @@ export class WindowManager {
 		this.cheerToast = null;
 	}
 
-	private ensurePopupPosition(): Point {
-		if (this.preferences.popupPosition) {
-			return this.preferences.popupPosition;
+	private scheduleDisplayRecovery(): void {
+		if (this.displayRecoverTimer) {
+			clearTimeout(this.displayRecoverTimer);
 		}
-		const { width, height } = this.preferences.popupSize;
-		return getCenteredPopupPosition(width, height);
+		this.displayRecoverTimer = setTimeout(() => {
+			this.displayRecoverTimer = null;
+			this.recoverOpenPopupPositions();
+		}, DISPLAY_RECOVER_DEBOUNCE_MS);
+	}
+
+	private setWindowPositionIfOpen(
+		window: BrowserWindow | null,
+		position: Point,
+	): void {
+		if (!window || window.isDestroyed()) return;
+		const [x, y] = window.getPosition();
+		if (x === position.x && y === position.y) return;
+		window.setPosition(position.x, position.y);
+	}
+
+	private ensurePopupPosition(): Point {
+		const { position, recovered } = resolveVisiblePopupPosition(
+			this.preferences.popupPosition,
+			this.preferences.popupSize,
+		);
+		if (recovered) {
+			this.persistPopupPosition?.(position);
+			this.sendPreferences();
+		}
+		return position;
 	}
 
 	private closeWindow(

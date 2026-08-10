@@ -81,7 +81,14 @@ function bootstrap(): void {
 	);
 	const state = new AppRuntimeState();
 	const processes = new ChildProcessRegistry();
-	const windows = new WindowManager(paths, preferences, VITE_DEV_SERVER_URL);
+	const windows = new WindowManager(
+		paths,
+		preferences,
+		VITE_DEV_SERVER_URL,
+		(position) => {
+			preferencesService.set("popupPosition", position);
+		},
+	);
 	const sound = new NotificationSoundPlayer(paths, preferences, app.isPackaged);
 
 	blinkStats.setPushHandler((snapshot) => {
@@ -301,6 +308,7 @@ function bootstrap(): void {
 
 	void app.whenReady().then(async () => {
 		lifecycle.register();
+		windows.registerDisplayListeners();
 
 		const startHidden =
 			process.argv.includes("--hidden") ||

@@ -374,9 +374,13 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	});
 	on(IPC_CHANNELS.popupEditorSaved, (_event, value: unknown) => {
 		const payload = value as { size: Size; position: Point };
+		const position = windows.clampPopupPosition(
+			payload.position,
+			payload.size,
+		);
 		preferences.set("popupSize", payload.size);
-		preferences.set("popupPosition", payload.position);
-		windows.applyPopupGeometry(payload.size, payload.position);
+		preferences.set("popupPosition", position);
+		windows.applyPopupGeometry(payload.size, position);
 		windows.sendPreferences();
 	});
 	on(IPC_CHANNELS.resetPreferences, (_event, replayOnboarding?: unknown) => {
