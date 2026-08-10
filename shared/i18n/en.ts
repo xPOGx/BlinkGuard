@@ -192,7 +192,9 @@ export const en: MessageCatalog = {
 	"camera.dismissError": "Dismiss camera error",
 	"camera.detection": "Camera Detection",
 	"camera.detectionDesc":
-		"Turn this on to unlock blink-aware reminders, live stats, coaching, and rewards. Off = timer reminders only; those camera features stay inactive.",
+		"Off — timer reminders only. Turn this on to unlock blink-aware reminders, live stats, coaching, and rewards.",
+	"camera.detectionDescOn":
+		"On — blink-aware reminders, live stats, coaching, and rewards are available. Open a preview with Show Camera.",
 	"camera.toggleAria": "Toggle camera detection",
 	"camera.show": "Show Camera",
 	"camera.stopShowing": "Stop Showing",
@@ -324,10 +326,15 @@ export const en: MessageCatalog = {
 		"Defaults target healthier screen habits (~12+ blinks/min over a workday and several hours of tracking). Set a target to 0 to turn that metric off.",
 	"goals.enabled": "Enable goals",
 	"goals.enabledAria": "Toggle goals",
+	"goals.showSettings": "Show settings",
+	"goals.hideSettings": "Hide settings",
 	"goals.dailyBlinks": "Daily blinks",
 	"goals.dailyTracking": "Daily tracking (minutes)",
 	"goals.weeklyBlinks": "Weekly blinks",
 	"goals.weeklyTracking": "Weekly tracking (minutes)",
+	"reset.dangerZone": "Danger Zone",
+	"reset.description":
+		"These actions permanently reset local settings. They cannot be undone.",
 	"reset.title": "Reset Preferences",
 	"reset.confirm": "Reset all preferences to default values?",
 	"reset.replayOnboarding": "Show first-run setup again",
@@ -463,6 +470,9 @@ export const en: MessageCatalog = {
 	"stats.week": "Week",
 	"stats.month": "Month",
 	"stats.year": "Year",
+	"stats.dangerZone": "Danger Zone",
+	"stats.clearDesc":
+		"Clearing statistics permanently deletes blink and session history. This cannot be undone.",
 	"stats.clear": "Clear statistics",
 	"stats.clearConfirm":
 		"Clear all blink and session statistics? This cannot be undone.",

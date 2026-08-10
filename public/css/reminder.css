@@ -5,6 +5,12 @@ body:has(.reminder-card) {
 	background: transparent !important;
 }
 
+/* Keep border/radius inside the transparent window — flush edges clip on Windows. */
+body:has(.reminder-card) {
+	box-sizing: border-box;
+	padding: 8px;
+}
+
 .reminder-card {
 	--popup-accent-color: var(--popup-accent);
 
@@ -20,7 +26,6 @@ body:has(.reminder-card) {
 	color: var(--popup-text-color);
 	border: 1px solid var(--popup-border);
 	border-radius: var(--popup-radius);
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
 	font-family: var(--popup-font);
 	opacity: 0;
 	animation: fadeInOut 2.5s forwards;

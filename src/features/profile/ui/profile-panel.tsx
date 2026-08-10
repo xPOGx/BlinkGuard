@@ -93,6 +93,17 @@ export function ProfilePanel() {
 				<SettingRow
 					title={t("profile.hero.title")}
 					description={t("profile.hero.desc")}
+					action={
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							onClick={() => setShareOpen(true)}
+						>
+							<Share className="mr-2 h-4 w-4" />
+							{t("profile.share.button")}
+						</Button>
+					}
 				>
 					<div className="space-y-4">
 						<div className="flex flex-wrap items-center gap-2.5">
@@ -138,6 +149,11 @@ export function ProfilePanel() {
 								/>
 							</div>
 						</div>
+						{shareStatus ? (
+							<p className="select-text break-all text-sm text-muted-foreground">
+								{shareStatus}
+							</p>
+						) : null}
 					</div>
 				</SettingRow>
 			</SettingPanel>
@@ -204,29 +220,6 @@ export function ProfilePanel() {
 							))}
 						</ul>
 					)}
-				</SettingRow>
-			</SettingPanel>
-
-			<SettingPanel>
-				<SettingRow
-					title={t("profile.share.title")}
-					description={t("profile.share.desc")}
-					action={
-						<Button
-							type="button"
-							variant="secondary"
-							onClick={() => setShareOpen(true)}
-						>
-							<Share className="mr-2 h-4 w-4" />
-							{t("profile.share.button")}
-						</Button>
-					}
-				>
-					{shareStatus ? (
-						<p className="select-text break-all text-sm text-muted-foreground">
-							{shareStatus}
-						</p>
-					) : null}
 				</SettingRow>
 			</SettingPanel>
 

@@ -22,5 +22,4 @@ body.blink-rate-coach-body {
 	white-space: nowrap;
 	opacity: 0;
 	animation: fadeIn 0.35s forwards;
-	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
 }

@@ -308,47 +308,58 @@ export function ResetPreferencesButton() {
 		setReplayOnboarding(false);
 	};
 
-	if (confirming) {
-		return (
-			<SettingPanel className="space-y-3">
-				<p className="text-sm text-foreground">{t("reset.confirm")}</p>
-				<label className="flex items-start gap-2 text-sm text-muted-foreground">
-					<input
-						type="checkbox"
-						checked={replayOnboarding}
-						onChange={(event) => setReplayOnboarding(event.target.checked)}
-						className="mt-0.5"
-					/>
-					<span>{t("reset.replayOnboarding")}</span>
-				</label>
-				<div className="flex flex-wrap gap-2">
+	return (
+		<SettingPanel className="border-destructive/40 bg-destructive/5">
+			<SettingRow
+				title={
+					<span className="text-destructive">{t("reset.dangerZone")}</span>
+				}
+				description={t("reset.description")}
+			>
+				{confirming ? (
+					<div className="space-y-3">
+						<p className="text-sm text-foreground">{t("reset.confirm")}</p>
+						<label className="flex items-start gap-2 text-sm text-muted-foreground">
+							<input
+								type="checkbox"
+								checked={replayOnboarding}
+								onChange={(event) =>
+									setReplayOnboarding(event.target.checked)
+								}
+								className="mt-0.5"
+							/>
+							<span>{t("reset.replayOnboarding")}</span>
+						</label>
+						<div className="flex flex-wrap gap-2">
+							<Button
+								type="button"
+								variant="secondary"
+								onClick={() => {
+									setConfirming(false);
+									setReplayOnboarding(false);
+								}}
+							>
+								{t("common.cancel")}
+							</Button>
+							<Button
+								type="button"
+								variant="destructive"
+								onClick={confirmReset}
+							>
+								{t("common.reset")}
+							</Button>
+						</div>
+					</div>
+				) : (
 					<Button
 						type="button"
-						variant="secondary"
-						onClick={() => {
-							setConfirming(false);
-							setReplayOnboarding(false);
-						}}
+						variant="destructive"
+						onClick={() => setConfirming(true)}
 					>
-						{t("common.cancel")}
+						{t("reset.title")}
 					</Button>
-					<Button type="button" variant="destructive" onClick={confirmReset}>
-						{t("common.reset")}
-					</Button>
-				</div>
-			</SettingPanel>
-		);
-	}
-
-	return (
-		<SettingPanel className="flex items-center justify-center">
-			<Button
-				type="button"
-				variant="destructive"
-				onClick={() => setConfirming(true)}
-			>
-				{t("reset.title")}
-			</Button>
+				)}
+			</SettingRow>
 		</SettingPanel>
 	);
 }
@@ -705,6 +716,7 @@ export function GoalsSettings({
 	setPreferences,
 }: GoalsSettingsProps) {
 	const t = useT();
+	const [settingsOpen, setSettingsOpen] = useState(false);
 	const atDefaults =
 		preferences.goalsEnabled === DEFAULT_GOALS_CONFIG.goalsEnabled &&
 		preferences.dailyBlinkGoal === DEFAULT_GOALS_CONFIG.dailyBlinkGoal &&
@@ -724,79 +736,114 @@ export function GoalsSettings({
 		<SettingPanel>
 			<SettingRow
 				title={t("goals.title")}
-				description={t("goals.description")}
-				action={
-					<ToggleSwitch
-						aria-label={t("goals.enabledAria")}
-						checked={preferences.goalsEnabled}
-						onChange={() =>
-							setPreferences((current) => ({
-								...current,
-								goalsEnabled: !current.goalsEnabled,
-							}))
-						}
-					/>
+				description={
+					settingsOpen ? t("goals.description") : undefined
 				}
-			>
-				{preferences.goalsEnabled ? (
-					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-						<GoalNumberInput
-							id="daily-blink-goal"
-							label={t("goals.dailyBlinks")}
-							value={preferences.dailyBlinkGoal}
-							onChange={(dailyBlinkGoal) =>
+				action={
+					<div className="flex flex-wrap items-center justify-end gap-2">
+						<Button
+							type="button"
+							size="sm"
+							variant="secondary"
+							aria-expanded={settingsOpen}
+							onClick={() => setSettingsOpen((open) => !open)}
+						>
+							<span className="inline-grid grid-cols-1 grid-rows-1 place-items-center">
+								<span
+									className="invisible col-start-1 row-start-1 whitespace-nowrap"
+									aria-hidden
+								>
+									{t("goals.showSettings")}
+								</span>
+								<span
+									className="invisible col-start-1 row-start-1 whitespace-nowrap"
+									aria-hidden
+								>
+									{t("goals.hideSettings")}
+								</span>
+								<span className="col-start-1 row-start-1 whitespace-nowrap">
+									{settingsOpen
+										? t("goals.hideSettings")
+										: t("goals.showSettings")}
+								</span>
+							</span>
+						</Button>
+						<ToggleSwitch
+							aria-label={t("goals.enabledAria")}
+							checked={preferences.goalsEnabled}
+							onChange={() =>
 								setPreferences((current) => ({
 									...current,
-									dailyBlinkGoal,
-								}))
-							}
-						/>
-						<GoalNumberInput
-							id="daily-tracking-goal"
-							label={t("goals.dailyTracking")}
-							value={preferences.dailyTrackingMinutesGoal}
-							onChange={(dailyTrackingMinutesGoal) =>
-								setPreferences((current) => ({
-									...current,
-									dailyTrackingMinutesGoal,
-								}))
-							}
-						/>
-						<GoalNumberInput
-							id="weekly-blink-goal"
-							label={t("goals.weeklyBlinks")}
-							value={preferences.weeklyBlinkGoal}
-							onChange={(weeklyBlinkGoal) =>
-								setPreferences((current) => ({
-									...current,
-									weeklyBlinkGoal,
-								}))
-							}
-						/>
-						<GoalNumberInput
-							id="weekly-tracking-goal"
-							label={t("goals.weeklyTracking")}
-							value={preferences.weeklyTrackingMinutesGoal}
-							onChange={(weeklyTrackingMinutesGoal) =>
-								setPreferences((current) => ({
-									...current,
-									weeklyTrackingMinutesGoal,
+									goalsEnabled: !current.goalsEnabled,
 								}))
 							}
 						/>
 					</div>
+				}
+			>
+				{settingsOpen ? (
+					<>
+						{preferences.goalsEnabled ? (
+							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+								<GoalNumberInput
+									id="daily-blink-goal"
+									label={t("goals.dailyBlinks")}
+									value={preferences.dailyBlinkGoal}
+									onChange={(dailyBlinkGoal) =>
+										setPreferences((current) => ({
+											...current,
+											dailyBlinkGoal,
+										}))
+									}
+								/>
+								<GoalNumberInput
+									id="daily-tracking-goal"
+									label={t("goals.dailyTracking")}
+									value={preferences.dailyTrackingMinutesGoal}
+									onChange={(dailyTrackingMinutesGoal) =>
+										setPreferences((current) => ({
+											...current,
+											dailyTrackingMinutesGoal,
+										}))
+									}
+								/>
+								<GoalNumberInput
+									id="weekly-blink-goal"
+									label={t("goals.weeklyBlinks")}
+									value={preferences.weeklyBlinkGoal}
+									onChange={(weeklyBlinkGoal) =>
+										setPreferences((current) => ({
+											...current,
+											weeklyBlinkGoal,
+										}))
+									}
+								/>
+								<GoalNumberInput
+									id="weekly-tracking-goal"
+									label={t("goals.weeklyTracking")}
+									value={preferences.weeklyTrackingMinutesGoal}
+									onChange={(weeklyTrackingMinutesGoal) =>
+										setPreferences((current) => ({
+											...current,
+											weeklyTrackingMinutesGoal,
+										}))
+									}
+								/>
+							</div>
+						) : null}
+						<div className={preferences.goalsEnabled ? "mt-3" : undefined}>
+							<Button
+								type="button"
+								size="sm"
+								variant="secondary"
+								disabled={atDefaults}
+								onClick={resetGoals}
+							>
+								{t("common.reset")}
+							</Button>
+						</div>
+					</>
 				) : null}
-				<div className={preferences.goalsEnabled ? "mt-3" : undefined}>
-					<Button
-						type="button"
-						size="sm"
-						variant="secondary"
-						disabled={atDefaults}
-						onClick={resetGoals}
-					>
-						{t("common.reset")}
-					</Button>
-				</div>
 			</SettingRow>
 		</SettingPanel>
 	);

@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Button } from "@/components/button";
-import { SettingPanel, SettingRow } from "@/components/setting-panel";
+import {
+	SettingGrid,
+	SettingPanel,
+	SettingRow,
+} from "@/components/setting-panel";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import {
@@ -135,43 +139,45 @@ export function StatisticsPanel() {
 				</SettingRow>
 			</SettingPanel>
 
-			<SettingPanel>
-				<SettingRow
-					title={t("stats.streak")}
-					description={t("stats.streakDesc")}
-				>
-					<div className="flex flex-wrap items-center gap-3">
-						<p className="text-lg font-semibold tabular-nums tracking-tight">
-							{t(streakKey, { n: streak.current })}
-						</p>
-						<span
-							className={cn(
-								"rounded-md border px-2 py-1 text-xs font-medium",
-								streak.shieldCharges > 0
-									? "border-teal-600/40 bg-teal-600/10 text-teal-800 dark:text-teal-200"
-									: "border-border text-muted-foreground",
-							)}
-						>
-							{streak.shieldCharges > 0
-								? t("stats.streak.shieldReady")
-								: t("stats.streak.shieldEmpty")}
-						</span>
-					</div>
-				</SettingRow>
-			</SettingPanel>
+			<SettingGrid>
+				<SettingPanel>
+					<SettingRow
+						title={t("stats.streak")}
+						description={t("stats.streakDesc")}
+					>
+						<div className="flex flex-wrap items-center gap-3">
+							<p className="text-lg font-semibold tabular-nums tracking-tight">
+								{t(streakKey, { n: streak.current })}
+							</p>
+							<span
+								className={cn(
+									"rounded-md border px-2 py-1 text-xs font-medium",
+									streak.shieldCharges > 0
+										? "border-teal-600/40 bg-teal-600/10 text-teal-800 dark:text-teal-200"
+										: "border-border text-muted-foreground",
+								)}
+							>
+								{streak.shieldCharges > 0
+									? t("stats.streak.shieldReady")
+									: t("stats.streak.shieldEmpty")}
+							</span>
+						</div>
+					</SettingRow>
+				</SettingPanel>
 
-			<SettingPanel>
-				<SettingRow
-					title={t("stats.liveRate")}
-					description={t("stats.liveRateDesc")}
-				>
-					<LiveBlinkRate
-						blinksPerMinute={snapshot.blinksPerMinute}
-						blinkRateReady={snapshot.blinkRateReady}
-						blinkRateWarmupMs={snapshot.blinkRateWarmupMs}
-					/>
-				</SettingRow>
-			</SettingPanel>
+				<SettingPanel>
+					<SettingRow
+						title={t("stats.liveRate")}
+						description={t("stats.liveRateDesc")}
+					>
+						<LiveBlinkRate
+							blinksPerMinute={snapshot.blinksPerMinute}
+							blinkRateReady={snapshot.blinkRateReady}
+							blinkRateWarmupMs={snapshot.blinkRateWarmupMs}
+						/>
+					</SettingRow>
+				</SettingPanel>
+			</SettingGrid>
 
 			<SettingPanel>
 				<SettingRow title={t("stats.today")} description={t("stats.todayDesc")}>
@@ -227,10 +233,17 @@ export function StatisticsPanel() {
 				/>
 			</SettingPanel>
 
-			<SettingPanel className="flex items-center justify-center">
-				<Button type="button" variant="destructive" onClick={clearStatistics}>
-					{t("stats.clear")}
-				</Button>
+			<SettingPanel className="border-destructive/40 bg-destructive/5">
+				<SettingRow
+					title={
+						<span className="text-destructive">{t("stats.dangerZone")}</span>
+					}
+					description={t("stats.clearDesc")}
+				>
+					<Button type="button" variant="destructive" onClick={clearStatistics}>
+						{t("stats.clear")}
+					</Button>
+				</SettingRow>
 			</SettingPanel>
 		</>
 	);

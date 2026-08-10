@@ -1,7 +1,8 @@
-import { Activity, Camera, Crosshair, Gauge, Info, UserRoundX } from "lucide-react";
+import { Activity, Camera, Crosshair, Gauge, UserRoundX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/button";
 import {
+	SettingGrid,
 	SettingPanel,
 	SettingRow,
 	ToggleSwitch,
@@ -219,29 +220,90 @@ export function CameraControls({
 		0,
 		Math.ceil((calibrationDurationMs - calibrationElapsedMs) / 1000),
 	);
+	const cameraOn = preferences.cameraEnabled;
 
 	return (
 		<>
-			<SettingPanel>
-				<SettingRow
-					title={
-						<>
-							<Camera className="h-4 w-4 text-muted-foreground" aria-hidden />
-							{t("camera.detection")}
-						</>
-					}
-					action={
-						<div className="flex items-center gap-2">
+			<SettingGrid>
+				<SettingPanel
+					className={cn(
+						"h-full",
+						cameraOn
+							? "border-teal-600/40 bg-teal-600/5"
+							: "border-amber-500/40 bg-amber-500/10",
+					)}
+				>
+					<SettingRow
+						title={
+							<>
+								<Camera
+									className={cn(
+										"h-4 w-4",
+										cameraOn
+											? "text-teal-700 dark:text-teal-300"
+											: "text-amber-700 dark:text-amber-200",
+									)}
+									aria-hidden
+								/>
+								<span
+									className={cn(
+										cameraOn
+											? "text-teal-900 dark:text-teal-100"
+											: "text-amber-950 dark:text-amber-50",
+									)}
+								>
+									{t("camera.detection")}
+								</span>
+							</>
+						}
+						description={
+							<span className="inline-grid w-full grid-cols-1 grid-rows-1">
+								<span
+									className="invisible col-start-1 row-start-1"
+									aria-hidden
+								>
+									{t("camera.detectionDesc")}
+								</span>
+								<span
+									className="invisible col-start-1 row-start-1"
+									aria-hidden
+								>
+									{t("camera.detectionDescOn")}
+								</span>
+								<span
+									className={cn(
+										"col-start-1 row-start-1",
+										cameraOn
+											? "text-teal-900/80 dark:text-teal-100/85"
+											: "text-amber-950/85 dark:text-amber-50/90",
+									)}
+								>
+									{cameraOn
+										? t("camera.detectionDescOn")
+										: t("camera.detectionDesc")}
+								</span>
+							</span>
+						}
+						action={
+							<ToggleSwitch
+								aria-label={t("camera.toggleAria")}
+								checked={cameraOn}
+								onChange={toggleCamera}
+							/>
+						}
+					>
+						{/* Keep button slot reserved so the row height stays stable. */}
+						<div
+							className={cn(
+								!cameraOn && "invisible pointer-events-none",
+							)}
+						>
 							{isWindowOpen ? (
 								<Button
 									type="button"
 									size="sm"
 									variant="destructive"
-									disabled={!preferences.cameraEnabled}
-									className={cn(
-										!preferences.cameraEnabled &&
-											"invisible pointer-events-none",
-									)}
+									tabIndex={cameraOn ? undefined : -1}
 									onClick={() => {
 										rendererIpc.closeCameraWindow();
 										setIsWindowOpen(false);
@@ -253,11 +315,7 @@ export function CameraControls({
 								<Button
 									type="button"
 									size="sm"
-									disabled={!preferences.cameraEnabled}
-									className={cn(
-										!preferences.cameraEnabled &&
-											"invisible pointer-events-none",
-									)}
+									tabIndex={cameraOn ? undefined : -1}
 									onClick={() => {
 										if (!preferences.isTracking) {
 											setPreferences((current) => ({
@@ -272,28 +330,73 @@ export function CameraControls({
 									{t("camera.show")}
 								</Button>
 							)}
-							<ToggleSwitch
-								aria-label={t("camera.toggleAria")}
-								checked={preferences.cameraEnabled}
-								onChange={toggleCamera}
-							/>
 						</div>
-					}
-				/>
-			</SettingPanel>
+					</SettingRow>
+				</SettingPanel>
 
-			{!preferences.cameraEnabled ? (
-				<div
-					role="status"
-					className="flex gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-100 sm:text-sm"
-				>
-					<Info
-						className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-200"
-						aria-hidden
-					/>
-					<p>{t("camera.detectionDesc")}</p>
-				</div>
-			) : null}
+				<SettingPanel className={cn("h-full", !cameraOn && "opacity-60")}>
+					<SettingRow
+						title={
+							<>
+								<UserRoundX
+									className="h-4 w-4 text-muted-foreground"
+									aria-hidden
+								/>
+								{t("camera.autoStopNoFace")}
+							</>
+						}
+						description={t(autoStopDescKey, { n: autoStopMinutes })}
+						action={
+							<ToggleSwitch
+								aria-label={t("camera.autoStopNoFaceToggleAria")}
+								checked={preferences.autoStopNoFaceEnabled}
+								disabled={!cameraOn}
+								onChange={() =>
+									setPreferences((current) => ({
+										...current,
+										autoStopNoFaceEnabled: !current.autoStopNoFaceEnabled,
+									}))
+								}
+							/>
+						}
+					>
+						<div
+							className={cn(
+								"flex items-center gap-2",
+								(!cameraOn || !preferences.autoStopNoFaceEnabled) &&
+									"opacity-50",
+							)}
+						>
+							<input
+								aria-label={t("camera.autoStopNoFaceIntervalAria")}
+								type="range"
+								min="1"
+								max="30"
+								value={autoStopMinutes}
+								disabled={
+									!cameraOn || !preferences.autoStopNoFaceEnabled
+								}
+								onChange={(event) =>
+									setPreferences((current) => ({
+										...current,
+										autoStopNoFaceMinutes: Number.parseInt(
+											event.target.value,
+											10,
+										),
+									}))
+								}
+								className="h-1.5 flex-1 appearance-none rounded-lg bg-muted disabled:cursor-not-allowed"
+								style={{
+									background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${autoStopProgress}%, ${trackColor} ${autoStopProgress}%, ${trackColor} 100%)`,
+								}}
+							/>
+							<div className="min-w-[2.5rem] text-center text-xs font-medium text-primary">
+								{autoStopMinutes}m
+							</div>
+						</div>
+					</SettingRow>
+				</SettingPanel>
+			</SettingGrid>
 
 			{preferences.cameraEnabled ? (
 				<>
@@ -336,193 +439,140 @@ export function CameraControls({
 						</SettingRow>
 					</SettingPanel>
 
-					<SettingPanel>
-						<SettingRow
-							title={
-								<>
-									<UserRoundX
-										className="h-4 w-4 text-muted-foreground"
-										aria-hidden
-									/>
-									{t("camera.autoStopNoFace")}
-								</>
-							}
-							description={t(autoStopDescKey, { n: autoStopMinutes })}
-							action={
-								<ToggleSwitch
-									aria-label={t("camera.autoStopNoFaceToggleAria")}
-									checked={preferences.autoStopNoFaceEnabled}
-									onChange={() =>
-										setPreferences((current) => ({
-											...current,
-											autoStopNoFaceEnabled: !current.autoStopNoFaceEnabled,
-										}))
-									}
-								/>
-							}
-						>
-							<div
-								className={cn(
-									"flex items-center gap-2",
-									!preferences.autoStopNoFaceEnabled && "opacity-50",
-								)}
-							>
-								<input
-									aria-label={t("camera.autoStopNoFaceIntervalAria")}
-									type="range"
-									min="1"
-									max="30"
-									value={autoStopMinutes}
-									disabled={!preferences.autoStopNoFaceEnabled}
-									onChange={(event) =>
-										setPreferences((current) => ({
-											...current,
-											autoStopNoFaceMinutes: Number.parseInt(
-												event.target.value,
-												10,
-											),
-										}))
-									}
-									className="h-1.5 flex-1 appearance-none rounded-lg bg-muted disabled:cursor-not-allowed"
-									style={{
-										background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${autoStopProgress}%, ${trackColor} ${autoStopProgress}%, ${trackColor} 100%)`,
-									}}
-								/>
-								<div className="min-w-[2.5rem] text-center text-xs font-medium text-primary">
-									{autoStopMinutes}m
-								</div>
-							</div>
-						</SettingRow>
-					</SettingPanel>
-
-					<SettingPanel>
-						<SettingRow
-							title={
-								<>
-									<Crosshair
-										className="h-4 w-4 text-muted-foreground"
-										aria-hidden
-									/>
-									{t("camera.calibration")}
-								</>
-							}
-							description={t("camera.calibrationDesc")}
-							action={
-								preferences.earCalibration !== null ? (
-									<span className="select-text text-xs text-primary">
-										EAR {preferences.earCalibration.toFixed(3)}
-									</span>
-								) : null
-							}
-						>
-							<div className="flex flex-wrap items-center gap-2">
-								{calibrating ? (
-									<Button
-										type="button"
-										size="sm"
-										variant="secondary"
-										onClick={cancelCalibration}
-									>
-										{t("camera.cancelCalibration", { n: remainingSec })}
-									</Button>
-								) : (
-									<Button type="button" size="sm" onClick={startCalibration}>
-										{t("camera.calibrate")}
-									</Button>
-								)}
-								{preferences.earCalibration !== null && !calibrating ? (
-									<Button
-										type="button"
-										size="sm"
-										variant="ghost"
-										onClick={resetCalibration}
-									>
-										{t("common.reset")}
-									</Button>
-								) : null}
-							</div>
-							{calibrating ? (
-								<>
-									<div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
-										<div
-											className="h-full bg-primary transition-[width] duration-200"
-											style={{ width: `${progressRatio * 100}%` }}
+					<SettingGrid>
+						<SettingPanel>
+							<SettingRow
+								title={
+									<>
+										<Crosshair
+											className="h-4 w-4 text-muted-foreground"
+											aria-hidden
 										/>
-									</div>
-									<p className="mt-2 text-xs text-muted-foreground">
-										{t("camera.calibrationProgress", {
-											n: calibrationSampleCount,
-											min: EAR_CALIBRATION_MIN_SAMPLES,
-										})}
-										{" · "}
-										{calibrationFaceDetected
-											? t("camera.calibrationFaceOk")
-											: t("camera.calibrationFaceMissing")}
+										{t("camera.calibration")}
+									</>
+								}
+								description={t("camera.calibrationDesc")}
+								action={
+									preferences.earCalibration !== null ? (
+										<span className="select-text text-xs text-primary">
+											EAR {preferences.earCalibration.toFixed(3)}
+										</span>
+									) : null
+								}
+							>
+								<div className="flex flex-wrap items-center gap-2">
+									{calibrating ? (
+										<Button
+											type="button"
+											size="sm"
+											variant="secondary"
+											onClick={cancelCalibration}
+										>
+											{t("camera.cancelCalibration", { n: remainingSec })}
+										</Button>
+									) : (
+										<Button
+											type="button"
+											size="sm"
+											onClick={startCalibration}
+										>
+											{t("camera.calibrate")}
+										</Button>
+									)}
+									{preferences.earCalibration !== null && !calibrating ? (
+										<Button
+											type="button"
+											size="sm"
+											variant="ghost"
+											onClick={resetCalibration}
+										>
+											{t("common.reset")}
+										</Button>
+									) : null}
+								</div>
+								{calibrating ? (
+									<>
+										<div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+											<div
+												className="h-full bg-primary transition-[width] duration-200"
+												style={{ width: `${progressRatio * 100}%` }}
+											/>
+										</div>
+										<p className="mt-2 text-xs text-muted-foreground">
+											{t("camera.calibrationProgress", {
+												n: calibrationSampleCount,
+												min: EAR_CALIBRATION_MIN_SAMPLES,
+											})}
+											{" · "}
+											{calibrationFaceDetected
+												? t("camera.calibrationFaceOk")
+												: t("camera.calibrationFaceMissing")}
+										</p>
+									</>
+								) : null}
+								{calibrationMessage ? (
+									<p className="mt-2 select-text text-xs text-muted-foreground">
+										{calibrationMessage}
 									</p>
-								</>
-							) : null}
-							{calibrationMessage ? (
-								<p className="mt-2 select-text text-xs text-muted-foreground">
-									{calibrationMessage}
-								</p>
-							) : null}
-						</SettingRow>
-					</SettingPanel>
+								) : null}
+							</SettingRow>
+						</SettingPanel>
 
-					<SettingPanel>
-						<SettingRow
-							title={
-								<>
-									<Gauge
-										className="h-4 w-4 text-muted-foreground"
-										aria-hidden
+						<SettingPanel>
+							<SettingRow
+								title={
+									<>
+										<Gauge
+											className="h-4 w-4 text-muted-foreground"
+											aria-hidden
+										/>
+										{t("camera.coaching")}
+									</>
+								}
+								description={t("camera.coachingDesc")}
+								action={
+									<ToggleSwitch
+										aria-label={t("camera.coachingToggleAria")}
+										checked={preferences.blinkRateCoachingEnabled}
+										onChange={() =>
+											setPreferences((current) => ({
+												...current,
+												blinkRateCoachingEnabled:
+													!current.blinkRateCoachingEnabled,
+											}))
+										}
 									/>
-									{t("camera.coaching")}
-								</>
-							}
-							description={t("camera.coachingDesc")}
-							action={
-								<ToggleSwitch
-									aria-label={t("camera.coachingToggleAria")}
-									checked={preferences.blinkRateCoachingEnabled}
-									onChange={() =>
-										setPreferences((current) => ({
-											...current,
-											blinkRateCoachingEnabled:
-												!current.blinkRateCoachingEnabled,
-										}))
-									}
-								/>
-							}
-						>
-							<div className="flex flex-wrap items-center gap-3">
-								<label
-									htmlFor="blink-rate-threshold"
-									className="text-xs text-muted-foreground"
-								>
-									{t("camera.minBlinks")}
-								</label>
-								<input
-									id="blink-rate-threshold"
-									type="number"
-									min={1}
-									max={60}
-									step={1}
-									disabled={!preferences.blinkRateCoachingEnabled}
-									value={preferences.blinkRateThresholdPerMin}
-									onChange={(event) => {
-										const value = Number.parseInt(event.target.value, 10);
-										if (!Number.isFinite(value)) return;
-										setPreferences((current) => ({
-											...current,
-											blinkRateThresholdPerMin: value,
-										}));
-									}}
-									className="w-20 rounded-md border border-border bg-background px-2 py-1 text-sm disabled:opacity-50"
-								/>
-							</div>
-						</SettingRow>
-					</SettingPanel>
+								}
+							>
+								<div className="flex flex-wrap items-center gap-3">
+									<label
+										htmlFor="blink-rate-threshold"
+										className="text-xs text-muted-foreground"
+									>
+										{t("camera.minBlinks")}
+									</label>
+									<input
+										id="blink-rate-threshold"
+										type="number"
+										min={1}
+										max={60}
+										step={1}
+										disabled={!preferences.blinkRateCoachingEnabled}
+										value={preferences.blinkRateThresholdPerMin}
+										onChange={(event) => {
+											const value = Number.parseInt(event.target.value, 10);
+											if (!Number.isFinite(value)) return;
+											setPreferences((current) => ({
+												...current,
+												blinkRateThresholdPerMin: value,
+											}));
+										}}
+										className="w-20 rounded-md border border-border bg-background px-2 py-1 text-sm disabled:opacity-50"
+									/>
+								</div>
+							</SettingRow>
+						</SettingPanel>
+					</SettingGrid>
 
 					<SettingPanel>
 						<SettingRow
