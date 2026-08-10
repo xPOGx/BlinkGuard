@@ -16,6 +16,7 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ### Changed
 
+- UI: polish settings layout and popup panel chrome
 - Docs: refresh README screenshots for Progress UI; clarify optional camera sidecar setup
 
 ## [2.5.0] - 2026-08-10
