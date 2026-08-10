@@ -9,7 +9,7 @@ ENCODE_JPEG_QUALITY = 50
 PREVIEW_MAX_WIDTH = 480
 ENCODE_PARAMS = [cv2.IMWRITE_JPEG_QUALITY, ENCODE_JPEG_QUALITY]
 
-# L2-A: local CLAHE before shape_predictor (HOG stays on raw gray).
+# L2-A: local CLAHE before shape_predictor (default HOG path stays raw gray).
 # Parked off: eye-ROI chase shook dots; face-rect still hurt Phase 0 when the
 # face patch was darker than the room (POG 2026-08-09 start_to_complete≈0.32).
 # Keep helpers for a future dark-only A/B — do not enable with gate retunes.
@@ -19,6 +19,11 @@ CLAHE_TILE_SIZE = (8, 8)
 FACE_ROI_PAD_RATIO = 0.05
 CLAHE_MAX_FACE_LUMA = 55.0
 CLAHE_BLEND = 0.35
+
+# Miss-only full-frame CLAHE for HOG retry (side light / Fifine face_none).
+# Separate from landmark CLAHE_ENABLED — never applied to shape_predictor here.
+HOG_DETECT_CLAHE_CLIP = 2.0
+HOG_DETECT_CLAHE_TILE = (8, 8)
 
 
 class PreallocatedBuffers:
@@ -35,6 +40,7 @@ class PreallocatedBuffers:
 		]
 		self.clahe_roi_count = 0
 		self._clahe = None
+		self._hog_detect_clahe = None
 
 	def clahe(self):
 		if self._clahe is None:
@@ -43,6 +49,15 @@ class PreallocatedBuffers:
 				tileGridSize=CLAHE_TILE_SIZE,
 			)
 		return self._clahe
+
+	def hog_detect_clahe(self):
+		"""Milder full-frame CLAHE used only on HOG miss retry."""
+		if self._hog_detect_clahe is None:
+			self._hog_detect_clahe = cv2.createCLAHE(
+				clipLimit=HOG_DETECT_CLAHE_CLIP,
+				tileGridSize=HOG_DETECT_CLAHE_TILE,
+			)
+		return self._hog_detect_clahe
 
 
 def _clamp_roi(x0, y0, x1, y1, width, height):
@@ -102,6 +117,47 @@ def apply_clahe_roi_blended(gray_out, gray_src, roi, clahe, blend=CLAHE_BLEND):
 	return 1
 
 
+def prepare_hog_detect_gray(gray, buffers):
+	"""
+	Full-frame mild CLAHE for HOG miss retry only.
+
+	Returns enhanced gray (buffers.temp_frame) or None if gray is unusable.
+	Does not depend on CLAHE_ENABLED (landmark path stays parked).
+	"""
+	if gray is None or buffers is None:
+		return None
+	if gray.size < 64:
+		return None
+	applied = buffers.hog_detect_clahe().apply(gray)
+	return _ensure_temp_gray(buffers, applied)
+
+
+def run_hog_face_detect(detector, gray, select_largest, buffers=None):
+	"""
+	HOG face detect with miss-only retries.
+
+	Order: raw upsample=0 → full-frame CLAHE upsample=0 → raw upsample=1.
+	Returns (face_or_None, retry_kind) where retry_kind is None|"clahe"|"upsample".
+	"""
+	faces = detector(gray, 0)
+	face = select_largest(faces)
+	if face is not None:
+		return face, None
+
+	enhanced = prepare_hog_detect_gray(gray, buffers)
+	if enhanced is not None:
+		faces = detector(enhanced, 0)
+		face = select_largest(faces)
+		if face is not None:
+			return face, "clahe"
+
+	faces = detector(gray, 1)
+	face = select_largest(faces)
+	if face is not None:
+		return face, "upsample"
+	return None, None
+
+
 def prepare_predictor_gray(
 	gray,
 	face,
@@ -110,7 +166,8 @@ def prepare_predictor_gray(
 	prev_right_eye=None,
 ):
 	"""
-	HOG must use raw gray; predictor may get a dark-gated face CLAHE copy.
+	Default HOG uses raw gray (+ miss-only retry elsewhere); predictor may get
+	a dark-gated face CLAHE copy when CLAHE_ENABLED.
 
 	prev_* eyes ignored (kept for call-site compat) — eye-ROI CLAHE caused
 	landmark feedback shake and bright-room FP credits.

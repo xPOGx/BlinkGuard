@@ -192,7 +192,7 @@ SHORT_BLINK_STRONG_ABS = 0.05
 MIN_FACE_AREA_PX = 1600  # ~40×40
 MIN_INTEROCULAR_PX = 12.0
 # HOG can miss several frames while talking / expression; hold last bbox.
-FACE_MISS_HOLD_FRAMES = 8
+FACE_MISS_HOLD_FRAMES = 12
 # Landmark quality blip mid-blink: skip EAR but do not cancel yet.
 FACE_QUALITY_HOLD_FRAMES = 2
 # After face loss, force every-frame HOG for this many frames (re-acquire).

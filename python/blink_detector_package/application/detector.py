@@ -38,6 +38,7 @@ from blink_detector_package.infrastructure.vision import (
 	PreallocatedBuffers,
 	encode_frame,
 	get_face_landmarks,
+	run_hog_face_detect,
 )
 
 NO_FACE_DATA = json.dumps(
@@ -75,6 +76,7 @@ class BlinkDetectorApplication:
 		self._last_skip_debug_time = 0.0
 		self._last_skip_debug_phase = None
 		self._last_near_miss_debug_time = 0.0
+		self._last_hog_retry_log_time = 0.0
 		# Preview follows target_fps (Ultra=30); encode stays light via size/q.
 		self._last_video_emit = 0.0
 		self._video_min_interval = 1.0 / max(8, int(self.camera.target_fps or 10))
@@ -437,7 +439,7 @@ class BlinkDetectorApplication:
 		gate_fps = max(8.0, min(configured, measured))
 		self.detection.set_target_fps(gate_fps)
 
-	def _resolve_face(self, detector, gray):
+	def _resolve_face(self, detector, gray, buffers=None):
 		"""Run HOG face detect on interval; otherwise reuse largest bbox.
 
 		While a blink candidate is active, re-detect every frame so a stale
@@ -446,6 +448,9 @@ class BlinkDetectorApplication:
 		so performance presets re-lock quickly. Do not force every-frame detect
 		merely because preview is on — HOG flicker while talking showed
 		face-missing UI (POG 2026-08-09). Brief miss hold keeps last bbox.
+
+		On HOG miss: mild full-frame CLAHE retry, then upsample=1 (cost only
+		when raw upsample=0 fails — side-light / Fifine face_none).
 		"""
 		interval = self.face_detect_interval
 		should_detect = (
@@ -455,9 +460,15 @@ class BlinkDetectorApplication:
 			or self._face_reacquire_frames > 0
 		)
 		if should_detect:
-			faces = detector(gray, 0)
-			face = select_largest_face(faces)
+			face, retry_kind = run_hog_face_detect(
+				detector,
+				gray,
+				select_largest_face,
+				buffers,
+			)
 			if face is not None:
+				if retry_kind:
+					self._maybe_log_hog_retry(retry_kind)
 				self._cached_face = face
 				self._face_miss_streak = 0
 				self._frames_since_face_detect = 1
@@ -480,6 +491,16 @@ class BlinkDetectorApplication:
 		if self._face_reacquire_frames > 0:
 			self._face_reacquire_frames -= 1
 		return self._cached_face
+
+	def _maybe_log_hog_retry(self, retry_kind):
+		"""Rate-limited debug when miss-only HOG retry recovers a face."""
+		now = time.time()
+		if now - self._last_hog_retry_log_time < 2.0:
+			return
+		self._last_hog_retry_log_time = now
+		self.transport.send(
+			{"debug": f"HOG face recovered via retry hog_retry={retry_kind}"}
+		)
 
 	def _face_quality_ok(self, face, landmarks):
 		"""Reject tiny / junk faces before EAR (symmetric noise bypasses asymmetry)."""
@@ -1073,8 +1094,9 @@ class BlinkDetectorApplication:
 				landmarks = None
 
 				gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-				# HOG on raw gray — CLAHE only for shape_predictor (L2-A).
-				face = self._resolve_face(detector, gray)
+				# HOG: raw first; miss-only CLAHE/upsample retry inside _resolve_face.
+				# Landmark CLAHE stays parked (CLAHE_ENABLED / L2-A).
+				face = self._resolve_face(detector, gray, buffers)
 				if face is not None:
 					landmarks, left_eye, right_eye = get_face_landmarks(
 						predictor,
