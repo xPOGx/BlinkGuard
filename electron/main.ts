@@ -247,6 +247,7 @@ function bootstrap(): void {
 		windows,
 		() => lifecycle.quit(),
 		() => preferences.locale,
+		() => preferences.snoozeMinutes,
 		() => {
 			windows.showMain();
 			autoUpdates.checkForUpdates({ interactive: true });
@@ -298,6 +299,7 @@ function bootstrap(): void {
 		installUpdate: () => autoUpdates.installUpdate(),
 		interactions: interactionLogger,
 		onShellReady: () => trackingRestore.onShellReady(),
+		onSnoozeMinutesChanged: () => tray.rebuildMenu(),
 	});
 
 	app.on("second-instance", () => {

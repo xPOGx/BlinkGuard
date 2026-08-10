@@ -110,6 +110,7 @@ export class PreferenceActions {
 		this.shortcuts.register(current.keyboardShortcut);
 		this.sidecar.applyCameraQuality(current.cameraQuality);
 		this.sidecar.applyEarCalibration(null);
+		this.tray?.rebuildMenu(this.preferences.current.locale);
 		this.windows.sendPreferences();
 		this.focusPause.recompute();
 	}

@@ -54,6 +54,8 @@ interface IpcDependencies {
 	interactions: InteractionLogger;
 	/** Cold-start gate: settings shell hydrated + boot splash dismissed. */
 	onShellReady?: () => void;
+	/** Tray label refresh when snooze duration changes (no prefs echo). */
+	onSnoozeMinutesChanged?: () => void;
 }
 
 export function registerIpcHandlers(deps: IpcDependencies): void {
@@ -73,6 +75,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		installUpdate,
 		interactions,
 		onShellReady,
+		onSnoozeMinutesChanged,
 	} = deps;
 	const current = preferences.current;
 
@@ -142,6 +145,13 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	});
 	on(IPC_CHANNELS.updateAutoStopNoFaceMinutes, (_event, minutes: unknown) => {
 		preferences.set("autoStopNoFaceMinutes", minutes as number);
+	});
+	on(IPC_CHANNELS.updateSnoozeMinutes, (_event, minutes: unknown) => {
+		const before = preferences.current.snoozeMinutes;
+		preferences.set("snoozeMinutes", minutes as number);
+		if (preferences.current.snoozeMinutes !== before) {
+			onSnoozeMinutesChanged?.();
+		}
 	});
 	on(IPC_CHANNELS.updateEarCalibration, (_event, baseline: unknown) => {
 		if (baseline === null) {

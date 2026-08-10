@@ -17,6 +17,7 @@ import {
 	sanitizeExercisePrompts,
 	sanitizeLookAwayHint,
 	sanitizeLookAwayTitle,
+	sanitizeSnoozeMinutes,
 	sanitizeSoundVolume,
 	toRendererPreferences,
 } from "../../../shared/preferences";
@@ -177,6 +178,19 @@ describe("auto-stop on no-face preference defaults", () => {
 		expect(sanitizeAutoStopNoFaceMinutes(0)).toBe(1);
 		expect(sanitizeAutoStopNoFaceMinutes(99)).toBe(30);
 		expect(sanitizeAutoStopNoFaceMinutes(7.6)).toBe(8);
+	});
+});
+
+describe("snooze duration preference defaults", () => {
+	it("defaults to 5 minutes", () => {
+		expect(DEFAULT_PREFERENCES.snoozeMinutes).toBe(5);
+	});
+
+	it("sanitizes snoozeMinutes to 1…30", () => {
+		expect(sanitizeSnoozeMinutes(null)).toBe(5);
+		expect(sanitizeSnoozeMinutes(0)).toBe(1);
+		expect(sanitizeSnoozeMinutes(99)).toBe(30);
+		expect(sanitizeSnoozeMinutes(7.6)).toBe(8);
 	});
 });
 

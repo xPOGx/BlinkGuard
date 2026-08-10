@@ -36,6 +36,10 @@ const AUTO_STOP_NO_FACE_MINUTES_MIN = 1;
 const AUTO_STOP_NO_FACE_MINUTES_MAX = 30;
 const AUTO_STOP_NO_FACE_MINUTES_DEFAULT = 2;
 
+const SNOOZE_MINUTES_MIN = 1;
+const SNOOZE_MINUTES_MAX = 30;
+const SNOOZE_MINUTES_DEFAULT = 5;
+
 const SOUND_VOLUME_MIN = 0;
 const SOUND_VOLUME_MAX = 100;
 const SOUND_VOLUME_DEFAULT = 100;
@@ -159,6 +163,19 @@ export function sanitizeAutoStopNoFaceMinutes(input: unknown): number {
 	);
 }
 
+/** Coerce stored/IPC snooze duration minutes to 1…30. */
+export function sanitizeSnoozeMinutes(input: unknown): number {
+	if (input === null || input === undefined || input === "") {
+		return SNOOZE_MINUTES_DEFAULT;
+	}
+	const n = typeof input === "number" ? input : Number(input);
+	if (!Number.isFinite(n)) return SNOOZE_MINUTES_DEFAULT;
+	return Math.min(
+		SNOOZE_MINUTES_MAX,
+		Math.max(SNOOZE_MINUTES_MIN, Math.round(n)),
+	);
+}
+
 /** Coerce stored/IPC notification sound volume to 0…100. */
 export function sanitizeSoundVolume(input: unknown): number {
 	if (input === null || input === undefined || input === "") {
@@ -212,6 +229,8 @@ export interface PersistedPreferences {
 	popupMessage: string;
 	/** When true, blink popup ignores mouse (watermark); snooze via tray. */
 	blinkPopupClickThrough: boolean;
+	/** Minutes to suppress/re-show prompts after Snooze (1…30). */
+	snoozeMinutes: number;
 	keyboardShortcut: string;
 	mgdMode: boolean;
 	soundEnabled: boolean;
@@ -320,6 +339,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	},
 	popupMessage: defaultPopupMessage("en"),
 	blinkPopupClickThrough: true,
+	snoozeMinutes: SNOOZE_MINUTES_DEFAULT,
 	keyboardShortcut: "Ctrl+I",
 	mgdMode: false,
 	soundEnabled: false,
@@ -562,6 +582,7 @@ export function sanitizePersistedPreferences(
 			record.blinkPopupClickThrough,
 			defaults.blinkPopupClickThrough,
 		),
+		snoozeMinutes: sanitizeSnoozeMinutes(record.snoozeMinutes),
 		keyboardShortcut:
 			typeof record.keyboardShortcut === "string" &&
 			record.keyboardShortcut.trim()

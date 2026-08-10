@@ -2,13 +2,13 @@ import { IPC_CHANNELS } from "../../shared/ipc-channels";
 import type { AppPreferences } from "../../shared/preferences";
 import {
 	BLINK_CREDIT_DEBOUNCE_MS,
-	BLINK_SNOOZE_MS,
 	CAMERA_POLL_INTERVAL_MS,
 	NO_FACE_DEBOUNCE_MS,
 	REMINDER_POPUP_VISIBLE_MS,
 	autoStopNoFaceDelayMs,
 	type BlinkCreditSource,
 	nextTimerReminderDelay,
+	promptSnoozeMs,
 	shouldArmAutoStopOnNoFace,
 	shouldShowCameraReminder,
 } from "../domain/reminder-policy";
@@ -112,20 +112,22 @@ export class ReminderService {
 	}
 
 	/**
-	 * Suppress blink popups for {@link BLINK_SNOOZE_MS}. Does not forge blink credit.
-	 * Loops keep running; shows resume naturally after the snooze window.
+	 * Suppress blink popups for {@link promptSnoozeMs}(`snoozeMinutes`).
+	 * Does not forge blink credit. Loops keep running; shows resume naturally
+	 * after the snooze window.
 	 */
 	snooze(): void {
+		const ms = promptSnoozeMs(this.preferences.snoozeMinutes);
 		this.windows.closeReminder();
 		if (this.state.blinkSnoozeTimeout) {
 			clearTimeout(this.state.blinkSnoozeTimeout);
 		}
-		this.state.blinkSnoozeUntil = Date.now() + BLINK_SNOOZE_MS;
+		this.state.blinkSnoozeUntil = Date.now() + ms;
 		this.markReminderShown();
 		this.state.blinkSnoozeTimeout = setTimeout(() => {
 			this.state.blinkSnoozeUntil = 0;
 			this.state.blinkSnoozeTimeout = null;
-		}, BLINK_SNOOZE_MS);
+		}, ms);
 	}
 
 	onFaceDetection(faceDetected: boolean): void {

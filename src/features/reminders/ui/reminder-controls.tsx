@@ -1,4 +1,5 @@
-import { Activity, Clock, Play, Square } from "lucide-react";
+import { Activity, Clock, Moon, Play, Square } from "lucide-react";
+import type { Dispatch, SetStateAction } from "react";
 import { Button } from "@/components/button";
 import { RangeSlider } from "@/components/range-slider";
 import { SettingPanel } from "@/components/setting-panel";
@@ -9,6 +10,7 @@ import { pluralKey } from "../../../../shared/i18n";
 
 interface ReminderControlsProps {
 	preferences: SettingsPreferences;
+	setPreferences: Dispatch<SetStateAction<SettingsPreferences>>;
 	onIntervalChange: (seconds: number) => void;
 	onToggleTracking: () => void;
 }
@@ -20,6 +22,7 @@ function formatBlinksPerMinute(intervalSeconds: number): string {
 
 export function ReminderControls({
 	preferences,
+	setPreferences,
 	onIntervalChange,
 	onToggleTracking,
 }: ReminderControlsProps) {
@@ -34,6 +37,12 @@ export function ReminderControls({
 			: "reminders.desc.timer",
 		locale,
 		interval,
+	);
+	const snoozeMinutes = preferences.snoozeMinutes;
+	const snoozeDescKey = pluralKey(
+		"reminders.snoozeDesc",
+		locale,
+		snoozeMinutes,
 	);
 	return (
 		<>
@@ -90,6 +99,38 @@ export function ReminderControls({
 									)}
 								</Button>
 							</div>
+						</div>
+					</div>
+				</SettingRow>
+			</SettingPanel>
+
+			<SettingPanel>
+				<SettingRow
+					title={
+						<>
+							<Moon className="h-4 w-4 text-muted-foreground" aria-hidden />
+							<label htmlFor="snooze-minutes">{t("reminders.snooze")}</label>
+						</>
+					}
+					description={t(snoozeDescKey, { n: snoozeMinutes })}
+				>
+					<div className="flex items-center gap-2">
+						<RangeSlider
+							id="snooze-minutes"
+							aria-label={t("reminders.snoozeAria")}
+							min={1}
+							max={30}
+							value={snoozeMinutes}
+							onChange={(next) =>
+								setPreferences((current) => ({
+									...current,
+									snoozeMinutes: next,
+								}))
+							}
+							className="h-1.5 flex-1"
+						/>
+						<div className="min-w-[2.5rem] text-center text-xs font-medium text-primary">
+							{snoozeMinutes}m
 						</div>
 					</div>
 				</SettingRow>

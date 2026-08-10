@@ -13,6 +13,7 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updateCameraQuality: vi.fn(),
 		updateAutoStopNoFaceEnabled: vi.fn(),
 		updateAutoStopNoFaceMinutes: vi.fn(),
+		updateSnoozeMinutes: vi.fn(),
 		updateEarCalibration: vi.fn(),
 		updateEyeExercisesEnabled: vi.fn(),
 		updateExerciseInterval: vi.fn(),
@@ -101,6 +102,16 @@ describe("sameRendererPrefs", () => {
 		).toBe(false);
 	});
 
+	it("detects snoozeMinutes preference changes", () => {
+		const base = { ...DEFAULT_RENDERER_PREFERENCES };
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				snoozeMinutes: 10,
+			}),
+		).toBe(false);
+	});
+
 	it("detects sound volume preference changes", () => {
 		const base = { ...DEFAULT_RENDERER_PREFERENCES };
 		expect(
@@ -164,6 +175,17 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateAutoStopNoFaceMinutes).toHaveBeenCalledWith(10);
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 		expect(rendererIpc.updateCameraEnabled).not.toHaveBeenCalled();
+	});
+
+	it("pushes only snoozeMinutes when it changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = { ...previous, snoozeMinutes: 12 };
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateSnoozeMinutes).toHaveBeenCalledWith(12);
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+		expect(rendererIpc.updateAutoStopNoFaceMinutes).not.toHaveBeenCalled();
 	});
 
 	it("pushes only sound volume when it changes", () => {

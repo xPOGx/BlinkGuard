@@ -2,6 +2,7 @@ import { BrowserWindow, screen } from "electron";
 import path from "node:path";
 import type { DebugOverlayKind } from "../../../shared/debug-preview";
 import {
+	pluralKey,
 	resolveCatalog,
 	resolveExercisePrompts,
 	resolveLookAwayHint,
@@ -67,9 +68,19 @@ export class WindowManager {
 
 	private sendI18n(window: BrowserWindow): void {
 		const locale = this.preferences.locale === "uk" ? "uk" : "en";
+		const n = this.preferences.snoozeMinutes;
+		const snoozeKeys = [
+			"popup.blink.snooze",
+			"popup.exercise.snooze",
+			"popup.lookAway.snooze",
+		] as const;
+		const messages = { ...resolveCatalog(locale) };
+		for (const key of snoozeKeys) {
+			messages[key] = t(locale, pluralKey(key, locale, n), { n });
+		}
 		window.webContents.send(IPC_CHANNELS.applyI18n, {
 			locale,
-			messages: resolveCatalog(locale),
+			messages,
 		});
 	}
 

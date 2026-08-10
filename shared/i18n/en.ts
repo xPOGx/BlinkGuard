@@ -162,6 +162,14 @@ export const en: MessageCatalog = {
 	"reminders.desc.timer": "Show reminder every {n} second",
 	"reminders.desc.timer_few": "Show reminder every {n} seconds",
 	"reminders.desc.timer_plural": "Show reminder every {n} seconds",
+	"reminders.snooze": "Snooze duration",
+	"reminders.snoozeDesc":
+		"Hide blink, exercise, and look-away prompts for {n} minute after Snooze.",
+	"reminders.snoozeDesc_few":
+		"Hide blink, exercise, and look-away prompts for {n} minutes after Snooze.",
+	"reminders.snoozeDesc_plural":
+		"Hide blink, exercise, and look-away prompts for {n} minutes after Snooze.",
+	"reminders.snoozeAria": "Snooze duration in minutes",
 	"reminders.rateSummary": "~{rate} blinks/min",
 	"reminders.rateHint.camera":
 		"upper bound if you blink once whenever a reminder would fire (reminders only appear after you have not blinked for the interval).",
@@ -555,7 +563,9 @@ export const en: MessageCatalog = {
 
 	// Tray / window titles
 	"tray.show": "Show BlinkGuard",
-	"tray.snoozeBlink": "Snooze blink (5 min)",
+	"tray.snoozeBlink": "Snooze blink ({n} min)",
+	"tray.snoozeBlink_few": "Snooze blink ({n} min)",
+	"tray.snoozeBlink_plural": "Snooze blink ({n} min)",
 	"tray.checkForUpdates": "Check for updates",
 	"tray.quit": "Quit",
 	"window.cameraTitle": "Camera Visualization",
@@ -589,18 +599,24 @@ export const en: MessageCatalog = {
 
 	// Popup chrome
 	"popup.blink.title": "Blink Reminder",
-	"popup.blink.snooze": "Snooze (5 min)",
+	"popup.blink.snooze": "Snooze ({n} min)",
+	"popup.blink.snooze_few": "Snooze ({n} min)",
+	"popup.blink.snooze_plural": "Snooze ({n} min)",
 	"popup.starting.message": "Starting",
 	"popup.stopped.message": "Stopped",
 	"popup.stopped.title": "Stopped Reminder",
 	"popup.exercise.title": "Eye Exercise Time!",
 	"popup.exercise.skip": "Skip",
-	"popup.exercise.snooze": "Snooze (5 min)",
+	"popup.exercise.snooze": "Snooze ({n} min)",
+	"popup.exercise.snooze_few": "Snooze ({n} min)",
+	"popup.exercise.snooze_plural": "Snooze ({n} min)",
 	"popup.lookAway.title": "Look away",
 	"popup.lookAway.hint": "Focus on something ~20 feet / 6 m away",
 	"popup.lookAway.unit": "seconds",
 	"popup.lookAway.skip": "Skip",
-	"popup.lookAway.snooze": "Snooze (5 min)",
+	"popup.lookAway.snooze": "Snooze ({n} min)",
+	"popup.lookAway.snooze_few": "Snooze ({n} min)",
+	"popup.lookAway.snooze_plural": "Snooze ({n} min)",
 	"popup.noFace.message": "No face detected",
 	"popup.coach.message": "Blink a bit more — rate is low",
 	"popup.cheer.message": "Nice blinks — keep it up!",

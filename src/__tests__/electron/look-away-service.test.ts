@@ -179,8 +179,11 @@ describe("LookAwayService", () => {
 		expect(store.get("lastLookAwayTime", 0)).toBeGreaterThanOrEqual(beforeSkip);
 	});
 
-	it("snooze closes and re-shows after 5 minutes", () => {
-		const preferences = createPreferences({ lookAwayInterval: 20 });
+	it("snooze closes and re-shows after snoozeMinutes", () => {
+		const preferences = createPreferences({
+			lookAwayInterval: 20,
+			snoozeMinutes: 10,
+		});
 		const state = new AppRuntimeState();
 		const store = createStore();
 		store.set("lastLookAwayTime", Date.now() - 21 * 60 * 1000);
@@ -201,7 +204,10 @@ describe("LookAwayService", () => {
 		expect(windows.closeLookAway).toHaveBeenCalled();
 		expect(state.isLookAwayShowing).toBe(false);
 
-		vi.advanceTimersByTime(5 * 60 * 1000);
+		vi.advanceTimersByTime(10 * 60 * 1000 - 1);
+		expect(windows.showLookAway).toHaveBeenCalledTimes(1);
+
+		vi.advanceTimersByTime(1);
 		expect(windows.showLookAway).toHaveBeenCalledTimes(2);
 	});
 

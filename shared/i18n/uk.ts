@@ -165,6 +165,14 @@ export const uk: MessageCatalog = {
 		"Показувати нагадування кожні {n} секунди",
 	"reminders.desc.timer_plural":
 		"Показувати нагадування кожні {n} секунд",
+	"reminders.snooze": "Тривалість відкладення",
+	"reminders.snoozeDesc":
+		"Ховати нагадування про моргання, вправи та погляд вдалину на {n} хвилину після «Відкласти».",
+	"reminders.snoozeDesc_few":
+		"Ховати нагадування про моргання, вправи та погляд вдалину на {n} хвилини після «Відкласти».",
+	"reminders.snoozeDesc_plural":
+		"Ховати нагадування про моргання, вправи та погляд вдалину на {n} хвилин після «Відкласти».",
+	"reminders.snoozeAria": "Тривалість відкладення в хвилинах",
 	"reminders.rateSummary": "~{rate} морг./хв",
 	"reminders.rateHint.camera":
 		"верхня межа, якщо моргати щоразу, коли спрацювало б нагадування (воно з’являється лише після паузи без моргання).",
@@ -563,7 +571,9 @@ export const uk: MessageCatalog = {
 
 	// Tray / window titles
 	"tray.show": "Показати BlinkGuard",
-	"tray.snoozeBlink": "Відкласти моргання (5 хв)",
+	"tray.snoozeBlink": "Відкласти моргання ({n} хв)",
+	"tray.snoozeBlink_few": "Відкласти моргання ({n} хв)",
+	"tray.snoozeBlink_plural": "Відкласти моргання ({n} хв)",
 	"tray.checkForUpdates": "Перевірити оновлення",
 	"tray.quit": "Вийти",
 	"window.cameraTitle": "Візуалізація камери",
@@ -597,18 +607,24 @@ export const uk: MessageCatalog = {
 
 	// Popup chrome
 	"popup.blink.title": "Нагадування проморгати",
-	"popup.blink.snooze": "Відкласти (5 хв)",
+	"popup.blink.snooze": "Відкласти ({n} хв)",
+	"popup.blink.snooze_few": "Відкласти ({n} хв)",
+	"popup.blink.snooze_plural": "Відкласти ({n} хв)",
 	"popup.starting.message": "Запуск…",
 	"popup.stopped.message": "Зупинено",
 	"popup.stopped.title": "Нагадування зупинено",
 	"popup.exercise.title": "Час вправи для очей!",
 	"popup.exercise.skip": "Пропустити",
-	"popup.exercise.snooze": "Відкласти (5 хв)",
+	"popup.exercise.snooze": "Відкласти ({n} хв)",
+	"popup.exercise.snooze_few": "Відкласти ({n} хв)",
+	"popup.exercise.snooze_plural": "Відкласти ({n} хв)",
 	"popup.lookAway.title": "Подивіться вдалину",
 	"popup.lookAway.hint": "Сфокусуйтесь на чомусь ~6 м / 20 футів далі",
 	"popup.lookAway.unit": "секунд",
 	"popup.lookAway.skip": "Пропустити",
-	"popup.lookAway.snooze": "Відкласти (5 хв)",
+	"popup.lookAway.snooze": "Відкласти ({n} хв)",
+	"popup.lookAway.snooze_few": "Відкласти ({n} хв)",
+	"popup.lookAway.snooze_plural": "Відкласти ({n} хв)",
 	"popup.noFace.message": "Обличчя не виявлено",
 	"popup.coach.message": "Моргайте трохи частіше — частота низька",
 	"popup.cheer.message": "Класні моргання — так тримати!",

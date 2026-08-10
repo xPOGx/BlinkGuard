@@ -1,6 +1,6 @@
 import { Menu, Tray, nativeImage, type MenuItemConstructorOptions } from "electron";
 import path from "node:path";
-import { t, type Locale } from "../../../shared/i18n";
+import { pluralKey, t, type Locale } from "../../../shared/i18n";
 import type { InteractionLogger } from "../logging/interaction-logger";
 import type { AppPaths } from "../paths/app-paths";
 import type { WindowManager } from "../windows/window-manager";
@@ -13,6 +13,7 @@ export class TrayController {
 		private readonly windows: WindowManager,
 		private readonly onQuit: () => void,
 		private readonly getLocale: () => Locale = () => "en",
+		private readonly getSnoozeMinutes: () => number = () => 5,
 		private readonly onCheckForUpdates: (() => void) | null = null,
 		private readonly interactions: InteractionLogger | null = null,
 		private readonly onSnoozeBlink: (() => void) | null = null,
@@ -49,8 +50,9 @@ export class TrayController {
 			},
 		];
 		if (this.onSnoozeBlink) {
+			const n = this.getSnoozeMinutes();
 			items.push({
-				label: t(locale, "tray.snoozeBlink"),
+				label: t(locale, pluralKey("tray.snoozeBlink", locale, n), { n }),
 				click: () => {
 					this.interactions?.append({
 						source: "tray",

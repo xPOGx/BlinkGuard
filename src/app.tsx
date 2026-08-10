@@ -314,6 +314,7 @@ function SettingsShell({
 									<>
 										<ReminderControls
 											preferences={preferences}
+											setPreferences={setPreferences}
 											onIntervalChange={changeReminderInterval}
 											onToggleTracking={toggleTracking}
 										/>

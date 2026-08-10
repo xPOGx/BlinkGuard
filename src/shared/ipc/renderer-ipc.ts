@@ -73,6 +73,8 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateAutoStopNoFaceEnabled, enabled),
 	updateAutoStopNoFaceMinutes: (minutes: number) =>
 		send(IPC_CHANNELS.updateAutoStopNoFaceMinutes, minutes),
+	updateSnoozeMinutes: (minutes: number) =>
+		send(IPC_CHANNELS.updateSnoozeMinutes, minutes),
 	updateEarCalibration: (baseline: number | null) =>
 		send(IPC_CHANNELS.updateEarCalibration, baseline),
 	startEarCalibration: () => send(IPC_CHANNELS.startEarCalibration),

@@ -6,6 +6,7 @@ import {
 	sanitizeLookAwayHint,
 	sanitizeLookAwayTitle,
 	sanitizePersistedPreferences,
+	sanitizeSnoozeMinutes,
 	sanitizeSoundVolume,
 	type AppPreferences,
 	type PersistedPreferences,
@@ -114,6 +115,8 @@ export class PreferencesService {
 			next = sanitizeAutoStopNoFaceMinutes(
 				value,
 			) as PersistedPreferences[K];
+		} else if (key === "snoozeMinutes") {
+			next = sanitizeSnoozeMinutes(value) as PersistedPreferences[K];
 		} else if (key === "soundVolume") {
 			next = sanitizeSoundVolume(value) as PersistedPreferences[K];
 		}

@@ -240,6 +240,12 @@ describe("PreferencesService", () => {
 		expect(service.current.autoStopNoFaceMinutes).toBe(30);
 		expect(store.setCounts.get("autoStopNoFaceMinutes")).toBe(1);
 
+		service.set("snoozeMinutes", 5);
+		expect(store.setCounts.get("snoozeMinutes") ?? 0).toBe(0);
+		service.set("snoozeMinutes", 99);
+		expect(service.current.snoozeMinutes).toBe(30);
+		expect(store.setCounts.get("snoozeMinutes")).toBe(1);
+
 		service.set("soundVolume", 100);
 		expect(store.setCounts.get("soundVolume") ?? 0).toBe(0);
 		service.set("soundVolume", 50);
@@ -259,6 +265,21 @@ describe("PreferencesService", () => {
 
 		expect(service.current.autoStopNoFaceMinutes).toBe(1);
 		expect(service.current.autoStopNoFaceEnabled).toBe(true);
+	});
+
+	it("defaults missing snoozeMinutes to 5 on hydrate", () => {
+		const store = new FakePreferenceStore();
+		const service = new PreferencesService(store);
+		expect(service.current.snoozeMinutes).toBe(5);
+	});
+
+	it("sanitizes invalid snoozeMinutes on hydrate", () => {
+		const store = new FakePreferenceStore();
+		store.set("snoozeMinutes", 0);
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.snoozeMinutes).toBe(1);
 	});
 
 	it("sanitizes invalid soundVolume on hydrate", () => {
@@ -361,11 +382,13 @@ describe("PreferencesService", () => {
 		service.replaceFromBackup({
 			...DEFAULT_PREFERENCES,
 			autoStopNoFaceMinutes: 99,
+			snoozeMinutes: 99,
 			soundVolume: -5,
 			cameraQuality: "turbo" as never,
 		});
 
 		expect(service.current.autoStopNoFaceMinutes).toBe(30);
+		expect(service.current.snoozeMinutes).toBe(30);
 		expect(service.current.soundVolume).toBe(0);
 		expect(service.current.cameraQuality).toBe(
 			DEFAULT_PREFERENCES.cameraQuality,

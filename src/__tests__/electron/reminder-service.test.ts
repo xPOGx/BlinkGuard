@@ -376,11 +376,12 @@ describe("ReminderService credit semantics", () => {
 		expect(state.lastReminderShownAt).toBeGreaterThan(blinkBefore);
 	});
 
-	it("snooze suppresses blink popups for 5 minutes then resumes", () => {
+	it("snooze suppresses blink popups for snoozeMinutes then resumes", () => {
 		const preferences = createPreferences({
 			isTracking: false,
 			cameraEnabled: false,
 			reminderInterval: 3000,
+			snoozeMinutes: 5,
 		});
 		const state = new AppRuntimeState();
 		const windows = createWindows();
@@ -408,6 +409,35 @@ describe("ReminderService credit semantics", () => {
 		vi.advanceTimersByTime(1 + nextTimerReminderDelay(3000));
 		expect(windows.showReminder).toHaveBeenCalledWith("blink");
 		expect(state.blinkSnoozeUntil).toBe(0);
+	});
+
+	it("snooze duration follows snoozeMinutes preference", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: false,
+			reminderInterval: 3000,
+			snoozeMinutes: 1,
+		});
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar({ isRunning: false, isCameraReady: false }),
+			createSound(),
+			createStore(),
+		);
+
+		service.start(3000);
+		service.snooze();
+		windows.showReminder.mockClear();
+
+		vi.advanceTimersByTime(60_000 - 1);
+		expect(windows.showReminder).not.toHaveBeenCalled();
+
+		vi.advanceTimersByTime(1 + nextTimerReminderDelay(3000));
+		expect(windows.showReminder).toHaveBeenCalledWith("blink");
 	});
 
 	it("snooze does not forge blink credit; onBlink still works", () => {

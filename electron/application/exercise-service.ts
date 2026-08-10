@@ -5,7 +5,7 @@ import {
 } from "../../shared/preferences";
 import {
 	EXERCISE_POPUP_VISIBLE_MS,
-	PROMPT_SNOOZE_MS,
+	promptSnoozeMs,
 } from "../domain/reminder-policy";
 import type { AppRuntimeState } from "./app-runtime-state";
 import type { PreferenceStore } from "./ports/preference-store";
@@ -62,7 +62,7 @@ export class ExerciseService {
 		}
 		this.state.exerciseSnoozeTimeout = setTimeout(
 			() => this.show(),
-			PROMPT_SNOOZE_MS,
+			promptSnoozeMs(this.preferences.snoozeMinutes),
 		);
 	}
 

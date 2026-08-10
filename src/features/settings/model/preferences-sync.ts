@@ -42,6 +42,7 @@ export function sameRendererPrefs(
 		a.cameraQuality === b.cameraQuality &&
 		a.autoStopNoFaceEnabled === b.autoStopNoFaceEnabled &&
 		a.autoStopNoFaceMinutes === b.autoStopNoFaceMinutes &&
+		a.snoozeMinutes === b.snoozeMinutes &&
 		a.blinkRateCoachingEnabled === b.blinkRateCoachingEnabled &&
 		a.blinkRateThresholdPerMin === b.blinkRateThresholdPerMin &&
 		a.earCalibration === b.earCalibration &&
@@ -104,6 +105,9 @@ export function pushPreferenceDiff(
 		previous.autoStopNoFaceMinutes !== next.autoStopNoFaceMinutes
 	) {
 		rendererIpc.updateAutoStopNoFaceMinutes(next.autoStopNoFaceMinutes);
+	}
+	if (!previous || previous.snoozeMinutes !== next.snoozeMinutes) {
+		rendererIpc.updateSnoozeMinutes(next.snoozeMinutes);
 	}
 	if (!previous || previous.earCalibration !== next.earCalibration) {
 		rendererIpc.updateEarCalibration(next.earCalibration);

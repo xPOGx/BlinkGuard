@@ -6,6 +6,7 @@ import {
 	REMINDER_POPUP_VISIBLE_MS,
 	autoStopNoFaceDelayMs,
 	nextTimerReminderDelay,
+	promptSnoozeMs,
 	shouldArmAutoStopOnNoFace,
 	shouldShowCameraReminder,
 } from "../../../electron/domain/reminder-policy";
@@ -22,6 +23,12 @@ describe("reminder-policy", () => {
 	it("converts auto-stop minutes to milliseconds", () => {
 		expect(autoStopNoFaceDelayMs(2)).toBe(120_000);
 		expect(autoStopNoFaceDelayMs(1)).toBe(60_000);
+	});
+
+	it("converts snooze minutes to milliseconds", () => {
+		expect(promptSnoozeMs(5)).toBe(5 * 60 * 1000);
+		expect(promptSnoozeMs(1)).toBe(60_000);
+		expect(promptSnoozeMs(10)).toBe(10 * 60 * 1000);
 	});
 
 	it("arms auto-stop only while tracking with camera and feature on", () => {
