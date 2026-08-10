@@ -3,6 +3,8 @@ from collections import deque
 from blink_detector_package.domain.pose import evaluate_pose_gate
 
 BLINK_COOLDOWN = 0.55
+# Look-down echo burst after a real blink (POG 2026-08-10: +2–3 @ ~1.2s).
+LOOK_DOWN_COOLDOWN = 0.90
 BLINK_DISPLAY_DURATION = 0.2
 BLINK_MIN_EAR_DROP = 0.19
 BLINK_MIN_ABSOLUTE_EAR_DROP = 0.03
@@ -24,6 +26,18 @@ MIN_CLOSED_FRAMES = 1
 # Opening (reopen) velocity for V-shape; waived if closed_frames is deep enough.
 # Gaming/center: soft reopen still real (POG reject_opening).
 MIN_OPENING_VELOCITY = 0.06
+# Look-down multi-frame reopen floor (closed≥2 can also use strong-peak waive).
+LOOK_DOWN_MIN_OPENING_VELOCITY = 0.15
+# One-frame LD: depth + (reopen or strong peak).
+# Post-0.16/1.3: still 221 reject_opening (POG 2026-08-10) — real blinks at
+# peak≈0.8–1.2, drop≈0.14–0.15, openV often 0 / abs≈0.042–0.044.
+LOOK_DOWN_ONE_FRAME_MIN_OPENING = 0.30
+LOOK_DOWN_ONE_FRAME_MIN_DROP = 0.14
+LOOK_DOWN_ONE_FRAME_MIN_ABS = 0.040
+LOOK_DOWN_ONE_FRAME_STRONG_PEAK = 1.05
+# Wall-clock floor when LD peak clears short gate — gate_fps often < camera
+# preset, so frame_dt*0.95 still rejected real 33–35ms blinks (reject_duration).
+LOOK_DOWN_ONE_FRAME_DURATION_MIN = 0.028
 DEFAULT_TARGET_FPS = 15
 # Frames of closing |dEAR/dt| kept before blink start — smooth lag means the
 # real close spike is often 1–2 frames before FSM enters the close band.
@@ -34,7 +48,7 @@ BLINK_MIN_CLOSING_VELOCITY = 0.35
 # Short candidates: FPS-aware frontal via short_frontal_velocity(); look-down
 # uses SHORT_BLINK_MIN_VELOCITY.
 SHORT_BLINK_DURATION = 0.09
-# Look-down talk bounces often land just above SHORT_BLINK_DURATION (~0.09–0.11).
+# Kept for analyzers / docs; LD opening gate now applies at any duration.
 LOOK_DOWN_SHORTISH_DURATION = 0.12
 SHORT_BLINK_MIN_VELOCITY = 0.50
 
@@ -94,15 +108,14 @@ FACE_ABSENT_RESEED_LIVE_S = 1.5
 # Opening waive when effective close peak is strong but reopen velocity missed.
 # Applies frontal *and* look-down / ear_depressed (POG 2026-08-09 reject_opening).
 FRONTAL_OPENING_PEAK_WAIVE = 0.95
-# Look-down short + peak waive still needs depth or multi-frame (POG openV=0 FP).
-LOOK_DOWN_SHORT_WAIVE_ABS = 0.10
-# Look-down short without reopen: need deeper trough than talk jitter (~drop 0.25).
+# Look-down without reopen: need deeper trough than talk jitter (~drop 0.25).
 LOOK_DOWN_SHORT_OPEN_DROP = 0.35
 LOOK_DOWN_SHORT_OPEN_CLOSED = 3
-# Dark/Ultra shortish LD: strong measured close can waive reopen
-# (POG 2026-08-09 post-0.74: reject_opening peak p50≈1.17, bin 1.2–1.5).
-LOOK_DOWN_SHORT_STRONG_PEAK = 1.2
-LOOK_DOWN_SHORT_STRONG_DROP = 0.16
+# Dark/Ultra LD: strong measured close can waive reopen (closed≥2).
+# 1.15 still FN on real closed=2 peak≈0.85–1.1 (POG 2026-08-10 RO mf_peak).
+LOOK_DOWN_SHORT_STRONG_PEAK = 1.00
+LOOK_DOWN_SHORT_STRONG_DROP = 0.14
+LOOK_DOWN_SHORT_STRONG_CLOSED = 2
 # Synthetic peak must beat measured by this to count as "invented" (needs V-shape).
 SYNTHETIC_PEAK_EPS = 0.20
 # Short shallow dips without a strong measured close → reject (POG FP).
@@ -119,6 +132,10 @@ MOTION_REJECT_DELTA = 0.22
 # Strong measured blinks: waive motion (nod often coincides with real blink).
 MOTION_WAIVE_PEAK = 1.2
 MOTION_WAIVE_DROP = 0.35
+# Per-frame pose step EMA — one-frame candidates never accumulate pose_delta
+# (POG 2026-08-10: all completes had pose_delta=0; head moves still credited).
+MOTION_RECENT_ALPHA = 0.40
+# Seeded into candidate at start; same waive as MOTION_REJECT_DELTA.
 
 
 def get_adaptive_ear_drop_threshold(baseline_ear):
@@ -153,18 +170,18 @@ def short_look_down_velocity(fps):
 	"""
 	Short-blink closing velocity for look-down.
 
-	Raised vs 0.45 after talk-jaw FP (POG 2026-08-09: short look_down
-	credits with openV≈0, drop≈0.25, peak often still ≥0.9).
+	0.75 at ≥18 FPS rejected real Ultra blinks (POG 2026-08-10:
+	reject_velocity peak p50≈0.59). Keep above talk jitter (~0.45).
 	"""
 	try:
 		rate = float(fps)
 	except (TypeError, ValueError):
 		rate = DEFAULT_TARGET_FPS
 	if rate >= 18:
-		return 0.75
+		return 0.55
 	if rate >= 12:
-		return 0.70
-	return 0.65
+		return 0.55
+	return 0.50
 
 
 # Strong drop can cover a short-velocity miss (smooth lag under-reports peak).
@@ -283,6 +300,9 @@ class BlinkDetectionState:
 		self._candidate_yaw = None
 		self._candidate_pitch = None
 		self._candidate_pose_delta = 0.0
+		self._prev_gate_yaw = None
+		self._prev_gate_pitch = None
+		self._recent_pose_motion = 0.0
 
 	def set_target_fps(self, fps):
 		"""Update expected camera FPS for duration / short-velocity gates."""
@@ -352,6 +372,24 @@ class BlinkDetectionState:
 		):
 			self._live_open_stable_since = None
 			self._prev_ear_for_live = ear
+			return
+
+		# Sticky presence gates + noisy mid-band EAR (top webcam, eyes on
+		# screen bottom): LIVE_OPEN_FALL stable-hold never arms, live stays
+		# frontal-high, ear/live≈0.55–0.68 → skip_eyes_closed / skip_await
+		# for tens of seconds (POG 2026-08-10). Ease ref without stability.
+		if (
+			(self.eyes_closed or self.awaiting_reopen)
+			and ear < self.live_open_ear * 0.92
+		):
+			if ear < self.live_open_ear:
+				alpha = LIVE_OPEN_FALL_ALPHA
+				self.live_open_ear = (
+					(1 - alpha) * self.live_open_ear + alpha * ear
+				)
+			self._live_open_stable_since = None
+			self._prev_ear_for_live = ear
+			self._refresh_ear_depressed()
 			return
 
 		if ear >= self.live_open_ear * 0.92:
@@ -675,6 +713,31 @@ class BlinkDetectionState:
 			(1 - alpha) * self.resting_pitch + alpha * pitch
 		)
 
+	def _update_recent_pose_motion(self, gate, pose=None):
+		"""EMA of per-frame |Δyaw|+|Δpitch| for one-frame motion rejects."""
+		# Invalid / missing pose must not invent a jump from yaw=0 → real pose
+		# (unit tests seed without pose; field face-loss flickers do the same).
+		if not pose or not pose.get("valid", False):
+			self._prev_gate_yaw = None
+			self._prev_gate_pitch = None
+			self._recent_pose_motion *= 1.0 - MOTION_RECENT_ALPHA
+			return
+		yaw = float(gate.get("yaw") or 0.0)
+		pitch = float(gate.get("pitch") or 0.0)
+		if self._prev_gate_yaw is not None and self._prev_gate_pitch is not None:
+			step = abs(yaw - self._prev_gate_yaw) + abs(
+				pitch - self._prev_gate_pitch
+			)
+			alpha = MOTION_RECENT_ALPHA
+			self._recent_pose_motion = (
+				(1 - alpha) * self._recent_pose_motion + alpha * step
+			)
+		self._prev_gate_yaw = yaw
+		self._prev_gate_pitch = pitch
+
+	def _cooldown_s(self, treat_as_look_down):
+		return LOOK_DOWN_COOLDOWN if treat_as_look_down else BLINK_COOLDOWN
+
 	def _update_eyes_closed_state(
 		self, current_ear, current_time, look_down=False
 	):
@@ -801,6 +864,7 @@ class BlinkDetectionState:
 			self.pose_strictness,
 			resting_pitch=self.resting_pitch,
 		)
+		self._update_recent_pose_motion(gate, pose=pose)
 
 		ear_fields = {
 			"ear": ear_smooth,
@@ -953,7 +1017,8 @@ class BlinkDetectionState:
 		# reject_cooldown storms from same-blink bounce (POG 2026-08-08: ~42%).
 		cooldown_remaining = max(
 			0.0,
-			BLINK_COOLDOWN - (current_time - self.last_blink_time),
+			self._cooldown_s(treat_as_look_down)
+			- (current_time - self.last_blink_time),
 		)
 		# Start: smoothed OR raw EAR enters close band (raw catches 1-frame lag).
 		# Recovery/credit still use smooth.
@@ -1015,9 +1080,12 @@ class BlinkDetectionState:
 			self.max_right_drop = right_drop
 			self._candidate_yaw = float(gate.get("yaw") or 0.0)
 			self._candidate_pitch = float(gate.get("pitch") or 0.0)
-			self._candidate_pose_delta = 0.0
+			# One-frame blinks never accumulate in-candidate Δpose — seed with
+			# recent head motion so nods still hit reject_motion.
+			self._candidate_pose_delta = float(self._recent_pose_motion)
 			info_pose["closed_frames"] = self.closed_frames
 			info_pose["peak_opening_velocity"] = self.peak_opening_velocity
+			info_pose["pose_delta"] = self._candidate_pose_delta
 			return False, {
 				"baseline": ref,
 				"drop": ear_drop_percentage,
@@ -1139,39 +1207,49 @@ class BlinkDetectionState:
 					self.peak_opening_velocity >= MIN_OPENING_VELOCITY
 					or self.closed_frames >= max(2, MIN_CLOSED_FRAMES + 1)
 				)
-				# Look-down shortish talk-jaw: closed_frames=2 + openV=0 + drop≈0.25
-				# was enough to credit (POG 2026-08-09). Require reopen or a
-				# deeper multi-frame trough. Window extends past SHORT_BLINK
-				# (0.09–0.11s talk bounces still FP).
-				look_down_shortish = (
-					treat_as_look_down
-					and blink_duration < LOOK_DOWN_SHORTISH_DURATION
-				)
-				if look_down_shortish:
-					opening_ok = (
-						self.peak_opening_velocity >= MIN_OPENING_VELOCITY
-						or (
-							self.closed_frames >= LOOK_DOWN_SHORT_OPEN_CLOSED
-							and self.max_drop_percentage
-							>= LOOK_DOWN_SHORT_OPEN_DROP
+				# Look-down / ear-depressed: closed≥2 + tiny openV credited
+				# talk/chat EAR noise (POG 2026-08-10). Require real reopen,
+				# deep multi-frame trough, or strong peak with closed≥2 —
+				# at any duration (not only shortish).
+				if treat_as_look_down:
+					if self.closed_frames < 2:
+						# One-frame: reopen+depth, or strong close+depth
+						# (openV often 0 on real high-FPS blinks).
+						depth_ok = (
+							self.max_drop_percentage
+							>= LOOK_DOWN_ONE_FRAME_MIN_DROP
+							and absolute_drop >= LOOK_DOWN_ONE_FRAME_MIN_ABS
 						)
-						or (
-							measured_peak >= LOOK_DOWN_SHORT_STRONG_PEAK
-							and self.max_drop_percentage
-							>= LOOK_DOWN_SHORT_STRONG_DROP
+						opening_ok = depth_ok and (
+							self.peak_opening_velocity
+							>= LOOK_DOWN_ONE_FRAME_MIN_OPENING
+							or measured_peak
+							>= LOOK_DOWN_ONE_FRAME_STRONG_PEAK
 						)
-					)
+					else:
+						opening_ok = (
+							self.peak_opening_velocity
+							>= LOOK_DOWN_MIN_OPENING_VELOCITY
+							or (
+								self.closed_frames
+								>= LOOK_DOWN_SHORT_OPEN_CLOSED
+								and self.max_drop_percentage
+								>= LOOK_DOWN_SHORT_OPEN_DROP
+							)
+							or (
+								measured_peak >= LOOK_DOWN_SHORT_STRONG_PEAK
+								and self.max_drop_percentage
+								>= LOOK_DOWN_SHORT_STRONG_DROP
+								and self.closed_frames
+								>= LOOK_DOWN_SHORT_STRONG_CLOSED
+							)
+						)
 				if (
 					not opening_ok
 					and measured_peak >= FRONTAL_OPENING_PEAK_WAIVE
+					and not treat_as_look_down
 				):
-					if look_down_shortish:
-						opening_ok = (
-							absolute_drop >= LOOK_DOWN_SHORT_WAIVE_ABS
-							and self.closed_frames
-							>= max(2, MIN_CLOSED_FRAMES + 1)
-						)
-					elif blink_duration < SHORT_BLINK_DURATION:
+					if blink_duration < SHORT_BLINK_DURATION:
 						# Frontal short peak-waive still needs depth (open0 FP).
 						opening_ok = (
 							absolute_drop >= FRONTAL_SHORT_WAIVE_ABS
@@ -1203,8 +1281,8 @@ class BlinkDetectionState:
 					)
 
 				closed_ok = self.closed_frames >= MIN_CLOSED_FRAMES
-				# Look-down: allow ~one-frame duration when measured peak is
-				# clearly above talk jitter (raised short_look_down_velocity).
+				# Look-down: allow sub-gate-fps one-frame blinks when peak is
+				# clearly above talk jitter (POG reject_duration @ 33–35ms).
 				effective_duration_min = duration_min
 				if (
 					treat_as_look_down
@@ -1212,7 +1290,9 @@ class BlinkDetectionState:
 					>= short_look_down_velocity(self.target_fps)
 				):
 					effective_duration_min = min(
-						duration_min, frame_dt * 0.95
+						duration_min,
+						frame_dt * 0.95,
+						LOOK_DOWN_ONE_FRAME_DURATION_MIN,
 					)
 				# Min + closed only. BLINK_DURATION_MAX forces eval / latch
 				# eyes_closed — do NOT put the upper bound in duration_ok
@@ -1255,7 +1335,8 @@ class BlinkDetectionState:
 				)
 				cooldown_remaining = max(
 					0.0,
-					BLINK_COOLDOWN - (current_time - self.last_blink_time),
+					self._cooldown_s(treat_as_look_down)
+					- (current_time - self.last_blink_time),
 				)
 				peak_vel = effective_peak
 				peak_open = self.peak_opening_velocity
@@ -1358,6 +1439,9 @@ class BlinkDetectionState:
 		self._candidate_yaw = None
 		self._candidate_pitch = None
 		self._candidate_pose_delta = 0.0
+		self._prev_gate_yaw = None
+		self._prev_gate_pitch = None
+		self._recent_pose_motion = 0.0
 		self.blink_in_progress = False
 		self.blink_start_time = 0.0
 		self.last_blink_time = 0.0

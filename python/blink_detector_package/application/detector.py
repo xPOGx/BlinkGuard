@@ -683,7 +683,9 @@ class BlinkDetectorApplication:
 				else face_area
 			),
 			"interocular": _opt_float("interocular"),
+			# Camera preset vs measured gate FPS (gates use detection.target_fps).
 			"target_fps": int(self.camera.target_fps),
+			"gate_fps": round(float(self.detection.target_fps), 2),
 			"face_detect_interval": int(self.face_detect_interval),
 			"processing_resolution": list(self.camera.processing_resolution),
 			"detector_backend": "dlib",
@@ -869,9 +871,12 @@ class BlinkDetectorApplication:
 				and ear_s <= float(close_band) * 1.02
 				and ear_s > float(close_band)
 			)
-			near_vel = vel >= min_vel * 0.75
+			# Velocity-only near_miss spammed look-down chat (~90/min) with
+			# drop≈0 (POG 2026-08-10). Require some EAR drop for the vel path.
+			drop_pct = float(blink_info.get("drop") or 0.0)
+			near_vel = vel >= min_vel * 0.90 and drop_pct >= 0.08
 			if (near_band or near_vel) and (
-				current_time - self._last_near_miss_debug_time >= 0.5
+				current_time - self._last_near_miss_debug_time >= 2.0
 			):
 				self._last_near_miss_debug_time = current_time
 				debug_payload = self._emit_blink_outcome(
