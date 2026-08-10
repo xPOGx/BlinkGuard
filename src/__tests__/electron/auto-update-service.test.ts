@@ -37,10 +37,29 @@ vi.mock("../../../electron/infrastructure/updates/update-feed", () => ({
 	hasUpdateFeed: () => true,
 }));
 
+vi.mock("../../../electron/infrastructure/process/process-cleanup", () => ({
+	killOrphanedSidecarProcesses: vi.fn(() => Promise.resolve()),
+}));
+
 import {
 	AutoUpdateService,
 	UPDATE_CHECK_MS,
+	isNewerVersion,
 } from "../../../electron/infrastructure/updates/auto-update-service";
+
+async function flushMicrotasks(): Promise<void> {
+	await Promise.resolve();
+	await Promise.resolve();
+}
+
+describe("isNewerVersion", () => {
+	it("compares major.minor.patch", () => {
+		expect(isNewerVersion("2.5.1", "2.5.0")).toBe(true);
+		expect(isNewerVersion("2.5.0", "2.5.1")).toBe(false);
+		expect(isNewerVersion("2.5.0", "2.5.0")).toBe(false);
+		expect(isNewerVersion("v3.0.0", "2.9.9")).toBe(true);
+	});
+});
 
 describe("AutoUpdateService", () => {
 	let emitted: AutoUpdateStatus[];
@@ -163,41 +182,136 @@ describe("AutoUpdateService", () => {
 		expect(ensureVisibleCalls).toBe(0);
 	});
 
-	it("installUpdate calls quitAndInstall after download", () => {
+	it("installUpdate re-checks then quitAndInstall when staged is still latest", async () => {
 		const svc = createService();
 		svc.start();
 		svc.checkForUpdates({ interactive: true });
 		autoUpdater.emit("update-downloaded", { version: "3.0.0" });
+		quitAndInstall.mockClear();
+		checkForUpdatesMock.mockClear();
 		svc.installUpdate();
+		expect(checkForUpdatesMock).toHaveBeenCalledTimes(1);
+		expect(quitAndInstall).not.toHaveBeenCalled();
+		autoUpdater.emit("update-available", { version: "3.0.0" });
+		await flushMicrotasks();
 		expect(quitAndInstall).toHaveBeenCalledWith(false, true);
 	});
 
-	it("re-presents ready dialog when already downloaded interactively", () => {
+	it("installUpdate does not quitAndInstall when a newer latest appears", async () => {
 		const svc = createService();
 		svc.start();
 		svc.checkForUpdates({ interactive: true });
-		autoUpdater.emit("update-downloaded", { version: "3.0.0" });
-		emitted.length = 0;
-		ensureVisibleCalls = 0;
-		svc.checkForUpdates({ interactive: true });
-		expect(emitted).toEqual([
-			{ state: "ready", version: "3.0.0", surface: "dialog" },
-		]);
-		expect(ensureVisibleCalls).toBe(1);
+		autoUpdater.emit("update-downloaded", { version: "2.5.0" });
+		quitAndInstall.mockClear();
+		svc.installUpdate();
+		autoUpdater.emit("update-available", { version: "2.5.1" });
+		await flushMicrotasks();
+		expect(quitAndInstall).not.toHaveBeenCalled();
+		autoUpdater.emit("update-downloaded", { version: "2.5.1" });
+		await flushMicrotasks();
+		expect(quitAndInstall).toHaveBeenCalledWith(false, true);
 	});
 
-	it("re-presents ready toast when already downloaded on silent check", () => {
+	it("re-checks GitHub when staged and re-presents ready if still latest", () => {
+		const svc = createService();
+		svc.start();
+		svc.checkForUpdates({ interactive: true });
+		autoUpdater.emit("update-downloaded", { version: "3.0.0" });
+		emitted.length = 0;
+		ensureVisibleCalls = 0;
+		checkForUpdatesMock.mockClear();
+		svc.checkForUpdates({ interactive: true });
+		expect(checkForUpdatesMock).toHaveBeenCalledTimes(1);
+		expect(emitted).toEqual([{ state: "checking", surface: "dialog" }]);
+		autoUpdater.emit("update-available", { version: "3.0.0" });
+		expect(emitted.at(-1)).toEqual({
+			state: "ready",
+			version: "3.0.0",
+			surface: "dialog",
+		});
+		expect(ensureVisibleCalls).toBeGreaterThan(0);
+	});
+
+	it("silent check re-queries GitHub when staged and presents ready if unchanged", () => {
 		const svc = createService();
 		svc.start();
 		svc.checkForUpdates();
 		autoUpdater.emit("update-downloaded", { version: "3.0.0" });
 		emitted.length = 0;
 		ensureVisibleCalls = 0;
+		checkForUpdatesMock.mockClear();
 		svc.checkForUpdates();
+		expect(checkForUpdatesMock).toHaveBeenCalledTimes(1);
+		autoUpdater.emit("update-available", { version: "3.0.0" });
 		expect(emitted).toEqual([
 			{ state: "ready", version: "3.0.0", surface: "toast" },
 		]);
 		expect(ensureVisibleCalls).toBe(0);
+	});
+
+	it("replaces stale staged package when a newer latest is available", () => {
+		const svc = createService();
+		svc.start();
+		svc.checkForUpdates();
+		autoUpdater.emit("update-downloaded", { version: "2.5.0" });
+		emitted.length = 0;
+		checkForUpdatesMock.mockClear();
+		svc.checkForUpdates();
+		expect(checkForUpdatesMock).toHaveBeenCalledTimes(1);
+		autoUpdater.emit("update-available", { version: "2.5.1" });
+		autoUpdater.emit("download-progress", { percent: 50 });
+		autoUpdater.emit("update-downloaded", { version: "2.5.1" });
+		expect(emitted).toEqual([
+			{ state: "available", version: "2.5.1", surface: "toast" },
+			{
+				state: "downloading",
+				version: "2.5.1",
+				percent: 50,
+				surface: "toast",
+			},
+			{ state: "ready", version: "2.5.1", surface: "toast" },
+		]);
+	});
+
+	it("background poll re-checks even when staged and refreshes newer latest", () => {
+		const svc = createService();
+		svc.start();
+		svc.checkForUpdates();
+		autoUpdater.emit("update-downloaded", { version: "5.0.0" });
+		emitted.length = 0;
+		checkForUpdatesMock.mockClear();
+		svc.checkForUpdates({ background: true });
+		expect(checkForUpdatesMock).toHaveBeenCalledTimes(1);
+		expect(emitted).toEqual([]);
+		autoUpdater.emit("update-available", { version: "5.1.0" });
+		expect(emitted).toEqual([
+			{ state: "available", version: "5.1.0", surface: "toast" },
+		]);
+	});
+
+	it("background stays quiet when staged package is still latest", () => {
+		const svc = createService();
+		svc.start();
+		svc.checkForUpdates();
+		autoUpdater.emit("update-downloaded", { version: "5.0.0" });
+		emitted.length = 0;
+		svc.checkForUpdates({ background: true });
+		autoUpdater.emit("update-available", { version: "5.0.0" });
+		expect(emitted).toEqual([]);
+	});
+
+	it("clears staged download on update-not-available so install is a no-op", () => {
+		const svc = createService();
+		svc.start();
+		svc.checkForUpdates();
+		autoUpdater.emit("update-downloaded", { version: "6.0.0" });
+		svc.checkForUpdates({ interactive: true });
+		autoUpdater.emit("update-not-available");
+		quitAndInstall.mockClear();
+		checkForUpdatesMock.mockClear();
+		svc.installUpdate();
+		expect(quitAndInstall).not.toHaveBeenCalled();
+		expect(checkForUpdatesMock).not.toHaveBeenCalled();
 	});
 
 	it("uses native dialog fallback when main window cannot host UI", () => {
@@ -241,18 +355,6 @@ describe("AutoUpdateService", () => {
 		expect(emitted).toEqual([
 			{ state: "available", version: "4.0.0", surface: "toast" },
 		]);
-	});
-
-	it("background skips re-presenting when update already downloaded", () => {
-		const svc = createService();
-		svc.start();
-		svc.checkForUpdates();
-		autoUpdater.emit("update-downloaded", { version: "5.0.0" });
-		emitted.length = 0;
-		checkForUpdatesMock.mockClear();
-		svc.checkForUpdates({ background: true });
-		expect(emitted).toEqual([]);
-		expect(checkForUpdatesMock).not.toHaveBeenCalled();
 	});
 
 	it("dispose stops further interval polls", () => {

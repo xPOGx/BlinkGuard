@@ -30,6 +30,32 @@ export type AutoUpdateUiPort = {
 	canHostInAppUi(): boolean;
 };
 
+/** True when `candidate` is a strictly newer semver than `baseline` (major.minor.patch). */
+export function isNewerVersion(candidate: string, baseline: string): boolean {
+	const next = parseSemverTriplet(candidate);
+	const prev = parseSemverTriplet(baseline);
+	if (!next || !prev) {
+		return candidate.trim() !== baseline.trim() && candidate.trim() > baseline.trim();
+	}
+	for (let i = 0; i < 3; i++) {
+		if (next[i] !== prev[i]) return next[i] > prev[i];
+	}
+	return false;
+}
+
+function parseSemverTriplet(version: string): [number, number, number] | null {
+	const match = version
+		.trim()
+		.replace(/^v/i, "")
+		.match(/^(\d+)\.(\d+)\.(\d+)/);
+	if (!match) return null;
+	return [
+		Number(match[1]),
+		Number(match[2]),
+		Number(match[3]),
+	];
+}
+
 /**
  * Windows / macOS GitHub Releases updater. Hard no-op when unpackaged,
  * unsupported platform, or when the build has no embedded feed
@@ -38,6 +64,10 @@ export type AutoUpdateUiPort = {
  * Silent launch → toast surface (ephemeral); install on quit via autoInstallOnAppQuit.
  * Manual About/tray → dialog; `ready` Restart only for interactive checks.
  * Background interval → quiet unless an update is actually available.
+ *
+ * Always re-checks GitHub latest even with a staged download so a newer release
+ * published before Restart replaces the stale package (no version ladder; feed
+ * is already `/releases/latest`).
  */
 export class AutoUpdateService {
 	private enabled = false;
@@ -48,6 +78,11 @@ export class AutoUpdateService {
 	private interactivePending = false;
 	/** True while a background interval check is in flight. */
 	private backgroundPending = false;
+	/**
+	 * After Restart: re-check GitHub once; install only when staged matches
+	 * latest (or the check fails soft).
+	 */
+	private installAfterFreshCheck = false;
 	private updateTimer: ReturnType<typeof setInterval> | null = null;
 
 	constructor(
@@ -70,7 +105,13 @@ export class AutoUpdateService {
 				this.checking = false;
 				const interactive = this.interactivePending;
 				const background = this.backgroundPending;
+				const installPending = this.installAfterFreshCheck;
 				this.clearPendingFlags();
+				// Soft-fail: still install the staged package if Restart asked for it.
+				if (installPending && this.downloadedVersion) {
+					this.performQuitAndInstall();
+					return;
+				}
 				if (background) return;
 				this.present(
 					{ state: "error", surface: this.surfaceFor(interactive) },
@@ -82,7 +123,12 @@ export class AutoUpdateService {
 				this.checking = false;
 				const interactive = this.interactivePending;
 				const background = this.backgroundPending;
+				const installPending = this.installAfterFreshCheck;
 				this.clearPendingFlags();
+				// Running app is already latest; drop any obsolete staged package.
+				this.downloadedVersion = null;
+				this.availableVersion = null;
+				if (installPending) return;
 				if (background) return;
 				this.present(
 					{ state: "upToDate", surface: this.surfaceFor(interactive) },
@@ -96,8 +142,33 @@ export class AutoUpdateService {
 					typeof info?.version === "string" && info.version.length > 0
 						? info.version
 						: "…";
-				this.availableVersion = version;
 				const interactive = this.interactivePending;
+				const background = this.backgroundPending;
+
+				// Already staged this exact latest — no second download storm.
+				if (
+					this.downloadedVersion &&
+					!isNewerVersion(version, this.downloadedVersion)
+				) {
+					if (this.installAfterFreshCheck) {
+						this.performQuitAndInstall();
+						return;
+					}
+					this.clearPendingFlags();
+					if (background) return;
+					this.presentReady(this.downloadedVersion, interactive);
+					return;
+				}
+
+				// Stale staged package — let autoDownload pull the new latest.
+				if (
+					this.downloadedVersion &&
+					isNewerVersion(version, this.downloadedVersion)
+				) {
+					this.downloadedVersion = null;
+				}
+
+				this.availableVersion = version;
 				this.present(
 					{
 						state: "available",
@@ -128,6 +199,7 @@ export class AutoUpdateService {
 			autoUpdater.on("update-downloaded", (info) => {
 				this.checking = false;
 				const wasInteractive = this.interactivePending;
+				const installPending = this.installAfterFreshCheck;
 				this.clearPendingFlags();
 				const version =
 					typeof info?.version === "string" && info.version.length > 0
@@ -135,6 +207,10 @@ export class AutoUpdateService {
 						: (this.availableVersion ?? "…");
 				this.downloadedVersion = version;
 				this.availableVersion = version;
+				if (installPending) {
+					this.performQuitAndInstall();
+					return;
+				}
 				this.presentReady(version, wasInteractive);
 			});
 
@@ -180,21 +256,18 @@ export class AutoUpdateService {
 				this.interactivePending = false;
 			}
 
-			if (this.downloadedVersion) {
-				if (background) {
-					this.clearPendingFlags();
-					return;
-				}
-				const wasInteractive = this.interactivePending;
-				this.clearPendingFlags();
-				this.presentReady(this.downloadedVersion, wasInteractive);
-				return;
-			}
+			// Always re-query GitHub latest (do not sticky-skip when staged).
 
-			if (!background) {
+			if (!background && !this.downloadedVersion) {
 				this.present(
 					{ state: "checking", surface: this.surfaceFor(interactive) },
 					interactive,
+				);
+			} else if (!background && this.downloadedVersion && interactive) {
+				// Interactive: show checking briefly while we confirm staged is still latest.
+				this.present(
+					{ state: "checking", surface: "dialog" },
+					true,
 				);
 			}
 
@@ -206,7 +279,12 @@ export class AutoUpdateService {
 				this.checking = false;
 				const wasInteractive = this.interactivePending;
 				const wasBackground = this.backgroundPending;
+				const installPending = this.installAfterFreshCheck;
 				this.clearPendingFlags();
+				if (installPending && this.downloadedVersion) {
+					this.performQuitAndInstall();
+					return;
+				}
 				if (wasBackground) return;
 				this.present(
 					{ state: "error", surface: this.surfaceFor(wasInteractive) },
@@ -216,15 +294,35 @@ export class AutoUpdateService {
 		} catch (error) {
 			console.error("Auto-update check failed:", error);
 			this.checking = false;
+			const installPending = this.installAfterFreshCheck;
 			this.clearPendingFlags();
+			if (installPending && this.downloadedVersion) {
+				this.performQuitAndInstall();
+				return;
+			}
 			if (options.interactive) {
 				this.present({ state: "error", surface: "dialog" }, true);
 			}
 		}
 	}
 
-	/** Install a previously downloaded update (About / in-app Restart). */
+	/**
+	 * Install a previously downloaded update (About / in-app Restart).
+	 * Re-checks GitHub latest first so a newer release replaces a stale stage.
+	 */
 	installUpdate(): void {
+		if (!this.downloadedVersion) return;
+		if (!this.enabled) {
+			this.performQuitAndInstall();
+			return;
+		}
+		this.installAfterFreshCheck = true;
+		this.checkForUpdates({ interactive: true });
+	}
+
+	private performQuitAndInstall(): void {
+		this.installAfterFreshCheck = false;
+		this.clearPendingFlags();
 		if (!this.downloadedVersion) return;
 		try {
 			// quitAndInstall can skip graceful before-quit cleanup; kill the
