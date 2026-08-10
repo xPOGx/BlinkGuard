@@ -1,4 +1,4 @@
-import { Download, ExternalLink, Heart, ScrollText } from "lucide-react";
+import { ExternalLink, Heart, ScrollText, Upload } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/button";
 import { SettingPanel } from "@/components/setting-panel";
@@ -125,7 +125,7 @@ export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 									void handleExportDiagnostics();
 								}}
 							>
-								<Download className="mr-2 h-4 w-4" aria-hidden />
+								<Upload className="mr-2 h-4 w-4" aria-hidden />
 								{exportBusy
 									? t("about.exportDiagnostics.busy")
 									: t("about.exportDiagnostics.button")}

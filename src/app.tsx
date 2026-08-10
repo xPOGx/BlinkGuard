@@ -186,7 +186,7 @@ function SettingsShell({
 	}, [prefsHydrated]);
 
 	return (
-		<div className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground min-[721px]:flex-row">
+		<div className="flex h-full min-h-0 flex-col overflow-hidden bg-background text-foreground min-[820px]:flex-row">
 			{showOnboarding ? (
 				<OnboardingWizard
 					preferences={preferences}
@@ -196,8 +196,8 @@ function SettingsShell({
 			) : null}
 			<UpdateToast {...autoUpdate} />
 			<UpdateDialog {...autoUpdate} />
-			<aside className="flex shrink-0 flex-col border-b border-border bg-sidebar min-[721px]:w-56 min-[721px]:border-r min-[721px]:border-b-0">
-				<div className="flex items-center gap-2.5 px-4 py-3 min-[721px]:px-5 min-[721px]:py-5">
+			<aside className="flex shrink-0 flex-col border-b border-border bg-sidebar min-[820px]:w-56 min-[820px]:border-r min-[820px]:border-b-0">
+				<div className="flex items-center gap-2.5 px-4 py-3 min-[820px]:px-5 min-[820px]:py-5">
 					<TrackingEyeButton
 						isTracking={preferences.isTracking}
 						onToggle={toggleTracking}
@@ -206,7 +206,7 @@ function SettingsShell({
 						<h1 className="text-base font-semibold tracking-tight">
 							BlinkGuard
 						</h1>
-						<p className="hidden text-xs text-muted-foreground min-[721px]:block">
+						<p className="hidden text-xs text-muted-foreground min-[820px]:block">
 							{t("app.tagline")}
 						</p>
 					</div>
@@ -214,7 +214,7 @@ function SettingsShell({
 
 				<nav
 					aria-label={t("app.navAria")}
-					className="flex gap-1 overflow-x-auto px-3 pb-3 min-[721px]:flex-1 min-[721px]:flex-col min-[721px]:overflow-visible min-[721px]:px-3 min-[721px]:pb-0"
+					className="flex gap-1 overflow-x-auto px-3 pb-3 min-[820px]:flex-1 min-[820px]:flex-col min-[820px]:overflow-visible min-[820px]:px-3 min-[820px]:pb-0"
 				>
 					{sections.map((item) => {
 						const Icon = item.icon;
@@ -249,7 +249,7 @@ function SettingsShell({
 					})}
 				</nav>
 
-				<div className="hidden border-t border-border p-3 min-[721px]:block">
+				<div className="hidden border-t border-border p-3 min-[820px]:block">
 					<DarkModeToggle
 						darkMode={preferences.darkMode}
 						setPreferences={setPreferences}
@@ -268,7 +268,7 @@ function SettingsShell({
 							{active.description}
 						</p>
 					</div>
-					<div className="shrink-0 min-[721px]:hidden">
+					<div className="shrink-0 min-[820px]:hidden">
 						<DarkModeToggle
 							darkMode={preferences.darkMode}
 							setPreferences={setPreferences}
