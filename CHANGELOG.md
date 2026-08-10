@@ -4,6 +4,29 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-08-10
+
+### Added
+
+- Multi-action global keyboard shortcuts
+- Configurable reminder snooze duration
+- Eye-care (exercises / look-away) can run independently of blink reminders
+- Expanded first-run onboarding with language and ready steps
+- Settings: collapse custom prompts behind toggles
+
+### Fixed
+
+- Camera: harden HOG face detect against flicker misses
+- Camera: mirror preview for natural left-right motion
+- Blink: soften look-down opening gates for real blinks
+- Updates: refresh staged download against GitHub latest
+- UI: clamp popup position when displays change
+- UI: align export icon and raise nav breakpoint to 820px
+
+### Changed
+
+- UI: extract shared atoms and split settings controls
+
 ## [2.5.1] - 2026-08-10
 
 ### Added
