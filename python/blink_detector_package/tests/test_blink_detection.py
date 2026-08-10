@@ -869,9 +869,9 @@ class BlinkDetectionTests(unittest.TestCase):
 		state.blink_in_progress = True
 		state.blink_start_time = t
 		state.closed_frames = 2
-		# Below LOOK_DOWN_SHORT_STRONG_PEAK (1.0) — talk jitter, not blink.
-		state.peak_closing_velocity = 0.90
-		state.peak_closing_velocity_measured = 0.90
+		# Below LOOK_DOWN_SHORT_STRONG_PEAK (0.85) — talk jitter, not blink.
+		state.peak_closing_velocity = 0.75
+		state.peak_closing_velocity_measured = 0.75
 		state.peak_opening_velocity = 0.0
 		state.max_drop_percentage = 0.25
 		state._candidate_pose_delta = 0.0
@@ -888,7 +888,7 @@ class BlinkDetectionTests(unittest.TestCase):
 		)
 
 	def test_look_down_one_frame_strong_peak_no_credit(self):
-		"""LD closed=1 + strong peak but shallow drop → still reject_opening."""
+		"""LD closed=1 + strong peak but shallow drop → still reject."""
 		state = BlinkDetectionState(target_fps=20)
 		t = _seed_open_eye(state, ear=0.28)
 		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
@@ -899,7 +899,7 @@ class BlinkDetectionTests(unittest.TestCase):
 		state.peak_closing_velocity = 1.25
 		state.peak_closing_velocity_measured = 1.25
 		state.peak_opening_velocity = 0.0
-		state.max_drop_percentage = 0.10
+		state.max_drop_percentage = 0.08
 		state._candidate_pose_delta = 0.0
 		state._ear_window.clear()
 		for _ in range(3):
@@ -907,10 +907,10 @@ class BlinkDetectionTests(unittest.TestCase):
 		t += 0.05
 		credited, info = state.detect(0.26, t, pose=pose)
 		self.assertFalse(credited)
-		self.assertEqual(info["phase"], "reject_opening")
+		self.assertIn(info["phase"], ("reject_opening", "reject_threshold"))
 
 	def test_look_down_strong_peak_waives_with_closed2(self):
-		"""Dark/Ultra LD: peak≥1.0 + closed≥2 can credit without openV."""
+		"""Dark/Ultra LD: peak≥0.85 + closed≥2 can credit without openV."""
 		state = BlinkDetectionState(target_fps=20)
 		t = _seed_open_eye(state, ear=0.28)
 		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
@@ -918,10 +918,10 @@ class BlinkDetectionTests(unittest.TestCase):
 		state.blink_in_progress = True
 		state.blink_start_time = t
 		state.closed_frames = 2
-		state.peak_closing_velocity = 1.05
-		state.peak_closing_velocity_measured = 1.05
+		state.peak_closing_velocity = 0.90
+		state.peak_closing_velocity_measured = 0.90
 		state.peak_opening_velocity = 0.0
-		state.max_drop_percentage = 0.15
+		state.max_drop_percentage = 0.20
 		state._candidate_pose_delta = 0.0
 		state._ear_window.clear()
 		for _ in range(3):
@@ -940,10 +940,10 @@ class BlinkDetectionTests(unittest.TestCase):
 		state.blink_in_progress = True
 		state.blink_start_time = t
 		state.closed_frames = 1
-		state.peak_closing_velocity = 0.9
-		state.peak_closing_velocity_measured = 0.9
+		state.peak_closing_velocity = 0.70
+		state.peak_closing_velocity_measured = 0.70
 		state.peak_opening_velocity = 0.40
-		state.max_drop_percentage = 0.10
+		state.max_drop_percentage = 0.08
 		state._candidate_pose_delta = 0.0
 		state._ear_window.clear()
 		for _ in range(3):
@@ -951,10 +951,10 @@ class BlinkDetectionTests(unittest.TestCase):
 		t += 0.05
 		credited, info = state.detect(0.26, t, pose=pose)
 		self.assertFalse(credited)
-		self.assertEqual(info["phase"], "reject_opening")
+		self.assertIn(info["phase"], ("reject_opening", "reject_threshold"))
 
 	def test_look_down_one_frame_strong_peak_with_depth_credits(self):
-		"""Real high-FPS LD: closed=1 openV=0 peak≥1.05 + depth → credit."""
+		"""Real high-FPS LD: closed=1 openV=0 peak≥0.85 + depth → credit."""
 		state = BlinkDetectionState(target_fps=20)
 		t = _seed_open_eye(state, ear=0.28)
 		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
@@ -962,10 +962,10 @@ class BlinkDetectionTests(unittest.TestCase):
 		state.blink_in_progress = True
 		state.blink_start_time = t
 		state.closed_frames = 1
-		state.peak_closing_velocity = 1.10
-		state.peak_closing_velocity_measured = 1.10
+		state.peak_closing_velocity = 0.90
+		state.peak_closing_velocity_measured = 0.90
 		state.peak_opening_velocity = 0.0
-		state.max_drop_percentage = 0.15
+		state.max_drop_percentage = 0.20
 		state._candidate_pose_delta = 0.0
 		state._ear_window.clear()
 		for _ in range(3):
@@ -1023,7 +1023,7 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertEqual(info["phase"], "reject_motion")
 
 	def test_look_down_weak_open_no_credit(self):
-		"""LD openV in (MIN_OPENING, LOOK_DOWN_MIN) without deep trough → reject."""
+		"""LD weak openV + peak below strong waive → reject_opening."""
 		state = BlinkDetectionState(target_fps=20)
 		t = _seed_open_eye(state, ear=0.28)
 		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
@@ -1031,8 +1031,8 @@ class BlinkDetectionTests(unittest.TestCase):
 		state.blink_in_progress = True
 		state.blink_start_time = t
 		state.closed_frames = 1
-		state.peak_closing_velocity = 0.9
-		state.peak_closing_velocity_measured = 0.9
+		state.peak_closing_velocity = 0.70
+		state.peak_closing_velocity_measured = 0.70
 		state.peak_opening_velocity = 0.10
 		state.max_drop_percentage = 0.22
 		state._candidate_pose_delta = 0.0

@@ -29,12 +29,12 @@ MIN_OPENING_VELOCITY = 0.06
 # Look-down multi-frame reopen floor (closed≥2 can also use strong-peak waive).
 LOOK_DOWN_MIN_OPENING_VELOCITY = 0.15
 # One-frame LD: depth + (reopen or strong peak).
-# Post-0.16/1.3: still 221 reject_opening (POG 2026-08-10) — real blinks at
-# peak≈0.8–1.2, drop≈0.14–0.15, openV often 0 / abs≈0.042–0.044.
-LOOK_DOWN_ONE_FRAME_MIN_OPENING = 0.30
-LOOK_DOWN_ONE_FRAME_MIN_DROP = 0.14
-LOOK_DOWN_ONE_FRAME_MIN_ABS = 0.040
-LOOK_DOWN_ONE_FRAME_STRONG_PEAK = 1.05
+# Post-1.05/0.040: still ~154 reject_opening (POG 2026-08-10 evening) —
+# real blinks at peak≈0.7–1.0, abs≈0.032–0.038, openV often missed.
+LOOK_DOWN_ONE_FRAME_MIN_OPENING = 0.25
+LOOK_DOWN_ONE_FRAME_MIN_DROP = 0.12
+LOOK_DOWN_ONE_FRAME_MIN_ABS = 0.035
+LOOK_DOWN_ONE_FRAME_STRONG_PEAK = 0.85
 # Wall-clock floor when LD peak clears short gate — gate_fps often < camera
 # preset, so frame_dt*0.95 still rejected real 33–35ms blinks (reject_duration).
 LOOK_DOWN_ONE_FRAME_DURATION_MIN = 0.028
@@ -112,9 +112,8 @@ FRONTAL_OPENING_PEAK_WAIVE = 0.95
 LOOK_DOWN_SHORT_OPEN_DROP = 0.35
 LOOK_DOWN_SHORT_OPEN_CLOSED = 3
 # Dark/Ultra LD: strong measured close can waive reopen (closed≥2).
-# 1.15 still FN on real closed=2 peak≈0.85–1.1 (POG 2026-08-10 RO mf_peak).
-LOOK_DOWN_SHORT_STRONG_PEAK = 1.00
-LOOK_DOWN_SHORT_STRONG_DROP = 0.14
+LOOK_DOWN_SHORT_STRONG_PEAK = 0.85
+LOOK_DOWN_SHORT_STRONG_DROP = 0.12
 LOOK_DOWN_SHORT_STRONG_CLOSED = 2
 # Synthetic peak must beat measured by this to count as "invented" (needs V-shape).
 SYNTHETIC_PEAK_EPS = 0.20
