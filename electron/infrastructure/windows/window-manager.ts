@@ -71,14 +71,15 @@ export class WindowManager {
 		options: { showOnReady?: boolean } = {},
 	): BrowserWindow {
 		const showOnReady = options.showOnReady ?? true;
+		const darkMode = this.preferences.darkMode !== false;
 		const window = new BrowserWindow({
 			width: 1024,
 			height: 768,
 			minWidth: 720,
 			minHeight: 520,
 			show: false,
-			// Match renderer boot splash / light shell background.
-			backgroundColor: "#F4F7F9",
+			// Match renderer boot splash / shell background for current theme.
+			backgroundColor: darkMode ? "#0B1220" : "#F4F7F9",
 			icon: path.join(this.paths.root, "assets", "icons", "icon.png"),
 			autoHideMenuBar: true,
 			webPreferences: {
@@ -102,10 +103,15 @@ export class WindowManager {
 			this.sendPreferences();
 			this.onMainLoaded?.();
 		});
+		const darkQuery = darkMode ? "1" : "0";
 		if (this.devServerUrl) {
-			void window.loadURL(this.devServerUrl);
+			const url = new URL(this.devServerUrl);
+			url.searchParams.set("dark", darkQuery);
+			void window.loadURL(url.toString());
 		} else {
-			void window.loadFile(path.join(this.paths.rendererDist, "index.html"));
+			void window.loadFile(path.join(this.paths.rendererDist, "index.html"), {
+				query: { dark: darkQuery },
+			});
 		}
 		return window;
 	}

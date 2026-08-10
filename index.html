@@ -7,6 +7,15 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <title>BlinkGuard</title>
+    <script>
+      (function () {
+        var params = new URLSearchParams(location.search);
+        var darkParam = params.get("dark");
+        var dark = darkParam === null ? true : darkParam !== "0";
+        document.documentElement.classList.toggle("dark", dark);
+        window.__bootSplashShownAt = performance.now();
+      })();
+    </script>
     <style>
       /* Match shared/preferences DEFAULT darkMode + index.css --background tokens. */
       html,
@@ -32,11 +41,20 @@
         display: grid;
         place-items: center;
         background:
-          radial-gradient(ellipse 70% 55% at 50% 42%, #d9efe9 0%, transparent 62%),
+          radial-gradient(ellipse 55% 45% at 50% 38%, hsl(173 45% 88% / 0.9) 0%, transparent 58%),
+          radial-gradient(ellipse 80% 60% at 70% 80%, hsl(210 30% 92% / 0.7) 0%, transparent 55%),
           linear-gradient(160deg, #eef3f6 0%, #f4f7f9 45%, #e7f3f0 100%);
         font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
         color: #0f172a;
         transition: opacity 320ms ease, visibility 320ms ease;
+      }
+
+      html.dark #boot-splash {
+        background:
+          radial-gradient(ellipse 55% 45% at 50% 38%, hsl(173 28% 18% / 0.9) 0%, transparent 58%),
+          radial-gradient(ellipse 80% 60% at 72% 82%, hsl(222 40% 14% / 0.75) 0%, transparent 55%),
+          linear-gradient(160deg, hsl(222 40% 10%) 0%, hsl(222 40% 8%) 45%, hsl(217 30% 9%) 100%);
+        color: hsl(210 20% 98%);
       }
 
       #boot-splash.boot-splash--hide {
@@ -45,43 +63,165 @@
         pointer-events: none;
       }
 
+      #boot-splash.boot-splash--hide .boot-splash__inner {
+        transform: scale(0.96) translateY(6px);
+      }
+
       .boot-splash__inner {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 0.85rem;
-        animation: boot-splash-rise 480ms ease-out both;
+        gap: 1rem;
+        transition: transform 320ms ease;
       }
 
-      .boot-splash__lottie {
-        width: 7.5rem;
-        height: 7.5rem;
+      .boot-splash__mark {
+        position: relative;
+        width: 9.5rem;
+        height: 9.5rem;
+        display: grid;
+        place-items: center;
+        animation: boot-splash-rise 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
       }
 
-      .boot-splash__lottie:empty {
+      .boot-splash__mark::before {
+        content: "";
+        position: absolute;
+        inset: 8%;
         border-radius: 9999px;
-        background: hsl(173 45% 92%);
-        box-shadow: inset 0 0 0 2px hsl(173 58% 36% / 0.2);
-        animation: boot-splash-pulse 1.4s ease-in-out infinite;
+        background: radial-gradient(
+          circle at 50% 50%,
+          hsl(173 55% 55% / 0.28) 0%,
+          hsl(173 45% 60% / 0.1) 42%,
+          transparent 70%
+        );
+        filter: blur(2px);
+        animation: boot-splash-halo 2.4s ease-in-out infinite;
+      }
+
+      html.dark .boot-splash__mark::before {
+        background: radial-gradient(
+          circle at 50% 50%,
+          hsl(173 50% 42% / 0.38) 0%,
+          hsl(173 40% 30% / 0.14) 42%,
+          transparent 70%
+        );
+      }
+
+      .boot-splash__orbit {
+        position: absolute;
+        inset: 0;
+        border-radius: 9999px;
+        background: conic-gradient(
+          from 0deg,
+          transparent 0deg,
+          transparent 220deg,
+          hsl(173 58% 36% / 0.08) 260deg,
+          hsl(173 58% 36% / 0.85) 300deg,
+          hsl(173 58% 50% / 0.35) 330deg,
+          transparent 360deg
+        );
+        -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+        mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+        animation: boot-splash-orbit 4.8s linear infinite;
+      }
+
+      html.dark .boot-splash__orbit {
+        background: conic-gradient(
+          from 0deg,
+          transparent 0deg,
+          transparent 220deg,
+          hsl(173 55% 42% / 0.1) 260deg,
+          hsl(173 55% 52% / 0.95) 300deg,
+          hsl(173 55% 60% / 0.4) 330deg,
+          transparent 360deg
+        );
+      }
+
+      .boot-splash__icon {
+        position: relative;
+        z-index: 1;
+        width: 7.25rem;
+        height: 7.25rem;
+        border-radius: 9999px;
+        object-fit: cover;
+        display: block;
+        box-shadow:
+          0 10px 28px hsl(222 40% 8% / 0.16),
+          inset 0 0 0 2px hsl(173 58% 36% / 0.2);
+        animation: boot-splash-pulse 2.2s ease-in-out infinite;
+      }
+
+      html.dark .boot-splash__icon {
+        box-shadow:
+          0 14px 36px hsl(222 50% 2% / 0.55),
+          inset 0 0 0 2px hsl(173 55% 42% / 0.32);
       }
 
       .boot-splash__title {
         margin: 0;
-        font-size: 1.35rem;
+        font-size: 1.55rem;
         font-weight: 600;
-        letter-spacing: -0.02em;
+        letter-spacing: -0.035em;
+        animation: boot-splash-rise 560ms cubic-bezier(0.22, 1, 0.36, 1) 90ms both;
       }
 
       .boot-splash__hint {
         margin: 0;
-        font-size: 0.8rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        letter-spacing: 0.01em;
         color: #64748b;
+        animation: boot-splash-rise 560ms cubic-bezier(0.22, 1, 0.36, 1) 180ms both;
+      }
+
+      html.dark .boot-splash__hint {
+        color: hsl(215 14% 65%);
+      }
+
+      .boot-splash__bar {
+        width: 7.5rem;
+        height: 3px;
+        margin-top: 0.35rem;
+        border-radius: 9999px;
+        overflow: hidden;
+        background: hsl(214 18% 86% / 0.85);
+        animation: boot-splash-rise 560ms cubic-bezier(0.22, 1, 0.36, 1) 260ms both;
+      }
+
+      html.dark .boot-splash__bar {
+        background: hsl(217 22% 22% / 0.95);
+      }
+
+      .boot-splash__bar-fill {
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(
+          90deg,
+          hsl(173 58% 36% / 0.15),
+          hsl(173 58% 36%),
+          hsl(173 55% 55%),
+          hsl(173 58% 36% / 0.15)
+        );
+        animation: boot-splash-shimmer 1.35s ease-in-out infinite;
+      }
+
+      html.dark .boot-splash__bar-fill {
+        background: linear-gradient(
+          90deg,
+          hsl(173 55% 42% / 0.15),
+          hsl(173 55% 48%),
+          hsl(173 55% 62%),
+          hsl(173 55% 42% / 0.15)
+        );
       }
 
       @keyframes boot-splash-rise {
         from {
           opacity: 0;
-          transform: translateY(8px);
+          transform: translateY(10px);
         }
         to {
           opacity: 1;
@@ -93,18 +233,63 @@
         0%,
         100% {
           transform: scale(1);
-          opacity: 0.85;
         }
         50% {
-          transform: scale(1.04);
+          transform: scale(1.025);
+        }
+      }
+
+      @keyframes boot-splash-halo {
+        0%,
+        100% {
+          opacity: 0.75;
+          transform: scale(1);
+        }
+        50% {
           opacity: 1;
+          transform: scale(1.06);
+        }
+      }
+
+      @keyframes boot-splash-orbit {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @keyframes boot-splash-shimmer {
+        0% {
+          transform: translateX(-120%);
+        }
+        100% {
+          transform: translateX(280%);
         }
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .boot-splash__inner,
-        .boot-splash__lottie:empty {
+        .boot-splash__mark,
+        .boot-splash__title,
+        .boot-splash__hint,
+        .boot-splash__bar,
+        .boot-splash__mark::before,
+        .boot-splash__orbit,
+        .boot-splash__icon,
+        .boot-splash__bar-fill {
           animation: none;
+        }
+
+        .boot-splash__mark,
+        .boot-splash__title,
+        .boot-splash__hint,
+        .boot-splash__bar {
+          opacity: 1;
+          transform: none;
+        }
+
+        .boot-splash__bar-fill {
+          width: 100%;
+          transform: none;
+          opacity: 0.55;
         }
       }
     </style>
@@ -112,9 +297,22 @@
   <body>
     <div id="boot-splash" role="status" aria-live="polite" aria-busy="true">
       <div class="boot-splash__inner">
-        <div id="boot-splash-lottie" class="boot-splash__lottie" aria-hidden="true"></div>
+        <div class="boot-splash__mark" aria-hidden="true">
+          <span class="boot-splash__orbit"></span>
+          <img
+            class="boot-splash__icon"
+            src="/boot-icon.png"
+            width="116"
+            height="116"
+            alt=""
+            decoding="async"
+          />
+        </div>
         <p class="boot-splash__title">BlinkGuard</p>
         <p class="boot-splash__hint">Getting ready…</p>
+        <div class="boot-splash__bar" aria-hidden="true">
+          <span class="boot-splash__bar-fill"></span>
+        </div>
       </div>
     </div>
     <div id="root"></div>

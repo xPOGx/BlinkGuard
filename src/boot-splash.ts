@@ -1,26 +1,13 @@
-import lottieWeb, { type AnimationItem } from "lottie-web/build/player/lottie_light";
-import eyeAnimation from "@/assets/eye.json";
-
-type LottiePlayer = {
-	loadAnimation: typeof lottieWeb.loadAnimation;
-};
-
-const lottiePlayer = (
-	"loadAnimation" in lottieWeb
-		? lottieWeb
-		: (lottieWeb as unknown as { default: LottiePlayer }).default
-) as LottiePlayer;
-
 const MIN_VISIBLE_MS = 700;
 const FADE_MS = 320;
 const SAFETY_DISMISS_MS = 8_000;
 
-let animation: AnimationItem | null = null;
 let shownAt = 0;
 let dismissTimer: ReturnType<typeof setTimeout> | null = null;
 let safetyTimer: ReturnType<typeof setTimeout> | null = null;
 let dismissed = false;
 let dismissRequested = false;
+let armed = false;
 
 function splashElement(): HTMLElement | null {
 	return document.getElementById("boot-splash");
@@ -37,24 +24,15 @@ function clearTimers(): void {
 	}
 }
 
-/** Mount the eye Lottie into the HTML boot splash as early as the renderer loads. */
-export function mountBootSplash(): void {
-	if (import.meta.env.MODE === "test") return;
-
-	const container = document.getElementById("boot-splash-lottie");
-	const splash = splashElement();
-	if (!container || !splash || animation) return;
-
-	shownAt = performance.now();
-	animation = lottiePlayer.loadAnimation({
-		container,
-		renderer: "svg",
-		loop: true,
-		autoplay: true,
-		animationData: structuredClone(eyeAnimation),
-	});
-	animation.setSpeed(1.15);
-
+/** Arm timers using the HTML paint timestamp when present. */
+function armBootSplash(): void {
+	if (armed || import.meta.env.MODE === "test") return;
+	armed = true;
+	const paintedAt = window.__bootSplashShownAt;
+	shownAt =
+		typeof paintedAt === "number" && Number.isFinite(paintedAt)
+			? paintedAt
+			: performance.now();
 	safetyTimer = setTimeout(() => {
 		void dismissBootSplash();
 	}, SAFETY_DISMISS_MS);
@@ -65,6 +43,8 @@ export function dismissBootSplash(): Promise<void> {
 	if (import.meta.env.MODE === "test" || dismissed || dismissRequested) {
 		return Promise.resolve();
 	}
+
+	armBootSplash();
 
 	const splash = splashElement();
 	if (!splash) {
@@ -82,8 +62,6 @@ export function dismissBootSplash(): Promise<void> {
 			dismissTimer = null;
 			splash.classList.add("boot-splash--hide");
 			window.setTimeout(() => {
-				animation?.destroy();
-				animation = null;
 				splash.remove();
 				dismissed = true;
 				clearTimers();
@@ -91,4 +69,8 @@ export function dismissBootSplash(): Promise<void> {
 			}, FADE_MS);
 		}, wait);
 	});
+}
+
+if (import.meta.env.MODE !== "test") {
+	armBootSplash();
 }

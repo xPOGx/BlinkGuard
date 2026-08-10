@@ -14,7 +14,7 @@ Pragmatic Clean Architecture with a thin `electron/main.ts` composition root. Fe
 | `electron/domain/` | Pure policies (`reminder-policy`, `focus-policy`, `blink-rate-coaching`) |
 | `electron/application/` | Runtime state + preferences / reminder / exercise / look-away / tracking-session (Start/Stop also pauses eye-care timers) / blink-stats / blink-rate-coaching / focus-pause / preference-actions / deferred-tracking-restore and ports |
 | `electron/infrastructure/` | IPC, windows, lifecycle/power, sidecar, shortcuts, sound, store, process cleanup, paths/logging, profile PNG export, focus (Win+Mac fullscreen detectors; stub elsewhere) |
-| `electron/main.ts` | Vite entry/composition root only: constructs collaborators, connects callbacks, starts lifecycle; cold-start tracking restore waits for renderer `shellReady` (after boot splash) |
+| `electron/main.ts` | Vite entry/composition root only: constructs collaborators, connects callbacks, starts lifecycle; cold-start tracking restore waits for renderer `shellReady` (after boot splash). Boot splash is static HTML (`index.html` + round `/boot-icon.png`); dismiss + `shellReady` from renderer. Splash/window chrome theme follows persisted `darkMode` via `?dark=` + `BrowserWindow.backgroundColor` |
 | `electron/preload.ts` | `contextBridge`; whitelists from `shared/ipc-channels` |
 | `src/app.tsx` | Settings shell (`BlinkGuardHomepage`) |
 | `src/features/*` | Feature `model/` + `ui/` (reminders, camera, exercises, look-away, popup-appearance, statistics, profile, rewards, settings, onboarding, about, shortcuts, debug) |
