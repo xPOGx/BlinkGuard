@@ -48,6 +48,7 @@ export function sameRendererPrefs(
 		a.eyeExercisesEnabled === b.eyeExercisesEnabled &&
 		a.exerciseInterval === b.exerciseInterval &&
 		sameStringArray(a.exercisePrompts, b.exercisePrompts) &&
+		a.eyeCareIndependentOfTracking === b.eyeCareIndependentOfTracking &&
 		a.lookAwayEnabled === b.lookAwayEnabled &&
 		a.lookAwayInterval === b.lookAwayInterval &&
 		a.lookAwayDuration === b.lookAwayDuration &&
@@ -118,6 +119,14 @@ export function pushPreferenceDiff(
 		!sameStringArray(previous.exercisePrompts, next.exercisePrompts)
 	) {
 		rendererIpc.updateExercisePrompts(next.exercisePrompts);
+	}
+	if (
+		!previous ||
+		previous.eyeCareIndependentOfTracking !== next.eyeCareIndependentOfTracking
+	) {
+		rendererIpc.updateEyeCareIndependentOfTracking(
+			next.eyeCareIndependentOfTracking,
+		);
 	}
 	if (!previous || previous.lookAwayEnabled !== next.lookAwayEnabled) {
 		rendererIpc.updateLookAwayEnabled(next.lookAwayEnabled);

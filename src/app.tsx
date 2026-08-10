@@ -20,6 +20,7 @@ import { CameraControls } from "@/features/camera/ui/camera-controls";
 import { CameraErrorBanner } from "@/features/camera/ui/camera-error-banner";
 import { DebugPanel } from "@/features/debug/ui/debug-panel";
 import { ExerciseSettings } from "@/features/exercises/ui/exercise-settings";
+import { EyeCareIndependenceSettings } from "@/features/exercises/ui/eye-care-independence-settings";
 import { EyePromptsDisabledNotice } from "@/features/exercises/ui/eye-prompts-disabled-notice";
 import { LookAwaySettings } from "@/features/look-away/ui/look-away-settings";
 import { OnboardingWizard } from "@/features/onboarding/ui/onboarding-wizard";
@@ -343,6 +344,10 @@ function SettingsShell({
 										<EyePromptsDisabledNotice
 											eyeExercisesEnabled={preferences.eyeExercisesEnabled}
 											lookAwayEnabled={preferences.lookAwayEnabled}
+										/>
+										<EyeCareIndependenceSettings
+											preferences={preferences}
+											setPreferences={setPreferences}
 										/>
 										<ExerciseSettings
 											preferences={preferences}

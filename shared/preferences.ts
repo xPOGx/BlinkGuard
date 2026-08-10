@@ -191,7 +191,12 @@ export interface PersistedPreferences {
 	exerciseInterval: number;
 	/** Rotating eye-exercise instruction texts shown in the exercise popup. */
 	exercisePrompts: string[];
-	/** Periodic 20-20-20 style look-away breaks (own pref; timers pause while tracking is stopped). */
+	/**
+	 * When true (default), exercise/look-away timers run even if Start/Stop
+	 * blink reminders is off. When false, Stop also pauses eye-care.
+	 */
+	eyeCareIndependentOfTracking: boolean;
+	/** Periodic 20-20-20 style look-away breaks. */
 	lookAwayEnabled: boolean;
 	/** Minutes between look-away prompts. */
 	lookAwayInterval: number;
@@ -300,6 +305,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	eyeExercisesEnabled: true,
 	exerciseInterval: 40,
 	exercisePrompts: [...DEFAULT_EXERCISE_PROMPTS],
+	eyeCareIndependentOfTracking: true,
 	lookAwayEnabled: true,
 	lookAwayInterval: 20,
 	lookAwayDuration: 20,
@@ -530,6 +536,10 @@ export function sanitizePersistedPreferences(
 			defaults.exerciseInterval,
 		),
 		exercisePrompts: sanitizeExercisePrompts(record.exercisePrompts, locale),
+		eyeCareIndependentOfTracking: asBoolean(
+			record.eyeCareIndependentOfTracking,
+			defaults.eyeCareIndependentOfTracking,
+		),
 		lookAwayEnabled: asBoolean(record.lookAwayEnabled, defaults.lookAwayEnabled),
 		lookAwayInterval: asPositiveMinutes(
 			record.lookAwayInterval,

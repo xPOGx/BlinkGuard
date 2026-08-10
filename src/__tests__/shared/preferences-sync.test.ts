@@ -17,6 +17,7 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updateEyeExercisesEnabled: vi.fn(),
 		updateExerciseInterval: vi.fn(),
 		updateExercisePrompts: vi.fn(),
+		updateEyeCareIndependentOfTracking: vi.fn(),
 		updateLookAwayEnabled: vi.fn(),
 		updateLookAwayInterval: vi.fn(),
 		updateLookAwayDuration: vi.fn(),
@@ -187,6 +188,20 @@ describe("pushPreferenceDiff", () => {
 		);
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 		expect(rendererIpc.updatePopupMessage).not.toHaveBeenCalled();
+	});
+
+	it("pushes only eye-care independence when it changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = { ...previous, eyeCareIndependentOfTracking: false };
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateEyeCareIndependentOfTracking).toHaveBeenCalledWith(
+			false,
+		);
+		expect(rendererIpc.updateEyeExercisesEnabled).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLookAwayEnabled).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 	});
 
 	it("pushes only look-away copy when title or hint change", () => {

@@ -161,12 +161,23 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	});
 	on(IPC_CHANNELS.updateEyeExercisesEnabled, (_event, enabled: unknown) => {
 		preferences.set("eyeExercisesEnabled", enabled as boolean);
-		if (enabled) exercises.start();
-		else exercises.stop();
+		if (!enabled) {
+			exercises.stop();
+			return;
+		}
+		if (
+			current.eyeCareIndependentOfTracking ||
+			current.isTracking
+		) {
+			exercises.start();
+		}
 	});
 	on(IPC_CHANNELS.updateExerciseInterval, (_event, interval: unknown) => {
 		preferences.set("exerciseInterval", interval as number);
-		if (current.eyeExercisesEnabled) {
+		if (
+			current.eyeExercisesEnabled &&
+			(current.eyeCareIndependentOfTracking || current.isTracking)
+		) {
 			exercises.stop();
 			exercises.start();
 		}
@@ -174,14 +185,41 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	on(IPC_CHANNELS.updateExercisePrompts, (_event, prompts: unknown) => {
 		preferences.set("exercisePrompts", prompts as string[]);
 	});
+	on(
+		IPC_CHANNELS.updateEyeCareIndependentOfTracking,
+		(_event, enabled: unknown) => {
+			const independent = Boolean(enabled);
+			preferences.set("eyeCareIndependentOfTracking", independent);
+			if (independent) {
+				if (current.eyeExercisesEnabled) exercises.start();
+				if (current.lookAwayEnabled) lookAway.start();
+				return;
+			}
+			if (!current.isTracking) {
+				exercises.stop();
+				lookAway.stop();
+			}
+		},
+	);
 	on(IPC_CHANNELS.updateLookAwayEnabled, (_event, enabled: unknown) => {
 		preferences.set("lookAwayEnabled", enabled as boolean);
-		if (enabled) lookAway.start();
-		else lookAway.stop();
+		if (!enabled) {
+			lookAway.stop();
+			return;
+		}
+		if (
+			current.eyeCareIndependentOfTracking ||
+			current.isTracking
+		) {
+			lookAway.start();
+		}
 	});
 	on(IPC_CHANNELS.updateLookAwayInterval, (_event, interval: unknown) => {
 		preferences.set("lookAwayInterval", interval as number);
-		if (current.lookAwayEnabled) {
+		if (
+			current.lookAwayEnabled &&
+			(current.eyeCareIndependentOfTracking || current.isTracking)
+		) {
 			lookAway.stop();
 			lookAway.start();
 		}

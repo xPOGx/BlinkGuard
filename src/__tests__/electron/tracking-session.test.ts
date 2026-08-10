@@ -10,6 +10,7 @@ function createDeps(
 		eyeExercisesEnabled: boolean;
 		lookAwayEnabled: boolean;
 		reminderInterval: number;
+		eyeCareIndependentOfTracking: boolean;
 	}> = {},
 ) {
 	const reminders = {
@@ -35,14 +36,24 @@ function createDeps(
 			eyeExercisesEnabled: overrides.eyeExercisesEnabled ?? true,
 			lookAwayEnabled: overrides.lookAwayEnabled ?? true,
 			reminderInterval: overrides.reminderInterval ?? 5000,
+			eyeCareIndependentOfTracking:
+				overrides.eyeCareIndependentOfTracking ?? true,
 		},
 	};
 	return deps as TrackingSessionDeps & typeof deps;
 }
 
 describe("tracking-session", () => {
-	it("stopTrackingSession stops blink and eye-care timers with status", () => {
-		const deps = createDeps();
+	it("stopTrackingSession stops only blink when eye-care is independent", () => {
+		const deps = createDeps({ eyeCareIndependentOfTracking: true });
+		stopTrackingSession(deps, true);
+		expect(deps.reminders.stop).toHaveBeenCalledWith(true);
+		expect(deps.exercises.stop).not.toHaveBeenCalled();
+		expect(deps.lookAway.stop).not.toHaveBeenCalled();
+	});
+
+	it("stopTrackingSession stops blink and eye-care when coupled", () => {
+		const deps = createDeps({ eyeCareIndependentOfTracking: false });
 		stopTrackingSession(deps, true);
 		expect(deps.reminders.stop).toHaveBeenCalledWith(true);
 		expect(deps.reminders.ensureStopped).not.toHaveBeenCalled();
@@ -50,8 +61,8 @@ describe("tracking-session", () => {
 		expect(deps.lookAway.stop).toHaveBeenCalledOnce();
 	});
 
-	it("stopTrackingSession can tear down silently", () => {
-		const deps = createDeps();
+	it("stopTrackingSession can tear down silently when coupled", () => {
+		const deps = createDeps({ eyeCareIndependentOfTracking: false });
 		stopTrackingSession(deps, false);
 		expect(deps.reminders.ensureStopped).toHaveBeenCalledOnce();
 		expect(deps.reminders.stop).not.toHaveBeenCalled();
@@ -59,8 +70,22 @@ describe("tracking-session", () => {
 		expect(deps.lookAway.stop).toHaveBeenCalledOnce();
 	});
 
-	it("startTrackingSession starts blink and resumes enabled eye-care", () => {
+	it("startTrackingSession starts only blink when eye-care is independent", () => {
 		const deps = createDeps({
+			eyeCareIndependentOfTracking: true,
+			eyeExercisesEnabled: true,
+			lookAwayEnabled: true,
+			reminderInterval: 4000,
+		});
+		startTrackingSession(deps);
+		expect(deps.reminders.start).toHaveBeenCalledWith(4000);
+		expect(deps.exercises.start).not.toHaveBeenCalled();
+		expect(deps.lookAway.start).not.toHaveBeenCalled();
+	});
+
+	it("startTrackingSession starts blink and resumes enabled eye-care when coupled", () => {
+		const deps = createDeps({
+			eyeCareIndependentOfTracking: false,
 			eyeExercisesEnabled: true,
 			lookAwayEnabled: true,
 			reminderInterval: 4000,
@@ -73,8 +98,9 @@ describe("tracking-session", () => {
 		expect(deps.lookAway.start).toHaveBeenCalledOnce();
 	});
 
-	it("startTrackingSession skips disabled eye-care prefs", () => {
+	it("startTrackingSession skips disabled eye-care prefs when coupled", () => {
 		const deps = createDeps({
+			eyeCareIndependentOfTracking: false,
 			eyeExercisesEnabled: false,
 			lookAwayEnabled: false,
 		});

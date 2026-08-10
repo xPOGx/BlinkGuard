@@ -267,6 +267,11 @@ export const en: MessageCatalog = {
 	"exercises.disabledNotice.title": "Eye strain risk",
 	"exercises.disabledNotice.body":
 		"Eye exercises and 20-20-20 look-away breaks are both turned off. Long screen sessions without breaks can contribute to digital eye strain — consider enabling at least one reminder.",
+	"exercises.independent.title": "Run independently of blink reminders",
+	"exercises.independent.desc":
+		"Keep exercise and look-away prompts running when Start/Stop reminders is off. Turn this off to pause both together with Stop.",
+	"exercises.independent.toggleAria":
+		"Toggle eye-care independent of blink reminders",
 
 	// Look away
 	"lookAway.title": "20-20-20 Look Away",

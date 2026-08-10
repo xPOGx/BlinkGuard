@@ -3,20 +3,24 @@ import type { ExerciseService } from "./exercise-service";
 import type { LookAwayService } from "./look-away-service";
 import type { ReminderService } from "./reminder-service";
 
-/** Collaborators for a blink-tracking session that also owns eye-care timers. */
+/** Collaborators for a blink-tracking session that may also own eye-care timers. */
 export type TrackingSessionDeps = {
 	reminders: Pick<ReminderService, "start" | "stop" | "ensureStopped">;
 	exercises: Pick<ExerciseService, "start" | "stop" | "resetTimer">;
 	lookAway: Pick<LookAwayService, "start" | "stop" | "resetTimer">;
 	preferences: Pick<
 		AppPreferences,
-		"eyeExercisesEnabled" | "lookAwayEnabled" | "reminderInterval"
+		| "eyeExercisesEnabled"
+		| "lookAwayEnabled"
+		| "reminderInterval"
+		| "eyeCareIndependentOfTracking"
 	>;
 };
 
 /**
- * Stop blink tracking and pause exercise / look-away timers (prefs unchanged).
- * Use `showStatus: false` for silent teardown (e.g. cancel auto-resume).
+ * Stop blink tracking. When eye-care is coupled to reminders
+ * (`eyeCareIndependentOfTracking === false`), also pause exercise / look-away
+ * (prefs unchanged). Use `showStatus: false` for silent teardown.
  */
 export function stopTrackingSession(
 	deps: TrackingSessionDeps,
@@ -27,19 +31,23 @@ export function stopTrackingSession(
 	} else {
 		deps.reminders.ensureStopped();
 	}
-	deps.exercises.stop();
-	deps.lookAway.stop();
+	if (!deps.preferences.eyeCareIndependentOfTracking) {
+		deps.exercises.stop();
+		deps.lookAway.stop();
+	}
 }
 
 /**
- * Start blink tracking and resume eye-care timers when their prefs are on.
- * Resets eye-care due clocks so Stop→Start does not fire an immediate popup.
+ * Start blink tracking. When eye-care is coupled, resume enabled timers and
+ * reset due clocks so Stop→Start does not fire an immediate popup.
+ * Independent mode leaves eye-care timers alone (owned by their own prefs).
  */
 export function startTrackingSession(
 	deps: TrackingSessionDeps,
 	interval?: number,
 ): void {
 	deps.reminders.start(interval ?? deps.preferences.reminderInterval);
+	if (deps.preferences.eyeCareIndependentOfTracking) return;
 	if (deps.preferences.eyeExercisesEnabled) {
 		deps.exercises.resetTimer();
 		deps.exercises.start();

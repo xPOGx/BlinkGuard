@@ -320,10 +320,15 @@ function bootstrap(): void {
 			: null;
 
 		exercises.resetTimer();
-		if (preferences.eyeExercisesEnabled) exercises.start();
-
 		lookAway.resetTimer();
-		if (preferences.lookAwayEnabled) lookAway.start();
+		const eyeCareMayRun =
+			preferences.eyeCareIndependentOfTracking || preferences.isTracking;
+		if (eyeCareMayRun && preferences.eyeExercisesEnabled) {
+			exercises.start();
+		}
+		if (eyeCareMayRun && preferences.lookAwayEnabled) {
+			lookAway.start();
+		}
 
 		focusPause.startQuietHoursWatch();
 		focusMonitor.start();
