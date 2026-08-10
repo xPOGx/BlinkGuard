@@ -4,6 +4,20 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-08-10
+
+### Added
+
+- Themed boot splash with compressed app icon
+
+### Fixed
+
+- Blink: tune look-down FSM gates from Phase 0 logs
+
+### Changed
+
+- Docs: refresh README screenshots for Progress UI; clarify optional camera sidecar setup
+
 ## [2.5.0] - 2026-08-10
 
 ### Added
