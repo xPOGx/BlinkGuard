@@ -1,6 +1,7 @@
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { Button } from "@/components/button";
-import { SettingPanel, SettingRow } from "@/components/setting-panel";
+import { SettingPanel } from "@/components/setting-panel";
+import { SettingRow } from "@/components/setting-row";
 import { useReleaseNotes } from "@/features/about/model/use-release-notes";
 import { SimpleMarkdown } from "@/features/about/ui/simple-markdown";
 import { useT } from "@/i18n";

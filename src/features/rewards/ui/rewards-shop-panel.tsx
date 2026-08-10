@@ -1,5 +1,6 @@
 import { Button } from "@/components/button";
-import { SettingPanel, SettingRow } from "@/components/setting-panel";
+import { SettingPanel } from "@/components/setting-panel";
+import { SettingRow } from "@/components/setting-row";
 import { useBlinkStats } from "@/features/statistics/model/use-blink-stats";
 import { useI18n } from "@/i18n";
 import type { BlinkRewardId } from "../../../../shared/blink-rewards";
@@ -101,8 +102,7 @@ export function RewardsShopPanel() {
 							const showOwned =
 								reward.owned ||
 								(reward.id === "streakShield" && reward.charges > 0);
-							const showMax =
-								reward.id === "shopDiscount" && reward.atMax;
+							const showMax = reward.id === "shopDiscount" && reward.atMax;
 
 							return (
 								<div

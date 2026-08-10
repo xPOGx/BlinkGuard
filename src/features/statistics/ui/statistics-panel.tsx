@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/button";
-import {
-	SettingGrid,
-	SettingPanel,
-	SettingRow,
-} from "@/components/setting-panel";
+import { SettingGrid } from "@/components/setting-grid";
+import { SettingPanel } from "@/components/setting-panel";
+import { SettingRow } from "@/components/setting-row";
+import { SummaryStat } from "@/components/summary-stat";
 import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 import {
@@ -278,17 +277,6 @@ function GoalProgressRow({
 					style={{ width: `${ratio * 100}%` }}
 				/>
 			</div>
-		</div>
-	);
-}
-
-function SummaryStat({ label, value }: { label: string; value: string }) {
-	return (
-		<div className="rounded-md border border-border bg-background px-3 py-2">
-			<p className="text-xs text-muted-foreground">{label}</p>
-			<p className="mt-0.5 text-lg font-semibold tabular-nums tracking-tight">
-				{value}
-			</p>
 		</div>
 	);
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/button";
-import { SettingPanel, ToggleSwitch } from "@/components/setting-panel";
+import { SettingPanel } from "@/components/setting-panel";
+import { ToggleSwitch } from "@/components/toggle-switch";
 import {
 	type ProfileShareCardInput,
 	renderProfileShareCard,

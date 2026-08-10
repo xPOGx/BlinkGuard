@@ -1,12 +1,11 @@
 import { Activity, Camera, Crosshair, Gauge, UserRoundX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/button";
-import {
-	SettingGrid,
-	SettingPanel,
-	SettingRow,
-	ToggleSwitch,
-} from "@/components/setting-panel";
+import { RangeSlider } from "@/components/range-slider";
+import { SettingGrid } from "@/components/setting-grid";
+import { SettingPanel } from "@/components/setting-panel";
+import { SettingRow } from "@/components/setting-row";
+import { ToggleSwitch } from "@/components/toggle-switch";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { useI18n, useT } from "@/i18n";
@@ -19,39 +18,6 @@ import {
 import { EAR_CALIBRATION_MIN_SAMPLES } from "../../../../shared/ear-calibration";
 import { pluralKey, t as translate } from "../../../../shared/i18n";
 import type { CameraQuality } from "../../../../shared/preferences";
-
-interface CameraErrorBannerProps {
-	error: string | null;
-	onDismiss: () => void;
-}
-
-export function CameraErrorBanner({
-	error,
-	onDismiss,
-}: CameraErrorBannerProps) {
-	const t = useT();
-	if (!error) return null;
-
-	return (
-		<div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-destructive">
-			<div className="flex items-center justify-between gap-3">
-				<div className="flex min-w-0 items-center gap-2 text-sm">
-					<Camera className="h-4 w-4 shrink-0" aria-hidden />
-					<span className="font-medium">{t("camera.error")}</span>
-					<span className="select-text truncate">{error}</span>
-				</div>
-				<button
-					type="button"
-					aria-label={t("camera.dismissError")}
-					onClick={onDismiss}
-					className="shrink-0 text-lg leading-none opacity-70 hover:opacity-100"
-				>
-					×
-				</button>
-			</div>
-		</div>
-	);
-}
 
 interface CameraControlsProps {
 	preferences: SettingsPreferences;
@@ -86,11 +52,6 @@ export function CameraControls({
 	};
 
 	const autoStopMinutes = preferences.autoStopNoFaceMinutes;
-	const autoStopProgress = ((autoStopMinutes - 1) / 29) * 100;
-	const trackColor = preferences.darkMode
-		? "hsl(217 25% 18%)"
-		: "hsl(210 18% 90%)";
-	const fillColor = "hsl(173 58% 36%)";
 	const autoStopDescKey = pluralKey(
 		"camera.autoStopNoFaceDesc",
 		locale,
@@ -258,16 +219,10 @@ export function CameraControls({
 						}
 						description={
 							<span className="inline-grid w-full grid-cols-1 grid-rows-1">
-								<span
-									className="invisible col-start-1 row-start-1"
-									aria-hidden
-								>
+								<span className="invisible col-start-1 row-start-1" aria-hidden>
 									{t("camera.detectionDesc")}
 								</span>
-								<span
-									className="invisible col-start-1 row-start-1"
-									aria-hidden
-								>
+								<span className="invisible col-start-1 row-start-1" aria-hidden>
 									{t("camera.detectionDescOn")}
 								</span>
 								<span
@@ -293,11 +248,7 @@ export function CameraControls({
 						}
 					>
 						{/* Keep button slot reserved so the row height stays stable. */}
-						<div
-							className={cn(
-								!cameraOn && "invisible pointer-events-none",
-							)}
-						>
+						<div className={cn(!cameraOn && "invisible pointer-events-none")}>
 							{isWindowOpen ? (
 								<Button
 									type="button"
@@ -367,28 +318,19 @@ export function CameraControls({
 									"opacity-50",
 							)}
 						>
-							<input
+							<RangeSlider
 								aria-label={t("camera.autoStopNoFaceIntervalAria")}
-								type="range"
-								min="1"
-								max="30"
+								min={1}
+								max={30}
 								value={autoStopMinutes}
-								disabled={
-									!cameraOn || !preferences.autoStopNoFaceEnabled
-								}
-								onChange={(event) =>
+								disabled={!cameraOn || !preferences.autoStopNoFaceEnabled}
+								onChange={(autoStopNoFaceMinutes) =>
 									setPreferences((current) => ({
 										...current,
-										autoStopNoFaceMinutes: Number.parseInt(
-											event.target.value,
-											10,
-										),
+										autoStopNoFaceMinutes,
 									}))
 								}
-								className="h-1.5 flex-1 appearance-none rounded-lg bg-muted disabled:cursor-not-allowed"
-								style={{
-									background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${autoStopProgress}%, ${trackColor} ${autoStopProgress}%, ${trackColor} 100%)`,
-								}}
+								className="h-1.5 flex-1"
 							/>
 							<div className="min-w-[2.5rem] text-center text-xs font-medium text-primary">
 								{autoStopMinutes}m
@@ -471,11 +413,7 @@ export function CameraControls({
 											{t("camera.cancelCalibration", { n: remainingSec })}
 										</Button>
 									) : (
-										<Button
-											type="button"
-											size="sm"
-											onClick={startCalibration}
-										>
+										<Button type="button" size="sm" onClick={startCalibration}>
 											{t("camera.calibrate")}
 										</Button>
 									)}

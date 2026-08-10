@@ -1,11 +1,10 @@
 import { Clock, Dumbbell, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/button";
-import {
-	SettingPanel,
-	SettingRow,
-	ToggleSwitch,
-} from "@/components/setting-panel";
+import { RangeSlider } from "@/components/range-slider";
+import { SettingPanel } from "@/components/setting-panel";
+import { SettingRow } from "@/components/setting-row";
+import { ToggleSwitch } from "@/components/toggle-switch";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { useI18n } from "@/i18n";
@@ -22,11 +21,6 @@ export function ExerciseSettings({
 }: ExerciseSettingsProps) {
 	const { t, locale } = useI18n();
 	const [promptsOpen, setPromptsOpen] = useState(false);
-	const progress = ((preferences.exerciseInterval - 5) / 55) * 100;
-	const trackColor = preferences.darkMode
-		? "hsl(217 25% 18%)"
-		: "hsl(210 18% 90%)";
-	const fillColor = "hsl(173 58% 36%)";
 	const prompts = preferences.exercisePrompts;
 	const descKey = pluralKey(
 		"exercises.desc",
@@ -95,22 +89,18 @@ export function ExerciseSettings({
 							{t("common.interval")}
 						</div>
 						<div className="flex items-center gap-2">
-							<input
+							<RangeSlider
 								aria-label={t("exercises.intervalAria")}
-								type="range"
-								min="5"
-								max="60"
+								min={5}
+								max={60}
 								value={preferences.exerciseInterval}
-								onChange={(event) =>
+								onChange={(exerciseInterval) =>
 									setPreferences((current) => ({
 										...current,
-										exerciseInterval: Number.parseInt(event.target.value, 10),
+										exerciseInterval,
 									}))
 								}
-								className="h-1.5 flex-1 cursor-pointer appearance-none rounded-lg bg-muted"
-								style={{
-									background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${progress}%, ${trackColor} ${progress}%, ${trackColor} 100%)`,
-								}}
+								className="h-1.5 flex-1"
 							/>
 							<div className="min-w-[2.5rem] text-center text-xs font-medium text-primary">
 								{preferences.exerciseInterval}m

@@ -1,11 +1,9 @@
 import { Palette, Settings } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "@/components/button";
-import {
-	SettingPanel,
-	SettingRow,
-	ToggleSwitch,
-} from "@/components/setting-panel";
+import { SettingPanel } from "@/components/setting-panel";
+import { SettingRow } from "@/components/setting-row";
+import { ToggleSwitch } from "@/components/toggle-switch";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { useT } from "@/i18n";

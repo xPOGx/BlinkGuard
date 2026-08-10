@@ -17,6 +17,7 @@ Pragmatic Clean Architecture with a thin `electron/main.ts` composition root. Fe
 | `electron/main.ts` | Vite entry/composition root only: constructs collaborators, connects callbacks, starts lifecycle; cold-start tracking restore waits for renderer `shellReady` (after boot splash). Boot splash is static HTML (`index.html` + round `/boot-icon.png`); dismiss + `shellReady` from renderer. Splash/window chrome theme follows persisted `darkMode` via `?dark=` + `BrowserWindow.backgroundColor` |
 | `electron/preload.ts` | `contextBridge`; whitelists from `shared/ipc-channels` |
 | `src/app.tsx` | Settings shell (`BlinkGuardHomepage`) |
+| `src/components/` | Shared React UI (1 file = 1 component); catalog in `.cursor/skills/ui-reuse/catalog.json` |
 | `src/features/*` | Feature `model/` + `ui/` (reminders, camera, exercises, look-away, popup-appearance, statistics, profile, rewards, settings, onboarding, about, shortcuts, debug) |
 | `src/shared/ipc/` | Renderer IPC adapter |
 | `public/js`, `public/css` | Vanilla popup scripts/styles; panel transparency via CSS alpha in `theme.js` (not `BrowserWindow.setOpacity`); frosted panels use `.popup-glass` underlay blur |
@@ -29,6 +30,7 @@ Cursor rules under `.cursor/rules/` and project skills under `.cursor/skills/` d
 - `readme-screenshots` — README product PNGs via `scripts/screenshot_tools/` (Windows)
 - `i18n-en-uk` — EN+UK catalogs, plurals, popup `data-i18n`
 - `preferences-sync-loops` — main↔renderer prefs bounce prevention
+- `ui-reuse` — read `.cursor/skills/ui-reuse/catalog.json` before creating/changing UI; reuse atoms/molecules/organisms
 - `keep-agent-docs-current` — after meaningful changes, fix drifted rules/skills/`AGENTS.md`
 
 ### Required service: the Electron desktop app

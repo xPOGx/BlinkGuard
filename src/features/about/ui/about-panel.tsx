@@ -1,7 +1,8 @@
 import { Download, ExternalLink, Heart, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/button";
-import { SettingPanel, SettingRow } from "@/components/setting-panel";
+import { SettingPanel } from "@/components/setting-panel";
+import { SettingRow } from "@/components/setting-row";
 import type { useAutoUpdate } from "@/features/about/model/use-auto-update";
 import { ReleaseNotesPanel } from "@/features/about/ui/release-notes-panel";
 import { ThanksPanel } from "@/features/about/ui/thanks-panel";

@@ -1,6 +1,8 @@
 import { Activity, Clock, Play, Square } from "lucide-react";
 import { Button } from "@/components/button";
-import { SettingPanel, SettingRow } from "@/components/setting-panel";
+import { RangeSlider } from "@/components/range-slider";
+import { SettingPanel } from "@/components/setting-panel";
+import { SettingRow } from "@/components/setting-row";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import { useI18n } from "@/i18n";
 import { pluralKey } from "../../../../shared/i18n";
@@ -22,11 +24,6 @@ export function ReminderControls({
 	onToggleTracking,
 }: ReminderControlsProps) {
 	const { t, locale } = useI18n();
-	const progress = ((preferences.reminderInterval - 1) / 9) * 100;
-	const trackColor = preferences.darkMode
-		? "hsl(217 25% 18%)"
-		: "hsl(210 18% 90%)";
-	const fillColor = "hsl(173 58% 36%)";
 	const blinksPerMinute = 60 / preferences.reminderInterval;
 	const formattedRate = formatBlinksPerMinute(preferences.reminderInterval);
 	const inTypicalRange = blinksPerMinute >= 15 && blinksPerMinute <= 20;
@@ -53,20 +50,14 @@ export function ReminderControls({
 					description={t(descKey, { n: interval })}
 				>
 					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-						<input
+						<RangeSlider
 							id="reminder-interval"
 							aria-label={t("reminders.intervalAria")}
-							type="range"
-							min="1"
-							max="10"
+							min={1}
+							max={10}
 							value={preferences.reminderInterval}
-							onChange={(event) =>
-								onIntervalChange(Number.parseInt(event.target.value, 10))
-							}
-							className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-muted sm:flex-1"
-							style={{
-								background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${progress}%, ${trackColor} ${progress}%, ${trackColor} 100%)`,
-							}}
+							onChange={onIntervalChange}
+							className="sm:flex-1"
 						/>
 						<div className="flex shrink-0 items-center justify-center gap-3 sm:justify-end">
 							<div className="min-w-[4.5rem] rounded-md bg-accent px-3 py-1 text-center text-sm font-semibold text-accent-foreground">

@@ -1,9 +1,7 @@
 import { Button } from "@/components/button";
-import {
-	SettingPanel,
-	SettingRow,
-	ToggleSwitch,
-} from "@/components/setting-panel";
+import { SettingPanel } from "@/components/setting-panel";
+import { SettingRow } from "@/components/setting-row";
+import { ToggleSwitch } from "@/components/toggle-switch";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { useBlinkStats } from "@/features/statistics/model/use-blink-stats";
 import { useT } from "@/i18n";

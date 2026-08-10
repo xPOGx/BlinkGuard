@@ -1,7 +1,8 @@
 import { Camera, Keyboard, LogIn, Moon, Timer } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/button";
-import { SettingPanel, ToggleSwitch } from "@/components/setting-panel";
+import { SettingPanel } from "@/components/setting-panel";
+import { ToggleSwitch } from "@/components/toggle-switch";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { ShortcutSettings } from "@/features/shortcuts/ui/shortcut-settings";
@@ -145,7 +146,9 @@ export function OnboardingWizard({
 										className="mb-2 h-5 w-5 text-muted-foreground"
 										aria-hidden
 									/>
-									<p className="text-sm font-medium">{t("onboarding.camera")}</p>
+									<p className="text-sm font-medium">
+										{t("onboarding.camera")}
+									</p>
 									<p className="mt-1 text-xs text-muted-foreground">
 										{t("onboarding.cameraDesc")}
 									</p>

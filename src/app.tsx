@@ -16,10 +16,8 @@ import { AboutPanel } from "@/features/about/ui/about-panel";
 import { UpdateDialog } from "@/features/about/ui/update-dialog";
 import { UpdateToast } from "@/features/about/ui/update-toast";
 import { useCameraStatus } from "@/features/camera/model/use-camera-status";
-import {
-	CameraControls,
-	CameraErrorBanner,
-} from "@/features/camera/ui/camera-controls";
+import { CameraControls } from "@/features/camera/ui/camera-controls";
+import { CameraErrorBanner } from "@/features/camera/ui/camera-error-banner";
 import { DebugPanel } from "@/features/debug/ui/debug-panel";
 import { ExerciseSettings } from "@/features/exercises/ui/exercise-settings";
 import { EyePromptsDisabledNotice } from "@/features/exercises/ui/eye-prompts-disabled-notice";
@@ -30,16 +28,14 @@ import { ProfilePanel } from "@/features/profile/ui/profile-panel";
 import { ReminderControls } from "@/features/reminders/ui/reminder-controls";
 import { RewardsShopPanel } from "@/features/rewards/ui/rewards-shop-panel";
 import { usePreferences } from "@/features/settings/model/use-preferences";
-import {
-	BackupSettings,
-	DarkModeToggle,
-	GoalsSettings,
-	LanguageSettings,
-	LaunchAtLoginSettings,
-	QuietHoursFocusSettings,
-	ResetPreferencesButton,
-	SoundSettings,
-} from "@/features/settings/ui/settings-controls";
+import { BackupSettings } from "@/features/settings/ui/backup-settings";
+import { DarkModeToggle } from "@/features/settings/ui/dark-mode-toggle";
+import { GoalsSettings } from "@/features/settings/ui/goals-settings";
+import { LanguageSettings } from "@/features/settings/ui/language-settings";
+import { LaunchAtLoginSettings } from "@/features/settings/ui/launch-at-login-settings";
+import { QuietHoursFocusSettings } from "@/features/settings/ui/quiet-hours-focus-settings";
+import { ResetPreferencesButton } from "@/features/settings/ui/reset-preferences-button";
+import { SoundSettings } from "@/features/settings/ui/sound-settings";
 import { TrackingEyeButton } from "@/features/settings/ui/tracking-eye-button";
 import { useShortcutControls } from "@/features/shortcuts/model/use-shortcut-controls";
 import { ShortcutSettings } from "@/features/shortcuts/ui/shortcut-settings";
