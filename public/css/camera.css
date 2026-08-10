@@ -17,6 +17,8 @@
 	width: 100%;
 	height: 100%;
 	display: block;
+	/* Selfie-style preview: match how users expect left/right to move. */
+	transform: scaleX(-1);
 }
 
 .camera-face-missing {
