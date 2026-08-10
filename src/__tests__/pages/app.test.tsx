@@ -162,9 +162,7 @@ describe("settings shell", () => {
 
 		expect(screen.getByRole("dialog")).toBeDefined();
 		expect(screen.getByText("Welcome to BlinkGuard")).toBeDefined();
-		expect(
-			screen.getByRole("heading", { name: "Reminder mode" }),
-		).toBeDefined();
+		expect(screen.getByRole("heading", { name: "Language" })).toBeDefined();
 	});
 
 	it("hides onboarding when prefs hydrate as completed", () => {
@@ -192,6 +190,7 @@ describe("settings shell", () => {
 		render(<App />);
 		hydratePreferences({ hasCompletedOnboarding: false });
 
+		fireEvent.click(screen.getByRole("button", { name: "Next" }));
 		fireEvent.click(screen.getByRole("button", { name: "Next" }));
 		fireEvent.click(screen.getByRole("button", { name: "Next" }));
 		fireEvent.click(screen.getByRole("button", { name: "Next" }));

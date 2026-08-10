@@ -1,13 +1,25 @@
-import { Camera, Keyboard, LogIn, Moon, Timer } from "lucide-react";
-import { useState } from "react";
+import {
+	Camera,
+	Gamepad2,
+	Keyboard,
+	Languages,
+	LogIn,
+	Moon,
+	Play,
+	Timer,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/button";
 import { SettingPanel } from "@/components/setting-panel";
 import { ToggleSwitch } from "@/components/toggle-switch";
+import { applyLocale } from "@/features/settings/model/apply-locale";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { ShortcutSettings } from "@/features/shortcuts/ui/shortcut-settings";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { rendererIpc } from "@/shared/ipc/renderer-ipc";
+import type { Locale } from "../../../../shared/i18n";
 
 interface OnboardingWizardProps {
 	preferences: SettingsPreferences;
@@ -29,7 +41,23 @@ export function OnboardingWizard({
 }: OnboardingWizardProps) {
 	const t = useT();
 	const [stepIndex, setStepIndex] = useState(0);
+	const [fullscreenDetectionSupported, setFullscreenDetectionSupported] =
+		useState<boolean | null>(null);
+
+	useEffect(
+		() =>
+			rendererIpc.onFocusPauseState((payload) => {
+				setFullscreenDetectionSupported(payload.fullscreenDetectionSupported);
+			}),
+		[],
+	);
+
 	const steps = [
+		{
+			id: "language" as const,
+			title: t("onboarding.step.language"),
+			label: t("onboarding.step.languageLabel"),
+		},
 		{
 			id: "mode" as const,
 			title: t("onboarding.step.mode"),
@@ -41,24 +69,29 @@ export function OnboardingWizard({
 			label: t("onboarding.step.shortcutLabel"),
 		},
 		{
-			id: "launch" as const,
-			title: t("onboarding.step.launch"),
-			label: t("onboarding.step.launchLabel"),
-		},
-		{
 			id: "quiet" as const,
 			title: t("onboarding.step.quiet"),
 			label: t("onboarding.step.quietLabel"),
 		},
+		{
+			id: "ready" as const,
+			title: t("onboarding.step.ready"),
+			label: t("onboarding.step.readyLabel"),
+		},
 	];
 	const isLast = stepIndex === steps.length - 1;
 	const step = steps[stepIndex];
+	const fullscreenUnsupported = fullscreenDetectionSupported === false;
 
 	const complete = () => {
 		setPreferences((current) => ({
 			...current,
 			hasCompletedOnboarding: true,
 		}));
+	};
+
+	const selectLocale = (locale: Locale) => {
+		setPreferences((current) => applyLocale(current, locale));
 	};
 
 	return (
@@ -98,6 +131,43 @@ export function OnboardingWizard({
 				</div>
 
 				<div className="min-h-40">
+					{step.id === "language" ? (
+						<div className="space-y-3">
+							<p className="flex items-start gap-2 text-sm text-muted-foreground">
+								<Languages className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+								{t("onboarding.languageDesc")}
+							</p>
+							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+								<button
+									type="button"
+									onClick={() => selectLocale("en")}
+									className={cn(
+										"rounded-lg border p-4 text-left transition-colors",
+										preferences.locale === "en"
+											? "border-primary bg-primary/10"
+											: "border-border hover:bg-muted",
+									)}
+									aria-pressed={preferences.locale === "en"}
+								>
+									<p className="text-sm font-medium">{t("language.en")}</p>
+								</button>
+								<button
+									type="button"
+									onClick={() => selectLocale("uk")}
+									className={cn(
+										"rounded-lg border p-4 text-left transition-colors",
+										preferences.locale === "uk"
+											? "border-primary bg-primary/10"
+											: "border-border hover:bg-muted",
+									)}
+									aria-pressed={preferences.locale === "uk"}
+								>
+									<p className="text-sm font-medium">{t("language.uk")}</p>
+								</button>
+							</div>
+						</div>
+					) : null}
+
 					{step.id === "mode" ? (
 						<div className="space-y-3">
 							<div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -178,93 +248,133 @@ export function OnboardingWizard({
 						</div>
 					) : null}
 
-					{step.id === "launch" ? (
-						<div className="space-y-3">
-							<div className="flex items-center justify-between gap-4">
-								<p className="flex min-w-0 items-center gap-2 text-sm font-medium">
-									<LogIn
-										className="h-4 w-4 shrink-0 text-muted-foreground"
-										aria-hidden
-									/>
-									{t("launch.title")}
-								</p>
-								<div className="shrink-0">
-									<ToggleSwitch
-										aria-label={t("launch.toggleAria")}
-										checked={preferences.launchAtLogin}
-										onChange={() =>
-											setPreferences((current) => ({
-												...current,
-												launchAtLogin: !current.launchAtLogin,
-											}))
-										}
-									/>
+					{step.id === "quiet" ? (
+						<div className="space-y-4">
+							<div className="space-y-3">
+								<div className="flex items-center justify-between gap-4">
+									<p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+										<Moon
+											className="h-4 w-4 shrink-0 text-muted-foreground"
+											aria-hidden
+										/>
+										{t("quietHours.title")}
+									</p>
+									<div className="shrink-0">
+										<ToggleSwitch
+											aria-label={t("quietHours.toggleAria")}
+											checked={preferences.quietHoursEnabled}
+											onChange={() =>
+												setPreferences((current) => ({
+													...current,
+													quietHoursEnabled: !current.quietHoursEnabled,
+												}))
+											}
+										/>
+									</div>
 								</div>
+								<p className="text-xs text-muted-foreground sm:text-sm">
+									{t("onboarding.quietDesc")}
+								</p>
+								{preferences.quietHoursEnabled ? (
+									<div className="flex flex-wrap items-center gap-3">
+										<label className="flex items-center gap-2 text-sm text-muted-foreground">
+											<span>{t("common.from")}</span>
+											<input
+												type="time"
+												value={preferences.quietHoursStart}
+												onChange={(event) =>
+													setPreferences((current) => ({
+														...current,
+														quietHoursStart: event.target.value,
+													}))
+												}
+												className="rounded-md border border-border bg-background px-2 py-1 text-foreground"
+											/>
+										</label>
+										<label className="flex items-center gap-2 text-sm text-muted-foreground">
+											<span>{t("common.to")}</span>
+											<input
+												type="time"
+												value={preferences.quietHoursEnd}
+												onChange={(event) =>
+													setPreferences((current) => ({
+														...current,
+														quietHoursEnd: event.target.value,
+													}))
+												}
+												className="rounded-md border border-border bg-background px-2 py-1 text-foreground"
+											/>
+										</label>
+									</div>
+								) : null}
 							</div>
-							<p className="text-xs text-muted-foreground sm:text-sm">
-								{t("onboarding.launchDesc")}
-							</p>
+
+							<div className="space-y-3 border-t border-border pt-4">
+								<div className="flex items-center justify-between gap-4">
+									<p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+										<Gamepad2
+											className="h-4 w-4 shrink-0 text-muted-foreground"
+											aria-hidden
+										/>
+										{t("fullscreen.title")}
+									</p>
+									<div className="shrink-0">
+										<ToggleSwitch
+											aria-label={t("fullscreen.toggleAria")}
+											checked={preferences.pauseOnFullscreen}
+											disabled={fullscreenUnsupported}
+											onChange={() =>
+												setPreferences((current) => ({
+													...current,
+													pauseOnFullscreen: !current.pauseOnFullscreen,
+												}))
+											}
+										/>
+									</div>
+								</div>
+								<p className="text-xs text-muted-foreground sm:text-sm">
+									{fullscreenUnsupported
+										? t("fullscreen.unsupportedDescription")
+										: t("fullscreen.description")}
+								</p>
+							</div>
 						</div>
 					) : null}
 
-					{step.id === "quiet" ? (
-						<div className="space-y-3">
-							<div className="flex items-center justify-between gap-4">
-								<p className="flex min-w-0 items-center gap-2 text-sm font-medium">
-									<Moon
-										className="h-4 w-4 shrink-0 text-muted-foreground"
-										aria-hidden
-									/>
-									{t("quietHours.title")}
-								</p>
-								<div className="shrink-0">
-									<ToggleSwitch
-										aria-label={t("quietHours.toggleAria")}
-										checked={preferences.quietHoursEnabled}
-										onChange={() =>
-											setPreferences((current) => ({
-												...current,
-												quietHoursEnabled: !current.quietHoursEnabled,
-											}))
-										}
-									/>
-								</div>
-							</div>
-							<p className="text-xs text-muted-foreground sm:text-sm">
-								{t("onboarding.quietDesc")}
+					{step.id === "ready" ? (
+						<div className="space-y-4">
+							<p className="flex items-start gap-2 text-sm text-muted-foreground">
+								<Play className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+								{t("onboarding.readyDesc", {
+									shortcut: preferences.keyboardShortcut,
+								})}
 							</p>
-							{preferences.quietHoursEnabled ? (
-								<div className="flex flex-wrap items-center gap-3">
-									<label className="flex items-center gap-2 text-sm text-muted-foreground">
-										<span>{t("common.from")}</span>
-										<input
-											type="time"
-											value={preferences.quietHoursStart}
-											onChange={(event) =>
+							<div className="space-y-3 border-t border-border pt-4">
+								<div className="flex items-center justify-between gap-4">
+									<p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+										<LogIn
+											className="h-4 w-4 shrink-0 text-muted-foreground"
+											aria-hidden
+										/>
+										{t("launch.title")}
+									</p>
+									<div className="shrink-0">
+										<ToggleSwitch
+											aria-label={t("launch.toggleAria")}
+											checked={preferences.launchAtLogin}
+											onChange={() =>
 												setPreferences((current) => ({
 													...current,
-													quietHoursStart: event.target.value,
+													launchAtLogin: !current.launchAtLogin,
 												}))
 											}
-											className="rounded-md border border-border bg-background px-2 py-1 text-foreground"
 										/>
-									</label>
-									<label className="flex items-center gap-2 text-sm text-muted-foreground">
-										<span>{t("common.to")}</span>
-										<input
-											type="time"
-											value={preferences.quietHoursEnd}
-											onChange={(event) =>
-												setPreferences((current) => ({
-													...current,
-													quietHoursEnd: event.target.value,
-												}))
-											}
-											className="rounded-md border border-border bg-background px-2 py-1 text-foreground"
-										/>
-									</label>
+									</div>
 								</div>
-							) : null}
+								<p className="text-xs text-muted-foreground sm:text-sm">
+									{t("onboarding.launchDesc")}
+								</p>
+							</div>
 						</div>
 					) : null}
 				</div>

@@ -396,14 +396,20 @@ export const en: MessageCatalog = {
 	"onboarding.welcome": "Welcome to BlinkGuard",
 	"onboarding.subtitle":
 		"A quick setup — you can change everything later in Settings.",
+	"onboarding.step.language": "Language",
+	"onboarding.step.languageLabel": "Language",
 	"onboarding.step.mode": "Reminder mode",
 	"onboarding.step.modeLabel": "Mode",
 	"onboarding.step.shortcut": "Keyboard shortcut",
 	"onboarding.step.shortcutLabel": "Shortcut",
 	"onboarding.step.launch": "Launch at login",
 	"onboarding.step.launchLabel": "Launch",
-	"onboarding.step.quiet": "Quiet hours",
+	"onboarding.step.quiet": "Quiet hours & focus",
 	"onboarding.step.quietLabel": "Quiet hours",
+	"onboarding.step.ready": "You're ready",
+	"onboarding.step.readyLabel": "Ready",
+	"onboarding.languageDesc":
+		"Choose the language for settings and reminder popups.",
 	"onboarding.timer": "Timer",
 	"onboarding.timerDesc":
 		"Reminders on a fixed interval. Works without a camera.",
@@ -418,6 +424,8 @@ export const en: MessageCatalog = {
 		"Start BlinkGuard hidden in the system tray when you sign in. Closing the window keeps the app running in the tray.",
 	"onboarding.quietDesc":
 		"Hide blink and eye-care popups during this local-time window.",
+	"onboarding.readyDesc":
+		"Open Reminders and press Start, or use {shortcut} anytime to start or stop blink reminders.",
 
 	// Statistics
 	"stats.totals": "Totals",

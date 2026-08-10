@@ -2,17 +2,8 @@ import { ChevronDown } from "lucide-react";
 import { SettingPanel } from "@/components/setting-panel";
 import { SettingRow } from "@/components/setting-row";
 import { useT } from "@/i18n";
-import {
-	defaultExercisePrompts,
-	defaultLookAwayHint,
-	defaultLookAwayTitle,
-	defaultPopupMessage,
-	isBuiltInExercisePrompts,
-	isBuiltInLookAwayHint,
-	isBuiltInLookAwayTitle,
-	isBuiltInPopupMessage,
-	type Locale,
-} from "../../../../shared/i18n";
+import type { Locale } from "../../../../shared/i18n";
+import { applyLocale } from "../model/apply-locale";
 import type { SettingsPreferences } from "../model/preferences";
 import type { SetPreferences } from "../model/use-preferences";
 
@@ -38,25 +29,7 @@ export function LanguageSettings({
 							value={preferences.locale}
 							onChange={(event) => {
 								const locale = event.target.value as Locale;
-								setPreferences((current) => {
-									const next: SettingsPreferences = {
-										...current,
-										locale,
-									};
-									if (isBuiltInPopupMessage(current.popupMessage)) {
-										next.popupMessage = defaultPopupMessage(locale);
-									}
-									if (isBuiltInExercisePrompts(current.exercisePrompts)) {
-										next.exercisePrompts = defaultExercisePrompts(locale);
-									}
-									if (isBuiltInLookAwayTitle(current.lookAwayTitle)) {
-										next.lookAwayTitle = defaultLookAwayTitle(locale);
-									}
-									if (isBuiltInLookAwayHint(current.lookAwayHint)) {
-										next.lookAwayHint = defaultLookAwayHint(locale);
-									}
-									return next;
-								});
+								setPreferences((current) => applyLocale(current, locale));
 							}}
 							className="appearance-none rounded-md border border-border bg-background py-1.5 pl-2.5 pr-9 text-sm text-foreground"
 						>

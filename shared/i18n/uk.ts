@@ -404,14 +404,20 @@ export const uk: MessageCatalog = {
 	"onboarding.welcome": "Ласкаво просимо до BlinkGuard",
 	"onboarding.subtitle":
 		"Швидке налаштування — усе можна змінити пізніше в Налаштуваннях.",
+	"onboarding.step.language": "Мова",
+	"onboarding.step.languageLabel": "Мова",
 	"onboarding.step.mode": "Режим нагадувань",
 	"onboarding.step.modeLabel": "Режим",
 	"onboarding.step.shortcut": "Гаряча клавіша",
 	"onboarding.step.shortcutLabel": "Клавіша",
 	"onboarding.step.launch": "Запуск під час входу",
 	"onboarding.step.launchLabel": "Запуск",
-	"onboarding.step.quiet": "Тихі години",
+	"onboarding.step.quiet": "Тихі години та фокус",
 	"onboarding.step.quietLabel": "Тихі години",
+	"onboarding.step.ready": "Усе готово",
+	"onboarding.step.readyLabel": "Готово",
+	"onboarding.languageDesc":
+		"Оберіть мову налаштувань і спливаючих нагадувань.",
 	"onboarding.timer": "Таймер",
 	"onboarding.timerDesc":
 		"Нагадування з фіксованим інтервалом. Працює без камери.",
@@ -426,6 +432,8 @@ export const uk: MessageCatalog = {
 		"Запускати BlinkGuard у системному треї під час входу. Закриття вікна залишає програму в треї.",
 	"onboarding.quietDesc":
 		"Ховати спливаючі вікна моргання та турботи про очі в цей локальний час.",
+	"onboarding.readyDesc":
+		"Відкрийте «Нагадування» і натисніть «Старт», або будь-коли використовуйте {shortcut}, щоб увімкнути чи вимкнути нагадування.",
 
 	// Statistics
 	"stats.totals": "Підсумки",
