@@ -113,14 +113,19 @@ describe("backup document", () => {
 			appVersion: "1.0.0",
 			preferences: {
 				...DEFAULT_PREFERENCES,
-				keyboardShortcut: "Ctrl+B",
+				keyboardShortcuts: {
+					...DEFAULT_PREFERENCES.keyboardShortcuts,
+					trackingToggle: "Ctrl+B",
+				},
 			},
 			blinkStats: { ...DEFAULT_BLINK_STATS, days: [] },
 		});
 		const result = parseBackupDocument(document, "preferences");
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
-		expect(result.value.preferences?.keyboardShortcut).toBe("Ctrl+B");
+		expect(result.value.preferences?.keyboardShortcuts.trackingToggle).toBe(
+			"Ctrl+B",
+		);
 		expect(result.value.blinkStats).toBeUndefined();
 	});
 

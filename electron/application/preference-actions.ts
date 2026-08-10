@@ -6,7 +6,10 @@ import {
 } from "../../shared/backup";
 import { sanitizeLocale, type Locale } from "../../shared/i18n";
 import { IPC_CHANNELS } from "../../shared/ipc-channels";
-import type { CameraQuality } from "../../shared/preferences";
+import type {
+	CameraQuality,
+	KeyboardShortcuts,
+} from "../../shared/preferences";
 import type { BlinkStatsService } from "./blink-stats-service";
 import type { ExerciseService } from "./exercise-service";
 import type { FocusPauseService } from "./focus-pause-service";
@@ -29,7 +32,7 @@ export interface PreferenceActionWindows {
 }
 
 export interface PreferenceActionShortcuts {
-	register(shortcut: string): void;
+	registerAll(shortcuts: KeyboardShortcuts): void;
 }
 
 export interface PreferenceActionTray {
@@ -107,8 +110,8 @@ export class PreferenceActions {
 			replayOnboarding: Boolean(replayOnboarding),
 		});
 		this.applyLaunchAtLogin(false);
-		this.shortcuts.register(current.keyboardShortcut);
-		this.sidecar.applyCameraQuality(current.cameraQuality);
+		this.shortcuts.registerAll(this.preferences.current.keyboardShortcuts);
+		this.sidecar.applyCameraQuality(this.preferences.current.cameraQuality);
 		this.sidecar.applyEarCalibration(null);
 		this.tray?.rebuildMenu(this.preferences.current.locale);
 		this.windows.sendPreferences();
@@ -134,7 +137,7 @@ export class PreferenceActions {
 			this.preferences.replaceFromBackup(parsed.preferences);
 			const next = this.preferences.current;
 			this.applyLaunchAtLogin(next.launchAtLogin);
-			this.shortcuts.register(next.keyboardShortcut);
+			this.shortcuts.registerAll(next.keyboardShortcuts);
 			this.sidecar.applyCameraQuality(next.cameraQuality);
 			this.sidecar.applyEarCalibration(next.earCalibration);
 			this.tray?.rebuildMenu(next.locale);

@@ -57,6 +57,23 @@ describe("PreferencesService", () => {
 		expect(store.get("hasCompletedOnboarding")).toBe(true);
 	});
 
+	it("migrates legacy keyboardShortcut into keyboardShortcuts.trackingToggle", () => {
+		const store = new FakePreferenceStore();
+		store.set("keyboardShortcut", "Ctrl+B");
+		store.set("hasCompletedOnboarding", true);
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.keyboardShortcuts).toEqual({
+			...DEFAULT_PREFERENCES.keyboardShortcuts,
+			trackingToggle: "Ctrl+B",
+		});
+		expect(store.get("keyboardShortcuts")).toEqual({
+			...DEFAULT_PREFERENCES.keyboardShortcuts,
+			trackingToggle: "Ctrl+B",
+		});
+	});
+
 	it("keeps first-run onboarding when the store is empty", () => {
 		const store = new FakePreferenceStore();
 		const service = new PreferencesService(store);
@@ -201,14 +218,20 @@ describe("PreferencesService", () => {
 		const store = new FakePreferenceStore();
 		const service = new PreferencesService(store);
 
-		service.set("keyboardShortcut", "Ctrl+B");
+		service.set("keyboardShortcuts", {
+			...DEFAULT_PREFERENCES.keyboardShortcuts,
+			trackingToggle: "Ctrl+B",
+		});
 		service.set("cameraQuality", "performance");
 		service.set("earCalibration", 0.28);
 		service.set("launchAtLogin", true);
 		service.set("isTracking", true);
 
-		expect(service.current.keyboardShortcut).toBe("Ctrl+B");
-		expect(store.get("keyboardShortcut")).toBe("Ctrl+B");
+		expect(service.current.keyboardShortcuts.trackingToggle).toBe("Ctrl+B");
+		expect(store.get("keyboardShortcuts")).toEqual({
+			...DEFAULT_PREFERENCES.keyboardShortcuts,
+			trackingToggle: "Ctrl+B",
+		});
 		expect(service.current.cameraQuality).toBe("performance");
 		expect(store.get("cameraQuality")).toBe("performance");
 		expect(service.current.earCalibration).toBe(0.28);
@@ -356,7 +379,10 @@ describe("PreferencesService", () => {
 			darkMode: false,
 			locale: "uk",
 			reminderInterval: 7000,
-			keyboardShortcut: "Ctrl+B",
+			keyboardShortcuts: {
+				...DEFAULT_PREFERENCES.keyboardShortcuts,
+				trackingToggle: "Ctrl+B",
+			},
 			isTracking: true,
 			hasCompletedOnboarding: true,
 			cameraQuality: "high",
@@ -366,7 +392,7 @@ describe("PreferencesService", () => {
 		expect(service.current.darkMode).toBe(false);
 		expect(service.current.locale).toBe("uk");
 		expect(service.current.reminderInterval).toBe(7000);
-		expect(service.current.keyboardShortcut).toBe("Ctrl+B");
+		expect(service.current.keyboardShortcuts.trackingToggle).toBe("Ctrl+B");
 		expect(service.current.isTracking).toBe(false);
 		expect(service.current.hasCompletedOnboarding).toBe(true);
 		expect(service.current.cameraQuality).toBe("high");

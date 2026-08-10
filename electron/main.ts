@@ -235,6 +235,7 @@ function bootstrap(): void {
 		new ProcessCleanup(processes),
 		blinkStats,
 		() => {
+			shortcuts.unregisterAll();
 			focusMonitor.stop();
 			focusPause.stopQuietHoursWatch();
 			focusEnvironment.dispose?.();
@@ -270,6 +271,7 @@ function bootstrap(): void {
 		applyLaunchAtLogin,
 		tray,
 	);
+	shortcuts.setOpenCameraPreview(() => preferenceActions.showCameraWindow());
 
 	const trackingRestore = new DeferredTrackingRestore({
 		pending: preferences.isTracking,
@@ -289,6 +291,7 @@ function bootstrap(): void {
 		reminders,
 		exercises,
 		lookAway,
+		state,
 		sidecar,
 		shortcuts,
 		windows,
@@ -323,7 +326,7 @@ function bootstrap(): void {
 		autoUpdates.start();
 		autoUpdates.checkForUpdates();
 		applyLaunchAtLogin(preferences.launchAtLogin);
-		shortcuts.register(preferences.keyboardShortcut);
+		shortcuts.registerAll(preferences.keyboardShortcuts);
 
 		preferences.popupPosition = store.has("popupPosition")
 			? store.get("popupPosition")

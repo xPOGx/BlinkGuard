@@ -5,7 +5,13 @@ import { isBlinkRewardId } from "../../../shared/blink-rewards";
 import { isDebugOverlayKind, isDebugSoundKind } from "../../../shared/debug-preview";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import type { Point, PopupColors, Size } from "../../../shared/preferences";
-import { sanitizeGoalsConfig } from "../../../shared/preferences";
+import {
+	sameKeyboardShortcuts,
+	findDuplicateShortcutActions,
+	sanitizeGoalsConfig,
+	sanitizeKeyboardShortcuts,
+} from "../../../shared/preferences";
+import type { AppRuntimeState } from "../../application/app-runtime-state";
 import type { BlinkStatsService } from "../../application/blink-stats-service";
 import type { ExerciseService } from "../../application/exercise-service";
 import type { FocusPauseService } from "../../application/focus-pause-service";
@@ -13,6 +19,7 @@ import type { LookAwayService } from "../../application/look-away-service";
 import type { PreferenceActions } from "../../application/preference-actions";
 import type { PreferencesService } from "../../application/preferences-service";
 import type { ReminderService } from "../../application/reminder-service";
+import { snoozeAllPrompts } from "../../application/snooze-all";
 import {
 	startTrackingSession,
 	stopTrackingSession,
@@ -43,6 +50,7 @@ interface IpcDependencies {
 	reminders: ReminderService;
 	exercises: ExerciseService;
 	lookAway: LookAwayService;
+	state: AppRuntimeState;
 	sidecar: BlinkDetectorSidecar;
 	shortcuts: ShortcutController;
 	windows: WindowManager;
@@ -65,6 +73,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		reminders,
 		exercises,
 		lookAway,
+		state,
 		sidecar,
 		shortcuts,
 		windows,
@@ -243,9 +252,24 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	on(IPC_CHANNELS.updateLookAwayHint, (_event, hint: unknown) => {
 		preferences.set("lookAwayHint", hint as string);
 	});
-	on(IPC_CHANNELS.updateKeyboardShortcut, (_event, shortcut: unknown) => {
-		preferences.set("keyboardShortcut", shortcut as string);
-		shortcuts.register(shortcut as string);
+	on(IPC_CHANNELS.updateKeyboardShortcuts, (_event, raw: unknown) => {
+		const next = sanitizeKeyboardShortcuts(raw);
+		const before = preferences.current.keyboardShortcuts;
+		if (sameKeyboardShortcuts(before, next)) return;
+		const conflicts = findDuplicateShortcutActions(next);
+		if (conflicts.length > 0) {
+			const errors: Record<string, string> = {};
+			for (const action of conflicts) {
+				errors[action] = next[action];
+			}
+			windows.sendToMain(IPC_CHANNELS.shortcutError, { errors, conflicts });
+			return;
+		}
+		preferences.set("keyboardShortcuts", next);
+		shortcuts.registerAll(preferences.current.keyboardShortcuts);
+	});
+	on(IPC_CHANNELS.setShortcutCaptureMode, (_event, capturing: unknown) => {
+		shortcuts.setCaptureMode(Boolean(capturing));
 	});
 	on(IPC_CHANNELS.startCameraTracking, () => {
 		if (current.isTracking) {
@@ -270,6 +294,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	on(IPC_CHANNELS.skipLookAway, () => lookAway.skip());
 	on(IPC_CHANNELS.snoozeLookAway, () => lookAway.snooze());
 	on(IPC_CHANNELS.snoozeBlink, () => reminders.snooze());
+	on(IPC_CHANNELS.snoozeAll, () =>
+		snoozeAllPrompts({ reminders, exercises, lookAway, state }),
+	);
 	on(IPC_CHANNELS.updateMgdMode, (_event, enabled: unknown) => {
 		preferences.set("mgdMode", enabled as boolean);
 		reminders.syncCameraLoopForMgdMode();

@@ -397,16 +397,32 @@ export const uk: MessageCatalog = {
 	"fullscreen.paused": "Пауза: повний екран / гра",
 
 	// Shortcuts
-	"shortcut.title": "Гаряча клавіша",
+	"shortcut.title": "Гарячі клавіші",
 	"shortcut.description":
-		"Натисніть комбінацію, щоб увімкнути/вимкнути нагадування. Потрібен щонайменше один модифікатор (Ctrl, Shift, Alt, Cmd, Win) і одна звичайна клавіша.",
-	"shortcut.currentAria": "Поточна гаряча клавіша",
+		"Призначте глобальні комбінації для типових дій. Потрібен щонайменше один модифікатор (Ctrl, Shift, Alt, Cmd, Win) і одна звичайна клавіша — або залиште непризначеною.",
+	"shortcut.currentAria": "Поточна комбінація для «{action}»",
 	"shortcut.pressKeys": "Натисніть клавіші...",
+	"shortcut.unbound": "Не задано",
+	"shortcut.clear": "Скинути",
 	"shortcut.invalid":
 		"Недійсна комбінація: {shortcut}. Використовуйте лише ASCII і коректні комбінації.",
+	"shortcut.conflict":
+		"Комбінація {shortcut} уже використовується іншою дією. Оберіть іншу.",
 	"shortcut.asciiOnly": "Комбінація може містити лише ASCII-символи.",
 	"shortcut.needModifier":
 		"Потрібен щонайменше один модифікатор (Ctrl, Shift, Alt) і одна звичайна клавіша",
+	"shortcut.action.trackingToggle": "Старт / стоп нагадувань",
+	"shortcut.action.trackingToggleDesc":
+		"Увімкнути або вимкнути відстеження нагадувань (як кнопки Старт / Стоп).",
+	"shortcut.action.snoozeAll": "Відкласти підказки",
+	"shortcut.action.snoozeAllDesc":
+		"Відкласти нагадування про моргання (і закрити вправу / погляд у далечінь, якщо відкриті). Працює навіть коли спливаюче вікно ігнорує кліки.",
+	"shortcut.action.openSettings": "Відкрити налаштування",
+	"shortcut.action.openSettingsDesc":
+		"Показати й сфокусувати вікно налаштувань BlinkGuard.",
+	"shortcut.action.openCameraPreview": "Перегляд камери",
+	"shortcut.action.openCameraPreviewDesc":
+		"Відкрити вікно перегляду камери (за потреби вмикає камеру).",
 
 	// Onboarding
 	"onboarding.welcome": "Ласкаво просимо до BlinkGuard",
@@ -436,12 +452,16 @@ export const uk: MessageCatalog = {
 		"Без відстеження моргань через камеру нагадування за морганнями, жива статистика, коучинг і нагороди залишаються неактивними. Таймерні нагадування та спливаючі вікна турботи про очі працюють і далі.",
 	"onboarding.shortcutHint":
 		"Цією комбінацією можна будь-коли вмикати або вимикати нагадування.",
+	"onboarding.shortcutMoreInSettings":
+		"Додаткові гарячі клавіші (відкласти, налаштування, камера) — у розділі «Налаштування».",
 	"onboarding.launchDesc":
 		"Запускати BlinkGuard у системному треї під час входу. Закриття вікна залишає програму в треї.",
 	"onboarding.quietDesc":
 		"Ховати спливаючі вікна моргання та турботи про очі в цей локальний час.",
 	"onboarding.readyDesc":
 		"Відкрийте «Нагадування» і натисніть «Старт», або будь-коли використовуйте {shortcut}, щоб увімкнути чи вимкнути нагадування.",
+	"onboarding.readyDescUnbound":
+		"Відкрийте «Нагадування» і натисніть «Старт», щоб почати. Гарячу клавішу можна призначити будь-коли в Налаштуваннях.",
 
 	// Statistics
 	"stats.totals": "Підсумки",

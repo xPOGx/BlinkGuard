@@ -91,7 +91,7 @@ describe("settings shell", () => {
 		expect(screen.getByRole("button", { name: "Start" })).toBeDefined();
 
 		fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-		expect(screen.getByText("Keyboard Shortcut")).toBeDefined();
+		expect(screen.getByText("Keyboard shortcuts")).toBeDefined();
 		expect(screen.queryByText("Quiet hours")).toBeNull();
 
 		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
@@ -249,14 +249,16 @@ describe("settings shell", () => {
 		render(<App />);
 
 		fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-		fireEvent.click(screen.getByRole("button", { name: "Change" }));
+		fireEvent.click(screen.getAllByRole("button", { name: "Change" })[0]);
 		fireEvent.keyDown(window, { key: "k", ctrlKey: true });
 		fireEvent.keyDown(window, { key: "Enter" });
 
-		expect(send).toHaveBeenCalledWith(
-			IPC_CHANNELS.updateKeyboardShortcut,
-			"Ctrl+K",
-		);
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.updateKeyboardShortcuts, {
+			trackingToggle: "Ctrl+K",
+			snoozeAll: "",
+			openSettings: "",
+			openCameraPreview: "",
+		});
 	});
 
 	it("switches language and updates React UI immediately", () => {

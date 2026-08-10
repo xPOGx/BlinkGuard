@@ -11,12 +11,16 @@ import {
 import {
 	type AppPreferences,
 	DEFAULT_EXERCISE_PROMPTS,
+	DEFAULT_KEYBOARD_SHORTCUTS,
 	DEFAULT_PREFERENCES,
+	findDuplicateShortcutActions,
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
+	sanitizeKeyboardShortcuts,
 	sanitizeLookAwayHint,
 	sanitizeLookAwayTitle,
+	sanitizePersistedPreferences,
 	sanitizeSnoozeMinutes,
 	sanitizeSoundVolume,
 	toRendererPreferences,
@@ -178,6 +182,50 @@ describe("auto-stop on no-face preference defaults", () => {
 		expect(sanitizeAutoStopNoFaceMinutes(0)).toBe(1);
 		expect(sanitizeAutoStopNoFaceMinutes(99)).toBe(30);
 		expect(sanitizeAutoStopNoFaceMinutes(7.6)).toBe(8);
+	});
+});
+
+describe("keyboardShortcuts sanitize", () => {
+	it("defaults trackingToggle to Ctrl+I and leaves others unbound", () => {
+		expect(sanitizeKeyboardShortcuts(undefined)).toEqual({
+			...DEFAULT_KEYBOARD_SHORTCUTS,
+		});
+	});
+
+	it("allows empty trackingToggle (unbound)", () => {
+		expect(
+			sanitizeKeyboardShortcuts({
+				trackingToggle: "",
+				snoozeAll: "Ctrl+Shift+S",
+			}),
+		).toEqual({
+			trackingToggle: "",
+			snoozeAll: "Ctrl+Shift+S",
+			openSettings: "",
+			openCameraPreview: "",
+		});
+	});
+
+	it("migrates legacy keyboardShortcut when map is absent", () => {
+		const prefs = sanitizePersistedPreferences({
+			keyboardShortcut: "Ctrl+B",
+		});
+		expect(prefs.keyboardShortcuts.trackingToggle).toBe("Ctrl+B");
+		expect(prefs.keyboardShortcuts.snoozeAll).toBe("");
+	});
+
+	it("finds duplicate accelerators across actions", () => {
+		expect(
+			findDuplicateShortcutActions({
+				trackingToggle: "Ctrl+I",
+				snoozeAll: "Ctrl+I",
+				openSettings: "",
+				openCameraPreview: "",
+			}).sort(),
+		).toEqual(["snoozeAll", "trackingToggle"]);
+		expect(
+			findDuplicateShortcutActions({ ...DEFAULT_KEYBOARD_SHORTCUTS }),
+		).toEqual([]);
 	});
 });
 

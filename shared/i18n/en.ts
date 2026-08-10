@@ -389,16 +389,31 @@ export const en: MessageCatalog = {
 	"fullscreen.paused": "Paused: fullscreen / gaming",
 
 	// Shortcuts
-	"shortcut.title": "Keyboard Shortcut",
+	"shortcut.title": "Keyboard shortcuts",
 	"shortcut.description":
-		"Press the shortcut to start/stop reminders. Use at least one modifier key (Ctrl, Shift, Alt, Cmd, Win) and one regular key.",
-	"shortcut.currentAria": "Current keyboard shortcut",
+		"Bind global shortcuts for common actions. Use at least one modifier (Ctrl, Shift, Alt, Cmd, Win) and one regular key, or leave unbound.",
+	"shortcut.currentAria": "Current shortcut for {action}",
 	"shortcut.pressKeys": "Press keys...",
+	"shortcut.unbound": "Not set",
+	"shortcut.clear": "Clear",
 	"shortcut.invalid":
 		"Invalid shortcut: {shortcut}. Please use only ASCII characters and valid combinations.",
+	"shortcut.conflict":
+		"Shortcut {shortcut} is already used by another action. Choose a different combination.",
 	"shortcut.asciiOnly": "Shortcut must only contain ASCII characters.",
 	"shortcut.needModifier":
 		"Please use at least one modifier key (Ctrl, Shift, Alt) and one regular key",
+	"shortcut.action.trackingToggle": "Start / stop reminders",
+	"shortcut.action.trackingToggleDesc":
+		"Toggle blink reminder tracking (same as Start / Stop).",
+	"shortcut.action.snoozeAll": "Snooze prompts",
+	"shortcut.action.snoozeAllDesc":
+		"Snooze blink reminders (and close exercise / look-away if open). Works even when the blink popup ignores clicks.",
+	"shortcut.action.openSettings": "Open settings",
+	"shortcut.action.openSettingsDesc": "Show and focus the BlinkGuard settings window.",
+	"shortcut.action.openCameraPreview": "Camera preview",
+	"shortcut.action.openCameraPreviewDesc":
+		"Open the camera preview window (enables the camera if needed).",
 
 	// Onboarding
 	"onboarding.welcome": "Welcome to BlinkGuard",
@@ -428,12 +443,16 @@ export const en: MessageCatalog = {
 		"Without camera blink tracking, blink-aware reminders, live blink stats, coaching, and rewards stay inactive. Timer reminders and eye-care popups still work.",
 	"onboarding.shortcutHint":
 		"Use this shortcut anytime to start or stop blink reminders.",
+	"onboarding.shortcutMoreInSettings":
+		"More shortcuts (snooze, open settings, camera) are in Settings.",
 	"onboarding.launchDesc":
 		"Start BlinkGuard hidden in the system tray when you sign in. Closing the window keeps the app running in the tray.",
 	"onboarding.quietDesc":
 		"Hide blink and eye-care popups during this local-time window.",
 	"onboarding.readyDesc":
 		"Open Reminders and press Start, or use {shortcut} anytime to start or stop blink reminders.",
+	"onboarding.readyDescUnbound":
+		"Open Reminders and press Start to begin blink reminders. You can bind a shortcut anytime in Settings.",
 
 	// Statistics
 	"stats.totals": "Totals",

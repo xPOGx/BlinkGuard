@@ -377,13 +377,14 @@ function SettingsShell({
 								{section === "settings" && (
 									<>
 										<ShortcutSettings
-											shortcut={preferences.keyboardShortcut}
-											isRecording={shortcuts.isRecording}
+											shortcuts={preferences.keyboardShortcuts}
+											activeAction={shortcuts.activeAction}
 											temporaryShortcut={shortcuts.temporaryShortcut}
-											error={shortcuts.error}
+											errorMessage={shortcuts.errorMessage}
 											onStartRecording={shortcuts.startRecording}
 											onSave={shortcuts.save}
 											onCancel={shortcuts.cancel}
+											onClear={shortcuts.clear}
 										/>
 										<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 											<LanguageSettings

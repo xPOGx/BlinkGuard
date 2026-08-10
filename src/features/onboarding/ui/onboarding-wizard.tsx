@@ -15,6 +15,7 @@ import { ToggleSwitch } from "@/components/toggle-switch";
 import { applyLocale } from "@/features/settings/model/apply-locale";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
+import type { useShortcutControls } from "@/features/shortcuts/model/use-shortcut-controls";
 import { ShortcutSettings } from "@/features/shortcuts/ui/shortcut-settings";
 import { useT } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -24,14 +25,7 @@ import type { Locale } from "../../../../shared/i18n";
 interface OnboardingWizardProps {
 	preferences: SettingsPreferences;
 	setPreferences: SetPreferences;
-	shortcut: {
-		isRecording: boolean;
-		temporaryShortcut: string;
-		error: string;
-		startRecording: () => void;
-		save: () => void;
-		cancel: () => void;
-	};
+	shortcut: ReturnType<typeof useShortcutControls>;
 }
 
 export function OnboardingWizard({
@@ -237,13 +231,16 @@ export function OnboardingWizard({
 								{t("onboarding.shortcutHint")}
 							</p>
 							<ShortcutSettings
-								shortcut={preferences.keyboardShortcut}
-								isRecording={shortcut.isRecording}
+								shortcuts={preferences.keyboardShortcuts}
+								activeAction={shortcut.activeAction}
 								temporaryShortcut={shortcut.temporaryShortcut}
-								error={shortcut.error}
+								errorMessage={shortcut.errorMessage}
 								onStartRecording={shortcut.startRecording}
 								onSave={shortcut.save}
 								onCancel={shortcut.cancel}
+								onClear={shortcut.clear}
+								actions={["trackingToggle"]}
+								footerNote={t("onboarding.shortcutMoreInSettings")}
 							/>
 						</div>
 					) : null}
@@ -345,9 +342,11 @@ export function OnboardingWizard({
 						<div className="space-y-4">
 							<p className="flex items-start gap-2 text-sm text-muted-foreground">
 								<Play className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-								{t("onboarding.readyDesc", {
-									shortcut: preferences.keyboardShortcut,
-								})}
+								{preferences.keyboardShortcuts.trackingToggle
+									? t("onboarding.readyDesc", {
+											shortcut: preferences.keyboardShortcuts.trackingToggle,
+										})
+									: t("onboarding.readyDescUnbound")}
 							</p>
 							<div className="space-y-3 border-t border-border pt-4">
 								<div className="flex items-center justify-between gap-4">

@@ -28,7 +28,7 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updatePopupTransparency: vi.fn(),
 		updatePopupMessage: vi.fn(),
 		updateBlinkPopupClickThrough: vi.fn(),
-		updateKeyboardShortcut: vi.fn(),
+		updateKeyboardShortcuts: vi.fn(),
 		updateMgdMode: vi.fn(),
 		updateSoundEnabled: vi.fn(),
 		updateSoundVolume: vi.fn(),
@@ -112,6 +112,19 @@ describe("sameRendererPrefs", () => {
 		).toBe(false);
 	});
 
+	it("detects keyboardShortcuts map changes", () => {
+		const base = { ...DEFAULT_RENDERER_PREFERENCES };
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				keyboardShortcuts: {
+					...base.keyboardShortcuts,
+					snoozeAll: "Ctrl+Shift+S",
+				},
+			}),
+		).toBe(false);
+	});
+
 	it("detects sound volume preference changes", () => {
 		const base = { ...DEFAULT_RENDERER_PREFERENCES };
 		expect(
@@ -145,7 +158,7 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateCameraEnabled).not.toHaveBeenCalled();
 		expect(rendererIpc.updateEyeExercisesEnabled).not.toHaveBeenCalled();
 		expect(rendererIpc.updateLookAwayEnabled).not.toHaveBeenCalled();
-		expect(rendererIpc.updateKeyboardShortcut).not.toHaveBeenCalled();
+		expect(rendererIpc.updateKeyboardShortcuts).not.toHaveBeenCalled();
 		expect(rendererIpc.updateAutoStopNoFaceEnabled).not.toHaveBeenCalled();
 	});
 
@@ -175,6 +188,24 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateAutoStopNoFaceMinutes).toHaveBeenCalledWith(10);
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 		expect(rendererIpc.updateCameraEnabled).not.toHaveBeenCalled();
+	});
+
+	it("pushes keyboardShortcuts when the map changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = {
+			...previous,
+			keyboardShortcuts: {
+				...previous.keyboardShortcuts,
+				snoozeAll: "Ctrl+Shift+S",
+			},
+		};
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateKeyboardShortcuts).toHaveBeenCalledWith(
+			next.keyboardShortcuts,
+		);
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 	});
 
 	it("pushes only snoozeMinutes when it changes", () => {

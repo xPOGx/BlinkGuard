@@ -1,5 +1,9 @@
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
-import type { Point, Size } from "../../../../shared/preferences";
+import {
+	type Point,
+	type Size,
+	sameKeyboardShortcuts,
+} from "../../../../shared/preferences";
 import type { SettingsPreferences } from "./preferences";
 
 export function sameStringArray(a: string[], b: string[]): boolean {
@@ -60,7 +64,7 @@ export function sameRendererPrefs(
 		samePopupColors(a.popupColors, b.popupColors) &&
 		samePoint(a.popupPosition, b.popupPosition) &&
 		sameSize(a.popupSize, b.popupSize) &&
-		a.keyboardShortcut === b.keyboardShortcut &&
+		sameKeyboardShortcuts(a.keyboardShortcuts, b.keyboardShortcuts) &&
 		a.mgdMode === b.mgdMode &&
 		a.soundEnabled === b.soundEnabled &&
 		a.soundVolume === b.soundVolume &&
@@ -160,8 +164,11 @@ export function pushPreferenceDiff(
 	) {
 		rendererIpc.updateBlinkPopupClickThrough(next.blinkPopupClickThrough);
 	}
-	if (!previous || previous.keyboardShortcut !== next.keyboardShortcut) {
-		rendererIpc.updateKeyboardShortcut(next.keyboardShortcut);
+	if (
+		!previous ||
+		!sameKeyboardShortcuts(previous.keyboardShortcuts, next.keyboardShortcuts)
+	) {
+		rendererIpc.updateKeyboardShortcuts(next.keyboardShortcuts);
 	}
 	if (!previous || previous.mgdMode !== next.mgdMode) {
 		rendererIpc.updateMgdMode(next.mgdMode);

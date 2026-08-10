@@ -13,8 +13,10 @@ import type { ExportDiagnosticsResult } from "../../../shared/diagnostics";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import type {
 	CameraQuality,
+	KeyboardShortcuts,
 	PopupColors,
 	RendererPreferences,
+	ShortcutErrorPayload,
 } from "../../../shared/preferences";
 import type { ExportProfileImageResult } from "../../../shared/profile-export";
 import type { GetReleaseNotesResult } from "../../../shared/release-notes";
@@ -51,7 +53,7 @@ export const rendererIpc = {
 		subscribe(IPC_CHANNELS.cameraError, listener),
 	onCameraReady: (listener: () => void) =>
 		subscribe(IPC_CHANNELS.cameraReady, listener),
-	onShortcutError: (listener: (shortcut: string | null) => void) =>
+	onShortcutError: (listener: (payload: ShortcutErrorPayload) => void) =>
 		subscribe(IPC_CHANNELS.shortcutError, listener),
 	onCameraWindowClosed: (listener: () => void) =>
 		subscribe(IPC_CHANNELS.cameraWindowClosed, listener),
@@ -116,8 +118,11 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updatePopupMessage, message),
 	updateBlinkPopupClickThrough: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateBlinkPopupClickThrough, enabled),
-	updateKeyboardShortcut: (shortcut: string) =>
-		send(IPC_CHANNELS.updateKeyboardShortcut, shortcut),
+	updateKeyboardShortcuts: (shortcuts: KeyboardShortcuts) =>
+		send(IPC_CHANNELS.updateKeyboardShortcuts, shortcuts),
+	setShortcutCaptureMode: (capturing: boolean) =>
+		send(IPC_CHANNELS.setShortcutCaptureMode, capturing),
+	snoozeAll: () => send(IPC_CHANNELS.snoozeAll),
 	updateSoundEnabled: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateSoundEnabled, enabled),
 	updateSoundVolume: (volume: number) =>

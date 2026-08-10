@@ -60,7 +60,7 @@ function createActions(
 			applyCameraQuality: vi.fn(),
 			applyEarCalibration: vi.fn(),
 		}) as never,
-		(overrides.shortcuts ?? { register: vi.fn() }) as never,
+		(overrides.shortcuts ?? { registerAll: vi.fn() }) as never,
 		overrides.applyLaunchAtLogin ?? vi.fn(),
 		overrides.tray as never,
 	);
@@ -183,7 +183,7 @@ describe("PreferenceActions", () => {
 			applyCameraQuality: vi.fn(),
 			applyEarCalibration: vi.fn(),
 		};
-		const shortcuts = { register: vi.fn() };
+		const shortcuts = { registerAll: vi.fn() };
 		const applyLaunchAtLogin = vi.fn();
 		const tray = { rebuildMenu: vi.fn() };
 		const actions = createActions(preferences, {
@@ -205,7 +205,10 @@ describe("PreferenceActions", () => {
 				locale: "uk",
 				darkMode: false,
 				launchAtLogin: true,
-				keyboardShortcut: "Ctrl+B",
+				keyboardShortcuts: {
+					...preferences.current.keyboardShortcuts,
+					trackingToggle: "Ctrl+B",
+				},
 				cameraQuality: "high",
 				earCalibration: 0.25,
 				isTracking: true,
@@ -230,7 +233,10 @@ describe("PreferenceActions", () => {
 		expect(preferences.current.darkMode).toBe(false);
 		expect(preferences.current.isTracking).toBe(false);
 		expect(applyLaunchAtLogin).toHaveBeenCalledWith(true);
-		expect(shortcuts.register).toHaveBeenCalledWith("Ctrl+B");
+		expect(shortcuts.registerAll).toHaveBeenCalledWith({
+			...preferences.current.keyboardShortcuts,
+			trackingToggle: "Ctrl+B",
+		});
 		expect(sidecar.applyCameraQuality).toHaveBeenCalledWith("high");
 		expect(sidecar.applyEarCalibration).toHaveBeenCalledWith(0.25);
 		expect(tray.rebuildMenu).toHaveBeenCalledWith("uk");

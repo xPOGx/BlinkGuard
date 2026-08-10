@@ -1,14 +1,17 @@
 import {
 	DEFAULT_PREFERENCES,
+	sameKeyboardShortcuts,
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
+	sanitizeKeyboardShortcuts,
 	sanitizeLookAwayHint,
 	sanitizeLookAwayTitle,
 	sanitizePersistedPreferences,
 	sanitizeSnoozeMinutes,
 	sanitizeSoundVolume,
 	type AppPreferences,
+	type KeyboardShortcuts,
 	type PersistedPreferences,
 } from "../../shared/preferences";
 import { sanitizeLocale } from "../../shared/i18n";
@@ -57,6 +60,12 @@ function samePreferenceValue(
 		const b = next as PersistedPreferences["popupSize"];
 		return !!a && !!b && a.width === b.width && a.height === b.height;
 	}
+	if (key === "keyboardShortcuts") {
+		return sameKeyboardShortcuts(
+			previous as KeyboardShortcuts,
+			next as KeyboardShortcuts,
+		);
+	}
 	return false;
 }
 
@@ -64,22 +73,52 @@ export class PreferencesService {
 	readonly current: AppPreferences;
 
 	constructor(private readonly store: PreferenceStore) {
-		const loaded = { ...DEFAULT_PREFERENCES } as PersistedPreferences;
+		const loaded: Record<string, unknown> = { ...DEFAULT_PREFERENCES };
 		for (const key of PERSISTED_KEYS) {
-			loaded[key] = this.store.get(key, DEFAULT_PREFERENCES[key]) as never;
+			if (key === "keyboardShortcuts") {
+				// Omit default map when absent so sanitize can migrate legacy
+				// `keyboardShortcut` → `trackingToggle`.
+				if (this.store.has("keyboardShortcuts")) {
+					loaded.keyboardShortcuts = this.store.get(
+						"keyboardShortcuts",
+						DEFAULT_PREFERENCES.keyboardShortcuts,
+					);
+				} else {
+					delete loaded.keyboardShortcuts;
+				}
+				continue;
+			}
+			loaded[key] = this.store.get(key, DEFAULT_PREFERENCES[key]);
+		}
+		if (
+			!this.store.has("keyboardShortcuts") &&
+			this.store.has("keyboardShortcut")
+		) {
+			loaded.keyboardShortcut = this.store.get("keyboardShortcut", "");
 		}
 		const persisted = sanitizePersistedPreferences(loaded);
 
 		// Upgrade: existing installs without the flag should skip first-run.
 		if (!this.store.has("hasCompletedOnboarding")) {
-			const looksLikeExistingUser = PERSISTED_KEYS.some(
-				(key) =>
-					key !== "hasCompletedOnboarding" && this.store.has(key),
-			);
+			const looksLikeExistingUser =
+				PERSISTED_KEYS.some(
+					(key) =>
+						key !== "hasCompletedOnboarding" && this.store.has(key),
+				) || this.store.has("keyboardShortcut");
 			if (looksLikeExistingUser) {
 				persisted.hasCompletedOnboarding = true;
 				this.store.set("hasCompletedOnboarding", true);
 			}
+		}
+
+		// Persist migrated map only when upgrading from legacy `keyboardShortcut`.
+		// Do not write defaults on a fresh store — that would trip the
+		// hasCompletedOnboarding upgrade heuristic on the next launch.
+		if (
+			!this.store.has("keyboardShortcuts") &&
+			this.store.has("keyboardShortcut")
+		) {
+			this.store.set("keyboardShortcuts", persisted.keyboardShortcuts);
 		}
 
 		this.current = { ...persisted };
@@ -119,6 +158,8 @@ export class PreferencesService {
 			next = sanitizeSnoozeMinutes(value) as PersistedPreferences[K];
 		} else if (key === "soundVolume") {
 			next = sanitizeSoundVolume(value) as PersistedPreferences[K];
+		} else if (key === "keyboardShortcuts") {
+			next = sanitizeKeyboardShortcuts(value) as PersistedPreferences[K];
 		}
 		// No-op equal writes: settings sync and dual IPC callers re-send often.
 		if (samePreferenceValue(key, this.current[key], next)) {

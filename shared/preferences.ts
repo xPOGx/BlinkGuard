@@ -44,6 +44,87 @@ const SOUND_VOLUME_MIN = 0;
 const SOUND_VOLUME_MAX = 100;
 const SOUND_VOLUME_DEFAULT = 100;
 
+/** Global shortcut actions bound via Electron `globalShortcut`. */
+export const SHORTCUT_ACTIONS = [
+	"trackingToggle",
+	"snoozeAll",
+	"openSettings",
+	"openCameraPreview",
+] as const;
+
+export type ShortcutAction = (typeof SHORTCUT_ACTIONS)[number];
+
+/** Per-action accelerator strings; `""` means unbound. */
+export type KeyboardShortcuts = Record<ShortcutAction, string>;
+
+/** Failed accelerators after registerAll (action → accelerator). */
+export type ShortcutErrorMap = Partial<Record<ShortcutAction, string>>;
+
+export type ShortcutErrorPayload = {
+	errors: ShortcutErrorMap;
+	/** Actions that share the same accelerator within the map (none registered). */
+	conflicts: ShortcutAction[];
+};
+
+export const DEFAULT_KEYBOARD_SHORTCUTS: Readonly<KeyboardShortcuts> = {
+	trackingToggle: "Ctrl+I",
+	snoozeAll: "",
+	openSettings: "",
+	openCameraPreview: "",
+};
+
+export function sameKeyboardShortcuts(
+	a: KeyboardShortcuts,
+	b: KeyboardShortcuts,
+): boolean {
+	return SHORTCUT_ACTIONS.every((action) => a[action] === b[action]);
+}
+
+/** Actions that share a non-empty accelerator with at least one other action. */
+export function findDuplicateShortcutActions(
+	map: KeyboardShortcuts,
+): ShortcutAction[] {
+	const byAccel = new Map<string, ShortcutAction[]>();
+	for (const action of SHORTCUT_ACTIONS) {
+		const accel = map[action];
+		if (!accel) continue;
+		const group = byAccel.get(accel) ?? [];
+		group.push(action);
+		byAccel.set(accel, group);
+	}
+	const duplicates: ShortcutAction[] = [];
+	for (const [, actions] of byAccel) {
+		if (actions.length < 2) continue;
+		duplicates.push(...actions);
+	}
+	return duplicates;
+}
+
+/**
+ * Coerce stored/IPC shortcut map. Empty strings stay unbound.
+ * Legacy `keyboardShortcut` migrates into `trackingToggle` when the map is absent.
+ */
+export function sanitizeKeyboardShortcuts(
+	input: unknown,
+	legacyShortcut?: unknown,
+): KeyboardShortcuts {
+	const defaults = { ...DEFAULT_KEYBOARD_SHORTCUTS };
+	if (input && typeof input === "object") {
+		const record = input as Record<string, unknown>;
+		const next = { ...defaults };
+		for (const action of SHORTCUT_ACTIONS) {
+			if (typeof record[action] === "string") {
+				next[action] = record[action].trim();
+			}
+		}
+		return next;
+	}
+	if (typeof legacyShortcut === "string" && legacyShortcut.trim()) {
+		return { ...defaults, trackingToggle: legacyShortcut.trim() };
+	}
+	return defaults;
+}
+
 /** Headroom for ambitious weekly blink targets (workday-scale). */
 const GOAL_BLINKS_MAX = 100_000;
 const GOAL_TRACKING_MINUTES_MAX = 24 * 7 * 60;
@@ -231,7 +312,8 @@ export interface PersistedPreferences {
 	blinkPopupClickThrough: boolean;
 	/** Minutes to suppress/re-show prompts after Snooze (1…30). */
 	snoozeMinutes: number;
-	keyboardShortcut: string;
+	/** Per-action global accelerators; empty string = unbound. */
+	keyboardShortcuts: KeyboardShortcuts;
 	mgdMode: boolean;
 	soundEnabled: boolean;
 	/** Notification sound loudness 0…100 (HTML audio volume = value / 100). */
@@ -340,7 +422,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	popupMessage: defaultPopupMessage("en"),
 	blinkPopupClickThrough: true,
 	snoozeMinutes: SNOOZE_MINUTES_DEFAULT,
-	keyboardShortcut: "Ctrl+I",
+	keyboardShortcuts: { ...DEFAULT_KEYBOARD_SHORTCUTS },
 	mgdMode: false,
 	soundEnabled: false,
 	soundVolume: SOUND_VOLUME_DEFAULT,
@@ -583,11 +665,10 @@ export function sanitizePersistedPreferences(
 			defaults.blinkPopupClickThrough,
 		),
 		snoozeMinutes: sanitizeSnoozeMinutes(record.snoozeMinutes),
-		keyboardShortcut:
-			typeof record.keyboardShortcut === "string" &&
-			record.keyboardShortcut.trim()
-				? record.keyboardShortcut
-				: defaults.keyboardShortcut,
+		keyboardShortcuts: sanitizeKeyboardShortcuts(
+			record.keyboardShortcuts,
+			record.keyboardShortcut,
+		),
 		mgdMode: asBoolean(record.mgdMode, defaults.mgdMode),
 		soundEnabled: asBoolean(record.soundEnabled, defaults.soundEnabled),
 		soundVolume: sanitizeSoundVolume(record.soundVolume),
