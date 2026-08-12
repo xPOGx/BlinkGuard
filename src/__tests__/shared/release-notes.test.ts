@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	GITHUB_RELEASES_OWNER,
+	GITHUB_RELEASES_REPO,
+	GITHUB_REPO_PAGE_URL,
+	GITHUB_RELEASES_PAGE_URL,
 	isAllowedExternalUrl,
 	mapGithubRelease,
 	mapGithubReleases,
@@ -7,6 +11,15 @@ import {
 } from "../../../shared/release-notes";
 
 describe("release-notes mapping", () => {
+	it("points GitHub constants at the org repository", () => {
+		expect(GITHUB_RELEASES_OWNER).toBe("xpogx-org");
+		expect(GITHUB_RELEASES_REPO).toBe("BlinkGuard");
+		expect(GITHUB_REPO_PAGE_URL).toBe("https://github.com/xpogx-org/BlinkGuard");
+		expect(GITHUB_RELEASES_PAGE_URL).toBe(
+			"https://github.com/xpogx-org/BlinkGuard/releases",
+		);
+	});
+
 	it("maps a published release", () => {
 		expect(
 			mapGithubRelease({

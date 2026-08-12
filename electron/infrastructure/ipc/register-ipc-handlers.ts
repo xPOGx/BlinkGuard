@@ -45,6 +45,7 @@ import {
 import type { ShortcutController } from "../shortcuts/shortcut-controller";
 import type { WindowManager } from "../windows/window-manager";
 import {
+	GITHUB_REPO_PAGE_URL,
 	GITHUB_RELEASES_PAGE_URL,
 	isAllowedExternalUrl,
 } from "../../../shared/release-notes";
@@ -413,7 +414,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
 	});
 	on(IPC_CHANNELS.openGithubRepo, () => {
-		void shell.openExternal("https://github.com/xpogx-org/BlinkGuard");
+		void shell.openExternal(GITHUB_REPO_PAGE_URL);
 	});
 	on(IPC_CHANNELS.openGithubReleases, () => {
 		void shell.openExternal(GITHUB_RELEASES_PAGE_URL);

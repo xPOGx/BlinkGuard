@@ -143,7 +143,7 @@ Tradeoff: less driver AA for that app profile; in-app glass may look slightly le
 
 ## Connect
 
-[![GitHub](https://img.shields.io/badge/GitHub-xPOGx-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/xPOGx)
+[![GitHub](https://img.shields.io/badge/GitHub-xpogx--org%2FBlinkGuard-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/xpogx-org/BlinkGuard)
 [![Telegram](https://img.shields.io/badge/Telegram-PaOnGa-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/PaOnGa)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Pavlo%20Dzhevaha-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/pavlo-dzhevaha-342068105/)
 [![Open Collective](https://img.shields.io/badge/Open%20Collective-BlinkGuard-7FADF2?style=for-the-badge&logo=open-collective&logoColor=white)](https://opencollective.com/xpogx)

@@ -5,8 +5,10 @@
 export const GITHUB_RELEASES_OWNER = "xpogx-org";
 export const GITHUB_RELEASES_REPO = "BlinkGuard";
 
-export const GITHUB_RELEASES_PAGE_URL =
-	`https://github.com/${GITHUB_RELEASES_OWNER}/${GITHUB_RELEASES_REPO}/releases`;
+export const GITHUB_REPO_PAGE_URL =
+	`https://github.com/${GITHUB_RELEASES_OWNER}/${GITHUB_RELEASES_REPO}`;
+
+export const GITHUB_RELEASES_PAGE_URL = `${GITHUB_REPO_PAGE_URL}/releases`;
 
 export const GITHUB_RELEASES_API_URL =
 	`https://api.github.com/repos/${GITHUB_RELEASES_OWNER}/${GITHUB_RELEASES_REPO}/releases?per_page=20`;
