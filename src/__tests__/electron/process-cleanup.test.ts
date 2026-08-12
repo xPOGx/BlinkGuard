@@ -25,8 +25,8 @@ import {
 type FakeStdin = {
 	destroyed: boolean;
 	writableEnded: boolean;
-	write: ReturnType<typeof vi.fn>;
-	end: ReturnType<typeof vi.fn>;
+	write: (chunk?: string) => boolean;
+	end: (chunk?: string) => void;
 };
 
 type FakeChild = EventEmitter & {
@@ -43,12 +43,13 @@ function createFakeChild(pid: number, { exitOnEnd = false } = {}): FakeChild {
 	child.killed = false;
 	child.exitCode = null;
 	child.signalCode = null;
+	const write = vi.fn((_chunk?: string) => true);
 	const stdin: FakeStdin = {
 		destroyed: false,
 		writableEnded: false,
-		write: vi.fn(() => true),
+		write,
 		end: vi.fn((chunk?: string) => {
-			if (chunk) stdin.write(chunk);
+			if (chunk) write(chunk);
 			stdin.writableEnded = true;
 			if (exitOnEnd) {
 				queueMicrotask(() => {

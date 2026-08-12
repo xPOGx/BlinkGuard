@@ -35,7 +35,7 @@ describe("AppLifecycle shutdown order", () => {
 			{} as never,
 			{} as never,
 			{ destroyAll } as never,
-			{ run: cleanupRun },
+			{ run: cleanupRun, processes: {} as never } as never,
 			{ dispose: vi.fn() } as never,
 		);
 		return { lifecycle, destroyAll };
