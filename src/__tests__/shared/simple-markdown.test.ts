@@ -11,7 +11,7 @@ describe("parseSimpleMarkdown", () => {
 				"",
 				"### Added",
 				"- Goals shop",
-				"- [GitHub](https://github.com/xPOGx/BlinkGuard)",
+				"- [GitHub](https://github.com/xpogx-org/BlinkGuard)",
 			].join("\n"),
 		);
 
@@ -47,7 +47,7 @@ describe("parseSimpleMarkdown", () => {
 						children: [
 							{
 								type: "link",
-								href: "https://github.com/xPOGx/BlinkGuard",
+								href: "https://github.com/xpogx-org/BlinkGuard",
 								children: [{ type: "text", text: "GitHub" }],
 							},
 						],
@@ -60,7 +60,7 @@ describe("parseSimpleMarkdown", () => {
 
 	it("autolinks bare https URLs", () => {
 		const blocks = parseSimpleMarkdown(
-			"**Full Changelog**: https://github.com/xPOGx/BlinkGuard/compare/v2.0.0...v2.1.0",
+			"**Full Changelog**: https://github.com/xpogx-org/BlinkGuard/compare/v2.0.0...v2.1.0",
 		);
 		expect(blocks).toMatchObject([
 			{
@@ -73,11 +73,11 @@ describe("parseSimpleMarkdown", () => {
 					{ type: "text", text: ": " },
 					{
 						type: "link",
-						href: "https://github.com/xPOGx/BlinkGuard/compare/v2.0.0...v2.1.0",
+						href: "https://github.com/xpogx-org/BlinkGuard/compare/v2.0.0...v2.1.0",
 						children: [
 							{
 								type: "text",
-								text: "https://github.com/xPOGx/BlinkGuard/compare/v2.0.0...v2.1.0",
+								text: "https://github.com/xpogx-org/BlinkGuard/compare/v2.0.0...v2.1.0",
 							},
 						],
 					},

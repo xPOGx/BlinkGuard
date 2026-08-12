@@ -2,7 +2,7 @@
 
 Cross-platform desktop app that helps prevent dry eyes and eye strain with blink reminders and optional camera-based blink detection.
 
-**Homepage / source:** https://github.com/xPOGx/BlinkGuard · **Privacy:** [PRIVACY.md](PRIVACY.md) · **Security:** [SECURITY.md](SECURITY.md) · **Changelog:** [CHANGELOG.md](CHANGELOG.md)
+**Homepage / source:** https://github.com/xpogx-org/BlinkGuard · **Privacy:** [PRIVACY.md](PRIVACY.md) · **Security:** [SECURITY.md](SECURITY.md) · **Changelog:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Features
 
@@ -159,9 +159,9 @@ If BlinkGuard helps your eyes on long screen days, a star helps others find it a
 
 **BlinkGuard** — a quiet, local companion for your eyes
 
-[![Watch](https://img.shields.io/github/watchers/xPOGx/BlinkGuard?style=for-the-badge&label=Watch&logo=github)](https://github.com/xPOGx/BlinkGuard/subscription)
-[![Fork](https://img.shields.io/github/forks/xPOGx/BlinkGuard?style=for-the-badge&logo=github)](https://github.com/xPOGx/BlinkGuard/fork)
-[![Stars](https://img.shields.io/github/stars/xPOGx/BlinkGuard?style=for-the-badge&logo=github)](https://github.com/xPOGx/BlinkGuard/stargazers)
+[![Watch](https://img.shields.io/github/watchers/xpogx-org/BlinkGuard?style=for-the-badge&label=Watch&logo=github)](https://github.com/xpogx-org/BlinkGuard/subscription)
+[![Fork](https://img.shields.io/github/forks/xpogx-org/BlinkGuard?style=for-the-badge&logo=github)](https://github.com/xpogx-org/BlinkGuard/fork)
+[![Stars](https://img.shields.io/github/stars/xpogx-org/BlinkGuard?style=for-the-badge&logo=github)](https://github.com/xpogx-org/BlinkGuard/stargazers)
 
 ## Third-party attribution
 

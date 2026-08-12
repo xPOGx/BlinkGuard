@@ -21,8 +21,8 @@ When camera blink detection is enabled, frames are processed on your device by t
 
 ## Updates
 
-Optional in-app update checks contact GitHub Releases for this repository (`xPOGx/BlinkGuard`) to see if a newer build is available. That is a normal download/update channel, not usage analytics.
+Optional in-app update checks contact GitHub Releases for this repository (`xpogx-org/BlinkGuard`) to see if a newer build is available. That is a normal download/update channel, not usage analytics.
 
 ## Questions
 
-Open an issue at https://github.com/xPOGx/BlinkGuard/issues or see [SECURITY.md](SECURITY.md) for vulnerability reports.
+Open an issue at https://github.com/xpogx-org/BlinkGuard/issues or see [SECURITY.md](SECURITY.md) for vulnerability reports.

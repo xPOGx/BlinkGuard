@@ -2,7 +2,7 @@
  * Electron-free GitHub Releases contract for About → Release notes.
  */
 
-export const GITHUB_RELEASES_OWNER = "xPOGx";
+export const GITHUB_RELEASES_OWNER = "xpogx-org";
 export const GITHUB_RELEASES_REPO = "BlinkGuard";
 
 export const GITHUB_RELEASES_PAGE_URL =

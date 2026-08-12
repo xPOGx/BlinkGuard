@@ -14,7 +14,7 @@ describe("release-notes mapping", () => {
 				name: "BlinkGuard 2.1.0",
 				body: "## Added\n- Goals",
 				published_at: "2026-08-09T12:00:00Z",
-				html_url: "https://github.com/xPOGx/BlinkGuard/releases/tag/v2.1.0",
+				html_url: "https://github.com/xpogx-org/BlinkGuard/releases/tag/v2.1.0",
 				prerelease: false,
 				draft: false,
 			}),
@@ -23,7 +23,7 @@ describe("release-notes mapping", () => {
 			name: "BlinkGuard 2.1.0",
 			body: "## Added\n- Goals",
 			publishedAt: "2026-08-09T12:00:00Z",
-			htmlUrl: "https://github.com/xPOGx/BlinkGuard/releases/tag/v2.1.0",
+			htmlUrl: "https://github.com/xpogx-org/BlinkGuard/releases/tag/v2.1.0",
 			prerelease: false,
 		});
 	});
@@ -42,7 +42,7 @@ describe("release-notes mapping", () => {
 				tag_name: "v2.1.0",
 				name: "BlinkGuard 2.1.0",
 				body: "## BlinkGuard 2.1.0\n\nGoals and backup polish.",
-				html_url: "https://github.com/xPOGx/BlinkGuard/releases/tag/v2.1.0",
+				html_url: "https://github.com/xpogx-org/BlinkGuard/releases/tag/v2.1.0",
 			}),
 		).toMatchObject({
 			name: "BlinkGuard 2.1.0",
@@ -65,14 +65,14 @@ describe("release-notes mapping", () => {
 			mapGithubRelease({
 				tag_name: "v9.0.0",
 				draft: true,
-				html_url: "https://github.com/xPOGx/BlinkGuard/releases/tag/v9.0.0",
+				html_url: "https://github.com/xpogx-org/BlinkGuard/releases/tag/v9.0.0",
 			}),
 		).toBeNull();
 
 		expect(
 			mapGithubRelease({
 				tag_name: "v2.0.0",
-				html_url: "https://github.com/xPOGx/BlinkGuard/releases/tag/v2.0.0",
+				html_url: "https://github.com/xpogx-org/BlinkGuard/releases/tag/v2.0.0",
 			}),
 		).toMatchObject({
 			tagName: "v2.0.0",
@@ -87,7 +87,7 @@ describe("release-notes mapping", () => {
 		const releases = mapGithubReleases([
 			{
 				tag_name: "v1.0.0",
-				html_url: "https://github.com/xPOGx/BlinkGuard/releases/tag/v1.0.0",
+				html_url: "https://github.com/xpogx-org/BlinkGuard/releases/tag/v1.0.0",
 			},
 			{ not: "a release" },
 			null,
@@ -97,7 +97,7 @@ describe("release-notes mapping", () => {
 	});
 
 	it("allows only https external urls", () => {
-		expect(isAllowedExternalUrl("https://github.com/xPOGx/BlinkGuard")).toBe(
+		expect(isAllowedExternalUrl("https://github.com/xpogx-org/BlinkGuard")).toBe(
 			true,
 		);
 		expect(isAllowedExternalUrl("http://example.com")).toBe(false);

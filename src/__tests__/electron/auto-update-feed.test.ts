@@ -39,7 +39,7 @@ describe("hasUpdateFeed", () => {
 		tempDirs.push(dir);
 		fs.writeFileSync(
 			path.join(dir, "app-update.yml"),
-			"provider: github\nowner: xPOGx\nrepo: BlinkGuard\n",
+			"provider: github\nowner: xpogx-org\nrepo: BlinkGuard\n",
 			"utf8",
 		);
 		expect(hasUpdateFeed(dir)).toBe(true);

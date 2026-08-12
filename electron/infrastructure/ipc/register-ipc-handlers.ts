@@ -413,7 +413,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, blinkStats.getSnapshot());
 	});
 	on(IPC_CHANNELS.openGithubRepo, () => {
-		void shell.openExternal("https://github.com/xPOGx/BlinkGuard");
+		void shell.openExternal("https://github.com/xpogx-org/BlinkGuard");
 	});
 	on(IPC_CHANNELS.openGithubReleases, () => {
 		void shell.openExternal(GITHUB_RELEASES_PAGE_URL);

@@ -63,7 +63,7 @@ beforeEach(() => {
 								body: "## Added\n- Goals",
 								publishedAt: "2026-08-09T12:00:00Z",
 								htmlUrl:
-									"https://github.com/xPOGx/BlinkGuard/releases/tag/v2.1.0",
+									"https://github.com/xpogx-org/BlinkGuard/releases/tag/v2.1.0",
 								prerelease: false,
 							},
 						],

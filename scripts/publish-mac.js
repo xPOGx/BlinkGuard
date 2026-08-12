@@ -49,7 +49,7 @@ const args = [
 	"--publish",
 	"always",
 	"-c.publish.provider=github",
-	"-c.publish.owner=xPOGx",
+	"-c.publish.owner=xpogx-org",
 	"-c.publish.repo=BlinkGuard",
 	"-c.publish.releaseType=release",
 ];

@@ -5,13 +5,13 @@
 	"type": "module",
 	"description": "A desktop application to help prevent dry eyes by reminding you to blink regularly",
 	"license": "MIT",
-	"homepage": "https://github.com/xPOGx/BlinkGuard",
+	"homepage": "https://github.com/xpogx-org/BlinkGuard",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/xPOGx/BlinkGuard.git"
+		"url": "git+https://github.com/xpogx-org/BlinkGuard.git"
 	},
 	"bugs": {
-		"url": "https://github.com/xPOGx/BlinkGuard/issues"
+		"url": "https://github.com/xpogx-org/BlinkGuard/issues"
 	},
 	"author": {
 		"name": "Pavlo Dzhevaha",
