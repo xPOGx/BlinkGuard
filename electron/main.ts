@@ -12,7 +12,10 @@ import { PreferenceActions } from "./application/preference-actions";
 import { PreferencesService } from "./application/preferences-service";
 import { DeferredTrackingRestore } from "./application/deferred-tracking-restore";
 import { ReminderService } from "./application/reminder-service";
-import { startTrackingSession } from "./application/tracking-session";
+import {
+	startTrackingSession,
+	stopTrackingSession,
+} from "./application/tracking-session";
 import { createFocusEnvironment } from "./infrastructure/focus/create-focus-environment";
 import { FocusEnvironmentMonitor } from "./infrastructure/focus/focus-environment-monitor";
 import { registerIpcHandlers } from "./infrastructure/ipc/register-ipc-handlers";
@@ -205,6 +208,12 @@ function bootstrap(): void {
 		windows,
 		sound,
 		notificationGate,
+	);
+	reminders.bindTrackingSessionStop((showStatus) =>
+		stopTrackingSession(
+			{ reminders, exercises, lookAway, preferences },
+			showStatus,
+		),
 	);
 	const shortcuts = new ShortcutController(
 		preferences,

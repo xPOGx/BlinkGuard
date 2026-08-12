@@ -6,6 +6,7 @@ import type {
 	NotificationSoundPort,
 } from "../../../electron/application/ports/runtime-ports";
 import { ReminderService } from "../../../electron/application/reminder-service";
+import { stopTrackingSession } from "../../../electron/application/tracking-session";
 import {
 	BLINK_CREDIT_DEBOUNCE_MS,
 	BLINK_SNOOZE_MS,
@@ -602,5 +603,68 @@ describe("ReminderService auto-stop on no face", () => {
 		vi.advanceTimersByTime(2 * 60 * 1000);
 		expect(preferences.isTracking).toBe(true);
 		expect(windows.sendPreferences).not.toHaveBeenCalled();
+	});
+
+	it("calls the bound tracking-session stop after the no-face timeout", () => {
+		const preferences = createPreferences({
+			autoStopNoFaceEnabled: true,
+			autoStopNoFaceMinutes: 2,
+		});
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			createStore(),
+		);
+		const trackingSessionStop = vi.fn();
+		service.bindTrackingSessionStop(trackingSessionStop);
+
+		service.onFaceDetection(false);
+		vi.advanceTimersByTime(NO_FACE_DEBOUNCE_MS);
+		vi.advanceTimersByTime(2 * 60 * 1000);
+
+		expect(trackingSessionStop).toHaveBeenCalledWith(true);
+		expect(windows.sendPreferences).toHaveBeenCalled();
+		expect(windows.showReminder).not.toHaveBeenCalled();
+	});
+
+	it("pauses eye-care on auto-stop when coupled to tracking", () => {
+		const preferences = createPreferences({
+			autoStopNoFaceEnabled: true,
+			autoStopNoFaceMinutes: 2,
+			eyeCareIndependentOfTracking: false,
+		});
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			createStore(),
+		);
+		const exercises = { start: vi.fn(), stop: vi.fn(), resetTimer: vi.fn() };
+		const lookAway = { start: vi.fn(), stop: vi.fn(), resetTimer: vi.fn() };
+		service.bindTrackingSessionStop((showStatus) =>
+			stopTrackingSession(
+				{ reminders: service, exercises, lookAway, preferences },
+				showStatus,
+			),
+		);
+
+		service.onFaceDetection(false);
+		vi.advanceTimersByTime(NO_FACE_DEBOUNCE_MS);
+		vi.advanceTimersByTime(2 * 60 * 1000);
+
+		expect(preferences.isTracking).toBe(false);
+		expect(exercises.stop).toHaveBeenCalledOnce();
+		expect(lookAway.stop).toHaveBeenCalledOnce();
+		expect(windows.showReminder).toHaveBeenCalledWith("stopped");
+		expect(windows.sendPreferences).toHaveBeenCalled();
 	});
 });

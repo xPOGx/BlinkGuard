@@ -30,6 +30,7 @@ const ALLOW_ALL_GATE: NotificationGate = {
 export class ReminderService {
 	private lastDetectedBlinkAt = 0;
 	private cameraSoftPaused = false;
+	private trackingSessionStop: ((showStatus: boolean) => void) | null = null;
 
 	constructor(
 		private readonly preferences: AppPreferences,
@@ -42,6 +43,15 @@ export class ReminderService {
 		private readonly notificationGate: NotificationGate = ALLOW_ALL_GATE,
 		private readonly coaching: BlinkRateCoachingPort | null = null,
 	) {}
+
+	/**
+	 * Late-bind session teardown so no-face auto-stop can pause eye-care
+	 * when coupled (`eyeCareIndependentOfTracking === false`).
+	 * Exercises / look-away are constructed after this service in main.
+	 */
+	bindTrackingSessionStop(handler: (showStatus: boolean) => void): void {
+		this.trackingSessionStop = handler;
+	}
 
 	start(interval = this.preferences.reminderInterval): void {
 		this.ensureStopped();
@@ -454,7 +464,11 @@ export class ReminderService {
 			) {
 				return;
 			}
-			this.stop(true);
+			if (this.trackingSessionStop) {
+				this.trackingSessionStop(true);
+			} else {
+				this.stop(true);
+			}
 			this.windows.sendPreferences();
 		}, delayMs);
 	}
