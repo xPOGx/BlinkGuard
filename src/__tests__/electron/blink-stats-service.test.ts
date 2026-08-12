@@ -117,6 +117,7 @@ describe("BlinkStatsService", () => {
 		const need =
 			BLINK_REWARDS.statsFlair.cost + BLINK_REWARDS.cheer.cost;
 		for (let i = 0; i < need; i += 1) service.recordBlink();
+		onCheer.mockClear();
 
 		expect(service.purchaseReward("statsFlair")).toBe(true);
 		expect(service.getSnapshot().hasStatsFlair).toBe(true);
@@ -301,6 +302,55 @@ describe("BlinkStatsService", () => {
 		service.onTrackingStop();
 		expect(service.getSnapshot().blinkRateReady).toBe(false);
 		expect(service.getSnapshot().blinksPerMinute).toBe(0);
+		service.dispose();
+	});
+
+	it("face-coverage mode: ready after ~24s face-visible, BPM uses face time", () => {
+		const store = createStore();
+		const service = new BlinkStatsService(store);
+		service.setFaceCoverageMode(true);
+		service.onTrackingStart();
+		service.onFaceVisibility(true);
+
+		vi.advanceTimersByTime(20_000);
+		for (let i = 0; i < 5; i++) service.recordBlink();
+		expect(service.getSnapshot().blinkRateReady).toBe(false);
+		expect(service.getSnapshot().blinksPerMinute).toBe(0);
+		expect(service.getSnapshot().blinkRateWarmupTargetMs).toBe(24_000);
+
+		vi.advanceTimersByTime(4_000);
+		expect(service.getSnapshot().blinkRateReady).toBe(true);
+		// 5 blinks / 24s face → 12.5 /min
+		expect(service.getSnapshot().blinksPerMinute).toBeCloseTo(12.5, 5);
+
+		vi.advanceTimersByTime(6_000); // 30s face total
+		expect(service.getSnapshot().blinksPerMinute).toBe(10);
+
+		// Look away 30s — wall clock would halve BPM; face denominator stays ~30s.
+		service.onFaceVisibility(false);
+		vi.advanceTimersByTime(30_000);
+		expect(service.getSnapshot().blinkRateReady).toBe(true);
+		expect(service.getSnapshot().blinksPerMinute).toBe(10);
+
+		service.dispose();
+	});
+
+	it("face-coverage mode: trackingMs only accumulates while face is visible", () => {
+		const store = createStore();
+		const service = new BlinkStatsService(store);
+		service.setFaceCoverageMode(true);
+		service.onTrackingStart();
+		service.onFaceVisibility(true);
+
+		vi.advanceTimersByTime(10_000);
+		service.onFaceVisibility(false);
+		vi.advanceTimersByTime(20_000);
+		// Force flush interval
+		vi.advanceTimersByTime(15_000);
+
+		const trackingMs = service.getSnapshot().today.trackingMs;
+		expect(trackingMs).toBeGreaterThanOrEqual(10_000);
+		expect(trackingMs).toBeLessThan(20_000);
 		service.dispose();
 	});
 

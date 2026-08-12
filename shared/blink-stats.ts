@@ -8,6 +8,7 @@ import {
 	SHOP_DISCOUNT_MAX_LEVEL,
 	type BlinkRewardId,
 } from "./blink-rewards";
+import { BLINK_RATE_WINDOW_MS } from "./blink-rate";
 import {
 	monthLabels,
 	t,
@@ -662,10 +663,15 @@ export type BlinkStatsSnapshot = {
 	yearChart: ChartBucket[];
 	/** Live credited blinks/min over the last rolling minute (ephemeral). */
 	blinksPerMinute: number;
-	/** False until the current tracking session has run for a full minute. */
+	/** False until coverage / wall warmup is met for the live rate. */
 	blinkRateReady: boolean;
-	/** Elapsed ms in the current tracking session toward the rate warmup (0…window). */
+	/** Progress ms toward {@link blinkRateWarmupTargetMs} (0…target). */
 	blinkRateWarmupMs: number;
+	/**
+	 * Warmup denominator for UI: face-coverage ready ms (camera) or full
+	 * window (timer / MGD).
+	 */
+	blinkRateWarmupTargetMs: number;
 	goals: GoalsProgressSummary;
 	streak: StreakSummary;
 	rewards: RewardOffer[];
@@ -685,6 +691,7 @@ export function toBlinkStatsSnapshot(
 		current: 0,
 		shieldCharges: state.streakShieldCharges,
 	},
+	blinkRateWarmupTargetMs: number = BLINK_RATE_WINDOW_MS,
 ): BlinkStatsSnapshot {
 	const today = localDateKey(now);
 	return {
@@ -697,6 +704,7 @@ export function toBlinkStatsSnapshot(
 		blinksPerMinute,
 		blinkRateReady,
 		blinkRateWarmupMs,
+		blinkRateWarmupTargetMs,
 		goals: goalProgress(state, goals, now),
 		streak,
 		rewards: rewardOffers(state),

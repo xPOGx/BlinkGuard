@@ -173,6 +173,7 @@ export function StatisticsPanel() {
 							blinksPerMinute={snapshot.blinksPerMinute}
 							blinkRateReady={snapshot.blinkRateReady}
 							blinkRateWarmupMs={snapshot.blinkRateWarmupMs}
+							blinkRateWarmupTargetMs={snapshot.blinkRateWarmupTargetMs}
 						/>
 					</SettingRow>
 				</SettingPanel>

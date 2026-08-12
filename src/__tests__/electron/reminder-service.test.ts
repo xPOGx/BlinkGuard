@@ -155,6 +155,8 @@ describe("ReminderService credit semantics", () => {
 			recordBlink: vi.fn(),
 			onTrackingStart: vi.fn(),
 			onTrackingStop: vi.fn(),
+			onFaceVisibility: vi.fn(),
+			setFaceCoverageMode: vi.fn(),
 		};
 		const service = new ReminderService(
 			preferences,
@@ -194,6 +196,8 @@ describe("ReminderService credit semantics", () => {
 			recordBlink: vi.fn(),
 			onTrackingStart: vi.fn(),
 			onTrackingStop: vi.fn(),
+			onFaceVisibility: vi.fn(),
+			setFaceCoverageMode: vi.fn(),
 		};
 		const service = new ReminderService(
 			preferences,
@@ -452,6 +456,8 @@ describe("ReminderService credit semantics", () => {
 			recordBlink: vi.fn(),
 			onTrackingStart: vi.fn(),
 			onTrackingStop: vi.fn(),
+			onFaceVisibility: vi.fn(),
+			setFaceCoverageMode: vi.fn(),
 		};
 		const service = new ReminderService(
 			preferences,

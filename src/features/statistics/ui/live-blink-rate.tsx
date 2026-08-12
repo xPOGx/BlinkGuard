@@ -19,18 +19,21 @@ type LiveBlinkRateProps = {
 	blinksPerMinute: number;
 	blinkRateReady: boolean;
 	blinkRateWarmupMs: number;
+	blinkRateWarmupTargetMs?: number;
 };
 
 export function LiveBlinkRate({
 	blinksPerMinute,
 	blinkRateReady,
 	blinkRateWarmupMs,
+	blinkRateWarmupTargetMs = BLINK_RATE_WINDOW_MS,
 }: LiveBlinkRateProps) {
 	const t = useT();
 	const { locale } = useI18n();
 	const previousTargetRef = useRef(blinksPerMinute);
 	const [trend, setTrend] = useState<Trend>(null);
 	const warming = !blinkRateReady;
+	const warmupTargetMs = Math.max(1, blinkRateWarmupTargetMs);
 	const animatedBpm = useAnimatedNumber(
 		warming ? 0 : blinksPerMinute,
 		!warming,
@@ -40,16 +43,13 @@ export function LiveBlinkRate({
 	const targetGuidance = classifyBlinkRate(blinksPerMinute, locale);
 	const display = formatBlinksPerMinute(animatedBpm);
 	const idle = blinkRateReady && blinksPerMinute <= 0 && animatedBpm < 0.05;
-	const warmupPct = Math.min(
-		100,
-		(blinkRateWarmupMs / BLINK_RATE_WINDOW_MS) * 100,
-	);
+	const warmupPct = Math.min(100, (blinkRateWarmupMs / warmupTargetMs) * 100);
 	const meterPct = warming
 		? warmupPct
 		: Math.min(100, (animatedBpm / METER_CAP) * 100);
 	const remainingSec = Math.max(
 		0,
-		Math.ceil((BLINK_RATE_WINDOW_MS - blinkRateWarmupMs) / 1000),
+		Math.ceil((warmupTargetMs - blinkRateWarmupMs) / 1000),
 	);
 
 	useEffect(() => {

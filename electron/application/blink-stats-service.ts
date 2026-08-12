@@ -4,8 +4,13 @@ import {
 } from "../../shared/blink-profile";
 import {
 	BLINK_RATE_WINDOW_MS,
+	blinkRateCoverageReadyMs,
 	computeBlinksPerMinute,
+	computeFaceVisibleMsInWindow,
+	type FaceVisibleSegment,
+	isBlinkRateCoverageReady,
 	pruneBlinkTimestamps,
+	pruneFaceVisibleSegments,
 } from "../../shared/blink-rate";
 import type { BlinkRewardId } from "../../shared/blink-rewards";
 import {
@@ -63,7 +68,7 @@ export class BlinkStatsService {
 	private blinkTimestamps: number[] = [];
 	/** Last BPM included in a pushed snapshot — skip redundant rate ticks. */
 	private lastPushedBpm: number | null = null;
-	/** Last warmup second pushed while collecting the first minute. */
+	/** Last warmup second pushed while collecting coverage / first minute. */
 	private lastPushedWarmupSec: number | null = null;
 	/** True while the Statistics settings panel is mounted. */
 	private livePushEnabled = false;
@@ -75,6 +80,17 @@ export class BlinkStatsService {
 	> | null = null;
 	private cachedLocale: Locale | null = null;
 	private cheerEffects: CheerRewardEffects = {};
+
+	/**
+	 * When true (camera face-aware): BPM denominator + trackingMs use face-visible
+	 * time. When false (MGD / timer): wall-clock behavior.
+	 */
+	private faceCoverageMode = false;
+	private faceVisible = false;
+	private faceVisibleSinceMs: number | null = null;
+	private faceSegments: FaceVisibleSegment[] = [];
+	/** Face-visible ms not yet flushed into daily trackingMs. */
+	private pendingFaceTrackingMs = 0;
 
 	constructor(
 		private readonly store: PreferenceStore,
@@ -91,6 +107,47 @@ export class BlinkStatsService {
 
 	setCheerEffects(effects: CheerRewardEffects): void {
 		this.cheerEffects = effects;
+	}
+
+	/**
+	 * Camera face-aware tracking → true. MGD / timer-only → false.
+	 * Resets face clock when disabled so stale segments do not affect BPM.
+	 */
+	setFaceCoverageMode(enabled: boolean, nowMs: number = Date.now()): void {
+		if (this.faceCoverageMode === enabled) return;
+		if (this.faceCoverageMode && !enabled) {
+			this.closeFaceSegment(nowMs);
+			this.faceSegments = [];
+			this.pendingFaceTrackingMs = 0;
+			this.faceVisible = false;
+		}
+		this.faceCoverageMode = enabled;
+		if (!enabled) {
+			this.faceVisibleSinceMs = null;
+		}
+	}
+
+	isFaceCoverageMode(): boolean {
+		return this.faceCoverageMode;
+	}
+
+	/**
+	 * Raw sidecar face presence (no toast debounce). Drives coverage BPM +
+	 * face-only trackingMs while {@link faceCoverageMode} is on.
+	 */
+	onFaceVisibility(visible: boolean, nowMs: number = Date.now()): void {
+		if (!this.faceCoverageMode) {
+			this.faceVisible = visible;
+			return;
+		}
+		if (visible === this.faceVisible) return;
+		if (visible) {
+			this.faceVisible = true;
+			this.faceVisibleSinceMs = nowMs;
+			return;
+		}
+		this.closeFaceSegment(nowMs);
+		this.faceVisible = false;
 	}
 
 	/** Dev Debug: play Cheer FX without spending blinks. */
@@ -256,6 +313,7 @@ export class BlinkStatsService {
 		this.stopFlushTimer();
 		this.stopRateTick();
 		this.blinkTimestamps = [];
+		this.resetFaceClock();
 		this.lastPushedBpm = null;
 		this.lastPushedWarmupSec = null;
 		this.markChartsDirty();
@@ -275,9 +333,13 @@ export class BlinkStatsService {
 		this.reconcileStreak(now);
 		const nowMs = now.getTime();
 		this.blinkTimestamps = pruneBlinkTimestamps(this.blinkTimestamps, nowMs);
+		this.pruneFaceSegments(nowMs);
 		const { ready, warmupMs } = this.rateWarmup(nowMs);
+		const warmupTargetMs = this.faceCoverageMode
+			? blinkRateCoverageReadyMs()
+			: BLINK_RATE_WINDOW_MS;
 		const blinksPerMinute = ready
-			? computeBlinksPerMinute(this.blinkTimestamps, nowMs)
+			? this.computeLiveBpm(nowMs)
 			: 0;
 		const today = localDateKey(now);
 		const locale = this.getLocale();
@@ -298,6 +360,7 @@ export class BlinkStatsService {
 				locale,
 				goals,
 				streakResult.streak,
+				warmupTargetMs,
 			);
 			this.cachedCharts = {
 				dayChart: full.dayChart,
@@ -317,6 +380,7 @@ export class BlinkStatsService {
 			blinksPerMinute,
 			blinkRateReady: ready,
 			blinkRateWarmupMs: warmupMs,
+			blinkRateWarmupTargetMs: warmupTargetMs,
 			goals: goalProgress(this.state, goals, now),
 			streak: streakResult.streak,
 			rewards: rewardOffers(this.state),
@@ -374,6 +438,7 @@ export class BlinkStatsService {
 		this.state = recordSessionStart(this.state, now);
 		this.trackingStartedAt = now.getTime();
 		this.rateSessionStartedAt = now.getTime();
+		this.resetFaceClock();
 		this.lastPushedWarmupSec = null;
 		this.markChartsDirty();
 		this.persist();
@@ -390,6 +455,7 @@ export class BlinkStatsService {
 		this.rateSessionStartedAt = null;
 		this.lastPushedWarmupSec = null;
 		this.blinkTimestamps = [];
+		this.resetFaceClock();
 		this.lastPushedBpm = null;
 		this.schedulePush(true);
 	}
@@ -398,6 +464,7 @@ export class BlinkStatsService {
 		this.stopFlushTimer();
 		this.stopRateTick();
 		this.blinkTimestamps = [];
+		this.resetFaceClock();
 		this.lastPushedBpm = null;
 		this.lastPushedWarmupSec = null;
 		this.markChartsDirty();
@@ -445,9 +512,36 @@ export class BlinkStatsService {
 		}
 	}
 
+	private getFaceVisibleMs(nowMs: number): number {
+		return computeFaceVisibleMsInWindow(
+			this.faceSegments,
+			nowMs,
+			BLINK_RATE_WINDOW_MS,
+			this.faceVisibleSinceMs,
+		);
+	}
+
+	private computeLiveBpm(nowMs: number): number {
+		if (this.faceCoverageMode) {
+			const faceVisibleMs = this.getFaceVisibleMs(nowMs);
+			return computeBlinksPerMinute(this.blinkTimestamps, nowMs, {
+				faceVisibleMs,
+			});
+		}
+		return computeBlinksPerMinute(this.blinkTimestamps, nowMs);
+	}
+
 	private rateWarmup(nowMs: number): { ready: boolean; warmupMs: number } {
 		if (this.rateSessionStartedAt === null) {
 			return { ready: false, warmupMs: 0 };
+		}
+		if (this.faceCoverageMode) {
+			const faceVisibleMs = this.getFaceVisibleMs(nowMs);
+			const readyAt = blinkRateCoverageReadyMs();
+			return {
+				ready: isBlinkRateCoverageReady(faceVisibleMs),
+				warmupMs: Math.min(faceVisibleMs, readyAt),
+			};
 		}
 		const elapsed = Math.max(0, nowMs - this.rateSessionStartedAt);
 		const warmupMs = Math.min(elapsed, BLINK_RATE_WINDOW_MS);
@@ -457,14 +551,64 @@ export class BlinkStatsService {
 		};
 	}
 
+	private closeFaceSegment(nowMs: number): void {
+		if (this.faceVisibleSinceMs === null) return;
+		const startMs = this.faceVisibleSinceMs;
+		const endMs = nowMs;
+		this.faceVisibleSinceMs = null;
+		if (endMs <= startMs) return;
+		this.faceSegments.push({ startMs, endMs });
+		this.pendingFaceTrackingMs += endMs - startMs;
+		this.pruneFaceSegments(nowMs);
+	}
+
+	private pruneFaceSegments(nowMs: number): void {
+		this.faceSegments = pruneFaceVisibleSegments(
+			this.faceSegments,
+			nowMs,
+			BLINK_RATE_WINDOW_MS,
+		);
+	}
+
+	private resetFaceClock(): void {
+		this.faceVisible = false;
+		this.faceVisibleSinceMs = null;
+		this.faceSegments = [];
+		this.pendingFaceTrackingMs = 0;
+	}
+
 	private markChartsDirty(): void {
 		this.chartsDirty = true;
 	}
 
 	private flushTracking(now: Date = new Date()): void {
 		if (this.trackingStartedAt === null) return;
-		const elapsed = now.getTime() - this.trackingStartedAt;
-		this.trackingStartedAt = now.getTime();
+		const nowMs = now.getTime();
+
+		if (this.faceCoverageMode) {
+			if (this.faceVisibleSinceMs !== null) {
+				const delta = nowMs - this.faceVisibleSinceMs;
+				if (delta > 0) {
+					this.pendingFaceTrackingMs += delta;
+					this.faceSegments.push({
+						startMs: this.faceVisibleSinceMs,
+						endMs: nowMs,
+					});
+				}
+				this.faceVisibleSinceMs = nowMs;
+			}
+			const elapsed = this.pendingFaceTrackingMs;
+			this.pendingFaceTrackingMs = 0;
+			this.trackingStartedAt = nowMs;
+			this.pruneFaceSegments(nowMs);
+			if (elapsed <= 0) return;
+			this.state = addTrackingMs(this.state, elapsed, now);
+			this.persist();
+			return;
+		}
+
+		const elapsed = nowMs - this.trackingStartedAt;
+		this.trackingStartedAt = nowMs;
 		if (elapsed <= 0) return;
 		this.state = addTrackingMs(this.state, elapsed, now);
 		this.persist();
@@ -506,6 +650,7 @@ export class BlinkStatsService {
 	private tickLiveRate(nowMs: number = Date.now()): void {
 		if (!this.livePushEnabled || this.rateSessionStartedAt === null) return;
 
+		this.pruneFaceSegments(nowMs);
 		const { ready, warmupMs } = this.rateWarmup(nowMs);
 		if (!ready) {
 			const sec = Math.floor(warmupMs / 1000);
@@ -521,7 +666,7 @@ export class BlinkStatsService {
 			return;
 		}
 		this.blinkTimestamps = pruneBlinkTimestamps(this.blinkTimestamps, nowMs);
-		const bpm = computeBlinksPerMinute(this.blinkTimestamps, nowMs);
+		const bpm = this.computeLiveBpm(nowMs);
 		if (bpm === this.lastPushedBpm) return;
 		this.schedulePush();
 	}

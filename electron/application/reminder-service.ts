@@ -89,7 +89,10 @@ export class ReminderService {
 		this.preferences.isTracking = value;
 		this.store.set("isTracking", value);
 		if (value && !wasTracking) this.stats?.onTrackingStart();
-		if (!value && wasTracking) this.stats?.onTrackingStop();
+		if (!value && wasTracking) {
+			this.stats?.setFaceCoverageMode(false);
+			this.stats?.onTrackingStop();
+		}
 	}
 
 	/** Sidecar-detected blink only. Debounced; closes any open reminder. */
@@ -220,6 +223,7 @@ export class ReminderService {
 
 		if (!this.preferences.cameraEnabled) {
 			// Re-arm timer cadence without an immediate popup (slider tweak).
+			this.stats?.setFaceCoverageMode(false);
 			this.coaching?.stop();
 			this.state.blinkReminderActive = true;
 			this.state.blinkInterval = setInterval(() => {
@@ -266,6 +270,7 @@ export class ReminderService {
 		this.coaching?.stop();
 		this.sidecar.stopCamera();
 		this.resetFaceTracking();
+		this.stats?.onFaceVisibility(false);
 		this.windows.closeReminder();
 	}
 
@@ -287,6 +292,7 @@ export class ReminderService {
 	}
 
 	private startTimerLoop(): void {
+		this.stats?.setFaceCoverageMode(false);
 		this.coaching?.stop();
 		this.state.blinkReminderActive = true;
 		this.showBlinkReminder();
@@ -357,6 +363,7 @@ export class ReminderService {
 	}
 
 	private startMgdLoop(): void {
+		this.stats?.setFaceCoverageMode(false);
 		this.state.mgdReminderLoopActive = true;
 		if (this.state.blinkInterval) clearInterval(this.state.blinkInterval);
 		this.state.blinkInterval = setInterval(() => {
@@ -376,6 +383,7 @@ export class ReminderService {
 	}
 
 	private startFaceAwareLoop(): void {
+		this.stats?.setFaceCoverageMode(true);
 		this.state.cameraMonitoringInterval = setInterval(() => {
 			if (!this.preferences.isTracking || !this.sidecar.isRunning) {
 				this.state.clearReminderTimers();
