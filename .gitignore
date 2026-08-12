@@ -44,6 +44,8 @@ build/*
 !build/uninstallerSidebar.bmp
 # PyInstaller workdir (pattern above only matches repo-root build/)
 python/build/
+python/build_*/
+python/dist_*/
 develop-eggs/
 dist/
 downloads/
@@ -74,6 +76,10 @@ electron/assets/models/*.dat
 # Blink detector binary (built during CI)
 electron/resources/blink_detector
 electron/resources/blink_detector.exe
+
+# Stage-0 companion camera video (large MJPG AVI; keep local / AppData)
+python/fixtures/sessions/*.avi
+*.avi
 
 # Blink JSONL agent probes — reusable tools live in python/log_tools/;
 # keep one-offs out of git (and out of python/scripts/).
