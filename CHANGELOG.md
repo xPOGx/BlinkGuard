@@ -4,6 +4,25 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-08-12
+
+### Added
+
+- Camera: two-phase personal blink calibration
+- Blink: pose, per-eye, aperture, and logistic veto
+- Blink: labeled EAR corpus and offline F1 tools
+- Stats: live BPM from face-visible coverage
+
+### Fixed
+
+- Sidecar: let PyInstaller delete Temp on graceful quit
+- Reminders: pause eye-care on no-face auto-stop when coupled
+
+### Changed
+
+- GitHub links and update/publish targets point at `xpogx-org/BlinkGuard`
+- Ignore versioned PyInstaller build output
+
 ## [2.6.0] - 2026-08-10
 
 ### Added
