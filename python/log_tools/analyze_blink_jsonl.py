@@ -297,6 +297,13 @@ def main() -> int:
 			rejected.append(bd)
 
 	print("phases:", dict(phases.most_common()))
+	attempts = _completion_attempts(rows)
+	waive_counts: Counter[str] = Counter()
+	for bd in attempts:
+		raw = bd.get("waives")
+		if isinstance(raw, list):
+			waive_counts.update(str(w) for w in raw if w)
+	print("waives:", dict(waive_counts.most_common()) or "(none)")
 	total = len(rows)
 	print(f"credit_rate={len(credited) / total:.3f}" if total else "credit_rate=n/a")
 
@@ -319,7 +326,6 @@ def main() -> int:
 	look_down = [b for b in credited if b.get("look_down")]
 	print(f"credited_short={len(short)} credited_look_down={len(look_down)}")
 
-	attempts = _completion_attempts(rows)
 	_print_pose_reject_split(attempts)
 
 	print("--- credited ---")

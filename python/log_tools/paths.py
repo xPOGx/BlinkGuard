@@ -45,3 +45,13 @@ def domain_package_dir() -> Path:
 		/ "blink_detector_package"
 		/ "domain"
 	)
+
+
+def fixtures_dir() -> Path:
+	"""Committed Stage-0 corpus root (`python/fixtures/`)."""
+	return _PYTHON_DIR / "fixtures"
+
+
+def fixtures_sessions_dir() -> Path:
+	"""Labeled EAR-trace sessions (`python/fixtures/sessions/`)."""
+	return fixtures_dir() / "sessions"
