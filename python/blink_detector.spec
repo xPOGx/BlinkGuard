@@ -8,7 +8,13 @@ a = Analysis(
 	["blink_detector.py"],
 	pathex=["."],
 	binaries=[],
-	datas=[("../electron/assets/models", "assets/models")],
+	datas=[
+		("../electron/assets/models", "assets/models"),
+		(
+			"blink_detector_package/domain/classifier_weights.json",
+			"blink_detector_package/domain",
+		),
+	],
 	hiddenimports=hiddenimports,
 	hookspath=[],
 	hooksconfig={},

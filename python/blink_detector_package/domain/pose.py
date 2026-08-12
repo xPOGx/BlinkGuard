@@ -1,4 +1,8 @@
-"""Crude head-pose estimates from dlib 68-point landmarks (no solvePnP)."""
+"""Pose gate profiles and heuristic head-pose fallback (no OpenCV).
+
+Stage 3.2 live path: ``infrastructure.head_pose.estimate_head_pose`` (solvePnP).
+This module keeps gate profiles + a pure-Python heuristic used when PnP fails.
+"""
 
 # Matches BlinkDetectionState recovery when not looking down.
 BLINK_RECOVERY_DEFAULT = 0.7
@@ -8,35 +12,73 @@ BLINK_RECOVERY_DEFAULT = 0.7
 # Yaw hard-block is only for near-profile faces; side-monitor glances credit.
 POSE_PROFILES = {
 	"loose": {
-		"yaw_extreme": 1.20,
+		"yaw_extreme": 1.25,
 		"pitch_look_down_delta": 0.05,
 		"look_down_threshold_mult": 0.85,
 		"look_down_velocity_mult": 1.0,
-		# Unused for credit (LOOK_DOWN_CREDIT_RECOVERY_RATIO owns reopen).
-		"look_down_recovery": 0.74,
 	},
 	"normal": {
-		"yaw_extreme": 1.10,
+		# Raised 1.10→1.20: side_monitor_right sat just over 1.10 and
+		# skip_yaw cancelled mid-blink; left (~0.98) was already under.
+		"yaw_extreme": 1.20,
 		"pitch_look_down_delta": 0.06,
 		"look_down_threshold_mult": 0.88,
 		"look_down_velocity_mult": 1.05,
-		"look_down_recovery": 0.74,
 	},
 	"strict": {
 		"yaw_extreme": 0.95,
 		"pitch_look_down_delta": 0.07,
 		"look_down_threshold_mult": 0.90,
 		"look_down_velocity_mult": 1.1,
-		"look_down_recovery": 0.74,
 	},
 }
 
 DEFAULT_POSE_STRICTNESS = "normal"
 
+# Stage 3.3: pitch_delta above look-down threshold → weight 0→1 over this span.
+PITCH_WEIGHT_SPAN = 0.12
+
 
 def get_pose_profile(strictness=None):
 	key = strictness if strictness in POSE_PROFILES else DEFAULT_POSE_STRICTNESS
 	return POSE_PROFILES[key]
+
+
+def lerp(a, b, weight):
+	"""Linear blend: weight 0 → a, weight 1 → b."""
+	try:
+		w = float(weight)
+	except (TypeError, ValueError):
+		w = 0.0
+	w = 0.0 if w < 0.0 else (1.0 if w > 1.0 else w)
+	return (1.0 - w) * float(a) + w * float(b)
+
+
+def pose_weight(pitch_delta, profile, *, extreme_yaw=False):
+	"""
+	Continuous look-down amount in [0, 1] from pitch_delta.
+
+	0 while pitch_delta <= profile pitch_look_down_delta (or extreme yaw);
+	1 after an additional PITCH_WEIGHT_SPAN.
+	"""
+	if extreme_yaw:
+		return 0.0
+	try:
+		delta = float(pitch_delta)
+	except (TypeError, ValueError):
+		return 0.0
+	d0 = float(profile["pitch_look_down_delta"])
+	if delta <= d0:
+		return 0.0
+	span = float(PITCH_WEIGHT_SPAN)
+	if span <= 1e-9:
+		return 1.0
+	w = (delta - d0) / span
+	if w >= 1.0:
+		return 1.0
+	if w <= 0.0:
+		return 0.0
+	return w
 
 
 def _point(landmarks, index):
@@ -55,13 +97,15 @@ def _mean_xy(landmarks, start, end):
 	return sx / count, sy / count
 
 
-def estimate_head_pose(landmarks):
+def estimate_head_pose_heuristic(landmarks):
 	"""
-	Estimate normalized yaw/pitch from 68-point shape.
+	Normalized yaw/pitch from 68-point shape (no solvePnP).
 
 	yaw: 0 = frontal; magnitude grows toward profile (side monitor).
 	pitch: 0 ≈ neutral geometry; positive = looking down (chin tuck).
 	Absolute pitch is biased with top-mounted webcams — use resting delta.
+
+	Prefer ``infrastructure.head_pose.estimate_head_pose`` in live paths.
 	"""
 	if landmarks is None or len(landmarks) < 68:
 		return {"yaw": 0.0, "pitch": 0.0, "valid": False}
@@ -101,7 +145,8 @@ def evaluate_pose_gate(pose, strictness=None, resting_pitch=None):
 	Return gate decision for blink credit.
 
 	- extreme yaw (near profile) → block credit
-	- look-down = pitch above session resting pitch by delta → relax drop %
+	- pose_weight from pitch_delta (Stage 3.3); look_down = weight > 0
+	- threshold/velocity mults lerp frontal → look-down endpoints
 	"""
 	profile = get_pose_profile(strictness)
 	if not pose or not pose.get("valid", False):
@@ -109,6 +154,7 @@ def evaluate_pose_gate(pose, strictness=None, resting_pitch=None):
 			"allow_credit": True,
 			"look_down": False,
 			"extreme_yaw": False,
+			"pose_weight": 0.0,
 			"threshold_mult": 1.0,
 			"velocity_mult": 1.0,
 			"recovery_threshold": BLINK_RECOVERY_DEFAULT,
@@ -125,25 +171,25 @@ def evaluate_pose_gate(pose, strictness=None, resting_pitch=None):
 	if resting_pitch is None:
 		# No resting estimate yet — do not treat webcam bias as look-down.
 		pitch_delta = 0.0
-		look_down = False
 	else:
 		pitch_delta = pitch - float(resting_pitch)
-		look_down = (not extreme_yaw) and pitch_delta >= profile[
-			"pitch_look_down_delta"
-		]
 
-	threshold_mult = 1.0
-	velocity_mult = 1.0
+	weight = pose_weight(
+		pitch_delta, profile, extreme_yaw=extreme_yaw
+	)
+	look_down = weight > 0.0
+
+	threshold_mult = lerp(1.0, profile["look_down_threshold_mult"], weight)
+	velocity_mult = lerp(1.0, profile["look_down_velocity_mult"], weight)
+	# Frontal reopen uses BLINK_RECOVERY_DEFAULT. Look-down credit reopen is
+	# LOOK_DOWN_CREDIT_RECOVERY_RATIO in BlinkDetectionState (not this field).
 	recovery_threshold = BLINK_RECOVERY_DEFAULT
-	if look_down:
-		threshold_mult = profile["look_down_threshold_mult"]
-		velocity_mult = profile["look_down_velocity_mult"]
-		recovery_threshold = profile["look_down_recovery"]
 
 	return {
 		"allow_credit": not extreme_yaw,
 		"look_down": look_down,
 		"extreme_yaw": extreme_yaw,
+		"pose_weight": weight,
 		"threshold_mult": threshold_mult,
 		"velocity_mult": velocity_mult,
 		"recovery_threshold": recovery_threshold,
@@ -183,3 +229,43 @@ def select_largest_face(faces):
 			best_area = area
 			best = face
 	return best
+
+
+# Small HOG hits glued to the frame edge are clutter (laundry, bags), not
+# the user. Close-up faces that fill the frame may touch edges — those have
+# a large area fraction and still pass.
+FACE_EDGE_BORDER_PX = 3
+FACE_EDGE_MIN_AREA_FRAC = 0.12
+
+
+def face_bbox_plausible(face, frame_w, frame_h):
+	"""
+	True if this bbox can be the user.
+
+	Rejects small detections flush against a frame edge (HOG FP on laundry
+	when the real face is covered). Centered tiny faces still go through
+	MIN_FACE_AREA / too_far. Large close-up faces that clip the border pass.
+	"""
+	if face is None or frame_w <= 0 or frame_h <= 0:
+		return False
+	try:
+		left = int(face.left())
+		top = int(face.top())
+		right = int(face.right())
+		bottom = int(face.bottom())
+	except Exception:
+		return False
+	area = face_bbox_area(face)
+	frame_area = int(frame_w) * int(frame_h)
+	if frame_area <= 0 or area <= 0:
+		return False
+	frac = area / float(frame_area)
+	touches_edge = (
+		left <= FACE_EDGE_BORDER_PX
+		or top <= FACE_EDGE_BORDER_PX
+		or right >= int(frame_w) - FACE_EDGE_BORDER_PX
+		or bottom >= int(frame_h) - FACE_EDGE_BORDER_PX
+	)
+	if touches_edge and frac < FACE_EDGE_MIN_AREA_FRAC:
+		return False
+	return True

@@ -12,11 +12,12 @@ from blink_detector_package.domain import (
 	MIN_FACE_AREA_PX,
 	MIN_INTEROCULAR_PX,
 	BlinkDetectionState,
-	estimate_head_pose,
 	face_bbox_area,
+	face_bbox_plausible,
 	interocular_distance_px,
 	select_largest_face,
 )
+from blink_detector_package.infrastructure.head_pose import estimate_head_pose
 from blink_detector_package.domain.blink_detection import (
 	DEFAULT_TARGET_FPS,
 	FACE_MISS_HOLD_FRAMES,
@@ -37,6 +38,7 @@ from blink_detector_package.infrastructure.transport import NdjsonTransport
 from blink_detector_package.infrastructure.vision import (
 	PreallocatedBuffers,
 	encode_frame,
+	eye_intensity_aperture,
 	get_face_landmarks,
 	run_hog_face_detect,
 )
@@ -53,6 +55,143 @@ NO_FACE_DATA = json.dumps(
 		}
 	}
 )
+
+
+class TraceRecorder:
+	"""NDJSON EAR/pose dump + sidecar MJPG AVI for Stage-0 labeling."""
+
+	def __init__(self):
+		self._file = None
+		self._writer = None
+		self.path = None
+		self.video_path = None
+		self.frames = 0
+		self._fps = 15.0
+		self._video_error = None
+
+	@property
+	def active(self):
+		return self._file is not None
+
+	def start(self, path, header=None, target_fps=None):
+		self.stop()
+		target = Path(path)
+		if not str(path).strip():
+			raise ValueError("empty trace path")
+		target.parent.mkdir(parents=True, exist_ok=True)
+		if target.suffix.lower() not in (".ndjson", ".jsonl"):
+			target = target.with_suffix(".ndjson")
+		handle = target.open("w", encoding="utf-8")
+		self._file = handle
+		self.path = str(target.resolve())
+		self.video_path = str(target.with_suffix(".avi").resolve())
+		self.frames = 0
+		self._writer = None
+		self._video_error = None
+		try:
+			fps = float(target_fps) if target_fps is not None else 15.0
+		except (TypeError, ValueError):
+			fps = 15.0
+		self._fps = max(5.0, min(fps, 60.0))
+		meta = {
+			"type": "header",
+			"schema": "blinkguard.ear_trace.v1",
+			"video": Path(self.video_path).name,
+			"video_fps": self._fps,
+			"video_codec": "MJPG",
+		}
+		if header:
+			meta.update(header)
+			# Keep video keys authoritative after header merge.
+			meta["video"] = Path(self.video_path).name
+			meta["video_fps"] = self._fps
+			meta["video_codec"] = "MJPG"
+		handle.write(json.dumps(meta) + "\n")
+		handle.flush()
+		return self.path
+
+	def _ensure_writer(self, bgr):
+		if self._writer is not None or self.video_path is None:
+			return
+		if bgr is None or getattr(bgr, "size", 0) == 0:
+			return
+		height, width = bgr.shape[:2]
+		fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+		writer = cv2.VideoWriter(
+			self.video_path,
+			fourcc,
+			float(self._fps),
+			(int(width), int(height)),
+		)
+		if not writer.isOpened():
+			self._video_error = f"VideoWriter failed ({width}x{height} @ {self._fps})"
+			writer.release()
+			self._writer = None
+			return
+		self._writer = writer
+
+	def write_frame(self, payload, bgr=None):
+		if self._file is None:
+			return
+		row = dict(payload)
+		row["video_index"] = self.frames
+		self._file.write(json.dumps(row) + "\n")
+		if bgr is not None:
+			self._ensure_writer(bgr)
+			if self._writer is not None:
+				self._writer.write(bgr)
+		self.frames += 1
+		if self.frames % 5 == 0:
+			self._file.flush()
+
+	def stop(self):
+		if self._file is None:
+			return None
+		path = self.path
+		video_path = self.video_path
+		frames = self.frames
+		video_error = self._video_error
+		try:
+			self._file.flush()
+			self._file.close()
+		finally:
+			self._file = None
+			self.path = None
+		if self._writer is not None:
+			try:
+				self._writer.release()
+			except Exception:
+				pass
+			self._writer = None
+		self.video_path = None
+		self.frames = 0
+		self._video_error = None
+		# Drop header-only files so failed starts do not look like sessions.
+		if frames <= 0:
+			for dead in (path, video_path):
+				if not dead:
+					continue
+				try:
+					Path(dead).unlink(missing_ok=True)
+				except OSError:
+					pass
+			return {
+				"path": path,
+				"video_path": video_path,
+				"frames": 0,
+				"deleted_empty": True,
+			}
+		result = {
+			"path": path,
+			"video_path": video_path,
+			"frames": frames,
+		}
+		if video_error:
+			result["video_error"] = video_error
+		elif video_path and not Path(video_path).exists():
+			result["video_error"] = "video file missing after stop"
+		return result
+
 
 
 class BlinkDetectorApplication:
@@ -83,6 +222,7 @@ class BlinkDetectorApplication:
 		self._loop_dt_ema = 0.0
 		self._last_gate_fps_update = 0.0
 		self._last_processed_frame_time = 0.0
+		self.trace = TraceRecorder()
 		self._reset_capture_health()
 
 	def _reset_capture_health(self):
@@ -242,6 +382,8 @@ class BlinkDetectorApplication:
 		want_stop = False
 		want_start = False
 		want_video = False
+		record_trace_path = None
+		want_stop_trace = False
 		for data in batch:
 			for key in (
 				"target_fps",
@@ -249,6 +391,7 @@ class BlinkDetectorApplication:
 				"face_detect_interval",
 				"pose_strictness",
 				"ear_calibration",
+				"classifier_calibration",
 			):
 				if key in data:
 					merged[key] = data[key]
@@ -259,17 +402,108 @@ class BlinkDetectorApplication:
 				want_start = True
 			if "request_video" in data:
 				want_video = True
+			if "record_trace" in data:
+				record_trace_path = data["record_trace"]
+			if data.get("stop_trace"):
+				want_stop_trace = True
 
 		try:
 			self._apply_config_dict(merged)
 
+			if want_stop_trace or record_trace_path is not None:
+				# stop_trace before starting a new path in the same batch.
+				if want_stop_trace or (
+					record_trace_path is not None and self.trace.active
+				):
+					stopped = self.trace.stop()
+					if stopped:
+						if stopped.get("frames", 0) <= 0:
+							self.transport.send(
+								{
+									"error": (
+										"Trace recording produced 0 frames "
+										"(is the camera active?). Empty file removed."
+									)
+								}
+							)
+						else:
+							msg = (
+								"Trace recording stopped "
+								f"path={stopped['path']} "
+								f"frames={stopped['frames']}"
+							)
+							if stopped.get("video_path"):
+								msg += f" video={stopped['video_path']}"
+							if stopped.get("video_error"):
+								msg += f" video_error={stopped['video_error']}"
+							self.transport.send({"status": msg})
+							if stopped.get("video_error"):
+								self.transport.send(
+									{
+										"error": (
+											"EAR trace saved but video failed: "
+											f"{stopped['video_error']}"
+										)
+									}
+								)
+					elif want_stop_trace:
+						self.transport.send(
+							{"status": "Trace recording was not active"}
+						)
+				if record_trace_path is not None:
+					if not isinstance(record_trace_path, str) or not record_trace_path.strip():
+						self.transport.send(
+							{
+								"error": (
+									"record_trace requires a filesystem path string"
+								)
+							}
+						)
+					else:
+						try:
+							path = self.trace.start(
+								record_trace_path,
+								header=self._trace_header(),
+								target_fps=self.camera.target_fps,
+							)
+							self.transport.send(
+								{
+									"status": (
+										"Trace recording started "
+										f"path={path} "
+										f"video={self.trace.video_path}"
+									)
+								}
+							)
+						except (OSError, ValueError, TypeError) as error:
+							self.transport.send(
+								{
+									"error": (
+										f"Failed to start trace recording: {error}"
+									)
+								}
+							)
+
 			if want_stop:
+				# Do NOT stop EAR-trace here — users often record → camera on →
+				# scenario → camera off → stop recording. stop_camera must not
+				# close an empty/partial trace mid-session.
 				self.camera.stop(reason="stop_camera")
 				self.send_video = False
 				self._cached_face = None
 				self._face_miss_streak = 0
 				self._reset_capture_health()
 				self.transport.send({"status": "Camera stopped"})
+				if self.trace.active:
+					self.transport.send(
+						{
+							"debug": (
+								"Trace recording still active after camera stop "
+								f"frames_so_far={self.trace.frames} "
+								f"path={self.trace.path}"
+							)
+						}
+					)
 
 			if want_start:
 				if self.camera.start(self.detection.reset):
@@ -291,6 +525,59 @@ class BlinkDetectorApplication:
 			self.transport.send(
 				{"debug": f"Command processing error: {str(error)}"}
 			)
+
+	def _trace_header(self):
+		return {
+			"target_fps": int(self.camera.target_fps),
+			"processing_resolution": list(self.camera.processing_resolution),
+			"face_detect_interval": int(self.face_detect_interval),
+			"pose_strictness": self.pose_strictness,
+			"ear_calibration": self.detection.ear_calibration,
+			"started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+		}
+
+	def _record_trace_frame(
+		self,
+		*,
+		current_time,
+		face_status,
+		luma,
+		frame=None,
+		left_ear=None,
+		right_ear=None,
+		avg_ear=None,
+		pose=None,
+		face_area=None,
+		interocular=None,
+		left_aperture=None,
+		right_aperture=None,
+	):
+		if not self.trace.active:
+			return
+		payload = {
+			"t": float(current_time),
+			"left_ear": float(left_ear) if left_ear is not None else None,
+			"right_ear": float(right_ear) if right_ear is not None else None,
+			"avg_ear": float(avg_ear) if avg_ear is not None else None,
+			"yaw": float(pose["yaw"]) if pose and pose.get("valid") else 0.0,
+			"pitch": (
+				float(pose["pitch"]) if pose and pose.get("valid") else 0.0
+			),
+			"pose_valid": bool(pose.get("valid")) if pose else False,
+			"face_status": face_status or "none",
+			"face_area": int(face_area) if face_area is not None else None,
+			"interocular": (
+				float(interocular) if interocular is not None else None
+			),
+			"luma": float(luma) if luma is not None else None,
+			"left_aperture": (
+				float(left_aperture) if left_aperture is not None else None
+			),
+			"right_aperture": (
+				float(right_aperture) if right_aperture is not None else None
+			),
+		}
+		self.trace.write_frame(payload, bgr=frame)
 
 	def _sync_video_emit_interval(self):
 		"""Match preview cadence to quality preset (not a hard 10 FPS cap)."""
@@ -402,6 +689,42 @@ class BlinkDetectorApplication:
 						}
 					)
 
+		if "classifier_calibration" in data:
+			from blink_detector_package.domain.classifier import (
+				clear_personal,
+				personal_overlay,
+				set_personal,
+			)
+
+			value = data["classifier_calibration"]
+			if value is None:
+				clear_personal()
+				self.transport.send({"status": "Cleared classifier calibration"})
+			elif isinstance(value, dict):
+				set_personal(
+					value.get("bias"),
+					value.get("threshold"),
+				)
+				overlay = personal_overlay()
+				self.transport.send(
+					{
+						"status": (
+							"Applied classifier calibration "
+							f"bias={overlay['bias']:.3f} "
+							f"t={overlay['threshold']}"
+						)
+					}
+				)
+			else:
+				self.transport.send(
+					{
+						"debug": (
+							"Ignored invalid classifier_calibration: "
+							f"{value}"
+						)
+					}
+				)
+
 	def _emit_video_stream(self, frame, face_data=None):
 		"""JPEG plus same-frame overlay so preview dots/box stay locked to video.
 
@@ -502,12 +825,30 @@ class BlinkDetectorApplication:
 			{"debug": f"HOG face recovered via retry hog_retry={retry_kind}"}
 		)
 
-	def _face_quality_ok(self, face, landmarks):
+	def _face_quality_ok(self, face, landmarks, frame_w=0, frame_h=0):
 		"""Reject tiny / junk faces before EAR (symmetric noise bypasses asymmetry)."""
 		area = face_bbox_area(face) if face is not None else 0
 		interocular = interocular_distance_px(landmarks)
 		ok = area >= MIN_FACE_AREA_PX and interocular >= MIN_INTEROCULAR_PX
+		if ok and frame_w > 0 and frame_h > 0:
+			ok = face_bbox_plausible(face, frame_w, frame_h)
 		return ok, area, interocular
+
+	def _drop_junk_hog_face(self, face_data, current_time):
+		"""Clutter HOG hit — no overlay, same as a hard miss."""
+		self._cached_face = None
+		self._face_miss_streak = 0
+		self._quality_miss_streak = 0
+		self._face_reacquire_frames = FACE_REACQUIRE_FRAMES
+		self._last_clahe_roi_count = 0
+		had_candidate = False
+		if self.detection.blink_in_progress:
+			had_candidate = self.detection.cancel_on_face_lost(current_time)
+		else:
+			self.detection.mark_face_absent(current_time)
+		self._emit_face_lost(current_time, had_candidate)
+		face_data["faceDetected"] = False
+		face_data["faceStatus"] = "none"
 
 	def _emit_soft_face_quality_skip(
 		self,
@@ -670,6 +1011,7 @@ class BlinkDetectorApplication:
 			"pitch": float(blink_info.get("pitch") or 0.0),
 			"pitch_delta": float(blink_info.get("pitch_delta") or 0.0),
 			"resting_pitch": float(resting) if resting is not None else None,
+			"pose_weight": _opt_float("pose_weight"),
 			"look_down": bool(blink_info.get("look_down", False)),
 			"ear_depressed": bool(blink_info.get("ear_depressed", False)),
 			"treat_as_look_down": bool(
@@ -695,9 +1037,34 @@ class BlinkDetectorApplication:
 				blink_info.get("cooldown_remaining") or 0.0
 			),
 			"threshold": float(blink_info.get("threshold") or 0.0),
-			"require_bilateral": bool(
-				blink_info.get("require_bilateral", False)
+			"merge": blink_info.get("merge"),
+			"left_drop": _opt_float("left_drop"),
+			"right_drop": _opt_float("right_drop"),
+			"left_aperture": _opt_float("left_aperture"),
+			"right_aperture": _opt_float("right_aperture"),
+			"aperture_drop": _opt_float("aperture_drop"),
+			"aperture_ok": (
+				bool(blink_info["aperture_ok"])
+				if blink_info.get("aperture_ok") is not None
+				else None
 			),
+			"clf_p": _opt_float("clf_p"),
+			"clf_veto": (
+				bool(blink_info["clf_veto"])
+				if blink_info.get("clf_veto") is not None
+				else None
+			),
+			"waives": (
+				[str(w) for w in blink_info["waives"]]
+				if isinstance(blink_info.get("waives"), list)
+				else []
+			),
+			"reject_gate": (
+				str(blink_info["reject_gate"])
+				if blink_info.get("reject_gate")
+				else None
+			),
+			"live_open_aperture": _opt_float("live_open_aperture"),
 			"face_area": (
 				int(blink_info["face_area"])
 				if blink_info.get("face_area") is not None
@@ -746,6 +1113,11 @@ class BlinkDetectorApplication:
 			if payload["ear_smooth"] is not None
 			else "n/a"
 		)
+		clf_s = (
+			f"{payload['clf_p']:.2f}"
+			if payload.get("clf_p") is not None
+			else "n/a"
+		)
 		line = (
 			f"{prefix}: EAR={max_drop_ear:.3f}, baseline={baseline:.3f}, "
 			f"drop={drop:.1%}, abs={absolute_drop:.3f}, "
@@ -758,6 +1130,7 @@ class BlinkDetectorApplication:
 			f"yaw={payload['yaw']:.2f}, pitch={payload['pitch']:.2f}, "
 			f"dPitch={payload['pitch_delta']:.2f}, restPitch={resting_s}, "
 			f"lookDown={payload['look_down']}, "
+			f"clfP={clf_s} veto={payload.get('clf_veto')}, "
 			f"strict={payload['pose_strictness']}, "
 			f"backend={payload['detector_backend']}, "
 			f"cdLeft={payload['cooldown_remaining']:.3f}s, "
@@ -797,6 +1170,8 @@ class BlinkDetectorApplication:
 		right_ear,
 		pose,
 		face,
+		left_aperture=None,
+		right_aperture=None,
 	):
 		blink_detected, blink_info = self.detection.detect(
 			avg_ear,
@@ -804,6 +1179,8 @@ class BlinkDetectorApplication:
 			left_ear=left_ear,
 			right_ear=right_ear,
 			pose=pose,
+			left_aperture=left_aperture,
+			right_aperture=right_aperture,
 		)
 		phase = (blink_info or {}).get("phase")
 		if blink_detected and blink_info:
@@ -852,6 +1229,7 @@ class BlinkDetectorApplication:
 			face_data["blinkDebug"] = debug_payload
 		elif phase in (
 			"skip_yaw",
+			"skip_yaw_hold",
 			"skip_degraded",
 			"skip_eyes_closed",
 			"skip_await_open",
@@ -1074,6 +1452,12 @@ class BlinkDetectorApplication:
 						current_time
 					)
 					self._emit_face_lost(current_time, had_candidate)
+					self._record_trace_frame(
+						current_time=current_time,
+						face_status="none",
+						luma=luma,
+						frame=frame,
+					)
 					self.transport.send_serialized(NO_FACE_DATA)
 					if self.send_video:
 						self._emit_video_stream(frame)
@@ -1092,6 +1476,14 @@ class BlinkDetectorApplication:
 				left_eye = None
 				right_eye = None
 				landmarks = None
+				trace_left = None
+				trace_right = None
+				trace_avg = None
+				trace_pose = None
+				trace_area = None
+				trace_iod = None
+				trace_left_ap = None
+				trace_right_ap = None
 
 				gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 				# HOG: raw first; miss-only CLAHE/upsample retry inside _resolve_face.
@@ -1112,23 +1504,47 @@ class BlinkDetectorApplication:
 					quality_ok, face_area, interocular = self._face_quality_ok(
 						face,
 						landmarks,
+						frame_width,
+						frame_height,
 					)
+					trace_area = face_area
+					trace_iod = interocular
 					if not quality_ok:
-						self._emit_soft_face_quality_skip(
-							face_data,
-							face,
-							frame_width,
-							frame_height,
-							current_time,
-							face_area,
-							interocular,
-						)
+						if not face_bbox_plausible(
+							face, frame_width, frame_height
+						):
+							self._drop_junk_hog_face(
+								face_data, current_time
+							)
+						else:
+							self._emit_soft_face_quality_skip(
+								face_data,
+								face,
+								frame_width,
+								frame_height,
+								current_time,
+								face_area,
+								interocular,
+							)
 					else:
 						self._quality_miss_streak = 0
 						left_ear = calculate_ear_fast(left_eye, buffers)
 						right_ear = calculate_ear_fast(right_eye, buffers)
 						avg_ear = (left_ear + right_ear) * 0.5
-						pose = estimate_head_pose(landmarks)
+						left_aperture = eye_intensity_aperture(gray, left_eye)
+						right_aperture = eye_intensity_aperture(
+							gray, right_eye
+						)
+						pose = estimate_head_pose(
+							landmarks,
+							image_size=(frame_width, frame_height),
+						)
+						trace_left = left_ear
+						trace_right = right_ear
+						trace_avg = avg_ear
+						trace_pose = pose
+						trace_left_ap = left_aperture
+						trace_right_ap = right_aperture
 						face_data["faceDetected"] = True
 						face_data["faceStatus"] = "ok"
 						face_data["ear"] = float(avg_ear)
@@ -1154,21 +1570,32 @@ class BlinkDetectorApplication:
 							right_ear,
 							pose,
 							face,
+							left_aperture=left_aperture,
+							right_aperture=right_aperture,
 						)
 				else:
 					if face is not None:
-						# HOG ok but landmarks missing — same soft hold as
-						# quality floors (area/IOD). Keep bbox; avoid UI flash.
-						area = face_bbox_area(face)
-						self._emit_soft_face_quality_skip(
-							face_data,
-							face,
-							frame_width,
-							frame_height,
-							current_time,
-							area,
-							0.0,
-						)
+						if not face_bbox_plausible(
+							face, frame_width, frame_height
+						):
+							self._drop_junk_hog_face(
+								face_data, current_time
+							)
+						else:
+							# HOG ok but landmarks missing — same soft hold as
+							# quality floors (area/IOD). Keep bbox; avoid UI flash.
+							area = face_bbox_area(face)
+							trace_area = area
+							trace_iod = 0.0
+							self._emit_soft_face_quality_skip(
+								face_data,
+								face,
+								frame_width,
+								frame_height,
+								current_time,
+								area,
+								0.0,
+							)
 					else:
 						self._cached_face = None
 						self._face_miss_streak = 0
@@ -1180,6 +1607,20 @@ class BlinkDetectorApplication:
 						)
 						self._emit_face_lost(current_time, had_candidate)
 
+				self._record_trace_frame(
+					current_time=current_time,
+					face_status=face_data.get("faceStatus") or "none",
+					luma=luma,
+					frame=frame,
+					left_ear=trace_left,
+					right_ear=trace_right,
+					avg_ear=trace_avg,
+					pose=trace_pose,
+					face_area=trace_area,
+					interocular=trace_iod,
+					left_aperture=trace_left_ap,
+					right_aperture=trace_right_ap,
+				)
 				self._commit_frame_health(
 					luma,
 					False,
@@ -1209,6 +1650,17 @@ class BlinkDetectorApplication:
 				{"status": "Stopping blink detector..."}
 			)
 		finally:
+			stopped = self.trace.stop()
+			if stopped:
+				self.transport.send(
+					{
+						"status": (
+							"Trace recording stopped "
+							f"path={stopped['path']} "
+							f"frames={stopped['frames']}"
+						)
+					}
+				)
 			self.camera.stop(reason="detector_exit")
 			self.transport.send({"status": "Blink detector stopped"})
 			self.transport.stop()

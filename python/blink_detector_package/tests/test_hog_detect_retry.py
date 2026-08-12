@@ -140,6 +140,65 @@ class HogDetectRetryTests(unittest.TestCase):
 		self.assertIsNone(face)
 		self.assertIsNone(kind)
 
+	def test_weak_hog_score_dropped(self):
+		hit = _FakeFace()
+
+		class _Weak:
+			def __call__(self, gray, upsample):
+				return [hit]
+
+			def run(self, gray, upsample, adjust=0.0):
+				return [hit], [0.05], [0]
+
+		gray = np.zeros((64, 64), dtype=np.uint8)
+		face, kind = run_hog_face_detect(
+			_Weak(),
+			gray,
+			lambda faces: faces[0] if faces else None,
+			PreallocatedBuffers(),
+		)
+		self.assertIsNone(face)
+		self.assertIsNone(kind)
+
+	def test_edge_glued_small_box_dropped(self):
+		class _EdgeFace:
+			def __init__(self):
+				self._w = 40
+				self._h = 48
+
+			def left(self):
+				return 0
+
+			def top(self):
+				return 80
+
+			def right(self):
+				return 40
+
+			def bottom(self):
+				return 128
+
+			def width(self):
+				return self._w
+
+			def height(self):
+				return self._h
+
+		edge = _EdgeFace()
+
+		def detector(gray, upsample):
+			return [edge]
+
+		gray = np.zeros((360, 480), dtype=np.uint8)
+		face, kind = run_hog_face_detect(
+			detector,
+			gray,
+			lambda faces: faces[0] if faces else None,
+			PreallocatedBuffers(),
+		)
+		self.assertIsNone(face)
+		self.assertIsNone(kind)
+
 
 if __name__ == "__main__":
 	unittest.main()

@@ -9,9 +9,10 @@ from .blink_detection import (
 )
 from .pose import (
 	DEFAULT_POSE_STRICTNESS,
-	estimate_head_pose,
+	estimate_head_pose_heuristic,
 	evaluate_pose_gate,
 	face_bbox_area,
+	face_bbox_plausible,
 	interocular_distance_px,
 	select_largest_face,
 )
@@ -22,9 +23,10 @@ __all__ = [
 	"DEFAULT_POSE_STRICTNESS",
 	"MIN_FACE_AREA_PX",
 	"MIN_INTEROCULAR_PX",
-	"estimate_head_pose",
+	"estimate_head_pose_heuristic",
 	"evaluate_pose_gate",
 	"face_bbox_area",
+	"face_bbox_plausible",
 	"get_adaptive_ear_drop_threshold",
 	"interocular_distance_px",
 	"select_largest_face",

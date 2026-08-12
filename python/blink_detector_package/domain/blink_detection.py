@@ -1,6 +1,11 @@
 from collections import deque
 
-from blink_detector_package.domain.pose import evaluate_pose_gate
+from blink_detector_package.domain.classifier import score as classifier_score
+from blink_detector_package.domain.pose import (
+	evaluate_pose_gate,
+	get_pose_profile,
+	lerp,
+)
 
 BLINK_COOLDOWN = 0.55
 # Look-down echo burst after a real blink (POG 2026-08-10: +2–3 @ ~1.2s).
@@ -45,12 +50,14 @@ CLOSING_HISTORY_FRAMES = 5
 
 # Peak closing |dEAR/dt| (EAR units / second). Tuned for ~10–15 FPS.
 BLINK_MIN_CLOSING_VELOCITY = 0.35
-# Short candidates: FPS-aware frontal via short_frontal_velocity(); look-down
-# uses SHORT_BLINK_MIN_VELOCITY.
+# Short candidates: FPS-aware floors via short_frontal_velocity() /
+# short_look_down_velocity().
 SHORT_BLINK_DURATION = 0.09
-# Kept for analyzers / docs; LD opening gate now applies at any duration.
-LOOK_DOWN_SHORTISH_DURATION = 0.12
-SHORT_BLINK_MIN_VELOCITY = 0.50
+
+# Mid-blink yaw: tolerate brief flicker over yaw_extreme before cancel.
+# Hard-cancel immediately when |yaw| >= yaw_extreme + this margin.
+YAW_EXTREME_CANCEL_STREAK = 3
+YAW_EXTREME_HARD_MARGIN = 0.10
 
 # |L-R| / mean — above this → degraded / asymmetric; skip frame, no credit.
 # Side-monitor glances often land ~0.46–0.50; keep headroom below true junk.
@@ -244,6 +251,142 @@ def _bilateral_drops_agree(left_drop, right_drop, required_drop):
 	return spread <= BILATERAL_MAX_SPREAD
 
 
+def _min_eye_drop(required_drop):
+	return float(required_drop) * 0.28
+
+
+class EyeTrack:
+	"""Per-eye EAR smooth / velocity / candidate stats (Stage 3.4)."""
+
+	def __init__(self):
+		self._ear_window = deque(maxlen=EAR_SMOOTH_WINDOW)
+		self.prev_ear = None
+		self.prev_time = None
+		self._smoothed_closing = 0.0
+		self._closing_history = deque(maxlen=CLOSING_HISTORY_FRAMES)
+		self.peak_closing = 0.0
+		self.peak_closing_measured = 0.0
+		self.peak_opening = 0.0
+		self.max_drop = 0.0
+		self.closed_frames = 0
+		self.smooth = 0.0
+		self.raw = None
+
+	def clear_stream(self):
+		self.prev_ear = None
+		self.prev_time = None
+		self._smoothed_closing = 0.0
+		self._closing_history.clear()
+		self._ear_window.clear()
+		self.smooth = 0.0
+		self.raw = None
+
+	def reset_candidate(self):
+		self.peak_closing = 0.0
+		self.peak_closing_measured = 0.0
+		self.peak_opening = 0.0
+		self.max_drop = 0.0
+		self.closed_frames = 0
+
+	def pre_blink_closing_peak(self):
+		if not self._closing_history:
+			return 0.0
+		return max(self._closing_history)
+
+	def update(
+		self,
+		ear_raw,
+		current_time,
+		*,
+		blink_in_progress,
+		ref,
+		close_band_ear,
+	):
+		"""Update smooth + velocity; accumulate candidate stats when active."""
+		if ear_raw is None:
+			self.raw = None
+			return 0.0, 0.0
+		ear = float(ear_raw)
+		self.raw = ear
+		self._ear_window.append(ear)
+		self.smooth = sum(self._ear_window) / len(self._ear_window)
+
+		closing_raw = 0.0
+		opening = 0.0
+		if self.prev_ear is not None and self.prev_time is not None:
+			dt = current_time - self.prev_time
+			if dt > 1e-4:
+				raw = (ear - self.prev_ear) / dt
+				closing_raw = -raw if raw < 0 else 0.0
+				opening = raw if raw > 0 else 0.0
+				alpha = VELOCITY_SMOOTH_ALPHA
+				self._smoothed_closing = (
+					alpha * closing_raw
+					+ (1.0 - alpha) * self._smoothed_closing
+				)
+				self._closing_history.append(closing_raw)
+				if blink_in_progress:
+					if closing_raw > self.peak_closing:
+						self.peak_closing = closing_raw
+					if closing_raw > self.peak_closing_measured:
+						self.peak_closing_measured = closing_raw
+					if opening > self.peak_opening:
+						self.peak_opening = opening
+
+		self.prev_ear = ear
+		self.prev_time = current_time
+
+		if blink_in_progress and ref > 0:
+			drop = max(0.0, (ref - self.smooth) / ref)
+			if drop > self.max_drop:
+				self.max_drop = drop
+			if self.smooth < close_band_ear and opening <= 1e-6:
+				self.closed_frames += 1
+
+		return closing_raw, opening
+
+
+def merge_eye_drops(
+	left_drop,
+	right_drop,
+	*,
+	required_drop,
+	pose_w,
+	yaw,
+	has_both,
+):
+	"""
+	Stage 3.4 drop merge.
+
+	Returns (ok, merge_label, reject_phase_or_None).
+	merge_label: both|stronger|single|None
+
+	- both: each eye ≥ min_each and magnitudes agree
+	- stronger: both ≥ min_each but spread large, OR non-frontal with one eye
+	- anti-talk: frontal + only one eye dipped → reject_bilateral
+	"""
+	if not has_both:
+		return True, "single", None
+	min_each = _min_eye_drop(required_drop)
+	left_ok = float(left_drop) >= min_each
+	right_ok = float(right_drop) >= min_each
+	# Match prior require_bilateral pose band; slightly softer pose_w for 3.3 lerp.
+	frontal_strict = float(pose_w) <= 0.25 and abs(float(yaw)) < 0.35
+
+	if left_ok and right_ok:
+		if _bilateral_drops_agree(left_drop, right_drop, required_drop):
+			return True, "both", None
+		return True, "stronger", None
+
+	if left_ok or right_ok:
+		if frontal_strict:
+			return False, None, "reject_bilateral"
+		# Look-down / high yaw: allow stronger without symmetric second eye.
+		return True, "stronger", None
+
+	return False, None, "reject_bilateral"
+
+
 # Soft pull of live baseline toward personal open-eye calibration.
 CALIBRATION_ANCHOR_WEIGHT = 0.1
 # Plausible open-eye EAR clamp (matches shared/ear-calibration.ts).
@@ -302,6 +445,20 @@ class BlinkDetectionState:
 		self._prev_gate_yaw = None
 		self._prev_gate_pitch = None
 		self._recent_pose_motion = 0.0
+		# Consecutive extreme-yaw frames while a candidate is active.
+		self._extreme_yaw_streak = 0
+		# Stage 3.4 per-eye tracks (avg stream still used for live_open / ref).
+		self.left_track = EyeTrack()
+		self.right_track = EyeTrack()
+		self._merge_label = None
+		# Stage 3.5 intensity aperture confirm (optional 2nd channel).
+		self.live_open_aperture = 0.0
+		self.max_left_ap_drop = 0.0
+		self.max_right_ap_drop = 0.0
+		self._had_left_aperture = False
+		self._had_right_aperture = False
+		self._confirm_aperture_ok = None
+		self._confirm_aperture_drop = None
 
 	def set_target_fps(self, fps):
 		"""Update expected camera FPS for duration / short-velocity gates."""
@@ -341,6 +498,90 @@ class BlinkDetectionState:
 		if self.live_open_ear > 0:
 			return self.live_open_ear
 		return self.current_baseline_ear
+
+	def _ref_aperture(self):
+		"""Open-lid intensity aperture reference for Stage 3.5 confirm."""
+		return float(self.live_open_aperture or 0.0)
+
+	def _compute_aperture_drop(self, aperture):
+		ref = self._ref_aperture()
+		if ref <= 0 or aperture is None:
+			return None
+		return max(0.0, (ref - float(aperture)) / ref)
+
+	def _accumulate_aperture_drops(self, left_aperture, right_aperture):
+		"""Update peak per-eye aperture drops while a candidate is active."""
+		left_d = self._compute_aperture_drop(left_aperture)
+		right_d = self._compute_aperture_drop(right_aperture)
+		if left_d is not None:
+			self._had_left_aperture = True
+			if left_d > self.max_left_ap_drop:
+				self.max_left_ap_drop = left_d
+		if right_d is not None:
+			self._had_right_aperture = True
+			if right_d > self.max_right_ap_drop:
+				self.max_right_ap_drop = right_d
+
+	def _confirm_aperture_for_credit(
+		self, adaptive_threshold, *, pose_w=0.0, yaw=0.0
+	):
+		"""
+		Stage 3.5 credit confirm.
+
+		Returns (ok, strong_aperture_drop_or_None).
+		No aperture samples → skip confirm (legacy traces / disabled).
+		Side + look-down: require a full adaptive drop (min_each is too soft
+		for landmark/aperture jitter — POG 2026-08-12 1 Hz storm).
+		"""
+		had_any = self._had_left_aperture or self._had_right_aperture
+		if not had_any:
+			return True, None
+		min_drop = _min_eye_drop(adaptive_threshold)
+		if float(pose_w) >= 0.5 and abs(float(yaw)) >= 0.35:
+			min_drop = float(adaptive_threshold)
+		# Stronger EAR eye (same rule as merge stronger).
+		use_left = self.max_left_drop >= self.max_right_drop
+		if use_left and self._had_left_aperture:
+			drop = self.max_left_ap_drop
+			return drop >= min_drop, drop
+		if (not use_left) and self._had_right_aperture:
+			drop = self.max_right_ap_drop
+			return drop >= min_drop, drop
+		# Stronger eye never produced aperture — do not FN; skip confirm.
+		return True, None
+
+	def _update_live_open_aperture(self, left_aperture, right_aperture, closing_velocity):
+		"""
+		Track open aperture height (same rise/fall spirit as live_open_ear).
+
+		Frozen during an active candidate so drops are vs pre-blink open.
+		"""
+		samples = [
+			float(v)
+			for v in (left_aperture, right_aperture)
+			if v is not None
+		]
+		if not samples:
+			return
+		ap = sum(samples) / len(samples)
+		if ap <= 0:
+			return
+		if self.live_open_aperture <= 0:
+			self.live_open_aperture = ap
+			return
+		if self.blink_in_progress:
+			return
+		if ap >= self.live_open_aperture * 0.92:
+			alpha = LIVE_OPEN_RISE_ALPHA
+			self.live_open_aperture = (
+				(1 - alpha) * self.live_open_aperture + alpha * ap
+			)
+			return
+		if closing_velocity <= LIVE_OPEN_FALL_MAX_CLOSING_VEL:
+			alpha = LIVE_OPEN_FALL_ALPHA
+			self.live_open_aperture = (
+				(1 - alpha) * self.live_open_aperture + alpha * ap
+			)
 
 	def _update_live_open_ear(self, ear_smooth, closing_velocity, current_time):
 		"""
@@ -628,6 +869,16 @@ class BlinkDetectionState:
 		self._candidate_yaw = None
 		self._candidate_pitch = None
 		self._candidate_pose_delta = 0.0
+		self._extreme_yaw_streak = 0
+		self.left_track.reset_candidate()
+		self.right_track.reset_candidate()
+		self._merge_label = None
+		self.max_left_ap_drop = 0.0
+		self.max_right_ap_drop = 0.0
+		self._had_left_aperture = False
+		self._had_right_aperture = False
+		self._confirm_aperture_ok = None
+		self._confirm_aperture_drop = None
 
 	def cancel_on_face_lost(self, current_time=None):
 		"""
@@ -646,6 +897,8 @@ class BlinkDetectionState:
 		self._smoothed_closing_velocity = 0.0
 		self._closing_history.clear()
 		self._ear_window.clear()
+		self.left_track.clear_stream()
+		self.right_track.clear_stream()
 		if current_time is not None:
 			self.mark_face_absent(current_time)
 		return had_candidate
@@ -734,11 +987,11 @@ class BlinkDetectionState:
 		self._prev_gate_yaw = yaw
 		self._prev_gate_pitch = pitch
 
-	def _cooldown_s(self, treat_as_look_down):
-		return LOOK_DOWN_COOLDOWN if treat_as_look_down else BLINK_COOLDOWN
+	def _cooldown_s(self, pose_w):
+		return lerp(BLINK_COOLDOWN, LOOK_DOWN_COOLDOWN, pose_w)
 
 	def _update_eyes_closed_state(
-		self, current_ear, current_time, look_down=False
+		self, current_ear, current_time, pose_w=0.0
 	):
 		"""
 		Track sustained low EAR and post-credit reopen vs *live* open ref.
@@ -750,7 +1003,7 @@ class BlinkDetectionState:
 		Frontal await clear must sit at/above the close band — clearing at 0.70
 		while close≈0.84 re-arms start in the mid-band (~1 Hz FP). Look-down /
 		ear_depressed use LOOK_DOWN_AWAIT_CLEAR_RATIO so chat open is not
-		sticky skip_await_open.
+		sticky skip_await_open. Stage 3.3 blends via pose_w.
 		"""
 		ref = self._ref_ear()
 		if ref <= 0:
@@ -758,13 +1011,9 @@ class BlinkDetectionState:
 
 		open_ratio = current_ear / ref
 		close_ratio = 1.0 - get_adaptive_ear_drop_threshold(ref)
-		if look_down:
-			clear_open_ratio = max(
-				EYES_OPEN_RATIO, LOOK_DOWN_AWAIT_CLEAR_RATIO
-			)
-		else:
-			# Must leave the start zone before another candidate can arm.
-			clear_open_ratio = max(EYES_OPEN_RATIO, close_ratio)
+		frontal_clear = max(EYES_OPEN_RATIO, close_ratio)
+		ld_clear = max(EYES_OPEN_RATIO, LOOK_DOWN_AWAIT_CLEAR_RATIO)
+		clear_open_ratio = lerp(frontal_clear, ld_clear, pose_w)
 
 		if (
 			self.awaiting_reopen
@@ -778,7 +1027,7 @@ class BlinkDetectionState:
 				self.eyes_closed = True
 				self._open_ear_since = None
 			elif open_ratio < close_ratio:
-				if look_down:
+				if pose_w >= 0.5:
 					# Look-down resting open often sits under frontal close band;
 					# do not refresh await forever (POG skip_await_open sticky).
 					self.awaiting_reopen = False
@@ -836,12 +1085,15 @@ class BlinkDetectionState:
 		left_ear=None,
 		right_ear=None,
 		pose=None,
+		left_aperture=None,
+		right_aperture=None,
 	):
 		"""
 		Run blink state machine.
 
 		Optional left/right EAR enable bilateral gates.
 		Optional pose dict (yaw/pitch/valid) enables pose gates.
+		Optional left/right intensity aperture (Stage 3.5) confirms credit.
 		`current_ear` is raw avg EAR; FSM uses a short rolling mean.
 		"""
 		ear_raw = float(current_ear)
@@ -873,10 +1125,35 @@ class BlinkDetectionState:
 			"peak_opening_velocity": self.peak_opening_velocity,
 		}
 
-		# Extreme yaw (near profile): no credit; cancel in-progress blink.
+		# Extreme yaw (near profile): no credit. Mid-blink: tolerate brief
+		# flicker over the threshold; hard-cancel on streak or hard margin.
 		if gate["extreme_yaw"]:
+			yaw_abs = abs(float(gate.get("yaw") or 0.0))
+			yaw_extreme = float(
+				gate.get("profile", {}).get("yaw_extreme")
+				or get_pose_profile(self.pose_strictness)["yaw_extreme"]
+			)
+			hard = yaw_abs >= yaw_extreme + YAW_EXTREME_HARD_MARGIN
+			if self.blink_in_progress and not hard:
+				self._extreme_yaw_streak += 1
+				if self._extreme_yaw_streak < YAW_EXTREME_CANCEL_STREAK:
+					# Soft hold: keep candidate, still update velocity.
+					self._update_velocity(ear_raw, current_time)
+					return False, {
+						"baseline": self.current_baseline_ear,
+						"drop": 0.0,
+						"phase": "skip_yaw_hold",
+						"threshold": 0.0,
+						"yaw": gate["yaw"],
+						"pitch": gate["pitch"],
+						"pitch_delta": gate.get("pitch_delta", 0.0),
+						"extreme_yaw_streak": self._extreme_yaw_streak,
+						**ear_fields,
+					}
 			if self.blink_in_progress:
 				self._reset_blink_tracking()
+			else:
+				self._extreme_yaw_streak = 0
 			self._update_velocity(ear_raw, current_time)
 			return False, {
 				"baseline": self.current_baseline_ear,
@@ -888,6 +1165,7 @@ class BlinkDetectionState:
 				"pitch_delta": gate.get("pitch_delta", 0.0),
 				**ear_fields,
 			}
+		self._extreme_yaw_streak = 0
 
 		# Strong L/R asymmetry → degraded landmarks; skip frame, no credit.
 		if left_ear is not None and right_ear is not None:
@@ -914,6 +1192,9 @@ class BlinkDetectionState:
 			current_time,
 		)
 		self._update_live_open_ear(ear_smooth, closing_velocity, current_time)
+		self._update_live_open_aperture(
+			left_aperture, right_aperture, closing_velocity
+		)
 
 		if len(self.baseline_ear_values) < 5 and self.current_baseline_ear <= 0:
 			return False, None
@@ -922,11 +1203,14 @@ class BlinkDetectionState:
 		if ref <= 0:
 			return False, None
 
-		treat_as_look_down = bool(gate["look_down"] or self.ear_depressed)
+		pose_w = float(gate.get("pose_weight") or 0.0)
+		if self.ear_depressed:
+			pose_w = 1.0
+		treat_as_look_down = pose_w > 0.0
 		self._update_eyes_closed_state(
 			ear_smooth,
 			current_time,
-			look_down=treat_as_look_down,
+			pose_w=pose_w,
 		)
 		# Tick every usable frame so eyes_closed / look_down clear the hold
 		# (do not nudge after a long skip_* gap with a stale timer).
@@ -940,6 +1224,7 @@ class BlinkDetectionState:
 				"yaw": gate["yaw"],
 				"pitch": gate["pitch"],
 				"pitch_delta": gate.get("pitch_delta", 0.0),
+				"pose_weight": pose_w,
 				"look_down": treat_as_look_down,
 				"ear_depressed": self.ear_depressed,
 				**ear_fields,
@@ -960,38 +1245,71 @@ class BlinkDetectionState:
 		start_band_ear = close_band_ear
 		duration_min = min_blink_duration_s(self.target_fps)
 
-		left_drop = self._eye_drop(left_ear)
-		right_drop = self._eye_drop(right_ear)
-		has_bilateral = left_ear is not None and right_ear is not None
-		# Side glance / look-down → landmarks often asymmetric; don't require
-		# bilateral agreement (avg EAR + velocity still gate the event).
-		require_bilateral = (
-			has_bilateral
-			and not treat_as_look_down
-			and abs(gate["yaw"]) < 0.35
+		has_both = left_ear is not None and right_ear is not None
+		# Stage 3.4: per-eye smooth/velocity/candidate stats.
+		self.left_track.update(
+			left_ear,
+			current_time,
+			blink_in_progress=self.blink_in_progress,
+			ref=ref,
+			close_band_ear=close_band_ear,
 		)
+		self.right_track.update(
+			right_ear,
+			current_time,
+			blink_in_progress=self.blink_in_progress,
+			ref=ref,
+			close_band_ear=close_band_ear,
+		)
+		if self.blink_in_progress and has_both:
+			left_drop = self.left_track.max_drop
+			right_drop = self.right_track.max_drop
+		else:
+			left_drop = self._eye_drop(
+				self.left_track.smooth
+				if self.left_track.raw is not None
+				else left_ear
+			)
+			right_drop = self._eye_drop(
+				self.right_track.smooth
+				if self.right_track.raw is not None
+				else right_ear
+			)
 
 		info_pose = {
 			"yaw": gate["yaw"],
 			"pitch": gate["pitch"],
 			"pitch_delta": gate.get("pitch_delta", 0.0),
+			"pose_weight": pose_w,
 			"look_down": gate["look_down"],
 			"ear_depressed": self.ear_depressed,
 			"treat_as_look_down": treat_as_look_down,
 			"live_open_ear": self.live_open_ear,
+			"live_open_aperture": self.live_open_aperture,
 			"close_band_ear": close_band_ear,
 			"resting_pitch": self.resting_pitch,
 			"pose_strictness": self.pose_strictness,
 			"min_velocity": min_velocity,
 			"left_ear": left_ear,
 			"right_ear": right_ear,
+			"left_aperture": left_aperture,
+			"right_aperture": right_aperture,
 			"eyes_closed": self.eyes_closed,
 			"awaiting_reopen": self.awaiting_reopen,
 			"target_fps": self.target_fps,
+			"merge": self._merge_label,
+			"left_drop": left_drop,
+			"right_drop": right_drop,
+			"aperture_drop": self._confirm_aperture_drop,
+			"aperture_ok": self._confirm_aperture_ok,
 			**ear_fields,
 		}
-		if left_ear is not None and right_ear is not None:
+		if has_both:
 			info_pose["asymmetry"] = _ear_asymmetry(left_ear, right_ear)
+
+		# Track per-eye aperture drops during an active candidate.
+		if self.blink_in_progress:
+			self._accumulate_aperture_drops(left_aperture, right_aperture)
 
 		# Block new blink starts until lids clearly reopen (anti look-down storm).
 		if (
@@ -1016,15 +1334,40 @@ class BlinkDetectionState:
 		# reject_cooldown storms from same-blink bounce (POG 2026-08-08: ~42%).
 		cooldown_remaining = max(
 			0.0,
-			self._cooldown_s(treat_as_look_down)
+			self._cooldown_s(pose_w)
 			- (current_time - self.last_blink_time),
 		)
-		# Start: smoothed OR raw EAR enters close band (raw catches 1-frame lag).
-		# Recovery/credit still use smooth.
-		start_ear_hit = (
-			ear_smooth < start_band_ear or ear_raw < start_band_ear
-		)
-		start_drop_abs = max(ear_drop_absolute, ref - ear_raw)
+		# Start: either eye (or avg when single) enters close band.
+		# Recovery/credit still use smooth avg for open-ref stability.
+		if has_both:
+			l_hit = self.left_track.raw is not None and (
+				self.left_track.smooth < start_band_ear
+				or self.left_track.raw < start_band_ear
+			)
+			r_hit = self.right_track.raw is not None and (
+				self.right_track.smooth < start_band_ear
+				or self.right_track.raw < start_band_ear
+			)
+			start_ear_hit = l_hit or r_hit
+			start_drop_abs = max(
+				ear_drop_absolute,
+				ref - ear_raw,
+				(
+					ref - self.left_track.smooth
+					if self.left_track.raw is not None
+					else 0.0
+				),
+				(
+					ref - self.right_track.smooth
+					if self.right_track.raw is not None
+					else 0.0
+				),
+			)
+		else:
+			start_ear_hit = (
+				ear_smooth < start_band_ear or ear_raw < start_band_ear
+			)
+			start_drop_abs = max(ear_drop_absolute, ref - ear_raw)
 		start_drop_pct = start_drop_abs / ref if ref > 0 else 0.0
 		if (
 			not self.blink_in_progress
@@ -1061,22 +1404,54 @@ class BlinkDetectionState:
 			if raw_drop > ear_drop_absolute + 0.015:
 				implied_close = raw_drop / max(frame_dt, 1e-3)
 			pre_peak = self._pre_blink_closing_peak()
+			pre_left = self.left_track.pre_blink_closing_peak()
+			pre_right = self.right_track.pre_blink_closing_peak()
 			# Look-down / ear-depressed: keep pre-blink history (real close
 			# spikes), but do not invent implied close from band-cross alone.
-			if treat_as_look_down:
+			if pose_w > 0.25:
 				implied_close = 0.0
 			measured = max(
 				closing_velocity,
 				self.peak_closing_velocity_measured,
 				pre_peak,
+				pre_left,
+				pre_right,
 			)
 			self.peak_closing_velocity_measured = measured
 			# Effective peak for gates may include frontal implied_close seed.
 			self.peak_closing_velocity = max(measured, implied_close)
 			self.peak_opening_velocity = 0.0
 			self.closed_frames = 1
+			self.left_track.reset_candidate()
+			self.right_track.reset_candidate()
+			for track in (self.left_track, self.right_track):
+				if track.raw is None or ref <= 0:
+					continue
+				drop = max(0.0, (ref - track.smooth) / ref)
+				track.max_drop = drop
+				track.closed_frames = 1 if track.smooth < close_band_ear else 0
+				pre = track.pre_blink_closing_peak()
+				track.peak_closing_measured = pre
+				track.peak_closing = pre
+			if has_both:
+				left_drop = self.left_track.max_drop
+				right_drop = self.right_track.max_drop
+				self.max_drop_percentage = max(
+					self.max_drop_percentage,
+					left_drop,
+					right_drop,
+				)
+				info_pose["left_drop"] = left_drop
+				info_pose["right_drop"] = right_drop
 			self.max_left_drop = left_drop
 			self.max_right_drop = right_drop
+			self.max_left_ap_drop = 0.0
+			self.max_right_ap_drop = 0.0
+			self._had_left_aperture = False
+			self._had_right_aperture = False
+			self._confirm_aperture_ok = None
+			self._confirm_aperture_drop = None
+			self._accumulate_aperture_drops(left_aperture, right_aperture)
 			self._candidate_yaw = float(gate.get("yaw") or 0.0)
 			self._candidate_pitch = float(gate.get("pitch") or 0.0)
 			# One-frame blinks never accumulate in-candidate Δpose — seed with
@@ -1085,6 +1460,9 @@ class BlinkDetectionState:
 			info_pose["closed_frames"] = self.closed_frames
 			info_pose["peak_opening_velocity"] = self.peak_opening_velocity
 			info_pose["pose_delta"] = self._candidate_pose_delta
+			info_pose["aperture_drop"] = max(
+				self.max_left_ap_drop, self.max_right_ap_drop
+			) or None
 			return False, {
 				"baseline": ref,
 				"drop": ear_drop_percentage,
@@ -1110,16 +1488,52 @@ class BlinkDetectionState:
 				self._candidate_pose_delta = max(
 					self._candidate_pose_delta, dy + dp
 				)
-			# Count trough/hold frames only — do not inflate during reopen
-			# while smoothed EAR is still below the close band.
-			if ear_smooth < close_band_ear and opening_velocity <= 1e-6:
-				self.closed_frames += 1
-			if ear_drop_percentage > self.max_drop_percentage:
-				self.max_drop_percentage = ear_drop_percentage
-			if left_drop > self.max_left_drop:
-				self.max_left_drop = left_drop
-			if right_drop > self.max_right_drop:
-				self.max_right_drop = right_drop
+			if has_both:
+				# Shared peaks / drop / closed = max blend from per-eye tracks.
+				self.max_left_drop = self.left_track.max_drop
+				self.max_right_drop = self.right_track.max_drop
+				left_drop = self.max_left_drop
+				right_drop = self.max_right_drop
+				info_pose["left_drop"] = left_drop
+				info_pose["right_drop"] = right_drop
+				self.max_drop_percentage = max(
+					self.max_drop_percentage,
+					ear_drop_percentage,
+					self.max_left_drop,
+					self.max_right_drop,
+				)
+				self.peak_closing_velocity_measured = max(
+					self.peak_closing_velocity_measured,
+					self.left_track.peak_closing_measured,
+					self.right_track.peak_closing_measured,
+				)
+				self.peak_closing_velocity = max(
+					self.peak_closing_velocity,
+					self.left_track.peak_closing,
+					self.right_track.peak_closing,
+					self.peak_closing_velocity_measured,
+				)
+				self.peak_opening_velocity = max(
+					self.peak_opening_velocity,
+					self.left_track.peak_opening,
+					self.right_track.peak_opening,
+				)
+				self.closed_frames = max(
+					self.closed_frames,
+					self.left_track.closed_frames,
+					self.right_track.closed_frames,
+				)
+			else:
+				# Count trough/hold frames only — do not inflate during reopen
+				# while smoothed EAR is still below the close band.
+				if ear_smooth < close_band_ear and opening_velocity <= 1e-6:
+					self.closed_frames += 1
+				if ear_drop_percentage > self.max_drop_percentage:
+					self.max_drop_percentage = ear_drop_percentage
+				if left_drop > self.max_left_drop:
+					self.max_left_drop = left_drop
+				if right_drop > self.max_right_drop:
+					self.max_right_drop = right_drop
 
 			info_pose["closed_frames"] = self.closed_frames
 			info_pose["peak_opening_velocity"] = self.peak_opening_velocity
@@ -1149,17 +1563,16 @@ class BlinkDetectionState:
 			# Must leave the close band to complete. recovery_threshold (0.7) sits
 			# *below* close≈0.84 — mid-band EAR credited every cooldown (POG
 			# 2026-08-09 center-screen ~1 Hz storm).
-			# Look-down credit recovery is LOOK_DOWN_CREDIT_RECOVERY_RATIO only
-			# (pose look_down_recovery is unused for credit — was always overridden).
-			if treat_as_look_down:
-				recovery_level = ref * LOOK_DOWN_CREDIT_RECOVERY_RATIO
-			else:
-				recovery_level = max(ref * recovery_threshold, close_band_ear)
+			# Stage 3.3: blend frontal close-band floor → LD credit recovery.
+			frontal_recovery = max(ref * recovery_threshold, close_band_ear)
+			ld_recovery = ref * LOOK_DOWN_CREDIT_RECOVERY_RATIO
+			recovery_level = lerp(frontal_recovery, ld_recovery, pose_w)
 			recovered = ear_smooth > recovery_level
 			if (
 				recovered
 				or blink_duration > BLINK_DURATION_MAX + 1e-3
 			):
+				waives: list[str] = []
 				velocity_ok = self.peak_closing_velocity >= min_velocity
 				absolute_drop = ref * self.max_drop_percentage
 				# Short frontal: if history/seed missed the spike, infer from
@@ -1169,8 +1582,9 @@ class BlinkDetectionState:
 				measured_peak = self.peak_closing_velocity_measured
 				effective_peak = self.peak_closing_velocity
 				used_synthetic = False
+				allow_frontal_extras = pose_w <= 0.25
 				if (
-					not treat_as_look_down
+					allow_frontal_extras
 					and 0 < blink_duration < SHORT_BLINK_DURATION
 				):
 					synthetic = absolute_drop / max(blink_duration, frame_dt)
@@ -1179,74 +1593,126 @@ class BlinkDetectionState:
 							synthetic > measured_peak + SYNTHETIC_PEAK_EPS
 						)
 					effective_peak = max(effective_peak, synthetic)
+					if used_synthetic:
+						waives.append("synthetic_peak")
+				short_frontal = short_frontal_velocity(self.target_fps)
+				short_ld = short_look_down_velocity(self.target_fps)
 				short_min = min_velocity
 				if blink_duration < SHORT_BLINK_DURATION:
-					short_min = (
-						short_look_down_velocity(self.target_fps)
-						if treat_as_look_down
-						else short_frontal_velocity(self.target_fps)
-					)
+					short_min = lerp(short_frontal, short_ld, pose_w)
 					velocity_ok = (
 						effective_peak >= max(min_velocity, short_min)
 					)
 					# Strong blink shape: deep drop can cover a soft peak miss.
 					if (
 						not velocity_ok
-						and not treat_as_look_down
+						and allow_frontal_extras
 						and self.max_drop_percentage >= SHORT_BLINK_STRONG_DROP
 						and absolute_drop >= SHORT_BLINK_STRONG_ABS
 						and effective_peak >= (min_velocity * 0.5)
 					):
 						velocity_ok = True
+						waives.append("short_strong_drop")
 				# V-shape: opening spike, multi-frame hold, or a strong *measured*
 				# close peak when reopen velocity was missed. Do not waive on
 				# synthetic effective_peak — abs/duration invents ≥0.95 for any
 				# short mid-band dip (POG center FP storm).
+				opening_floor = lerp(
+					MIN_OPENING_VELOCITY,
+					LOOK_DOWN_MIN_OPENING_VELOCITY,
+					pose_w,
+				)
 				opening_ok = (
-					self.peak_opening_velocity >= MIN_OPENING_VELOCITY
+					self.peak_opening_velocity >= opening_floor
 					or self.closed_frames >= max(2, MIN_CLOSED_FRAMES + 1)
 				)
+				# Side glance: 34ms landmark jitter has huge fake peak/openV
+				# (POG 2026-08-12 down-left: 5–10 credits/s, drop≈0.20, yaw≈1.1).
+				# Real blinks in this pose are deeper than LOOK_DOWN_SHORT_OPEN_DROP.
+				side_glance = abs(float(gate["yaw"])) >= 0.35
+				if (
+					side_glance
+					and blink_duration < SHORT_BLINK_DURATION
+					and self.max_drop_percentage < LOOK_DOWN_SHORT_OPEN_DROP
+				):
+					opening_ok = False
 				# Look-down / ear-depressed: closed≥2 + tiny openV credited
 				# talk/chat EAR noise (POG 2026-08-10). Require real reopen,
 				# deep multi-frame trough, or strong peak with closed≥2 —
-				# at any duration (not only shortish).
-				if treat_as_look_down:
+				# at any duration (not only shortish). Applied when w≥0.5.
+				# Side + look-down: landmark ΔEAR/Δt is junk — do not waive
+				# on peak alone (POG 2026-08-12: 34ms credits every cooldown).
+				side_and_down = pose_w >= 0.5 and side_glance
+				if pose_w >= 0.5:
 					if self.closed_frames < 2:
 						# One-frame: reopen+depth, or strong close+depth
 						# (openV often 0 on real high-FPS blinks).
+						one_drop = lerp(
+							0.0, LOOK_DOWN_ONE_FRAME_MIN_DROP, pose_w
+						)
+						one_abs = lerp(
+							0.0, LOOK_DOWN_ONE_FRAME_MIN_ABS, pose_w
+						)
+						one_open = lerp(
+							MIN_OPENING_VELOCITY,
+							LOOK_DOWN_ONE_FRAME_MIN_OPENING,
+							pose_w,
+						)
+						one_peak = lerp(
+							FRONTAL_OPENING_PEAK_WAIVE,
+							LOOK_DOWN_ONE_FRAME_STRONG_PEAK,
+							pose_w,
+						)
 						depth_ok = (
-							self.max_drop_percentage
-							>= LOOK_DOWN_ONE_FRAME_MIN_DROP
-							and absolute_drop >= LOOK_DOWN_ONE_FRAME_MIN_ABS
+							self.max_drop_percentage >= one_drop
+							and absolute_drop >= one_abs
+						)
+						peak_waive = (
+							measured_peak >= one_peak and not side_and_down
 						)
 						opening_ok = depth_ok and (
-							self.peak_opening_velocity
-							>= LOOK_DOWN_ONE_FRAME_MIN_OPENING
-							or measured_peak
-							>= LOOK_DOWN_ONE_FRAME_STRONG_PEAK
+							self.peak_opening_velocity >= one_open
+							or peak_waive
 						)
+						if opening_ok and (
+							peak_waive
+							and self.peak_opening_velocity < one_open
+						):
+							waives.append("ld_one_frame_peak")
 					else:
-						opening_ok = (
-							self.peak_opening_velocity
-							>= LOOK_DOWN_MIN_OPENING_VELOCITY
-							or (
-								self.closed_frames
-								>= LOOK_DOWN_SHORT_OPEN_CLOSED
-								and self.max_drop_percentage
-								>= LOOK_DOWN_SHORT_OPEN_DROP
-							)
-							or (
-								measured_peak >= LOOK_DOWN_SHORT_STRONG_PEAK
-								and self.max_drop_percentage
-								>= LOOK_DOWN_SHORT_STRONG_DROP
-								and self.closed_frames
-								>= LOOK_DOWN_SHORT_STRONG_CLOSED
-							)
+						ld_reopen = (
+							self.peak_opening_velocity >= opening_floor
 						)
+						ld_deep = (
+							self.closed_frames >= LOOK_DOWN_SHORT_OPEN_CLOSED
+							and self.max_drop_percentage
+							>= LOOK_DOWN_SHORT_OPEN_DROP
+						)
+						ld_strong = (
+							not side_and_down
+							and measured_peak >= LOOK_DOWN_SHORT_STRONG_PEAK
+							and self.max_drop_percentage
+							>= LOOK_DOWN_SHORT_STRONG_DROP
+							and self.closed_frames
+							>= LOOK_DOWN_SHORT_STRONG_CLOSED
+						)
+						opening_ok = ld_reopen or ld_deep or ld_strong
+						if opening_ok and not ld_reopen:
+							if ld_deep:
+								waives.append("ld_deep_trough")
+							elif ld_strong:
+								waives.append("ld_strong_peak")
+					# Re-apply short side-glance depth floor after LD overwrites.
+					if (
+						side_glance
+						and blink_duration < SHORT_BLINK_DURATION
+						and self.max_drop_percentage < LOOK_DOWN_SHORT_OPEN_DROP
+					):
+						opening_ok = False
 				if (
 					not opening_ok
 					and measured_peak >= FRONTAL_OPENING_PEAK_WAIVE
-					and not treat_as_look_down
+					and allow_frontal_extras
 				):
 					if blink_duration < SHORT_BLINK_DURATION:
 						# Frontal short peak-waive still needs depth (open0 FP).
@@ -1257,6 +1723,8 @@ class BlinkDetectionState:
 						)
 					else:
 						opening_ok = True
+					if opening_ok:
+						waives.append("frontal_opening_peak")
 				# Synthetic-boosted short frontal must still show a real reopen
 				# or multi-frame trough (POG excellence: invented-V FP).
 				if used_synthetic and not (
@@ -1268,31 +1736,87 @@ class BlinkDetectionState:
 				if used_synthetic and (
 					self.max_drop_percentage < SYNTHETIC_SHORT_MIN_DROP
 					or absolute_drop < SYNTHETIC_SHORT_MIN_ABS
-					or measured_peak < short_frontal_velocity(self.target_fps) * 0.5
+					or measured_peak < short_frontal * 0.5
 				):
 					opening_ok = False
 				bilateral_ok = True
-				if require_bilateral:
-					bilateral_ok = _bilateral_drops_agree(
+				merge_label = "single"
+				merge_reject = None
+				if has_both:
+					bilateral_ok, merge_label, merge_reject = merge_eye_drops(
 						self.max_left_drop,
 						self.max_right_drop,
-						adaptive_threshold,
+						required_drop=adaptive_threshold,
+						pose_w=pose_w,
+						yaw=gate["yaw"],
+						has_both=True,
 					)
+					# Stronger path: stronger eye must clear velocity/opening
+					# (shared peaks already blend max of eyes; if merge is
+					# stronger with one shallow eye, require that eye's shape).
+					if bilateral_ok and merge_label == "stronger":
+						strong = (
+							self.left_track
+							if self.max_left_drop >= self.max_right_drop
+							else self.right_track
+						)
+						strong_vel = max(
+							strong.peak_closing,
+							strong.peak_closing_measured,
+						)
+						strong_open = (
+							strong.peak_opening >= opening_floor
+							or strong.closed_frames
+							>= max(2, MIN_CLOSED_FRAMES + 1)
+						)
+						# Shared gates may already pass via the strong eye's
+						# contribution to blended peaks; if not, fall back to
+						# per-eye shape so one deep eye can still credit on LD.
+						if not (velocity_ok and opening_ok):
+							eye_vel_ok = strong_vel >= min_velocity
+							if blink_duration < SHORT_BLINK_DURATION:
+								eye_vel_ok = strong_vel >= max(
+									min_velocity, short_min
+								)
+							# Side 34ms one-eye jitter has huge fake peak/openV
+							# (POG 2026-08-12 right monitor: credits every
+							# cooldown, drop≈0.16–0.27). Do not undo the
+							# side-glance short+shallow opening kill.
+							side_short_shallow = (
+								side_glance
+								and blink_duration < SHORT_BLINK_DURATION
+								and self.max_drop_percentage
+								< LOOK_DOWN_SHORT_OPEN_DROP
+							)
+							if (
+								eye_vel_ok
+								and strong_open
+								and not side_short_shallow
+							):
+								velocity_ok = True
+								opening_ok = True
+								waives.append("stronger_eye")
+					self._merge_label = merge_label
+					info_pose["merge"] = merge_label
+				else:
+					self._merge_label = "single"
+					info_pose["merge"] = "single"
 
 				closed_ok = self.closed_frames >= MIN_CLOSED_FRAMES
 				# Look-down: allow sub-gate-fps one-frame blinks when peak is
 				# clearly above talk jitter (POG reject_duration @ 33–35ms).
 				effective_duration_min = duration_min
 				if (
-					treat_as_look_down
-					and measured_peak
-					>= short_look_down_velocity(self.target_fps)
+					pose_w >= 0.5
+					and measured_peak >= short_ld
 				):
 					effective_duration_min = min(
 						duration_min,
 						frame_dt * 0.95,
 						LOOK_DOWN_ONE_FRAME_DURATION_MIN,
 					)
+					if effective_duration_min < duration_min:
+						waives.append("ld_short_duration")
 				# Min + closed only. BLINK_DURATION_MAX forces eval / latch
 				# eyes_closed — do NOT put the upper bound in duration_ok
 				# (POG 2026-08-09: all reject_duration were ~0.65s timeouts
@@ -1313,13 +1837,22 @@ class BlinkDetectionState:
 						and measured_peak < shallow_vel_floor
 					):
 						threshold_ok = False
-				motion_ok = (
-					self._candidate_pose_delta <= MOTION_REJECT_DELTA
-					or (
-						measured_peak >= MOTION_WAIVE_PEAK
-						and self.max_drop_percentage >= MOTION_WAIVE_DROP
-					)
+				motion_ok = self._candidate_pose_delta <= MOTION_REJECT_DELTA
+				if not motion_ok and (
+					measured_peak >= MOTION_WAIVE_PEAK
+					and self.max_drop_percentage >= MOTION_WAIVE_DROP
+				):
+					motion_ok = True
+					waives.append("motion_peak")
+				aperture_ok, strong_ap_drop = self._confirm_aperture_for_credit(
+					adaptive_threshold,
+					pose_w=pose_w,
+					yaw=gate["yaw"],
 				)
+				self._confirm_aperture_ok = aperture_ok
+				self._confirm_aperture_drop = strong_ap_drop
+				info_pose["aperture_ok"] = aperture_ok
+				info_pose["aperture_drop"] = strong_ap_drop
 				gates_ok = (
 					duration_ok
 					and threshold_ok
@@ -1327,6 +1860,7 @@ class BlinkDetectionState:
 					and opening_ok
 					and bilateral_ok
 					and motion_ok
+					and aperture_ok
 					and gate["allow_credit"]
 					# Never credit on duration-max while still mid/closed —
 					# must have reopened past recovery_level.
@@ -1334,7 +1868,7 @@ class BlinkDetectionState:
 				)
 				cooldown_remaining = max(
 					0.0,
-					self._cooldown_s(treat_as_look_down)
+					self._cooldown_s(pose_w)
 					- (current_time - self.last_blink_time),
 				)
 				peak_vel = effective_peak
@@ -1343,6 +1877,27 @@ class BlinkDetectionState:
 				max_drop_ear = ref * (1 - max_drop)
 				closed_at_end = self.closed_frames
 				pose_delta_at_end = self._candidate_pose_delta
+				left_drop_at_end = self.max_left_drop
+				right_drop_at_end = self.max_right_drop
+				clf_p = None
+				clf_veto = False
+				if gates_ok:
+					clf_p, clf_veto = classifier_score(
+						{
+							**info_pose,
+							"drop": max_drop,
+							"duration": blink_duration,
+							"closed_frames": closed_at_end,
+							"absolute_drop": ref - max_drop_ear,
+							"peak_velocity_raw": measured_peak,
+							"peak_opening_velocity": peak_open,
+							"pose_delta": pose_delta_at_end,
+							"left_drop": left_drop_at_end,
+							"right_drop": right_drop_at_end,
+							"aperture_drop": strong_ap_drop,
+							"merge": self._merge_label or merge_label,
+						}
+					)
 
 				def _outcome(phase, credited=False):
 					# info_pose first so explicit end-of-candidate fields win.
@@ -1363,11 +1918,21 @@ class BlinkDetectionState:
 						"closed_frames": closed_at_end,
 						"cooldown_remaining": cooldown_remaining,
 						"absolute_drop": ref - max_drop_ear,
-						"require_bilateral": require_bilateral,
+						"merge": self._merge_label or merge_label,
+						"left_drop": left_drop_at_end,
+						"right_drop": right_drop_at_end,
+						"aperture_drop": strong_ap_drop,
+						"aperture_ok": aperture_ok,
 						"pose_delta": pose_delta_at_end,
 						"ear": ear_smooth,
 						"ear_raw": ear_raw,
 						"ear_smooth": ear_smooth,
+						"waives": list(waives),
+						"clf_p": clf_p,
+						"clf_veto": clf_veto,
+						"reject_gate": (
+							None if credited or phase == "complete" else phase
+						),
 					}
 
 				def _arm_await_if_still_closed():
@@ -1379,6 +1944,10 @@ class BlinkDetectionState:
 
 				if gates_ok:
 					if cooldown_remaining <= 0:
+						if clf_veto:
+							self._reset_blink_tracking()
+							_arm_await_if_still_closed()
+							return _outcome("reject_classifier")
 						self.last_blink_time = current_time
 						self._reset_blink_tracking()
 						# Must fully reopen before another blink can start.
@@ -1407,6 +1976,8 @@ class BlinkDetectionState:
 					reason = "reject_threshold"
 				elif not bilateral_ok:
 					reason = "reject_bilateral"
+				elif not aperture_ok:
+					reason = "reject_aperture"
 				elif not motion_ok:
 					reason = "reject_motion"
 				else:
@@ -1430,6 +2001,7 @@ class BlinkDetectionState:
 		self.baseline_ear_values.clear()
 		self.current_baseline_ear = 0.0
 		self.live_open_ear = 0.0
+		self.live_open_aperture = 0.0
 		self.ear_depressed = False
 		self._live_open_stable_since = None
 		self._prev_ear_for_live = None
@@ -1441,6 +2013,7 @@ class BlinkDetectionState:
 		self._prev_gate_yaw = None
 		self._prev_gate_pitch = None
 		self._recent_pose_motion = 0.0
+		self._extreme_yaw_streak = 0
 		self.blink_in_progress = False
 		self.blink_start_time = 0.0
 		self.last_blink_time = 0.0
@@ -1456,7 +2029,16 @@ class BlinkDetectionState:
 		self.closed_frames = 0
 		self.max_left_drop = 0.0
 		self.max_right_drop = 0.0
+		self.max_left_ap_drop = 0.0
+		self.max_right_ap_drop = 0.0
+		self._had_left_aperture = False
+		self._had_right_aperture = False
+		self._confirm_aperture_ok = None
+		self._confirm_aperture_drop = None
 		self._ear_window.clear()
+		self.left_track = EyeTrack()
+		self.right_track = EyeTrack()
+		self._merge_label = None
 		self.resting_pitch = None
 		self.awaiting_reopen = False
 		self.awaiting_reopen_since = None
