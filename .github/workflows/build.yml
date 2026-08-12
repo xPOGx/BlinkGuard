@@ -63,16 +63,33 @@ jobs:
           $modelUrl = "https://github.com/davisking/dlib-models/raw/master/shape_predictor_68_face_landmarks.dat.bz2"
           $modelDir = "electron/assets/models"
           $modelPath = "$modelDir/shape_predictor_68_face_landmarks.dat"
+          $archivePath = "$modelPath.bz2"
 
           New-Item -ItemType Directory -Force -Path $modelDir | Out-Null
-          Invoke-WebRequest -Uri $modelUrl -OutFile "$modelPath.bz2"
+          # curl retries mid-stream drops; Invoke-WebRequest often fails with ResponseEnded on runners.
+          & curl.exe -L --fail --retry 5 --retry-delay 2 --retry-all-errors -o $archivePath $modelUrl
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "curl failed to download shape predictor (exit $LASTEXITCODE)"
+            exit $LASTEXITCODE
+          }
+          $archiveSize = (Get-Item $archivePath).Length
+          if ($archiveSize -lt 10MB) {
+            Write-Error "Downloaded archive looks too small ($archiveSize bytes)"
+            exit 1
+          }
 
-          try {
-            & "C:\Program Files\7-Zip\7z.exe" e "$modelPath.bz2" -o"$modelDir" -y
-            Remove-Item "$modelPath.bz2"
-          } catch {
+          $sevenZip = "C:\Program Files\7-Zip\7z.exe"
+          if (Test-Path $sevenZip) {
+            & $sevenZip e $archivePath "-o$modelDir" -y
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "7zip extract failed; falling back to Python..."
+              python -c "import bz2, pathlib; src=pathlib.Path(r'$archivePath'); dst=pathlib.Path(r'$modelPath'); dst.write_bytes(bz2.decompress(src.read_bytes())); src.unlink()"
+            } else {
+              Remove-Item $archivePath -Force
+            }
+          } else {
             Write-Host "7zip not available, using Python to extract..."
-            python -c "import bz2; import shutil; import os; os.makedirs('$modelDir', exist_ok=True); shutil.copyfileobj(bz2.open('$modelPath.bz2', 'rb'), open('$modelPath', 'wb')); os.remove('$modelPath.bz2')"
+            python -c "import bz2, pathlib; src=pathlib.Path(r'$archivePath'); dst=pathlib.Path(r'$modelPath'); dst.write_bytes(bz2.decompress(src.read_bytes())); src.unlink()"
           }
 
           if (!(Test-Path $modelPath)) {
@@ -247,7 +264,7 @@ jobs:
           MODEL_PATH="$MODEL_DIR/shape_predictor_68_face_landmarks.dat"
           MODEL_URL="https://github.com/davisking/dlib-models/raw/master/shape_predictor_68_face_landmarks.dat.bz2"
           mkdir -p "$MODEL_DIR"
-          curl -L --fail --retry 3 -o "$MODEL_PATH.bz2" "$MODEL_URL"
+          curl -L --fail --retry 5 --retry-delay 2 --retry-all-errors -o "$MODEL_PATH.bz2" "$MODEL_URL"
           python3 - <<'PY'
           import bz2, pathlib
           src = pathlib.Path("electron/assets/models/shape_predictor_68_face_landmarks.dat.bz2")
