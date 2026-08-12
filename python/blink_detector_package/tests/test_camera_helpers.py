@@ -236,6 +236,40 @@ class CommandBatchTests(unittest.TestCase):
 		app.process_commands()
 		self.assertEqual(started, [(20, (640, 480))])
 
+	def test_quit_sets_should_exit_without_camera(self):
+		from blink_detector_package.application.detector import (
+			BlinkDetectorApplication,
+		)
+
+		class _Transport:
+			def __init__(self):
+				import queue
+
+				self.command_queue = queue.Queue()
+
+			def send(self, _payload):
+				return None
+
+			def start_input_thread(self):
+				return None
+
+			def stop(self):
+				return None
+
+			def send_serialized(self, _line):
+				return None
+
+		transport = _Transport()
+		app = BlinkDetectorApplication(transport=transport)
+		camera_stopped = []
+		app.camera.stop = lambda reason="stop_camera": camera_stopped.append(
+			reason
+		)
+		transport.command_queue.put('{"quit": true}')
+		app.process_commands()
+		self.assertTrue(app._should_exit)
+		self.assertEqual(camera_stopped, [])
+
 
 if __name__ == "__main__":
 	unittest.main()

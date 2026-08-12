@@ -197,6 +197,7 @@ class TraceRecorder:
 class BlinkDetectorApplication:
 	def __init__(self, transport=None):
 		self.transport = transport or NdjsonTransport()
+		self._should_exit = False
 		self.camera = OpenCVCamera(self.transport)
 		self.detection = BlinkDetectionState(
 			target_fps=self.camera.target_fps,
@@ -406,6 +407,8 @@ class BlinkDetectorApplication:
 				record_trace_path = data["record_trace"]
 			if data.get("stop_trace"):
 				want_stop_trace = True
+			if data.get("quit"):
+				self._should_exit = True
 
 		try:
 			self._apply_config_dict(merged)
@@ -1387,6 +1390,8 @@ class BlinkDetectorApplication:
 		try:
 			while True:
 				self.process_commands()
+				if self._should_exit:
+					break
 				if (
 					not self.camera.active
 					or self.camera.capture is None

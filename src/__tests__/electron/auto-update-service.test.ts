@@ -197,6 +197,42 @@ describe("AutoUpdateService", () => {
 		expect(quitAndInstall).toHaveBeenCalledWith(false, true);
 	});
 
+	it("installUpdate awaits stopSidecar before quitAndInstall", async () => {
+		let released: () => void = () => {};
+		const stopSidecar = vi.fn(
+			() =>
+				new Promise<void>((resolve) => {
+					released = resolve;
+				}),
+		);
+		const svc = new AutoUpdateService(
+			() => "en",
+			{
+				emit: (status) => {
+					emitted.push(status);
+				},
+				ensureVisible: () => {
+					ensureVisibleCalls += 1;
+				},
+				canHostInAppUi: () => canHost,
+			},
+			stopSidecar,
+		);
+		service = svc;
+		svc.start();
+		svc.checkForUpdates({ interactive: true });
+		autoUpdater.emit("update-downloaded", { version: "3.0.0" });
+		quitAndInstall.mockClear();
+		svc.installUpdate();
+		autoUpdater.emit("update-available", { version: "3.0.0" });
+		await flushMicrotasks();
+		expect(stopSidecar).toHaveBeenCalledTimes(1);
+		expect(quitAndInstall).not.toHaveBeenCalled();
+		released();
+		await flushMicrotasks();
+		expect(quitAndInstall).toHaveBeenCalledWith(false, true);
+	});
+
 	it("installUpdate does not quitAndInstall when a newer latest appears", async () => {
 		const svc = createService();
 		svc.start();

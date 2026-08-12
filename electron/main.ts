@@ -241,6 +241,7 @@ function bootstrap(): void {
 		windows,
 		interactionLogger,
 	);
+	const processCleanup = new ProcessCleanup(processes);
 	const autoUpdates = new AutoUpdateService(
 		() => preferences.locale,
 		{
@@ -250,6 +251,7 @@ function bootstrap(): void {
 			canHostInAppUi: () =>
 				Boolean(windows.main && !windows.main.isDestroyed()),
 		},
+		() => processCleanup.run(),
 	);
 	const lifecycle = new AppLifecycle(
 		preferences,
@@ -258,7 +260,7 @@ function bootstrap(): void {
 		exercises,
 		lookAway,
 		windows,
-		new ProcessCleanup(processes),
+		processCleanup,
 		blinkStats,
 		() => {
 			shortcuts.unregisterAll();

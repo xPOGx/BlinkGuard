@@ -10,6 +10,7 @@ import type { WindowManager } from "../windows/window-manager";
 
 export class AppLifecycle {
 	private isQuitting = false;
+	private shutdownComplete = false;
 	private trayDestroy: (() => void) | null = null;
 
 	constructor(
@@ -29,8 +30,13 @@ export class AppLifecycle {
 	}
 
 	register(): void {
+		// Tray app: subscribe so Electron does not quit when the last window
+		// is destroyed (Windows default). Sidecar `_MEI*` cleanup needs that.
+		app.on("window-all-closed", () => {
+			if (this.shutdownComplete) return;
+		});
 		app.on("before-quit", (event) => {
-			if (this.isQuitting) return;
+			if (this.shutdownComplete) return;
 			event.preventDefault();
 			void this.shutdown().then(() => app.quit());
 		});
@@ -74,8 +80,11 @@ export class AppLifecycle {
 		this.state.clearReminderTimers();
 		this.state.clearExerciseTimers();
 		this.state.clearLookAwayTimers();
-		this.windows.destroyAll();
+		// Sidecar first: destroying windows on Windows can start app.quit()
+		// and TerminateProcess the PyInstaller bootloader before `_MEI*` delete.
 		await this.cleanup.run();
+		this.windows.destroyAll();
+		this.shutdownComplete = true;
 	}
 
 	private registerProcessSignals(): void {

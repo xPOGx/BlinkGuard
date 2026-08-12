@@ -88,6 +88,8 @@ export class AutoUpdateService {
 	constructor(
 		private readonly getLocale: () => Locale,
 		private readonly ui: AutoUpdateUiPort,
+		/** Graceful sidecar stop (stdin quit) before `quitAndInstall`; `/F` fallback inside. */
+		private readonly stopSidecar: () => Promise<void> = killOrphanedSidecarProcesses,
 	) {}
 
 	/** Call once after `app.whenReady`. Safe if updater cannot start. */
@@ -325,9 +327,10 @@ export class AutoUpdateService {
 		this.clearPendingFlags();
 		if (!this.downloadedVersion) return;
 		try {
-			// quitAndInstall can skip graceful before-quit cleanup; kill the
-			// sidecar first so the camera LED / exclusive lock are released.
-			void killOrphanedSidecarProcesses().finally(() => {
+			// quitAndInstall can skip graceful before-quit cleanup; stop the
+			// sidecar first so the camera LED / exclusive lock are released
+			// and PyInstaller can delete `%TEMP%\_MEI*` (force-kill fallback).
+			void this.stopSidecar().finally(() => {
 				try {
 					autoUpdater.quitAndInstall(false, true);
 				} catch (error) {
