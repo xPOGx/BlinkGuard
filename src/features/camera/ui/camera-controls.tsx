@@ -312,12 +312,6 @@ export function CameraControls({
 									size="sm"
 									tabIndex={cameraOn ? undefined : -1}
 									onClick={() => {
-										if (!preferences.isTracking) {
-											setPreferences((current) => ({
-												...current,
-												isTracking: true,
-											}));
-										}
 										rendererIpc.showCameraWindow();
 										setIsWindowOpen(true);
 									}}

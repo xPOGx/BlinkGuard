@@ -186,6 +186,35 @@ describe("ReminderService credit semantics", () => {
 		expect(stats.recordBlink).toHaveBeenCalledTimes(2);
 	});
 
+	it("onBlink ignores detected blinks when tracking is off", () => {
+		const preferences = createPreferences({ isTracking: false });
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		windows.reminderOpen = true;
+		const stats = {
+			recordBlink: vi.fn(),
+			onTrackingStart: vi.fn(),
+			onTrackingStop: vi.fn(),
+			onFaceVisibility: vi.fn(),
+			setFaceCoverageMode: vi.fn(),
+		};
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			createStore(),
+			stats,
+		);
+		const blinkBefore = state.lastBlinkTime;
+
+		expect(service.onBlink()).toBe(false);
+		expect(state.lastBlinkTime).toBe(blinkBefore);
+		expect(stats.recordBlink).not.toHaveBeenCalled();
+		expect(windows.closeReminder).not.toHaveBeenCalled();
+	});
+
 	it("start and stop notify blink stats for tracking sessions", () => {
 		const preferences = createPreferences({
 			isTracking: false,
@@ -672,5 +701,97 @@ describe("ReminderService auto-stop on no face", () => {
 		expect(lookAway.stop).toHaveBeenCalledOnce();
 		expect(windows.showReminder).toHaveBeenCalledWith("stopped");
 		expect(windows.sendPreferences).toHaveBeenCalled();
+	});
+});
+
+describe("ReminderService preview camera", () => {
+	it("ensureCameraActive starts capture without starting tracking", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: true,
+		});
+		const sidecar = createSidecar({
+			isRunning: true,
+			isCameraReady: false,
+		});
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			createWindows(),
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+
+		service.ensureCameraActive();
+
+		expect(preferences.isTracking).toBe(false);
+		expect(sidecar.startCamera).toHaveBeenCalledOnce();
+		expect(sidecar.stopCamera).not.toHaveBeenCalled();
+	});
+
+	it("ensureCameraActive requests video when capture is already live", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: true,
+		});
+		const sidecar = createSidecar({
+			isRunning: true,
+			isCameraReady: true,
+		});
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			createWindows(),
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+
+		service.ensureCameraActive();
+
+		expect(preferences.isTracking).toBe(false);
+		expect(sidecar.requestVideo).toHaveBeenCalledOnce();
+		expect(sidecar.startCamera).not.toHaveBeenCalled();
+	});
+
+	it("stopCameraIfIdle releases capture when tracking is off", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: true,
+		});
+		const sidecar = createSidecar();
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			createWindows(),
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+
+		service.stopCameraIfIdle();
+
+		expect(sidecar.stopCamera).toHaveBeenCalledOnce();
+	});
+
+	it("stopCameraIfIdle keeps capture while tracking", () => {
+		const preferences = createPreferences({
+			isTracking: true,
+			cameraEnabled: true,
+		});
+		const sidecar = createSidecar();
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			createWindows(),
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+
+		service.stopCameraIfIdle();
+
+		expect(sidecar.stopCamera).not.toHaveBeenCalled();
 	});
 });

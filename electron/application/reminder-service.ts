@@ -97,6 +97,7 @@ export class ReminderService {
 
 	/** Sidecar-detected blink only. Debounced; closes any open reminder. */
 	onBlink(): boolean {
+		if (!this.preferences.isTracking) return false;
 		if (!this.creditBlink("detected")) return false;
 		this.stats?.recordBlink();
 		this.windows.closeReminder();
@@ -251,10 +252,6 @@ export class ReminderService {
 	/** Ensure camera sidecar is running so preview / face tracking can work. */
 	ensureCameraActive(): void {
 		if (!this.preferences.cameraEnabled) return;
-		if (!this.preferences.isTracking) {
-			this.start();
-			return;
-		}
 		if (!this.sidecar.isRunning) this.sidecar.start();
 		if (this.sidecar.isCameraReady) {
 			// Preview-only: do not stop/start an already-live capture.
@@ -262,6 +259,12 @@ export class ReminderService {
 			return;
 		}
 		this.sidecar.startCamera();
+	}
+
+	/** Release capture when preview closes and tracking is not using the camera. */
+	stopCameraIfIdle(): void {
+		if (this.preferences.isTracking) return;
+		this.sidecar.stopCamera();
 	}
 
 	/** Soft-pause camera during fullscreen without clearing isTracking. */

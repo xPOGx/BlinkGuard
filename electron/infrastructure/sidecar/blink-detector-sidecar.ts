@@ -235,7 +235,7 @@ export class BlinkDetectorSidecar {
 			this.write({ stop_camera: true });
 		}
 		if (start) {
-			// Quality/EAR before start so CAP_PROP uses the preset, not 320×240.
+			// Quality/EAR before start so software resize/throttle use the preset.
 			this.applySessionConfig();
 			this.write({ start_camera: true });
 			// stop_camera clears Python send_video; restore preview if window open.

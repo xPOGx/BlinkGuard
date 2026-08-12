@@ -228,6 +228,7 @@ class OpenCVCamera:
 			# sustained black frames (luma≈0.3) on that machine; MSMF worked.
 			# (Separate tester uses Logitech C170 — different failure mode.)
 			# DSHOW remains failover. Skip CAP_ANY (re-enters MSMF).
+			# Also locked: no FOURCC / size / FPS CAP_PROP on open.
 			return [cv2.CAP_MSMF, cv2.CAP_DSHOW]
 		if sys.platform == "darwin":
 			return [cv2.CAP_AVFOUNDATION, cv2.CAP_ANY]
@@ -261,46 +262,22 @@ class OpenCVCamera:
 				add(index, backend)
 		return pairs
 
-	def _try_set_fourcc(self, cap, code: str) -> str:
-		"""Best-effort FOURCC; return actual fourcc string after set."""
-		try:
-			cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*code))
-		except Exception:
-			pass
-		return fourcc_to_str(cap.get(cv2.CAP_PROP_FOURCC))
-
 	def _apply_capture_props(self, capture=None):
 		cap = capture if capture is not None else self.capture
 		if cap is None:
 			return
-		# Request the processing preset size; accept whatever the driver
-		# negotiates (built-in cams often land on 640x360 — do not snap to 4:3).
-		# LOCKED with _platform_backends: no 4:3 snap / no Windows FOURCC force
-		# without fresh field diagnostics (2.4.0 regression on laptop webcam).
-		width, height = self.processing_resolution
-		fourcc_requested = None
+		# Native stream: do not negotiate FOURCC / size / FPS. Those CAP_PROP
+		# sets are what blacked out a built-in laptop cam (2.4.0: DSHOW + MJPG
+		# + 4:3 snap) and still break odd UVC modes. Quality preset is software
+		# only (detector resize + frame throttle). BUFFERSIZE is latency, not
+		# format. LOCKED with _platform_backends — do not reintroduce size /
+		# FOURCC / FPS sets without fresh Export diagnostics.
 		fourcc_actual = fourcc_to_str(cap.get(cv2.CAP_PROP_FOURCC))
-
-		if sys.platform == "win32":
-			# LOCKED: leave FOURCC to the driver/Frame Server. Forcing MJPG on
-			# DSHOW opened 320x240 black streams on a built-in laptop cam;
-			# working sessions used MSMF with the default negotiated format.
-			fourcc_requested = None
-		else:
-			fourcc_requested = "MJPG"
-			fourcc_actual = self._try_set_fourcc(cap, "MJPG")
 
 		try:
 			cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 		except Exception:
 			pass
-
-		cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-		cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-		# Do NOT set CAP_PROP_FPS on Windows — known to break format
-		# negotiation for many UVC webcams (OpenCV #9084).
-		if sys.platform != "win32":
-			cap.set(cv2.CAP_PROP_FPS, self.target_fps)
 
 		actual_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
 		actual_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
@@ -309,9 +286,13 @@ class OpenCVCamera:
 		self.fourcc = actual_fourcc or self.fourcc
 		self.emit_camera_state(
 			"camera_props",
-			requested_wh=[width, height],
-			requested_fps=self.target_fps,
-			requested_fourcc=fourcc_requested,
+			requested_wh=None,
+			requested_fps=None,
+			requested_fourcc=None,
+			size_prop_set=False,
+			fps_prop_set=False,
+			processing_resolution=list(self.processing_resolution),
+			target_fps=self.target_fps,
 			actual_wh=[actual_width, actual_height],
 			actual_fps=actual_fps,
 			fourcc=actual_fourcc,
@@ -320,14 +301,15 @@ class OpenCVCamera:
 			if self.backend is not None
 			else None,
 			index=self.camera_index,
-			fps_prop_set=sys.platform != "win32",
 		)
 		self.transport.send(
 			{
 				"debug": (
-					"Camera resolution set to: "
+					"Camera native stream: "
 					f"{actual_width}x{actual_height}, FPS: {actual_fps}, "
-					f"fourcc={actual_fourcc or '?'}"
+					f"fourcc={actual_fourcc or '?'}; "
+					f"process={self.processing_resolution[0]}x"
+					f"{self.processing_resolution[1]} @{self.target_fps}"
 				)
 			}
 		)
@@ -361,8 +343,11 @@ class OpenCVCamera:
 			backend=backend,
 			backend_name=name,
 			device_name=device_name,
-			requested_wh=list(self.processing_resolution),
-			requested_fps=self.target_fps,
+			requested_wh=None,
+			requested_fps=None,
+			requested_fourcc=None,
+			processing_resolution=list(self.processing_resolution),
+			target_fps=self.target_fps,
 		)
 		self.transport.send(
 			{
@@ -573,13 +558,11 @@ class OpenCVCamera:
 
 	def update_target_fps(self, target_fps):
 		self.target_fps = int(target_fps)
-		# Do not set CAP_PROP_FPS mid-stream — MSMF often goes black/stale.
-		# FPS is applied on the next open via _apply_capture_props.
+		# Software throttle only — never CAP_PROP_FPS (open or mid-stream).
 
 	def update_processing_resolution(self, processing_resolution):
 		self.processing_resolution = tuple(processing_resolution)
-		# Detector loop resizes to processing_resolution; avoid mid-stream
-		# CAP_PROP size changes that break Windows MSMF after a "Success" open.
+		# Detector loop resizes to processing_resolution; never CAP_PROP size.
 
 	def snapshot_meta(self):
 		wh = None

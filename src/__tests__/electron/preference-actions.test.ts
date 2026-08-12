@@ -139,7 +139,7 @@ describe("PreferenceActions", () => {
 	it("showCameraWindow enables camera only when it was off", () => {
 		const preferences = new PreferencesService(createStore());
 		preferences.set("cameraEnabled", false);
-		const reminders = { ensureCameraActive: vi.fn() };
+		const reminders = { ensureCameraActive: vi.fn(), stopCameraIfIdle: vi.fn() };
 		const windows = {
 			sendPreferences: vi.fn(),
 			sendToMain: vi.fn(),
@@ -158,6 +158,28 @@ describe("PreferenceActions", () => {
 		expect(windows.sendToMain).toHaveBeenCalledWith(
 			IPC_CHANNELS.cameraWindowClosed,
 		);
+		expect(reminders.stopCameraIfIdle).toHaveBeenCalledOnce();
+	});
+
+	it("showCameraWindow still releases idle camera when it was already enabled", () => {
+		const preferences = new PreferencesService(createStore());
+		preferences.set("cameraEnabled", true);
+		preferences.set("isTracking", false);
+		const reminders = { ensureCameraActive: vi.fn(), stopCameraIfIdle: vi.fn() };
+		const windows = {
+			sendPreferences: vi.fn(),
+			sendToMain: vi.fn(),
+			showCamera: vi.fn((onClosed: () => void) => {
+				onClosed();
+			}),
+		};
+		const actions = createActions(preferences, { reminders, windows });
+
+		actions.showCameraWindow();
+
+		expect(reminders.ensureCameraActive).toHaveBeenCalledOnce();
+		expect(windows.sendPreferences).not.toHaveBeenCalled();
+		expect(reminders.stopCameraIfIdle).toHaveBeenCalledOnce();
 	});
 
 	it("applyBackup replaces prefs with side effects and optional stats", () => {

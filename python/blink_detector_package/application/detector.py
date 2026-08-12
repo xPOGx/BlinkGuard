@@ -1413,6 +1413,7 @@ class BlinkDetectorApplication:
 					time.sleep(0.1)
 					continue
 
+				# Native capture size; quality preset is software-only.
 				current_shape = frame.shape[:2]
 				target_shape = self.camera.processing_resolution[::-1]
 				if current_shape != target_shape:

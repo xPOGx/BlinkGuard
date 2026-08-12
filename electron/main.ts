@@ -144,9 +144,9 @@ function bootstrap(): void {
 			},
 			isCameraWindowOpen: () => windows.isCameraOpen(),
 			shouldRetryCamera: () =>
-				preferences.isTracking &&
-				preferences.cameraEnabled &&
-				!reminders.isCameraSoftPaused,
+				!reminders.isCameraSoftPaused &&
+				(windows.isCameraOpen() ||
+					(preferences.isTracking && preferences.cameraEnabled)),
 			onCalibrationProgress: (payload) => {
 				windows.sendToMain(IPC_CHANNELS.earCalibrationProgress, payload);
 			},

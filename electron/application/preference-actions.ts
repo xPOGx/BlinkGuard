@@ -101,6 +101,7 @@ export class PreferenceActions {
 		}
 		this.windows.showCamera(() => {
 			this.windows.sendToMain(IPC_CHANNELS.cameraWindowClosed);
+			this.reminders.stopCameraIfIdle();
 		});
 	}
 

@@ -94,19 +94,63 @@ class CameraHelperTests(unittest.TestCase):
 		self.assertEqual(ordered[0], (0, cv2.CAP_DSHOW))
 		self.assertNotIn((0, cv2.CAP_MSMF), ordered)
 
-	def test_open_resolution_uses_processing_preset(self):
+	def test_apply_capture_props_does_not_set_format(self):
+		import cv2
+
 		from blink_detector_package.infrastructure.camera import OpenCVCamera
 
-		class _SilentTransport:
-			def send(self, _payload):
-				return None
+		events = []
 
-		cam = OpenCVCamera(_SilentTransport())
+		class _Transport:
+			def send(self, payload):
+				events.append(payload)
+
+		class _FakeCapture:
+			def __init__(self):
+				self.sets = []
+				self.props = {
+					cv2.CAP_PROP_FRAME_WIDTH: 1280,
+					cv2.CAP_PROP_FRAME_HEIGHT: 720,
+					cv2.CAP_PROP_FPS: 30,
+					cv2.CAP_PROP_FOURCC: cv2.VideoWriter_fourcc(*"YUY2"),
+				}
+
+			def set(self, prop, value):
+				self.sets.append((prop, value))
+				return True
+
+			def get(self, prop):
+				return self.props.get(prop, 0)
+
+		cam = OpenCVCamera(_Transport())
 		cam.processing_resolution = (480, 360)
-		# No snap helper — open requests the processing preset directly.
-		self.assertEqual(cam.processing_resolution, (480, 360))
-		cam.processing_resolution = (640, 480)
-		self.assertEqual(cam.processing_resolution, (640, 480))
+		cam.target_fps = 15
+		cam.backend = cv2.CAP_MSMF
+		cam.camera_index = 0
+		fake = _FakeCapture()
+		cam._apply_capture_props(fake)
+
+		set_ids = [prop for prop, _ in fake.sets]
+		self.assertNotIn(cv2.CAP_PROP_FRAME_WIDTH, set_ids)
+		self.assertNotIn(cv2.CAP_PROP_FRAME_HEIGHT, set_ids)
+		self.assertNotIn(cv2.CAP_PROP_FPS, set_ids)
+		self.assertNotIn(cv2.CAP_PROP_FOURCC, set_ids)
+		self.assertIn(cv2.CAP_PROP_BUFFERSIZE, set_ids)
+
+		states = [
+			e.get("cameraState")
+			for e in events
+			if isinstance(e.get("cameraState"), dict)
+		]
+		props_event = next(s for s in states if s.get("kind") == "camera_props")
+		self.assertIsNone(props_event["requested_wh"])
+		self.assertIsNone(props_event["requested_fps"])
+		self.assertIsNone(props_event["requested_fourcc"])
+		self.assertFalse(props_event["size_prop_set"])
+		self.assertFalse(props_event["fps_prop_set"])
+		self.assertEqual(props_event["processing_resolution"], [480, 360])
+		self.assertEqual(props_event["target_fps"], 15)
+		self.assertEqual(props_event["actual_wh"], [1280, 720])
 
 	def test_device_name_for_index_soft_match(self):
 		from blink_detector_package.infrastructure.camera import OpenCVCamera
