@@ -114,6 +114,17 @@ export const uk: MessageCatalog = {
 	"debug.onboarding.title": "Онбординг",
 	"debug.onboarding.desc":
 		"Знову відкрити майстер першого запуску без скидання інших налаштувань.",
+	"debug.trace.title": "Запис EAR-траси",
+	"debug.trace.desc":
+		"Запис EAR/пози в NDJSON + супровідне .avi (кадри камери) для розмітки. Трекінг → Start recording → камера → сценарій → Stop recording. Вимкнення камери не зупиняє запис.",
+	"debug.trace.start": "Почати запис",
+	"debug.trace.stop": "Зупинити запис",
+	"debug.trace.started": "Запис → {path}",
+	"debug.trace.startedNoPath": "Запис почато",
+	"debug.trace.stopped":
+		"Запис зупинено — тримайте .ndjson і одноіменний .avi разом в одній папці.",
+	"debug.trace.cancelled": "Збереження скасовано",
+	"debug.trace.error": "Не вдалося записати трасу",
 
 	// Dark mode / common
 	"common.darkMode": "Темна тема",
@@ -219,16 +230,21 @@ export const uk: MessageCatalog = {
 	"camera.quality.medium": "Середня",
 	"camera.quality.high": "Висока",
 	"camera.quality.ultra": "Ультра",
-	"camera.calibration": "Калібрування відкритих очей",
+	"camera.calibration": "Калібрування",
 	"camera.calibrationDesc":
-		"Тримайте очі відкритими й дивіться в камеру близько 8 секунд. Це підлаштує пороги моргання під ваше обличчя. Калібрування може м’яко підлаштовуватися при зміні освітлення; «Калібрувати» — жорстке скидання.",
+		"Два короткі кроки: тримайте очі відкритими близько 8 секунд, потім дивіться в камеру й моргніть щонайменше 6 разів. Це підлаштує пороги моргання й оцінку класифікатора під ваше обличчя. Калібрування може м’яко підлаштовуватися при зміні освітлення; «Калібрувати» — жорстке скидання.",
 	"camera.calibrate": "Калібрувати",
 	"camera.cancelCalibration": "Скасувати ({n} с)",
+	"camera.calibrationPhaseOpenEye": "Тримайте очі відкритими",
+	"camera.calibrationPhaseBlinks": "Дивіться в камеру й моргайте",
 	"camera.calibrationProgress": "Зразки {n}/{min}",
+	"camera.calibrationBlinkProgress": "Моргання {n}/{min}",
 	"camera.calibrationFaceOk": "Обличчя виявлено",
 	"camera.calibrationFaceMissing":
 		"Немає обличчя — розташуйте обличчя по центру камери",
 	"camera.calibrationSaved": "Калібрування збережено (EAR {value})",
+	"camera.calibrationPartialBlinks":
+		"Відкриті очі збережено (EAR {value}). Замало моргань ({n}/{min}) — дивіться в камеру, моргайте, потім знову «Калібрувати».",
 	"camera.calibrationIncomplete": "Калібрування не завершено",
 	"camera.calibrationIncompleteSamples":
 		"Замало зразків з відкритими очима ({n}/{min}). Тримайте обличчя по центру з відкритими очима.",
@@ -512,7 +528,7 @@ export const uk: MessageCatalog = {
 		"Постійна знижка на всі покупки, крім самої знижки. Зараз {percent}% (макс. 50%).",
 	"stats.liveRate": "Жива частота моргання",
 	"stats.liveRateDesc":
-		"Зараховані моргання за останню хвилину під час відстеження. Перша хвилина — розігрів.",
+		"Зараховані моргання за хвилину часу з видимим обличчям (камера). Потрібно ~24 с з обличчям у кадрі, перш ніж частота буде готова.",
 	"stats.today": "Сьогодні",
 	"stats.todayDesc":
 		"Зараховані моргання, час відстеження та сесії за локальний день.",
@@ -563,9 +579,9 @@ export const uk: MessageCatalog = {
 	"rate.current": "Поточна частота",
 	"rate.perMin": "/хв",
 	"rate.warmingUp": "Розігрів",
-	"rate.collecting": "Збираємо першу хвилину… ще {n} с",
+	"rate.collecting": "Потрібне обличчя в кадрі… ще {n} с",
 	"rate.startTracking":
-		"Увімкніть відстеження, щоб виміряти частоту. Перша хвилина — розігрів.",
+		"Увімкніть камеру й тримайте обличчя в кадрі, щоб виміряти частоту моргання.",
 	"rate.waiting": "Очікування зарахованих моргань…",
 	"rate.rising": "Частота зростає",
 	"rate.falling": "Частота падає",

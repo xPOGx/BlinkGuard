@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/button";
 import { SettingPanel } from "@/components/setting-panel";
 import { SettingRow } from "@/components/setting-row";
@@ -47,6 +48,8 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 	const discountLevel = discountOffer?.purchaseCount ?? 0;
 	const discountPercent = discountOffer?.discountPercent ?? 0;
 	const discountAtMax = discountOffer?.atMax ?? false;
+	const [traceStatus, setTraceStatus] = useState("");
+	const [traceRecording, setTraceRecording] = useState(false);
 
 	return (
 		<>
@@ -246,6 +249,74 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 								</div>
 							}
 						/>
+					</div>
+				</SettingRow>
+			</SettingPanel>
+
+			<SettingPanel>
+				<SettingRow
+					title={t("debug.trace.title")}
+					description={t("debug.trace.desc")}
+				>
+					<div className="flex flex-col gap-2">
+						<div className="flex flex-wrap gap-2">
+							<Button
+								type="button"
+								variant="secondary"
+								disabled={traceRecording}
+								onClick={async () => {
+									const result =
+										await rendererIpc.startTraceRecording();
+									if (result.status === "started") {
+										setTraceRecording(true);
+										const base = result.path
+											? t("debug.trace.started", {
+													path: result.path,
+												})
+											: t("debug.trace.startedNoPath");
+										setTraceStatus(
+											result.message
+												? `${base} — ${result.message}`
+												: base,
+										);
+										return;
+									}
+									if (result.status === "cancelled") {
+										setTraceStatus(t("debug.trace.cancelled"));
+										return;
+									}
+									setTraceStatus(
+										result.message || t("debug.trace.error"),
+									);
+								}}
+							>
+								{t("debug.trace.start")}
+							</Button>
+							<Button
+								type="button"
+								variant="secondary"
+								disabled={!traceRecording}
+								onClick={async () => {
+									const result =
+										await rendererIpc.stopTraceRecording();
+									setTraceRecording(false);
+									if (result.status === "stopped") {
+										setTraceStatus(t("debug.trace.stopped"));
+										return;
+									}
+									setTraceStatus(
+										result.message || t("debug.trace.error"),
+									);
+								}}
+							>
+								{t("debug.trace.stop")}
+							</Button>
+						</div>
+						{traceStatus ? (
+							<p className="text-xs text-[var(--muted-foreground)] break-all">
+								{traceStatus}
+							</p>
+						) : null}
 					</div>
 				</SettingRow>
 			</SettingPanel>

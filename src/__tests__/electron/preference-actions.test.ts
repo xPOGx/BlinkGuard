@@ -59,6 +59,7 @@ function createActions(
 			cancelEarCalibration: vi.fn(),
 			applyCameraQuality: vi.fn(),
 			applyEarCalibration: vi.fn(),
+			applyClassifierCalibration: vi.fn(),
 		}) as never,
 		(overrides.shortcuts ?? { registerAll: vi.fn() }) as never,
 		overrides.applyLaunchAtLogin ?? vi.fn(),
@@ -76,6 +77,7 @@ describe("PreferenceActions", () => {
 			cancelEarCalibration: vi.fn(),
 			applyCameraQuality: vi.fn(),
 			applyEarCalibration: vi.fn(),
+			applyClassifierCalibration: vi.fn(),
 		};
 		const actions = createActions(preferences, { reminders, sidecar });
 
@@ -182,6 +184,7 @@ describe("PreferenceActions", () => {
 			cancelEarCalibration: vi.fn(),
 			applyCameraQuality: vi.fn(),
 			applyEarCalibration: vi.fn(),
+			applyClassifierCalibration: vi.fn(),
 		};
 		const shortcuts = { registerAll: vi.fn() };
 		const applyLaunchAtLogin = vi.fn();
@@ -211,6 +214,8 @@ describe("PreferenceActions", () => {
 				},
 				cameraQuality: "high",
 				earCalibration: 0.25,
+				classifierBias: 0.4,
+				classifierThreshold: 0.2,
 				isTracking: true,
 			},
 			blinkStats: {
@@ -239,6 +244,10 @@ describe("PreferenceActions", () => {
 		});
 		expect(sidecar.applyCameraQuality).toHaveBeenCalledWith("high");
 		expect(sidecar.applyEarCalibration).toHaveBeenCalledWith(0.25);
+		expect(sidecar.applyClassifierCalibration).toHaveBeenCalledWith({
+			bias: 0.4,
+			threshold: 0.2,
+		});
 		expect(tray.rebuildMenu).toHaveBeenCalledWith("uk");
 		expect(blinkStats.invalidateCharts).toHaveBeenCalledOnce();
 		expect(windows.sendPreferences).toHaveBeenCalledOnce();

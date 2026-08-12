@@ -50,6 +50,8 @@ export function sameRendererPrefs(
 		a.blinkRateCoachingEnabled === b.blinkRateCoachingEnabled &&
 		a.blinkRateThresholdPerMin === b.blinkRateThresholdPerMin &&
 		a.earCalibration === b.earCalibration &&
+		a.classifierBias === b.classifierBias &&
+		a.classifierThreshold === b.classifierThreshold &&
 		a.eyeExercisesEnabled === b.eyeExercisesEnabled &&
 		a.exerciseInterval === b.exerciseInterval &&
 		sameStringArray(a.exercisePrompts, b.exercisePrompts) &&
@@ -115,6 +117,16 @@ export function pushPreferenceDiff(
 	}
 	if (!previous || previous.earCalibration !== next.earCalibration) {
 		rendererIpc.updateEarCalibration(next.earCalibration);
+	}
+	if (
+		!previous ||
+		previous.classifierBias !== next.classifierBias ||
+		previous.classifierThreshold !== next.classifierThreshold
+	) {
+		rendererIpc.updateClassifierCalibration({
+			bias: next.classifierBias,
+			threshold: next.classifierThreshold,
+		});
 	}
 	if (!previous || previous.eyeExercisesEnabled !== next.eyeExercisesEnabled) {
 		rendererIpc.updateEyeExercisesEnabled(next.eyeExercisesEnabled);

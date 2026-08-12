@@ -6,6 +6,7 @@ import {
 } from "../../shared/backup";
 import { sanitizeLocale, type Locale } from "../../shared/i18n";
 import { IPC_CHANNELS } from "../../shared/ipc-channels";
+import type { ClassifierCalibrationPayload } from "../../shared/classifier-calibration";
 import type {
 	CameraQuality,
 	KeyboardShortcuts,
@@ -23,6 +24,9 @@ export interface PreferenceActionSidecar {
 	cancelEarCalibration(reason?: string): void;
 	applyCameraQuality(quality?: CameraQuality): void;
 	applyEarCalibration(baseline?: number | null): void;
+	applyClassifierCalibration(
+		payload?: ClassifierCalibrationPayload | null,
+	): void;
 }
 
 export interface PreferenceActionWindows {
@@ -113,6 +117,7 @@ export class PreferenceActions {
 		this.shortcuts.registerAll(this.preferences.current.keyboardShortcuts);
 		this.sidecar.applyCameraQuality(this.preferences.current.cameraQuality);
 		this.sidecar.applyEarCalibration(null);
+		this.sidecar.applyClassifierCalibration(null);
 		this.tray?.rebuildMenu(this.preferences.current.locale);
 		this.windows.sendPreferences();
 		this.focusPause.recompute();
@@ -140,6 +145,10 @@ export class PreferenceActions {
 			this.shortcuts.registerAll(next.keyboardShortcuts);
 			this.sidecar.applyCameraQuality(next.cameraQuality);
 			this.sidecar.applyEarCalibration(next.earCalibration);
+			this.sidecar.applyClassifierCalibration({
+				bias: next.classifierBias,
+				threshold: next.classifierThreshold,
+			});
 			this.tray?.rebuildMenu(next.locale);
 			this.blinkStats.invalidateCharts();
 			this.windows.sendPreferences();

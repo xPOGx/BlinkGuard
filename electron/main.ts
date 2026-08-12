@@ -130,6 +130,7 @@ function bootstrap(): void {
 			},
 			onFaceData: (data: any) => {
 				reminders.onFaceDetection(!!data.faceDetected);
+				blinkStats.onFaceVisibility(!!data.faceDetected);
 				windows.sendToCamera(IPC_CHANNELS.faceTrackingData, data);
 			},
 			onVideoStream: (data) => {
@@ -153,6 +154,22 @@ function bootstrap(): void {
 				if (payload.baseline !== null) {
 					preferencesService.set("earCalibration", payload.baseline);
 					sidecar.applyEarCalibration(payload.baseline);
+				}
+				if (typeof payload.classifierBias === "number") {
+					preferencesService.set("classifierBias", payload.classifierBias);
+					preferencesService.set(
+						"classifierThreshold",
+						payload.classifierThreshold ?? null,
+					);
+					sidecar.applyClassifierCalibration({
+						bias: payload.classifierBias,
+						threshold: payload.classifierThreshold ?? null,
+					});
+				}
+				if (
+					payload.baseline !== null ||
+					typeof payload.classifierBias === "number"
+				) {
 					windows.sendPreferences();
 				}
 				windows.sendToMain(IPC_CHANNELS.earCalibrationComplete, payload);

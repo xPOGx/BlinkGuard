@@ -1,4 +1,8 @@
 import { BLINK_RATE_LOW_MAX } from "./blink-rate";
+import {
+	sanitizeClassifierBias,
+	sanitizeClassifierThreshold,
+} from "./classifier-calibration";
 import { isValidEarCalibration } from "./ear-calibration";
 import {
 	defaultExercisePrompts,
@@ -285,6 +289,10 @@ export interface PersistedPreferences {
 	blinkRateThresholdPerMin: number;
 	/** Personal open-eye EAR baseline; null when unset. */
 	earCalibration: number | null;
+	/** Stage 5 personal classifier logit bias; null when unset. */
+	classifierBias: number | null;
+	/** Stage 5 personal classifier threshold; null = baked 0.25. */
+	classifierThreshold: number | null;
 	eyeExercisesEnabled: boolean;
 	exerciseInterval: number;
 	/** Rotating eye-exercise instruction texts shown in the exercise popup. */
@@ -403,6 +411,8 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	blinkRateCoachingEnabled: true,
 	blinkRateThresholdPerMin: BLINK_RATE_LOW_MAX,
 	earCalibration: null,
+	classifierBias: null,
+	classifierThreshold: null,
 	eyeExercisesEnabled: true,
 	exerciseInterval: 40,
 	exercisePrompts: [...DEFAULT_EXERCISE_PROMPTS],
@@ -578,6 +588,10 @@ export function sanitizePersistedPreferences(
 			: isValidEarCalibration(earRaw)
 				? earRaw
 				: defaults.earCalibration;
+	const classifierBias = sanitizeClassifierBias(record.classifierBias);
+	const classifierThreshold = sanitizeClassifierThreshold(
+		record.classifierThreshold,
+	);
 
 	const quietStartRaw =
 		typeof record.quietHoursStart === "string"
@@ -629,6 +643,8 @@ export function sanitizePersistedPreferences(
 			record.blinkRateThresholdPerMin,
 		),
 		earCalibration,
+		classifierBias,
+		classifierThreshold,
 		eyeExercisesEnabled: asBoolean(
 			record.eyeExercisesEnabled,
 			defaults.eyeExercisesEnabled,

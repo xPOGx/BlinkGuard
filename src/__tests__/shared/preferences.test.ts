@@ -41,6 +41,8 @@ describe("toRendererPreferences", () => {
 		expect(renderer.popupMessage).toBe(DEFAULT_PREFERENCES.popupMessage);
 		expect(renderer.cameraQuality).toBe("medium");
 		expect(renderer.earCalibration).toBeNull();
+		expect(renderer.classifierBias).toBeNull();
+		expect(renderer.classifierThreshold).toBeNull();
 	});
 });
 
@@ -120,6 +122,29 @@ describe("ear calibration helpers", () => {
 describe("phase 4 preference defaults", () => {
 	it("defaults earCalibration to null", () => {
 		expect(DEFAULT_PREFERENCES.earCalibration).toBeNull();
+	});
+
+	it("defaults classifier calibration to null", () => {
+		expect(DEFAULT_PREFERENCES.classifierBias).toBeNull();
+		expect(DEFAULT_PREFERENCES.classifierThreshold).toBeNull();
+	});
+
+	it("sanitizes invalid classifier overlay fields to null", () => {
+		const prefs = sanitizePersistedPreferences({
+			classifierBias: 9,
+			classifierThreshold: 0.9,
+		});
+		expect(prefs.classifierBias).toBeNull();
+		expect(prefs.classifierThreshold).toBeNull();
+	});
+
+	it("keeps a valid classifier overlay", () => {
+		const prefs = sanitizePersistedPreferences({
+			classifierBias: 0.4,
+			classifierThreshold: 0.2,
+		});
+		expect(prefs.classifierBias).toBe(0.4);
+		expect(prefs.classifierThreshold).toBe(0.2);
 	});
 });
 

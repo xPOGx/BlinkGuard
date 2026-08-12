@@ -15,6 +15,10 @@ import {
 	CAMERA_QUALITY_OPTIONS,
 	CAMERA_QUALITY_PRESETS,
 } from "../../../../shared/camera-quality";
+import {
+	type CalibrationPhase,
+	CLASSIFIER_CALIBRATION_MIN_BLINKS,
+} from "../../../../shared/classifier-calibration";
 import { EAR_CALIBRATION_MIN_SAMPLES } from "../../../../shared/ear-calibration";
 import { pluralKey, t as translate } from "../../../../shared/i18n";
 import type { CameraQuality } from "../../../../shared/preferences";
@@ -39,10 +43,14 @@ export function CameraControls({
 	const [calibrationDurationMs, setCalibrationDurationMs] = useState(8000);
 	const [calibrationSampleCount, setCalibrationSampleCount] = useState(0);
 	const [calibrationFaceDetected, setCalibrationFaceDetected] = useState(false);
+	const [calibrationPhase, setCalibrationPhase] =
+		useState<CalibrationPhase>("open_eye");
+	const [calibrationBlinkCount, setCalibrationBlinkCount] = useState(0);
 	const [calibrationMessage, setCalibrationMessage] = useState<string | null>(
 		null,
 	);
 	const calibrationSampleCountRef = useRef(0);
+	const calibrationBlinkCountRef = useRef(0);
 
 	const qualityLabels: Record<CameraQuality, string> = {
 		performance: t("camera.quality.performance"),
@@ -66,21 +74,42 @@ export function CameraControls({
 			calibrationSampleCountRef.current = payload.sampleCount;
 			setCalibrationSampleCount(payload.sampleCount);
 			setCalibrationFaceDetected(Boolean(payload.faceDetected));
+			setCalibrationPhase(payload.phase ?? "open_eye");
+			const blinks = payload.blinkCount ?? 0;
+			calibrationBlinkCountRef.current = blinks;
+			setCalibrationBlinkCount(blinks);
 		});
 		const offComplete = rendererIpc.onEarCalibrationComplete((payload) => {
 			setCalibrating(false);
 			setCalibrationElapsedMs(0);
 			const samples = calibrationSampleCountRef.current;
+			const blinks = calibrationBlinkCountRef.current;
 			if (payload.baseline !== null) {
 				setPreferences((current) => ({
 					...current,
 					earCalibration: payload.baseline,
+					...(typeof payload.classifierBias === "number"
+						? {
+								classifierBias: payload.classifierBias,
+								classifierThreshold: payload.classifierThreshold ?? null,
+							}
+						: {}),
 				}));
-				setCalibrationMessage(
-					translate(locale, "camera.calibrationSaved", {
-						value: payload.baseline.toFixed(3),
-					}),
-				);
+				if (typeof payload.classifierBias === "number") {
+					setCalibrationMessage(
+						translate(locale, "camera.calibrationSaved", {
+							value: payload.baseline.toFixed(3),
+						}),
+					);
+				} else {
+					setCalibrationMessage(
+						translate(locale, "camera.calibrationPartialBlinks", {
+							value: payload.baseline.toFixed(3),
+							n: blinks,
+							min: CLASSIFIER_CALIBRATION_MIN_BLINKS,
+						}),
+					);
+				}
 			} else if (payload.error === "Calibration cancelled") {
 				setCalibrationMessage(translate(locale, "camera.calibrationCancelled"));
 			} else {
@@ -92,8 +121,11 @@ export function CameraControls({
 				);
 			}
 			calibrationSampleCountRef.current = 0;
+			calibrationBlinkCountRef.current = 0;
 			setCalibrationSampleCount(0);
+			setCalibrationBlinkCount(0);
 			setCalibrationFaceDetected(false);
+			setCalibrationPhase("open_eye");
 		});
 		return () => {
 			offProgress();
@@ -145,6 +177,9 @@ export function CameraControls({
 		calibrationSampleCountRef.current = 0;
 		setCalibrationSampleCount(0);
 		setCalibrationFaceDetected(false);
+		setCalibrationPhase("open_eye");
+		setCalibrationBlinkCount(0);
+		calibrationBlinkCountRef.current = 0;
 		if (!preferences.cameraEnabled) {
 			setPreferences((current) => ({
 				...current,
@@ -161,6 +196,9 @@ export function CameraControls({
 		calibrationSampleCountRef.current = 0;
 		setCalibrationSampleCount(0);
 		setCalibrationFaceDetected(false);
+		setCalibrationPhase("open_eye");
+		setCalibrationBlinkCount(0);
+		calibrationBlinkCountRef.current = 0;
 		setCalibrationMessage(t("camera.calibrationCancelled"));
 	};
 
@@ -168,8 +206,14 @@ export function CameraControls({
 		setPreferences((current) => ({
 			...current,
 			earCalibration: null,
+			classifierBias: null,
+			classifierThreshold: null,
 		}));
 		rendererIpc.updateEarCalibration(null);
+		rendererIpc.updateClassifierCalibration({
+			bias: null,
+			threshold: null,
+		});
 		setCalibrationMessage(t("camera.calibrationCleared"));
 	};
 
@@ -395,9 +439,17 @@ export function CameraControls({
 								}
 								description={t("camera.calibrationDesc")}
 								action={
-									preferences.earCalibration !== null ? (
+									preferences.earCalibration !== null ||
+									preferences.classifierBias !== null ? (
 										<span className="select-text text-xs text-primary">
-											EAR {preferences.earCalibration.toFixed(3)}
+											{preferences.earCalibration !== null
+												? `EAR ${preferences.earCalibration.toFixed(3)}`
+												: null}
+											{preferences.earCalibration !== null &&
+											preferences.classifierBias !== null
+												? " · "
+												: null}
+											{preferences.classifierBias !== null ? "clf" : null}
 										</span>
 									) : null
 								}
@@ -417,7 +469,9 @@ export function CameraControls({
 											{t("camera.calibrate")}
 										</Button>
 									)}
-									{preferences.earCalibration !== null && !calibrating ? (
+									{(preferences.earCalibration !== null ||
+										preferences.classifierBias !== null) &&
+									!calibrating ? (
 										<Button
 											type="button"
 											size="sm"
@@ -437,10 +491,19 @@ export function CameraControls({
 											/>
 										</div>
 										<p className="mt-2 text-xs text-muted-foreground">
-											{t("camera.calibrationProgress", {
-												n: calibrationSampleCount,
-												min: EAR_CALIBRATION_MIN_SAMPLES,
-											})}
+											{calibrationPhase === "blinks"
+												? t("camera.calibrationPhaseBlinks")
+												: t("camera.calibrationPhaseOpenEye")}
+											{" · "}
+											{calibrationPhase === "blinks"
+												? t("camera.calibrationBlinkProgress", {
+														n: calibrationBlinkCount,
+														min: CLASSIFIER_CALIBRATION_MIN_BLINKS,
+													})
+												: t("camera.calibrationProgress", {
+														n: calibrationSampleCount,
+														min: EAR_CALIBRATION_MIN_SAMPLES,
+													})}
 											{" · "}
 											{calibrationFaceDetected
 												? t("camera.calibrationFaceOk")

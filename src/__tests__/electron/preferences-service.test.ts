@@ -107,6 +107,7 @@ describe("PreferencesService", () => {
 		expect(service.current.darkMode).toBe(false);
 		expect(service.current.cameraQuality).toBe("high");
 		expect(service.current.earCalibration).toBe(0.31);
+		expect(service.current.classifierBias).toBeNull();
 		expect(service.current.launchAtLogin).toBe(true);
 		expect(service.current.isTracking).toBe(true);
 		expect(service.current.popupMessage).toBe(DEFAULT_PREFERENCES.popupMessage);
@@ -214,6 +215,17 @@ describe("PreferencesService", () => {
 		expect(service.current.earCalibration).toBeNull();
 	});
 
+	it("clears invalid classifier overlay from the store", () => {
+		const store = new FakePreferenceStore();
+		store.set("classifierBias", 9);
+		store.set("classifierThreshold", 0.9);
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.classifierBias).toBeNull();
+		expect(service.current.classifierThreshold).toBeNull();
+	});
+
 	it("persists set() into both memory and the store", () => {
 		const store = new FakePreferenceStore();
 		const service = new PreferencesService(store);
@@ -224,6 +236,8 @@ describe("PreferencesService", () => {
 		});
 		service.set("cameraQuality", "performance");
 		service.set("earCalibration", 0.28);
+		service.set("classifierBias", 0.4);
+		service.set("classifierThreshold", 0.2);
 		service.set("launchAtLogin", true);
 		service.set("isTracking", true);
 
@@ -236,6 +250,10 @@ describe("PreferencesService", () => {
 		expect(store.get("cameraQuality")).toBe("performance");
 		expect(service.current.earCalibration).toBe(0.28);
 		expect(store.get("earCalibration")).toBe(0.28);
+		expect(service.current.classifierBias).toBe(0.4);
+		expect(store.get("classifierBias")).toBe(0.4);
+		expect(service.current.classifierThreshold).toBe(0.2);
+		expect(store.get("classifierThreshold")).toBe(0.2);
 		expect(service.current.launchAtLogin).toBe(true);
 		expect(store.get("launchAtLogin")).toBe(true);
 		expect(service.current.isTracking).toBe(true);
@@ -345,6 +363,8 @@ describe("PreferencesService", () => {
 			DEFAULT_PREFERENCES.cameraQuality,
 		);
 		expect(service.current.earCalibration).toBeNull();
+		expect(service.current.classifierBias).toBeNull();
+		expect(service.current.classifierThreshold).toBeNull();
 	});
 
 	it("reset can clear popupPosition so defaults follow the active display", () => {

@@ -1,4 +1,5 @@
 import { ipcMain, shell, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import { sanitizeClassifierCalibrationPayload } from "../../../shared/classifier-calibration";
 import { isValidEarCalibration } from "../../../shared/ear-calibration";
 import { isCameraQuality } from "../../../shared/camera-quality";
 import { isBlinkRewardId } from "../../../shared/blink-rewards";
@@ -37,6 +38,10 @@ import type { InteractionLogger } from "../logging/interaction-logger";
 import { applyLaunchAtLogin } from "../lifecycle/login-item";
 import { fetchGithubReleases } from "../github/fetch-github-releases";
 import type { BlinkDetectorSidecar } from "../sidecar/blink-detector-sidecar";
+import {
+	startTraceRecordingDialog,
+	stopTraceRecordingSession,
+} from "../sidecar/trace-recording";
 import type { ShortcutController } from "../shortcuts/shortcut-controller";
 import type { WindowManager } from "../windows/window-manager";
 import {
@@ -171,6 +176,20 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		if (!isValidEarCalibration(baseline)) return;
 		preferences.set("earCalibration", baseline);
 		sidecar.applyEarCalibration(baseline);
+	});
+	on(IPC_CHANNELS.updateClassifierCalibration, (_event, payload: unknown) => {
+		const parsed = sanitizeClassifierCalibrationPayload(payload);
+		if (!parsed) return;
+		const current = preferences.current;
+		if (
+			current.classifierBias === parsed.bias &&
+			current.classifierThreshold === parsed.threshold
+		) {
+			return;
+		}
+		preferences.set("classifierBias", parsed.bias);
+		preferences.set("classifierThreshold", parsed.threshold);
+		sidecar.applyClassifierCalibration(parsed);
 	});
 	on(IPC_CHANNELS.startEarCalibration, () => {
 		preferenceActions.startEarCalibration();
@@ -544,6 +563,27 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 					preferenceActions.applyBackup(scope, parsed);
 				},
 			});
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.startTraceRecording,
+		async (_event: IpcMainInvokeEvent) => {
+			interactions.logIpc(IPC_CHANNELS.startTraceRecording, []);
+			return startTraceRecordingDialog({
+				sidecar,
+				parentWindow: windows.main && !windows.main.isDestroyed()
+					? windows.main
+					: null,
+			});
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.stopTraceRecording,
+		async (_event: IpcMainInvokeEvent) => {
+			interactions.logIpc(IPC_CHANNELS.stopTraceRecording, []);
+			return stopTraceRecordingSession(sidecar);
 		},
 	);
 }

@@ -20,6 +20,7 @@ import type {
 } from "../../../shared/preferences";
 import type { ExportProfileImageResult } from "../../../shared/profile-export";
 import type { GetReleaseNotesResult } from "../../../shared/release-notes";
+import type { TraceRecordingResult } from "../../../shared/trace-recording";
 
 type Listener = (...args: unknown[]) => void;
 
@@ -79,6 +80,10 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateSnoozeMinutes, minutes),
 	updateEarCalibration: (baseline: number | null) =>
 		send(IPC_CHANNELS.updateEarCalibration, baseline),
+	updateClassifierCalibration: (payload: {
+		bias: number | null;
+		threshold: number | null;
+	}) => send(IPC_CHANNELS.updateClassifierCalibration, payload),
 	startEarCalibration: () => send(IPC_CHANNELS.startEarCalibration),
 	cancelEarCalibration: () => send(IPC_CHANNELS.cancelEarCalibration),
 	onEarCalibrationProgress: (
@@ -87,10 +92,17 @@ export const rendererIpc = {
 			sampleCount: number;
 			durationMs: number;
 			faceDetected: boolean;
+			phase?: "open_eye" | "blinks";
+			blinkCount?: number;
 		}) => void,
 	) => subscribe(IPC_CHANNELS.earCalibrationProgress, listener),
 	onEarCalibrationComplete: (
-		listener: (payload: { baseline: number | null; error?: string }) => void,
+		listener: (payload: {
+			baseline: number | null;
+			classifierBias?: number | null;
+			classifierThreshold?: number | null;
+			error?: string;
+		}) => void,
 	) => subscribe(IPC_CHANNELS.earCalibrationComplete, listener),
 	updateEyeExercisesEnabled: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateEyeExercisesEnabled, enabled),
@@ -275,6 +287,36 @@ export const rendererIpc = {
 		return {
 			status: "error",
 			message: "Backup import is unavailable in this environment",
+		};
+	},
+	startTraceRecording: async (): Promise<TraceRecordingResult> => {
+		const result = await bridge()?.invoke(IPC_CHANNELS.startTraceRecording);
+		if (
+			result &&
+			typeof result === "object" &&
+			"status" in result &&
+			(result as TraceRecordingResult).status
+		) {
+			return result as TraceRecordingResult;
+		}
+		return {
+			status: "error",
+			message: "Trace recording is unavailable in this environment",
+		};
+	},
+	stopTraceRecording: async (): Promise<TraceRecordingResult> => {
+		const result = await bridge()?.invoke(IPC_CHANNELS.stopTraceRecording);
+		if (
+			result &&
+			typeof result === "object" &&
+			"status" in result &&
+			(result as TraceRecordingResult).status
+		) {
+			return result as TraceRecordingResult;
+		}
+		return {
+			status: "error",
+			message: "Trace recording is unavailable in this environment",
 		};
 	},
 };

@@ -148,6 +148,8 @@ function buildAlgorithmPrefs(
 		cameraEnabled: preferences.cameraEnabled,
 		cameraQuality: preferences.cameraQuality,
 		earCalibration: preferences.earCalibration,
+		classifierBias: preferences.classifierBias,
+		classifierThreshold: preferences.classifierThreshold,
 		mgdMode: preferences.mgdMode,
 		autoStopNoFaceEnabled: preferences.autoStopNoFaceEnabled,
 		autoStopNoFaceMinutes: preferences.autoStopNoFaceMinutes,

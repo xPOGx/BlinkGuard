@@ -15,6 +15,7 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updateAutoStopNoFaceMinutes: vi.fn(),
 		updateSnoozeMinutes: vi.fn(),
 		updateEarCalibration: vi.fn(),
+		updateClassifierCalibration: vi.fn(),
 		updateEyeExercisesEnabled: vi.fn(),
 		updateExerciseInterval: vi.fn(),
 		updateExercisePrompts: vi.fn(),
@@ -307,5 +308,23 @@ describe("pushPreferenceDiff", () => {
 				weeklyTrackingMinutesGoal: 120,
 			}),
 		).toBe(false);
+	});
+
+	it("pushes classifier calibration as one payload and does not touch locale", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = {
+			...previous,
+			classifierBias: 0.4,
+			classifierThreshold: 0.2,
+		};
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateClassifierCalibration).toHaveBeenCalledWith({
+			bias: 0.4,
+			threshold: 0.2,
+		});
+		expect(rendererIpc.updateEarCalibration).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 	});
 });

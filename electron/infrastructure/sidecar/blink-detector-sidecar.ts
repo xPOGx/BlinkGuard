@@ -3,6 +3,18 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
+	CLASSIFIER_CALIBRATION_BLINK_DURATION_MS,
+	CLASSIFIER_SIDE_YAW_WAIVE,
+	type CalibrationCompletePayload,
+	type CalibrationPhase,
+	type CalibrationProgressPayload,
+	type ClassifierCalibrationPayload,
+	isValidClassifierBias,
+	isValidClassifierThreshold,
+	personalBiasFromScores,
+	personalThresholdFromScores,
+} from "../../../shared/classifier-calibration";
+import {
 	EAR_CALIBRATION_DURATION_MS,
 	isValidEarCalibration,
 	medianEarCalibration,
@@ -29,16 +41,8 @@ interface SidecarCallbacks {
 	shouldRetryCamera: () => boolean;
 	/** True while the camera preview BrowserWindow is open. */
 	isCameraWindowOpen?: () => boolean;
-	onCalibrationProgress?: (payload: {
-		elapsedMs: number;
-		sampleCount: number;
-		durationMs: number;
-		faceDetected: boolean;
-	}) => void;
-	onCalibrationComplete?: (payload: {
-		baseline: number | null;
-		error?: string;
-	}) => void;
+	onCalibrationProgress?: (payload: CalibrationProgressPayload) => void;
+	onCalibrationComplete?: (payload: CalibrationCompletePayload) => void;
 }
 
 interface FaceDataSample {
@@ -55,7 +59,10 @@ export class BlinkDetectorSidecar {
 	private retryCount = 0;
 	private readonly maxRetries = 20;
 	private calibrationSamples: number[] = [];
+	private calibrationBlinkScores: number[] = [];
 	private calibrationActive = false;
+	private calibrationPhase: CalibrationPhase = "open_eye";
+	private pendingEarBaseline: number | null = null;
 	private calibrationStartedAt = 0;
 	private calibrationDurationMs = EAR_CALIBRATION_DURATION_MS;
 	private calibrationTimer: ReturnType<typeof setTimeout> | null = null;
@@ -257,10 +264,55 @@ export class BlinkDetectorSidecar {
 		this.write({ ear_calibration: resolved });
 	}
 
+	/** Push Stage 5 personal classifier overlay (or clear with null). */
+	applyClassifierCalibration(
+		payload?: ClassifierCalibrationPayload | null,
+	): void {
+		const resolved =
+			payload === undefined
+				? {
+						bias: this.preferences.classifierBias,
+						threshold: this.preferences.classifierThreshold,
+					}
+				: payload;
+		if (
+			resolved === null ||
+			(resolved.bias === null && resolved.threshold === null)
+		) {
+			this.write({ classifier_calibration: null });
+			return;
+		}
+		this.write({
+			classifier_calibration: {
+				bias: isValidClassifierBias(resolved.bias) ? resolved.bias : 0,
+				threshold: isValidClassifierThreshold(resolved.threshold)
+					? resolved.threshold
+					: null,
+			},
+		});
+	}
+
 	/** Apply quality + calibration after models are ready. */
 	applySessionConfig(): void {
 		this.applyCameraQuality();
 		this.applyEarCalibration();
+		this.applyClassifierCalibration();
+	}
+
+	/** Start Stage-0 EAR NDJSON recording in the sidecar (absolute path). */
+	startTraceRecording(filePath: string): boolean {
+		if (!this.running || !this.process?.stdin) return false;
+		const trimmed = filePath.trim();
+		if (!trimmed) return false;
+		this.write({ record_trace: trimmed });
+		return true;
+	}
+
+	/** Stop Stage-0 EAR NDJSON recording. */
+	stopTraceRecording(): boolean {
+		if (!this.running || !this.process?.stdin) return false;
+		this.write({ stop_trace: true });
+		return true;
 	}
 
 	startEarCalibration(durationMs = EAR_CALIBRATION_DURATION_MS): boolean {
@@ -275,39 +327,16 @@ export class BlinkDetectorSidecar {
 
 		this.calibrationActive = true;
 		this.calibrationSamples = [];
+		this.calibrationBlinkScores = [];
+		this.pendingEarBaseline = null;
 		this.calibrationFaceDetected = false;
-		this.calibrationStartedAt = Date.now();
-		this.calibrationDurationMs = durationMs;
-
-		this.calibrationProgressTimer = setInterval(() => {
-			if (!this.calibrationActive) return;
-			this.callbacks.onCalibrationProgress?.({
-				elapsedMs: Date.now() - this.calibrationStartedAt,
-				sampleCount: this.calibrationSamples.length,
-				durationMs: this.calibrationDurationMs,
-				faceDetected: this.calibrationFaceDetected,
-			});
-		}, 250);
-
-		this.calibrationTimer = setTimeout(() => {
-			this.finishEarCalibration();
-		}, durationMs);
-
-		this.callbacks.onCalibrationProgress?.({
-			elapsedMs: 0,
-			sampleCount: 0,
-			durationMs,
-			faceDetected: false,
-		});
+		this.beginCalibrationPhase("open_eye", durationMs);
 		return true;
 	}
 
 	cancelEarCalibration(reason?: string): void {
 		if (!this.calibrationActive) return;
-		this.clearCalibrationTimers();
-		this.calibrationActive = false;
-		this.calibrationSamples = [];
-		this.callbacks.onCalibrationComplete?.({
+		this.finishCalibrationSession({
 			baseline: null,
 			error: reason ?? "Calibration cancelled",
 		});
@@ -317,23 +346,96 @@ export class BlinkDetectorSidecar {
 		this.cameraReady = false;
 	}
 
-	private finishEarCalibration(): void {
-		if (!this.calibrationActive) return;
-		const samples = this.calibrationSamples;
+	private beginCalibrationPhase(
+		phase: CalibrationPhase,
+		durationMs: number,
+	): void {
 		this.clearCalibrationTimers();
-		this.calibrationActive = false;
-		this.calibrationSamples = [];
+		this.calibrationPhase = phase;
+		this.calibrationStartedAt = Date.now();
+		this.calibrationDurationMs = durationMs;
+		this.calibrationFaceDetected = false;
 
-		const baseline = medianEarCalibration(samples);
-		if (baseline === null) {
-			this.callbacks.onCalibrationComplete?.({
-				baseline: null,
+		this.calibrationProgressTimer = setInterval(() => {
+			if (!this.calibrationActive) return;
+			this.emitCalibrationProgress();
+		}, 250);
+
+		this.calibrationTimer = setTimeout(() => {
+			this.finishCalibrationPhase();
+		}, durationMs);
+
+		this.emitCalibrationProgress();
+	}
+
+	private emitCalibrationProgress(): void {
+		this.callbacks.onCalibrationProgress?.({
+			elapsedMs: Date.now() - this.calibrationStartedAt,
+			sampleCount:
+				this.calibrationPhase === "open_eye"
+					? this.calibrationSamples.length
+					: this.calibrationBlinkScores.length,
+			durationMs: this.calibrationDurationMs,
+			faceDetected: this.calibrationFaceDetected,
+			phase: this.calibrationPhase,
+			blinkCount: this.calibrationBlinkScores.length,
+		});
+	}
+
+	private finishCalibrationPhase(): void {
+		if (!this.calibrationActive) return;
+		if (this.calibrationPhase === "open_eye") {
+			const baseline = medianEarCalibration(this.calibrationSamples);
+			if (baseline === null) {
+				this.finishCalibrationSession({
+					baseline: null,
+					error:
+						"Not enough open-eye samples. Keep your face centered with eyes open.",
+				});
+				return;
+			}
+			this.pendingEarBaseline = baseline;
+			// Phase B needs the fresh open-eye baseline or FSM gates stay on
+			// the old/default EAR and deliberate blinks often never complete.
+			this.applyEarCalibration(baseline);
+			this.beginCalibrationPhase(
+				"blinks",
+				CLASSIFIER_CALIBRATION_BLINK_DURATION_MS,
+			);
+			return;
+		}
+
+		const scores = this.calibrationBlinkScores;
+		const bias = personalBiasFromScores(scores);
+		const baseline = this.pendingEarBaseline;
+		if (bias === null) {
+			this.finishCalibrationSession({
+				baseline,
+				classifierBias: null,
+				classifierThreshold: null,
 				error:
-					"Not enough open-eye samples. Keep your face centered with eyes open.",
+					"Not enough blinks for classifier calibration. EAR baseline was saved.",
 			});
 			return;
 		}
-		this.callbacks.onCalibrationComplete?.({ baseline });
+		this.finishCalibrationSession({
+			baseline,
+			classifierBias: bias,
+			classifierThreshold: personalThresholdFromScores(scores, bias),
+		});
+	}
+
+	private finishCalibrationSession(payload: CalibrationCompletePayload): void {
+		this.clearCalibrationTimers();
+		this.calibrationActive = false;
+		this.calibrationSamples = [];
+		this.calibrationBlinkScores = [];
+		this.pendingEarBaseline = null;
+		if (payload.baseline === null) {
+			// Cancel / Phase A fail: drop the live pending EAR.
+			this.applyEarCalibration();
+		}
+		this.callbacks.onCalibrationComplete?.(payload);
 	}
 
 	private clearCalibrationTimers(): void {
@@ -350,6 +452,7 @@ export class BlinkDetectorSidecar {
 	private sampleFaceDataForCalibration(data: FaceDataSample): void {
 		if (!this.calibrationActive) return;
 		this.calibrationFaceDetected = Boolean(data.faceDetected);
+		if (this.calibrationPhase !== "open_eye") return;
 		if (!data.faceDetected) return;
 		if (data.blink) return;
 		if (data.blink_phase === "start" || data.blink_phase === "complete") {
@@ -358,6 +461,25 @@ export class BlinkDetectorSidecar {
 		const ear = data.ear;
 		if (typeof ear !== "number" || !Number.isFinite(ear)) return;
 		this.calibrationSamples.push(ear);
+	}
+
+	private sampleBlinkDebugForCalibration(debug: Record<string, unknown>): void {
+		if (!this.calibrationActive || this.calibrationPhase !== "blinks") {
+			return;
+		}
+		const phase = debug.phase;
+		if (phase !== "complete" && phase !== "reject_classifier") return;
+		// Do not skip look_down: laptop webcams sit above the screen, so
+		// pitch_delta > ~0.05 (pose_weight > 0) on a normal "look at camera"
+		// pose and would drop almost every sample. Side-yaw is the frontal gate.
+		const yaw = typeof debug.yaw === "number" ? debug.yaw : 0;
+		if (Math.abs(yaw) >= CLASSIFIER_SIDE_YAW_WAIVE) return;
+		const p = debug.clf_p;
+		if (typeof p !== "number" || !Number.isFinite(p) || p <= 0 || p > 1) {
+			return;
+		}
+		this.calibrationBlinkScores.push(p);
+		this.calibrationFaceDetected = true;
 	}
 
 	private readStdout(child: ChildProcessWithoutNullStreams): void {
@@ -375,6 +497,11 @@ export class BlinkDetectorSidecar {
 
 	private handleMessage(message: Record<string, any>): void {
 		this.debugLogger?.captureSidecarMessage(message);
+		if (message.blinkDebug) {
+			this.sampleBlinkDebugForCalibration(
+				message.blinkDebug as Record<string, unknown>,
+			);
+		}
 		if (message.blink) {
 			this.callbacks.onBlink(message);
 			return;

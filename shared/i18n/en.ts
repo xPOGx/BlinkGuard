@@ -114,6 +114,16 @@ export const en: MessageCatalog = {
 	"debug.onboarding.title": "Onboarding",
 	"debug.onboarding.desc":
 		"Reopen the first-run wizard without resetting other preferences.",
+	"debug.trace.title": "EAR trace recording",
+	"debug.trace.desc":
+		"Record EAR/pose NDJSON + companion .avi (camera frames) for offline labeling. Start tracking → Start recording → camera on → scenario → Stop recording. Camera off does not stop the recording.",
+	"debug.trace.start": "Start recording",
+	"debug.trace.stop": "Stop recording",
+	"debug.trace.started": "Recording → {path}",
+	"debug.trace.startedNoPath": "Recording started",
+	"debug.trace.stopped": "Recording stopped — keep the .ndjson and matching .avi together (same folder/name).",
+	"debug.trace.cancelled": "Save cancelled",
+	"debug.trace.error": "Trace recording failed",
 
 	// Dark mode / common
 	"common.darkMode": "Dark mode",
@@ -214,16 +224,21 @@ export const en: MessageCatalog = {
 	"camera.quality.medium": "Medium",
 	"camera.quality.high": "High",
 	"camera.quality.ultra": "Ultra",
-	"camera.calibration": "Open-eye Calibration",
+	"camera.calibration": "Calibration",
 	"camera.calibrationDesc":
-		"Keep eyes open and look at the camera for about 8 seconds. This tunes blink thresholds to your face. Calibration can gently adapt when lighting drifts; use Calibrate for a hard reset.",
+		"Two short steps: keep eyes open for about 8 seconds, then look at the camera and blink at least 6 times. This tunes blink thresholds and the credit vote to your face. Calibration can gently adapt when lighting drifts; use Calibrate for a hard reset.",
 	"camera.calibrate": "Calibrate",
 	"camera.cancelCalibration": "Cancel ({n}s)",
+	"camera.calibrationPhaseOpenEye": "Keep eyes open",
+	"camera.calibrationPhaseBlinks": "Look at the camera and blink",
 	"camera.calibrationProgress": "Samples {n}/{min}",
+	"camera.calibrationBlinkProgress": "Blinks {n}/{min}",
 	"camera.calibrationFaceOk": "Face detected",
 	"camera.calibrationFaceMissing":
 		"No face — center yourself in the camera",
 	"camera.calibrationSaved": "Calibration saved (EAR {value})",
+	"camera.calibrationPartialBlinks":
+		"Open-eye saved (EAR {value}). Not enough blinks ({n}/{min}) — face the camera and blink, then Calibrate again.",
 	"camera.calibrationIncomplete": "Calibration did not complete",
 	"camera.calibrationIncompleteSamples":
 		"Not enough open-eye samples ({n}/{min}). Keep your face centered with eyes open.",
@@ -503,7 +518,7 @@ export const en: MessageCatalog = {
 		"Permanent discount on all shop buys except this upgrade. Now {percent}% (max 50%).",
 	"stats.liveRate": "Live blink rate",
 	"stats.liveRateDesc":
-		"Credited blinks over the last minute while tracking is active. The first minute is a warmup.",
+		"Credited blinks per minute of face-visible time in the last minute (camera). Needs ~24s with your face in view before the rate is ready.",
 	"stats.today": "Today",
 	"stats.todayDesc":
 		"Credited blinks, tracking time, and start/stop sessions for the local day.",
@@ -554,9 +569,9 @@ export const en: MessageCatalog = {
 	"rate.current": "Current rate",
 	"rate.perMin": "/min",
 	"rate.warmingUp": "Warming up",
-	"rate.collecting": "Collecting the first minute… {n}s left",
+	"rate.collecting": "Need face in view… {n}s left",
 	"rate.startTracking":
-		"Start tracking to measure blink rate. The first minute is a warmup.",
+		"Start camera tracking and keep your face in view to measure blink rate.",
 	"rate.waiting": "Waiting for credited blinks…",
 	"rate.rising": "Rate rising",
 	"rate.falling": "Rate falling",

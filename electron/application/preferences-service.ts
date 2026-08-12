@@ -1,4 +1,8 @@
 import {
+	sanitizeClassifierBias,
+	sanitizeClassifierThreshold,
+} from "../../shared/classifier-calibration";
+import {
 	DEFAULT_PREFERENCES,
 	sameKeyboardShortcuts,
 	sanitizeAutoStopNoFaceMinutes,
@@ -160,6 +164,10 @@ export class PreferencesService {
 			next = sanitizeSoundVolume(value) as PersistedPreferences[K];
 		} else if (key === "keyboardShortcuts") {
 			next = sanitizeKeyboardShortcuts(value) as PersistedPreferences[K];
+		} else if (key === "classifierBias") {
+			next = sanitizeClassifierBias(value) as PersistedPreferences[K];
+		} else if (key === "classifierThreshold") {
+			next = sanitizeClassifierThreshold(value) as PersistedPreferences[K];
 		}
 		// No-op equal writes: settings sync and dual IPC callers re-send often.
 		if (samePreferenceValue(key, this.current[key], next)) {
