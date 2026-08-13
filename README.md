@@ -172,9 +172,18 @@ Tradeoff: less driver AA for that app profile; in-app glass may look slightly le
 [![Telegram](https://img.shields.io/badge/Telegram-PaOnGa-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/PaOnGa)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Pavlo%20Dzhevaha-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/pavlo-dzhevaha-342068105/)
 [![Open Collective](https://img.shields.io/badge/Open%20Collective-BlinkGuard-7FADF2?style=for-the-badge&logo=open-collective&logoColor=white)](https://opencollective.com/xpogx)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Donate-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/xpogx)
 [![Email](https://img.shields.io/badge/Email-pavel19.1078%40gmail.com-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:pavel19.1078@gmail.com)
 
 BlinkGuard is a personal project by **Pavlo Dzhevaha** — built locally, from the heart, after enough dry eyes from long coding sessions. Issues, ideas, and PRs are welcome.
+
+---
+
+## Support
+
+Donations go toward release costs (code signing, notarization, CI). The app stays free, local, and open source — no paywalled features.
+
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Donate-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/xpogx)
 
 ---
 
