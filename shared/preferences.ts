@@ -316,7 +316,7 @@ export interface PersistedPreferences {
 	popupSize: Size;
 	popupColors: PopupColors;
 	popupMessage: string;
-	/** When true, blink popup ignores mouse (watermark); snooze via tray. */
+	/** When true, blink / exercise / look-away popups ignore mouse (watermark); snooze via tray. */
 	blinkPopupClickThrough: boolean;
 	/** Minutes to suppress/re-show prompts after Snooze (1…30). */
 	snoozeMinutes: number;

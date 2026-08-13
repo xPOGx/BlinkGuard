@@ -33,6 +33,13 @@ describe("i18n t()", () => {
 		expect(t("en", "app.tagline")).toBe("Eye care settings");
 	});
 
+	it("localizes shared click-through and eye-care tray snooze", () => {
+		expect(t("en", "popup.clickThrough")).toContain("reminder popups");
+		expect(t("uk", "popup.clickThrough")).toContain("попапи");
+		expect(t("en", "tray.snoozeExercise", { n: 5 })).toContain("5");
+		expect(t("uk", "tray.snoozeLookAway", { n: 2 })).toContain("2");
+	});
+
 	it("interpolates variables", () => {
 		expect(t("en", "reminders.desc.timer_plural", { n: 5 })).toBe(
 			"Show reminder every 5 seconds",

@@ -342,10 +342,10 @@ export const uk: MessageCatalog = {
 	"popup.transparencyAria": "Прозорість панелі",
 	"popup.transparencyHint":
 		"Більші значення роблять фон панелі прозорішим. Текст лишається повністю непрозорим — так гліфи чіткіші.",
-	"popup.clickThrough": "Пропускати кліки крізь попап моргання",
+	"popup.clickThrough": "Пропускати кліки крізь попапи нагадувань",
 	"popup.clickThroughDescription":
-		"Нагадування про моргання лишається видимим, але не перехоплює кліки (як водяний знак). Відкласти можна з меню в треї.",
-	"popup.clickThroughAria": "Пропускати кліки крізь попап моргання",
+		"Попапи моргання, вправи та «подивіться вдалину» лишаються видимими, але не перехоплюють кліки (як водяний знак). Відкласти можна з меню в треї.",
+	"popup.clickThroughAria": "Пропускати кліки крізь попапи нагадувань",
 	"popup.colorPickerAria": "Вибір кольору: {label}",
 
 	// Sound / launch / reset / quiet hours
@@ -610,6 +610,12 @@ export const uk: MessageCatalog = {
 	"tray.snoozeBlink": "Відкласти моргання ({n} хв)",
 	"tray.snoozeBlink_few": "Відкласти моргання ({n} хв)",
 	"tray.snoozeBlink_plural": "Відкласти моргання ({n} хв)",
+	"tray.snoozeExercise": "Відкласти вправу ({n} хв)",
+	"tray.snoozeExercise_few": "Відкласти вправу ({n} хв)",
+	"tray.snoozeExercise_plural": "Відкласти вправу ({n} хв)",
+	"tray.snoozeLookAway": "Відкласти погляд вдалину ({n} хв)",
+	"tray.snoozeLookAway_few": "Відкласти погляд вдалину ({n} хв)",
+	"tray.snoozeLookAway_plural": "Відкласти погляд вдалину ({n} хв)",
 	"tray.checkForUpdates": "Перевірити оновлення",
 	"tray.quit": "Вийти",
 	"window.cameraTitle": "Візуалізація камери",

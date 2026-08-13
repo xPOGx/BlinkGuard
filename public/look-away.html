@@ -2,21 +2,25 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self';">
+    <title data-i18n="popup.lookAway.title">Look away</title>
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/look-away.css">
 </head>
 <body>
     <div class="look-away-container popup-glass" id="container">
-        <div class="look-away-title" id="look-away-title">Look away</div>
+        <h2 class="look-away-title" id="look-away-title">Look away</h2>
         <div class="look-away-hint" id="look-away-hint">Focus on something ~20 feet / 6 m away</div>
-        <div class="look-away-countdown" id="countdown" aria-live="polite">20</div>
-        <div class="look-away-unit" data-i18n="popup.lookAway.unit">seconds</div>
-        <div class="look-away-buttons">
+        <div class="look-away-timer" role="status" aria-live="polite" aria-atomic="true">
+            <div class="look-away-countdown" id="countdown">20</div>
+            <div class="look-away-unit" data-i18n="popup.lookAway.unit">seconds</div>
+        </div>
+        <div class="look-away-buttons" hidden>
             <button class="look-away-button skip" type="button" data-i18n="popup.lookAway.skip">Skip</button>
             <button class="look-away-button snooze" type="button" data-i18n="popup.lookAway.snooze">Snooze (5 min)</button>
         </div>
     </div>
     <script src="js/shared/i18n.js"></script>
+    <script src="js/shared/popup-a11y.js"></script>
     <script src="js/shared/theme.js"></script>
     <script src="js/look-away.js"></script>
 </body>

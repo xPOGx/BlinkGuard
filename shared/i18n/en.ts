@@ -334,10 +334,10 @@ export const en: MessageCatalog = {
 	"popup.transparencyAria": "Panel transparency",
 	"popup.transparencyHint":
 		"Higher values make the panel background more see-through. Text stays fully opaque for sharper glyphs.",
-	"popup.clickThrough": "Pass clicks through blink popup",
+	"popup.clickThrough": "Pass clicks through reminder popups",
 	"popup.clickThroughDescription":
-		"Blink reminder stays visible but does not steal clicks (like a watermark). Snooze from the tray menu.",
-	"popup.clickThroughAria": "Pass clicks through blink popup",
+		"Blink, exercise, and look-away popups stay visible but do not steal clicks (like a watermark). Snooze from the tray menu.",
+	"popup.clickThroughAria": "Pass clicks through reminder popups",
 	"popup.colorPickerAria": "{label} picker",
 
 	// Sound / launch / reset / quiet hours
@@ -600,6 +600,12 @@ export const en: MessageCatalog = {
 	"tray.snoozeBlink": "Snooze blink ({n} min)",
 	"tray.snoozeBlink_few": "Snooze blink ({n} min)",
 	"tray.snoozeBlink_plural": "Snooze blink ({n} min)",
+	"tray.snoozeExercise": "Snooze exercise ({n} min)",
+	"tray.snoozeExercise_few": "Snooze exercise ({n} min)",
+	"tray.snoozeExercise_plural": "Snooze exercise ({n} min)",
+	"tray.snoozeLookAway": "Snooze look-away ({n} min)",
+	"tray.snoozeLookAway_few": "Snooze look-away ({n} min)",
+	"tray.snoozeLookAway_plural": "Snooze look-away ({n} min)",
 	"tray.checkForUpdates": "Check for updates",
 	"tray.quit": "Quit",
 	"window.cameraTitle": "Camera Visualization",

@@ -10,6 +10,26 @@ function snoozeExercise() {
 	window.close();
 }
 
+function applyExerciseClickThrough(enabled) {
+	const a11y = window.__popupA11y;
+	const root = document.getElementById("container");
+	const actions = document.querySelector(".exercise-buttons");
+	const snoozeBtn = document.querySelector(".exercise-button.snooze");
+	if (!a11y || !root) return;
+
+	a11y.setActionsHidden(actions, enabled);
+	if (enabled) {
+		a11y.teardownInteractiveDialog(root);
+		return;
+	}
+	a11y.mountInteractiveDialog({
+		root: root,
+		labelledById: "exercise-title",
+		primaryEl: snoozeBtn,
+		onEscape: snoozeExercise,
+	});
+}
+
 function initExercisePopup() {
 	const exerciseElement = document.getElementById("exercise");
 	window.popupAPI.onUpdateExercisePrompt((prompt) => {
@@ -28,6 +48,8 @@ function initExercisePopup() {
 	if (snoozeBtn) {
 		snoozeBtn.addEventListener("click", snoozeExercise);
 	}
+
+	window.popupAPI.onBlinkClickThrough(applyExerciseClickThrough);
 }
 
 function initExercise() {

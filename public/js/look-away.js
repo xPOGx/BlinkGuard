@@ -17,6 +17,26 @@ function snoozeLookAway() {
 	window.close();
 }
 
+function applyLookAwayClickThrough(enabled) {
+	const a11y = window.__popupA11y;
+	const root = document.getElementById("container");
+	const actions = document.querySelector(".look-away-buttons");
+	const snoozeBtn = document.querySelector(".look-away-button.snooze");
+	if (!a11y || !root) return;
+
+	a11y.setActionsHidden(actions, enabled);
+	if (enabled) {
+		a11y.teardownInteractiveDialog(root);
+		return;
+	}
+	a11y.mountInteractiveDialog({
+		root: root,
+		labelledById: "look-away-title",
+		primaryEl: snoozeBtn,
+		onEscape: snoozeLookAway,
+	});
+}
+
 function initLookAwayPopup() {
 	const titleEl = document.getElementById("look-away-title");
 	const hintEl = document.getElementById("look-away-hint");
@@ -55,6 +75,8 @@ function initLookAwayPopup() {
 	if (snoozeBtn) {
 		snoozeBtn.addEventListener("click", snoozeLookAway);
 	}
+
+	window.popupAPI.onBlinkClickThrough(applyLookAwayClickThrough);
 }
 
 function initLookAway() {

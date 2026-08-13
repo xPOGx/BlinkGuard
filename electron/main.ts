@@ -283,6 +283,8 @@ function bootstrap(): void {
 		},
 		interactionLogger,
 		() => reminders.snooze(),
+		() => exercises.snooze(),
+		() => lookAway.snooze(),
 	);
 	lifecycle.attachTray(tray);
 

@@ -204,16 +204,13 @@ export class WindowManager {
 					IPC_CHANNELS.cameraMode,
 					this.preferences.cameraEnabled,
 				);
-				popup.webContents.send(
-					IPC_CHANNELS.blinkClickThrough,
-					this.preferences.blinkPopupClickThrough,
-				);
+				this.sendClickThrough(popup);
 			}
 			if (!interactive) {
 				popup.setIgnoreMouseEvents(true);
 			}
 		});
-		popup.once("ready-to-show", () => popup.showInactive());
+		this.presentPanel(popup, interactive);
 		popup.on("closed", () => {
 			if (this.reminder === popup) this.reminder = null;
 		});
@@ -424,6 +421,7 @@ export class WindowManager {
 
 	showExercise(prompt: string, onClosed: () => void): BrowserWindow | null {
 		if (this.exercise && !this.exercise.isDestroyed()) return null;
+		const interactive = !this.preferences.blinkPopupClickThrough;
 		const popupWidth = 340;
 		const popupHeight = 200;
 		const { x, y } = getLeftBiasedPopupPosition(popupWidth, popupHeight);
@@ -432,16 +430,19 @@ export class WindowManager {
 			height: popupHeight,
 			x,
 			y,
-			focusable: true,
+			focusable: interactive,
 		}, this.paths.preload);
 		this.exercise = popup;
 		void popup.loadFile(path.join(this.paths.publicDir, "exercise.html"));
 		popup.webContents.on("did-finish-load", () => {
 			this.sendI18n(popup);
 			popup.webContents.send(IPC_CHANNELS.updateExercisePrompt, prompt);
+			this.sendClickThrough(popup);
+			if (!interactive) {
+				popup.setIgnoreMouseEvents(true);
+			}
 		});
-		// Same as look-away / blink: show without stealing focus.
-		popup.once("ready-to-show", () => popup.showInactive());
+		this.presentPanel(popup, interactive);
 		popup.on("closed", () => {
 			if (this.exercise === popup) this.exercise = null;
 			onClosed();
@@ -528,6 +529,7 @@ export class WindowManager {
 
 	showLookAway(onClosed: () => void): BrowserWindow | null {
 		if (this.lookAway && !this.lookAway.isDestroyed()) return null;
+		const interactive = !this.preferences.blinkPopupClickThrough;
 		const popupWidth = 340;
 		const popupHeight = 220;
 		const { x, y } = getRightBiasedPopupPosition(popupWidth, popupHeight);
@@ -536,7 +538,7 @@ export class WindowManager {
 			height: popupHeight,
 			x,
 			y,
-			focusable: true,
+			focusable: interactive,
 		}, this.paths.preload);
 		this.lookAway = popup;
 		void popup.loadFile(path.join(this.paths.publicDir, "look-away.html"), {
@@ -558,9 +560,12 @@ export class WindowManager {
 					locale,
 				),
 			});
+			this.sendClickThrough(popup);
+			if (!interactive) {
+				popup.setIgnoreMouseEvents(true);
+			}
 		});
-		// Same as blink: show without stealing focus (games / mouse capture).
-		popup.once("ready-to-show", () => popup.showInactive());
+		this.presentPanel(popup, interactive);
 		popup.on("closed", () => {
 			if (this.lookAway === popup) this.lookAway = null;
 			onClosed();
@@ -765,6 +770,25 @@ export class WindowManager {
 		const [x, y] = window.getPosition();
 		if (x === position.x && y === position.y) return;
 		window.setPosition(position.x, position.y);
+	}
+
+	private sendClickThrough(popup: BrowserWindow): void {
+		popup.webContents.send(
+			IPC_CHANNELS.blinkClickThrough,
+			this.preferences.blinkPopupClickThrough,
+		);
+	}
+
+	private presentPanel(popup: BrowserWindow, interactive: boolean): void {
+		popup.once("ready-to-show", () => {
+			if (popup.isDestroyed()) return;
+			if (interactive) {
+				popup.show();
+				popup.focus();
+			} else {
+				popup.showInactive();
+			}
+		});
 	}
 
 	private ensurePopupPosition(): Point {

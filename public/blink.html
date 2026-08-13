@@ -10,6 +10,7 @@
 </head>
 <body>
   <div class="reminder-card" id="blink" data-kind="blink">
+    <h2 id="blink-title" class="popup-sr-only" data-i18n="popup.blink.title">Blink Reminder</h2>
     <div class="reminder-stack">
       <div class="reminder-content">
         <div class="reminder-icon" aria-hidden="true">
@@ -18,12 +19,13 @@
             <circle cx="12" cy="12" r="3"/>
           </svg>
         </div>
-        <div class="reminder-message">Blink!</div>
+        <div class="reminder-message" id="blink-message" role="status" aria-live="polite" aria-atomic="true">Blink!</div>
       </div>
-      <button type="button" class="reminder-snooze" id="snooze-blink" data-i18n="popup.blink.snooze">Snooze (5 min)</button>
+      <button type="button" class="reminder-snooze" id="snooze-blink" hidden data-i18n="popup.blink.snooze">Snooze (5 min)</button>
     </div>
   </div>
   <script src="js/shared/i18n.js"></script>
+  <script src="js/shared/popup-a11y.js"></script>
   <script src="js/shared/theme.js"></script>
   <script src="js/reminder.js"></script>
 </body>

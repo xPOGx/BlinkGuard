@@ -17,6 +17,8 @@ export class TrayController {
 		private readonly onCheckForUpdates: (() => void) | null = null,
 		private readonly interactions: InteractionLogger | null = null,
 		private readonly onSnoozeBlink: (() => void) | null = null,
+		private readonly onSnoozeExercise: (() => void) | null = null,
+		private readonly onSnoozeLookAway: (() => void) | null = null,
 	) {}
 
 	create(): void {
@@ -49,19 +51,27 @@ export class TrayController {
 				},
 			},
 		];
-		if (this.onSnoozeBlink) {
-			const n = this.getSnoozeMinutes();
-			items.push({
-				label: t(locale, pluralKey("tray.snoozeBlink", locale, n), { n }),
-				click: () => {
-					this.interactions?.append({
-						source: "tray",
-						action: "menu-snooze-blink",
-					});
-					this.onSnoozeBlink?.();
-				},
-			});
-		}
+		this.pushSnoozeItem(
+			items,
+			locale,
+			"tray.snoozeBlink",
+			"menu-snooze-blink",
+			this.onSnoozeBlink,
+		);
+		this.pushSnoozeItem(
+			items,
+			locale,
+			"tray.snoozeExercise",
+			"menu-snooze-exercise",
+			this.onSnoozeExercise,
+		);
+		this.pushSnoozeItem(
+			items,
+			locale,
+			"tray.snoozeLookAway",
+			"menu-snooze-look-away",
+			this.onSnoozeLookAway,
+		);
 		if (this.onCheckForUpdates) {
 			items.push({
 				label: t(locale, "tray.checkForUpdates"),
@@ -91,6 +101,24 @@ export class TrayController {
 		if (!this.tray) return;
 		this.tray.destroy();
 		this.tray = null;
+	}
+
+	private pushSnoozeItem(
+		items: MenuItemConstructorOptions[],
+		locale: Locale,
+		key: "tray.snoozeBlink" | "tray.snoozeExercise" | "tray.snoozeLookAway",
+		action: string,
+		handler: (() => void) | null,
+	): void {
+		if (!handler) return;
+		const n = this.getSnoozeMinutes();
+		items.push({
+			label: t(locale, pluralKey(key, locale, n), { n }),
+			click: () => {
+				this.interactions?.append({ source: "tray", action });
+				handler();
+			},
+		});
 	}
 
 	private loadIcon() {

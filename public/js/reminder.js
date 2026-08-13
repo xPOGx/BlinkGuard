@@ -5,10 +5,22 @@ function snoozeBlink() {
 }
 
 function applyBlinkClickThrough(enabled) {
+	const a11y = window.__popupA11y;
+	const root = document.getElementById("blink");
 	const snoozeBtn = document.getElementById("snooze-blink");
-	if (!snoozeBtn) return;
-	snoozeBtn.hidden = Boolean(enabled);
-	snoozeBtn.style.display = enabled ? "none" : "";
+	if (!a11y || !snoozeBtn) return;
+
+	a11y.setActionsHidden(snoozeBtn, enabled);
+	if (enabled || !root) {
+		if (root) a11y.teardownInteractiveDialog(root);
+		return;
+	}
+	a11y.mountInteractiveDialog({
+		root: root,
+		labelledById: "blink-title",
+		primaryEl: snoozeBtn,
+		onEscape: snoozeBlink,
+	});
 }
 
 function initReminderPopup() {
