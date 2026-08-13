@@ -38,6 +38,30 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 
 ![Exercise reminder popup](docs/screenshots/popup-exercise.png)
 
+## Install
+
+Download the latest Windows installer or macOS DMG from [GitHub Releases](https://github.com/xpogx-org/BlinkGuard/releases/latest).
+
+### Windows
+
+Run `BlinkGuard.Setup.exe` and follow the installer.
+
+### macOS Gatekeeper (“app is damaged”)
+
+GitHub macOS builds are often **unsigned** (no Apple Developer ID / notarize in CI). After a browser download, macOS attaches a quarantine flag. Gatekeeper then shows:
+
+> “BlinkGuard” is damaged and can’t be opened. You should move it to the Trash.
+
+The app is not corrupt. **Right-click → Open does not bypass this dialog.** After dragging BlinkGuard into Applications, strip the quarantine flag in Terminal:
+
+```bash
+xattr -cr /Applications/BlinkGuard.app
+```
+
+Then open the app again. If it lives somewhere else, pass that path instead.
+
+Signed + notarized builds do not need this step.
+
 ## Technology stack
 
 | Area | Stack |
@@ -138,6 +162,7 @@ Tradeoff: less driver AA for that app profile; in-app glass may look slightly le
   - Signs/notarizes when Apple + signing secrets (`CSC_LINK` / `CSC_NAME`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`) are set
   - Otherwise packages **unsigned** so CI still ships DMG/ZIP + `latest-mac.yml` (job does not skip)
 - In-app updates need a **published** build with embedded `app-update.yml` (tag/`build:*:publish`); local `--publish never` packages have no feed. Signed + notarized mac builds are recommended for Gatekeeper; unsigned releases may still publish updater metadata but install can fail at runtime without crashing the app.
+- End-user workaround for unsigned Mac downloads: see [Install](#install) (`xattr -cr`). Local `npm run remove-quarantine` only clears the builder machine, not testers who downloaded via Chrome/Safari.
 
 ---
 
