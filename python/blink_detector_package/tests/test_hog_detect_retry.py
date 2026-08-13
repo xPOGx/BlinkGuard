@@ -200,5 +200,23 @@ class HogDetectRetryTests(unittest.TestCase):
 		self.assertIsNone(kind)
 
 
+	def test_upsample_eye_micro_box_dropped(self):
+		"""upsample=1 must not return a ~44px eye as a face."""
+		eye = _FakeFace(44, 44)
+
+		def detector(gray, upsample):
+			return [eye] if upsample == 1 else []
+
+		gray = np.zeros((360, 480), dtype=np.uint8)
+		face, kind = run_hog_face_detect(
+			detector,
+			gray,
+			lambda faces: faces[0] if faces else None,
+			PreallocatedBuffers(),
+		)
+		self.assertIsNone(face)
+		self.assertIsNone(kind)
+
+
 if __name__ == "__main__":
 	unittest.main()

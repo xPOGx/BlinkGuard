@@ -236,6 +236,9 @@ def select_largest_face(faces):
 # a large area fraction and still pass.
 FACE_EDGE_BORDER_PX = 3
 FACE_EDGE_MIN_AREA_FRAC = 0.12
+# Centered ~44px HOG hits on an eye/eyebrow (Fifine upsample=1) are not a
+# face. 18% of 480px ≈ 86px — zip area ≤2809 miss, 8190+ can still pass.
+MIN_FACE_WIDTH_FRAC = 0.18
 
 
 def face_bbox_plausible(face, frame_w, frame_h):
@@ -243,8 +246,9 @@ def face_bbox_plausible(face, frame_w, frame_h):
 	True if this bbox can be the user.
 
 	Rejects small detections flush against a frame edge (HOG FP on laundry
-	when the real face is covered). Centered tiny faces still go through
-	MIN_FACE_AREA / too_far. Large close-up faces that clip the border pass.
+	when the real face is covered) and centered micro-boxes (eye-as-face).
+	Those are miss / face_none, not too_far. Large close-up faces that clip
+	the border still pass.
 	"""
 	if face is None or frame_w <= 0 or frame_h <= 0:
 		return False
@@ -253,7 +257,10 @@ def face_bbox_plausible(face, frame_w, frame_h):
 		top = int(face.top())
 		right = int(face.right())
 		bottom = int(face.bottom())
+		box_w = int(face.width())
 	except Exception:
+		return False
+	if box_w < int(MIN_FACE_WIDTH_FRAC * int(frame_w)):
 		return False
 	area = face_bbox_area(face)
 	frame_area = int(frame_w) * int(frame_h)

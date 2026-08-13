@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChildProcessRegistry } from "../../../electron/infrastructure/process/child-process-registry";
 import { BlinkDetectorSidecar } from "../../../electron/infrastructure/sidecar/blink-detector-sidecar";
-import { SIDECAR_STATUS } from "../../../electron/infrastructure/sidecar/protocol";
+import { SIDECAR_STATUS, isBenignSidecarStderr } from "../../../electron/infrastructure/sidecar/protocol";
 import { DEFAULT_PREFERENCES } from "../../../shared/preferences";
 
 type FakeChild = EventEmitter & {
@@ -137,5 +137,84 @@ describe("BlinkDetectorSidecar preview restore", () => {
 		);
 		expect(sidecar.isCameraReady).toBe(true);
 		expect(parseWrites(stdinChunks)).toEqual([]);
+	});
+});
+
+describe("BlinkDetectorSidecar EAR calibration samples", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	function createSidecar() {
+		const { child } = createFakeChild();
+		const sidecar = new BlinkDetectorSidecar(
+			{
+				root: "/app",
+				publicDir: "/app/public",
+				preload: "/app/preload.js",
+			} as never,
+			false,
+			new ChildProcessRegistry(),
+			{ ...DEFAULT_PREFERENCES },
+			{
+				onBlink: vi.fn(),
+				onFaceData: vi.fn(),
+				onVideoStream: vi.fn(),
+				onError: vi.fn(),
+				onCameraReady: vi.fn(),
+				shouldRetryCamera: () => true,
+			},
+		);
+		attachRunningProcess(sidecar, child);
+		return { sidecar, child };
+	}
+
+	function emitFaceData(
+		child: FakeChild,
+		faceData: Record<string, unknown>,
+	): void {
+		child.stdout.emit(
+			"data",
+			Buffer.from(`${JSON.stringify({ faceData })}\n`),
+		);
+	}
+
+	it("samples Phase A EAR only when faceStatus is ok", () => {
+		const { sidecar, child } = createSidecar();
+		expect(sidecar.startEarCalibration()).toBe(true);
+		const internal = sidecar as unknown as { calibrationSamples: number[] };
+
+		emitFaceData(child, {
+			faceDetected: true,
+			faceStatus: "too_far",
+			ear: 0.214,
+		});
+		emitFaceData(child, {
+			faceDetected: true,
+			faceStatus: "none",
+			ear: 0.2,
+		});
+		emitFaceData(child, {
+			faceDetected: true,
+			faceStatus: "ok",
+			ear: 0.28,
+		});
+
+		expect(internal.calibrationSamples).toEqual([0.28]);
+	});
+});
+
+describe("isBenignSidecarStderr", () => {
+	it("ignores OpenCV YuNet graph-engine target warn", () => {
+		expect(
+			isBenignSidecarStderr(
+				"[ WARN:0@0.239] global net_impl_backend.cpp:345 cv::dnn::dnn5_v20260605::Net::Impl::setPreferableTarget Targets are not supported by the new graph engine for now",
+			),
+		).toBe(true);
+		expect(isBenignSidecarStderr("camera open failed")).toBe(false);
 	});
 });

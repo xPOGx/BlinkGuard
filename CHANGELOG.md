@@ -4,6 +4,10 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+### Fixed
+
+- Camera: stop locking onto an eye/eyebrow as a face (relative min bbox); YuNet locates, HOG-refine is the 68-pt crop (CNN rectangle never goes to the predictor); skip HOG-refine while the YuNet box is still; Phase A ignores non-ok faces; ignore OpenCV DNN graph-engine stderr
+
 ## [2.7.0] - 2026-08-12
 
 ### Added

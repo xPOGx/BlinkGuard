@@ -9,6 +9,7 @@ from .blink_detection import (
 )
 from .pose import (
 	DEFAULT_POSE_STRICTNESS,
+	MIN_FACE_WIDTH_FRAC,
 	estimate_head_pose_heuristic,
 	evaluate_pose_gate,
 	face_bbox_area,
@@ -22,6 +23,7 @@ __all__ = [
 	"BlinkDetectionState",
 	"DEFAULT_POSE_STRICTNESS",
 	"MIN_FACE_AREA_PX",
+	"MIN_FACE_WIDTH_FRAC",
 	"MIN_INTEROCULAR_PX",
 	"estimate_head_pose_heuristic",
 	"evaluate_pose_gate",

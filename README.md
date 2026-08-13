@@ -8,7 +8,7 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 
 - **Blink reminders** — start/stop tracking from the control panel; interval slider from 1–10 seconds
 - **Timer mode** — show a reminder popup on a fixed interval
-- **Camera blink detection (optional)** — OpenCV/dlib sidecar; ROI gates, personal blink calibration, pose/per-eye vetoes, and adaptive EAR; reminds you only when you haven’t blinked for the set interval
+- **Camera blink detection (optional)** — OpenCV YuNet + dlib sidecar; ROI gates, personal blink calibration, pose/per-eye vetoes, and adaptive EAR; reminds you only when you haven’t blinked for the set interval
 - **MGD mode** — when camera detection is on, show timed popups even while blinking; the popup still closes when a blink is detected
 - **Camera visualization** — optional live preview (up to Ultra 30 FPS) with face/eye landmarks and EAR status
 - **Eye exercise reminders** — can run independently of blink reminders; configurable interval (5–60 minutes); Skip / configurable Snooze; auto-close after 30 seconds
@@ -92,7 +92,7 @@ See `AGENTS.md` for Cursor Cloud–specific notes.
 
 ### Optional camera sidecar
 
-Only needed if you want OpenCV/dlib blink detection or the live camera preview. You need a webcam, [Git LFS](https://git-lfs.com/) for the landmarks model, and a Python toolchain that can install `dlib`.
+Only needed if you want OpenCV/dlib blink detection or the live camera preview. You need a webcam, [Git LFS](https://git-lfs.com/) for the landmarks model, the committed YuNet ONNX (`electron/assets/models/face_detection_yunet_2023mar.onnx`), and a Python toolchain that can install `dlib`.
 
 **Python version:** use **3.11** (same as CI). Very new releases (e.g. **3.14**) often have no prebuilt `dlib` wheel on Windows; `pip` then tries to compile from source and fails without a C++ toolchain.
 

@@ -30,7 +30,7 @@ import type {
 import type { BlinkDetectorDebugLogger } from "../logging/blink-detector-debug-logger";
 import type { AppPaths } from "../paths/app-paths";
 import type { ChildProcessRegistry } from "../process/child-process-registry";
-import { NdjsonBuffer, SIDECAR_STATUS, encodeSidecarMessage } from "./protocol";
+import { NdjsonBuffer, SIDECAR_STATUS, encodeSidecarMessage, isBenignSidecarStderr } from "./protocol";
 
 interface SidecarCallbacks {
 	onBlink: (data: { ear?: number; time?: number }) => void;
@@ -47,6 +47,7 @@ interface SidecarCallbacks {
 
 interface FaceDataSample {
 	faceDetected?: boolean;
+	faceStatus?: string;
 	ear?: number;
 	blink?: boolean;
 	blink_phase?: string;
@@ -166,7 +167,9 @@ export class BlinkDetectorSidecar {
 		// OpenCV/MSMF often prints [WARN] to stderr while capture still works —
 		// never promote raw stderr to the settings error banner (NDJSON `error` is enough).
 		child.stderr.on("data", (data: Buffer) => {
-			console.error("Blink detector stderr:", data.toString());
+			const text = data.toString();
+			if (isBenignSidecarStderr(text)) return;
+			console.error("Blink detector stderr:", text);
 		});
 	}
 
@@ -454,6 +457,7 @@ export class BlinkDetectorSidecar {
 		this.calibrationFaceDetected = Boolean(data.faceDetected);
 		if (this.calibrationPhase !== "open_eye") return;
 		if (!data.faceDetected) return;
+		if (data.faceStatus !== "ok") return;
 		if (data.blink) return;
 		if (data.blink_phase === "start" || data.blink_phase === "complete") {
 			return;

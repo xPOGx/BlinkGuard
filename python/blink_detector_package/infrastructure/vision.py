@@ -32,6 +32,22 @@ HOG_DETECT_CLAHE_TILE = (8, 8)
 # retry via CLAHE/upsample — this only drops low-confidence hits.
 HOG_MIN_SCORE = 0.30
 
+# YuNet locates a real face (anti eye-as-face / side-light miss).
+# shape_predictor_68 is trained on dlib HOG boxes — never feed the padded
+# CNN rectangle to 68-pt. After a YuNet hit, HOG-refine inside that ROI
+# and use the HOG rect. YuNet+HOG-miss is a miss, not a CNN crop.
+# Score in models.load_yunet.
+YUNET_PAD_X = 0.05
+YUNET_PAD_Y = 0.05
+HOG_REFINE_PAD = 0.35
+HOG_REFINE_MIN_IOU = 0.25
+# Box hold swallows detector px noise so the HOG crop (and thus 68-pt)
+# does not jitter. Keep tight so look-down can still move the crop.
+FACE_BOX_HOLD_IOU = 0.93
+FACE_BOX_HOLD_CENTER_PX = 2.5
+FACE_BOX_EMA_NEW = 0.25
+FACE_BOX_SNAP_IOU = 0.45
+
 # Stage 3.1: upscale padded face ROI before shape_predictor for sub-pixel EAR.
 # 1 = disabled (integer path); 2 = default; 3 only if FPS budget allows.
 LANDMARK_ROI_UPSCALE = 2
@@ -172,6 +188,13 @@ class PreallocatedBuffers:
 		self._clahe = None
 		self._hog_detect_clahe = None
 		self._upscale_patch = None
+		self.last_yunet_rect = None
+		self.last_refine_kind = None
+		self.yunet_input_size = None
+
+	def clear_landmark_track(self):
+		"""Kept for detector face-loss calls; landmarks are not temporally held."""
+		return
 
 	def clahe(self):
 		if self._clahe is None:
@@ -326,6 +349,296 @@ def run_hog_face_detect(detector, gray, select_largest, buffers=None):
 	return None, None
 
 
+def _offset_rect(rect, dx, dy):
+	return dlib.rectangle(
+		int(rect.left() + dx),
+		int(rect.top() + dy),
+		int(rect.right() + dx),
+		int(rect.bottom() + dy),
+	)
+
+
+def hog_refine_yunet_box(detector, gray, yunet_rect, select_largest, buffers=None):
+	"""HOG inside an expanded YuNet ROI — native dlib crop for 68-pt."""
+	if detector is None or gray is None or yunet_rect is None:
+		return None, None
+	try:
+		height, width = gray.shape[:2]
+	except (TypeError, AttributeError, ValueError):
+		return None, None
+	box = pad_xywh_to_box(
+		yunet_rect.left(),
+		yunet_rect.top(),
+		yunet_rect.width(),
+		yunet_rect.height(),
+		width,
+		height,
+		pad_x=HOG_REFINE_PAD,
+		pad_y=HOG_REFINE_PAD,
+	)
+	if box is None:
+		return None, None
+	x0, y0, x1, y1 = box
+	roi = gray[y0:y1, x0:x1]
+	if roi.size < 64:
+		return None, None
+	yunet_box = _ltrb(yunet_rect)
+
+	def _pick(roi_gray, upsample):
+		faces = hog_detect_rects(detector, roi_gray, upsample)
+		mapped = [_offset_rect(face, x0, y0) for face in faces]
+		overlapping = [
+			face
+			for face in mapped
+			if box_iou(_ltrb(face), yunet_box) >= HOG_REFINE_MIN_IOU
+		]
+		return _select_plausible_face(overlapping, gray, select_largest)
+
+	face = _pick(roi, 0)
+	if face is not None:
+		return face, None
+	if buffers is not None:
+		try:
+			enhanced = buffers.hog_detect_clahe().apply(roi)
+		except Exception:
+			enhanced = None
+		if enhanced is not None:
+			face = _pick(enhanced, 0)
+			if face is not None:
+				return face, "clahe"
+	# No upsample=1 here: YuNet already sized a real face. Pyramid on the
+	# ROI was extra cost and the old eye-as-face vector. Full-frame
+	# upsample stays on the YuNet-miss path only.
+	return None, None
+
+
+def pad_xywh_to_box(x, y, w, h, frame_w, frame_h, pad_x=YUNET_PAD_X, pad_y=YUNET_PAD_Y):
+	"""Expand a detection box and clamp to the frame. Returns (l, t, r, b)."""
+	try:
+		width = int(frame_w)
+		height = int(frame_h)
+		box_w = float(w)
+		box_h = float(h)
+		px = box_w * float(pad_x)
+		py = box_h * float(pad_y)
+		left = int(round(float(x) - px))
+		top = int(round(float(y) - py))
+		right = int(round(float(x) + box_w + px))
+		bottom = int(round(float(y) + box_h + py))
+	except (TypeError, ValueError):
+		return None
+	if width < 2 or height < 2:
+		return None
+	left = max(0, min(left, width - 2))
+	top = max(0, min(top, height - 2))
+	right = max(left + 1, min(right, width - 1))
+	bottom = max(top + 1, min(bottom, height - 1))
+	return left, top, right, bottom
+
+
+def yunet_row_to_rect(row, frame_w, frame_h):
+	"""dlib.rectangle from one FaceDetectorYN row (xywh + small pad)."""
+	try:
+		x, y, w, h = row[0], row[1], row[2], row[3]
+	except (TypeError, ValueError, IndexError):
+		return None
+	box = pad_xywh_to_box(x, y, w, h, frame_w, frame_h)
+	return _rect_from_box(box)
+
+
+def _rect_from_box(box):
+	if box is None:
+		return None
+	left, top, right, bottom = box
+	return dlib.rectangle(int(left), int(top), int(right), int(bottom))
+
+
+def _ltrb(face):
+	try:
+		return (
+			float(face.left()),
+			float(face.top()),
+			float(face.right()),
+			float(face.bottom()),
+		)
+	except (TypeError, ValueError, AttributeError):
+		return None
+
+
+def box_iou(a, b):
+	"""IoU of two (l, t, r, b) boxes. 0 if either is invalid."""
+	if a is None or b is None:
+		return 0.0
+	al, at, ar, ab = a
+	bl, bt, br, bb = b
+	iw = min(ar, br) - max(al, bl)
+	ih = min(ab, bb) - max(at, bt)
+	if iw <= 0 or ih <= 0:
+		return 0.0
+	inter = iw * ih
+	area_a = max(0.0, ar - al) * max(0.0, ab - at)
+	area_b = max(0.0, br - bl) * max(0.0, bb - bt)
+	union = area_a + area_b - inter
+	if union <= 0:
+		return 0.0
+	return inter / union
+
+
+def _rects_nearly_same(prev, new):
+	"""True when two boxes are within the face-box hold (jitter, not a move)."""
+	if prev is None or new is None:
+		return False
+	prev_box = _ltrb(prev)
+	new_box = _ltrb(new)
+	if prev_box is None or new_box is None:
+		return False
+	iou = box_iou(prev_box, new_box)
+	pcx = (prev_box[0] + prev_box[2]) * 0.5
+	pcy = (prev_box[1] + prev_box[3]) * 0.5
+	ncx = (new_box[0] + new_box[2]) * 0.5
+	ncy = (new_box[1] + new_box[3]) * 0.5
+	center_dist = ((ncx - pcx) ** 2 + (ncy - pcy) ** 2) ** 0.5
+	return iou >= FACE_BOX_HOLD_IOU and center_dist <= FACE_BOX_HOLD_CENTER_PX
+
+
+def stabilize_face_rect(prev, new):
+	"""
+	Hold/EMA a detection box so detector pixel jitter does not shake EAR.
+
+	Nearly-identical boxes keep `prev` (integer-stable for the predictor).
+	Moderate overlap EMA-blends. Low IoU snaps to `new` (re-acquire / turn).
+	"""
+	if new is None:
+		return None
+	if prev is None:
+		return new
+	if _rects_nearly_same(prev, new):
+		return prev
+	prev_box = _ltrb(prev)
+	new_box = _ltrb(new)
+	if prev_box is None or new_box is None:
+		return new
+	iou = box_iou(prev_box, new_box)
+	if iou < FACE_BOX_SNAP_IOU:
+		return new
+	alpha = FACE_BOX_EMA_NEW
+	blended = tuple(
+		(1.0 - alpha) * p + alpha * n for p, n in zip(prev_box, new_box)
+	)
+	rect = _rect_from_box(blended)
+	return rect if rect is not None else new
+
+
+def yunet_faces_to_hits(faces, frame_w, frame_h):
+	"""List of dlib.rectangles from FaceDetectorYN rows."""
+	if faces is None:
+		return []
+	try:
+		rows = list(faces)
+	except TypeError:
+		return []
+	rects = []
+	for row in rows:
+		rect = yunet_row_to_rect(row, frame_w, frame_h)
+		if rect is not None:
+			rects.append(rect)
+	return rects
+
+
+def yunet_faces_to_rects(faces, frame_w, frame_h):
+	"""Convert FaceDetectorYN rows to lightly padded rectangles."""
+	return yunet_faces_to_hits(faces, frame_w, frame_h)
+
+
+def run_yunet_face_detect(yunet, bgr, select_largest, buffers=None):
+	"""
+	YuNet on BGR. Returns (face_or_None, input_size_or_None).
+
+	input_size is (width, height) last passed to setInputSize — tests assert it.
+	"""
+	if yunet is None or bgr is None:
+		return None, None
+	try:
+		height, width = bgr.shape[:2]
+	except (TypeError, AttributeError, ValueError):
+		return None, None
+	if width < 2 or height < 2:
+		return None, None
+	size = (int(width), int(height))
+	try:
+		prev_size = getattr(buffers, "yunet_input_size", None) if buffers is not None else None
+		if prev_size != size:
+			yunet.setInputSize(size)
+			if buffers is not None:
+				buffers.yunet_input_size = size
+		_retval, faces = yunet.detect(bgr)
+	except Exception:
+		return None, size
+	rects = yunet_faces_to_hits(faces, width, height)
+	face = _select_plausible_face(rects, bgr, select_largest)
+	return face, size
+
+
+def run_face_detect(
+	detector,
+	gray,
+	select_largest,
+	buffers=None,
+	bgr=None,
+	yunet=None,
+	prev_face=None,
+):
+	"""
+	YuNet locates; HOG-refine supplies the 68-pt crop.
+
+	If YuNet hits, HOG runs inside that ROI unless the YuNet box has not
+	moved since the last successful refine (reuse prev_face). Only the
+	HOG rect goes to the predictor — never the CNN rectangle.
+	YuNet+HOG-miss is a miss (hold last HOG crop upstream); do not fall
+	through to full-frame HOG (eye-as-face). If YuNet is missing/misses,
+	full-frame HOG miss chain (size gate still applies).
+	Returns (face_or_None, kind) where kind is
+	"hog"|"clahe"|"upsample"|None.
+	"""
+	if yunet is not None and bgr is not None:
+		yunet_face, _size = run_yunet_face_detect(
+			yunet, bgr, select_largest, buffers=buffers
+		)
+		if yunet_face is not None:
+			last_yunet = (
+				getattr(buffers, "last_yunet_rect", None)
+				if buffers is not None
+				else None
+			)
+			if prev_face is not None and _rects_nearly_same(last_yunet, yunet_face):
+				held_kind = getattr(buffers, "last_refine_kind", None) or "hog"
+				return prev_face, held_kind
+			hog_face, hog_kind = hog_refine_yunet_box(
+				detector,
+				gray,
+				yunet_face,
+				select_largest,
+				buffers,
+			)
+			if buffers is not None:
+				if hog_face is not None:
+					buffers.last_yunet_rect = yunet_face
+					buffers.last_refine_kind = hog_kind or "hog"
+				else:
+					buffers.last_yunet_rect = None
+					buffers.last_refine_kind = None
+			if hog_face is not None:
+				return hog_face, hog_kind or "hog"
+			return None, None
+		if buffers is not None:
+			buffers.last_yunet_rect = None
+			buffers.last_refine_kind = None
+	face, kind = run_hog_face_detect(detector, gray, select_largest, buffers)
+	if face is not None and kind is None:
+		return face, "hog"
+	return face, kind
+
+
 def prepare_predictor_gray(
 	gray,
 	face,
@@ -474,12 +787,11 @@ def get_face_landmarks(
 	upscale=None,
 ):
 	"""Fill 68-pt buffer plus eye slices; used for EAR + pose gates."""
+	del prev_left_eye, prev_right_eye
 	gray_pred, _count = prepare_predictor_gray(
 		gray,
 		face,
 		buffers,
-		prev_left_eye=prev_left_eye,
-		prev_right_eye=prev_right_eye,
 	)
 	scale = get_landmark_roi_upscale() if upscale is None else max(1, int(upscale))
 	shape, x0, y0, used_scale = _predict_shape_on_gray(

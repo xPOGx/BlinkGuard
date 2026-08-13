@@ -46,7 +46,7 @@ from blink_detector_package.infrastructure.vision import (  # noqa: E402
 	eye_intensity_aperture,
 	get_face_landmarks,
 	get_landmark_roi_upscale,
-	run_hog_face_detect,
+	run_face_detect,
 	set_landmark_roi_upscale,
 )
 from trace_io import (  # noqa: E402
@@ -106,12 +106,12 @@ def reprocess_video(
 	face_detect_interval: int = 1,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
 	"""
-	Run HOG + shape_predictor over avi frames; return (header, frames).
+	Run YuNet/HOG + shape_predictor over avi frames; return (header, frames).
 
 	When timing_frames from the original NDJSON are provided, keep their `t`
 	and `video_index` so labels still match.
 	"""
-	detector, predictor, predictor_path = load_models()
+	detector, predictor, predictor_path, yunet = load_models()
 	if detector is None or predictor is None:
 		raise RuntimeError(f"Failed to load models (predictor={predictor_path})")
 
@@ -168,6 +168,7 @@ def reprocess_video(
 					bgr,
 					detector=detector,
 					predictor=predictor,
+					yunet=yunet,
 					buffers=buffers,
 					face_holder=[face],
 					frame_i=cap_index,
@@ -195,6 +196,7 @@ def reprocess_video(
 					bgr,
 					detector=detector,
 					predictor=predictor,
+					yunet=yunet,
 					buffers=buffers,
 					face_holder=[face],
 					frame_i=index,
@@ -234,6 +236,7 @@ def _process_bgr(
 	*,
 	detector,
 	predictor,
+	yunet,
 	buffers: PreallocatedBuffers,
 	face_holder: list,
 	frame_i: int,
@@ -245,8 +248,14 @@ def _process_bgr(
 	gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
 	face = face_holder[0]
 	if frame_i % interval == 0 or face is None:
-		face, _retry = run_hog_face_detect(
-			detector, gray, select_largest_face, buffers=buffers
+		face, _retry = run_face_detect(
+			detector,
+			gray,
+			select_largest_face,
+			buffers=buffers,
+			bgr=bgr,
+			yunet=yunet,
+			prev_face=face,
 		)
 
 	row: dict[str, Any] = {

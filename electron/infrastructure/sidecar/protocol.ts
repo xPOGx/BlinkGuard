@@ -9,6 +9,11 @@ export function encodeSidecarMessage(message: object): string {
 	return `${JSON.stringify(message)}\n`;
 }
 
+/** OpenCV DNN/MSMF noise — capture still works; do not treat as a sidecar error. */
+export function isBenignSidecarStderr(text: string): boolean {
+	return /setPreferableTarget|new graph engine for now/i.test(text);
+}
+
 export class NdjsonBuffer {
 	private buffer = "";
 

@@ -40,7 +40,8 @@ from blink_detector_package.infrastructure.vision import (
 	encode_frame,
 	eye_intensity_aperture,
 	get_face_landmarks,
-	run_hog_face_detect,
+	run_face_detect,
+	stabilize_face_rect,
 )
 
 NO_FACE_DATA = json.dumps(
@@ -217,6 +218,9 @@ class BlinkDetectorApplication:
 		self._last_skip_debug_phase = None
 		self._last_near_miss_debug_time = 0.0
 		self._last_hog_retry_log_time = 0.0
+		self._last_face_detect = None
+		self._yunet = None
+		self._vision_buffers = None
 		# Preview follows target_fps (Ultra=30); encode stays light via size/q.
 		self._last_video_emit = 0.0
 		self._video_min_interval = 1.0 / max(8, int(self.camera.target_fps or 10))
@@ -309,6 +313,7 @@ class BlinkDetectorApplication:
 		streak_ms = int((current_time - self._no_face_streak_start) * 1000)
 		ok = self.camera.recover_from_no_face(self.detection.reset, streak_ms)
 		self._cached_face = None
+		self._clear_landmark_track()
 		self._reset_capture_health()
 		return ok
 
@@ -494,6 +499,7 @@ class BlinkDetectorApplication:
 				self.camera.stop(reason="stop_camera")
 				self.send_video = False
 				self._cached_face = None
+				self._clear_landmark_track()
 				self._face_miss_streak = 0
 				self._reset_capture_health()
 				self.transport.send({"status": "Camera stopped"})
@@ -511,6 +517,7 @@ class BlinkDetectorApplication:
 			if want_start:
 				if self.camera.start(self.detection.reset):
 					self._cached_face = None
+					self._clear_landmark_track()
 					self._face_miss_streak = 0
 					self._frames_since_face_detect = 0
 					self._reset_capture_health()
@@ -765,36 +772,49 @@ class BlinkDetectorApplication:
 		gate_fps = max(8.0, min(configured, measured))
 		self.detection.set_target_fps(gate_fps)
 
-	def _resolve_face(self, detector, gray, buffers=None):
-		"""Run HOG face detect on interval; otherwise reuse largest bbox.
+	def _clear_landmark_track(self):
+		buf = getattr(self, "_vision_buffers", None)
+		if buf is not None:
+			buf.clear_landmark_track()
 
-		While a blink candidate is active, re-detect every frame so a stale
-		bbox (performance face_detect_interval>1) cannot poison mid-blink EAR.
-		After a hard face loss, force every-frame HOG for FACE_REACQUIRE_FRAMES
-		so performance presets re-lock quickly. Do not force every-frame detect
-		merely because preview is on — HOG flicker while talking showed
-		face-missing UI (POG 2026-08-09). Brief miss hold keeps last bbox.
+	def _resolve_face(self, detector, gray, buffers=None, frame=None):
+		"""Run face detect on interval; otherwise reuse largest bbox.
 
-		On HOG miss: mild full-frame CLAHE retry, then upsample=1 (cost only
-		when raw upsample=0 fails — side-light / Fifine face_none).
+		YuNet locates a real face; HOG-refine inside that ROI supplies the
+		crop shape_predictor was trained on. Never feed the CNN box to 68-pt.
+		Skip HOG-refine while the YuNet box is still (reuse last HOG crop).
+		Hold/EMA tiny box jitter so the HOG crop (and 68-pt) stay still.
+		After a hard face loss, force every-frame detect for
+		FACE_REACQUIRE_FRAMES. Do not force every-frame detect during an
+		in-progress blink. Brief miss hold keeps last bbox.
+
+		Micro-boxes (eye-as-face, ~44px on 480) fail face_bbox_plausible and
+		count as miss, not too_far.
 		"""
 		interval = self.face_detect_interval
 		should_detect = (
 			self._cached_face is None
 			or self._frames_since_face_detect >= interval
-			or self.detection.blink_in_progress
 			or self._face_reacquire_frames > 0
 		)
 		if should_detect:
-			face, retry_kind = run_hog_face_detect(
+			face, retry_kind = run_face_detect(
 				detector,
 				gray,
 				select_largest_face,
 				buffers,
+				bgr=frame,
+				yunet=self._yunet,
+				prev_face=self._cached_face,
 			)
 			if face is not None:
-				if retry_kind:
+				self._last_face_detect = retry_kind or "hog"
+				if (
+					retry_kind in ("clahe", "upsample")
+					and face is not self._cached_face
+				):
 					self._maybe_log_hog_retry(retry_kind)
+				face = stabilize_face_rect(self._cached_face, face)
 				self._cached_face = face
 				self._face_miss_streak = 0
 				self._frames_since_face_detect = 1
@@ -809,6 +829,8 @@ class BlinkDetectorApplication:
 				self._frames_since_face_detect = 1
 				return self._cached_face
 			self._cached_face = None
+			self._last_face_detect = None
+			self._clear_landmark_track()
 			self._face_reacquire_frames = FACE_REACQUIRE_FRAMES
 			self._frames_since_face_detect = 1
 			return None
@@ -825,7 +847,7 @@ class BlinkDetectorApplication:
 			return
 		self._last_hog_retry_log_time = now
 		self.transport.send(
-			{"debug": f"HOG face recovered via retry hog_retry={retry_kind}"}
+			{"debug": f"Face recovered via retry face_detect={retry_kind}"}
 		)
 
 	def _face_quality_ok(self, face, landmarks, frame_w=0, frame_h=0):
@@ -840,6 +862,7 @@ class BlinkDetectorApplication:
 	def _drop_junk_hog_face(self, face_data, current_time):
 		"""Clutter HOG hit — no overlay, same as a hard miss."""
 		self._cached_face = None
+		self._clear_landmark_track()
 		self._face_miss_streak = 0
 		self._quality_miss_streak = 0
 		self._face_reacquire_frames = FACE_REACQUIRE_FRAMES
@@ -1080,6 +1103,7 @@ class BlinkDetectorApplication:
 			"face_detect_interval": int(self.face_detect_interval),
 			"processing_resolution": list(self.camera.processing_resolution),
 			"detector_backend": "dlib",
+			"face_detect": self._last_face_detect,
 			"clahe": self._last_clahe_roi_count > 0,
 			"clahe_roi_count": int(self._last_clahe_roi_count),
 		}
@@ -1136,6 +1160,7 @@ class BlinkDetectorApplication:
 			f"clfP={clf_s} veto={payload.get('clf_veto')}, "
 			f"strict={payload['pose_strictness']}, "
 			f"backend={payload['detector_backend']}, "
+			f"faceDetect={payload.get('face_detect')}, "
 			f"cdLeft={payload['cooldown_remaining']:.3f}s, "
 			f"fps={payload['target_fps']}, "
 			f"fInt={payload['face_detect_interval']}, "
@@ -1327,7 +1352,8 @@ class BlinkDetectorApplication:
 		self.transport.send(
 			{"status": "Starting blink detector in standby mode..."}
 		)
-		detector, predictor, predictor_path = load_models()
+		detector, predictor, predictor_path, yunet = load_models()
+		self._yunet = yunet
 		if detector is None or predictor is None:
 			self.transport.send(
 				{
@@ -1340,10 +1366,20 @@ class BlinkDetectorApplication:
 			sys.exit(1)
 
 		buffers = PreallocatedBuffers()
+		self._vision_buffers = buffers
 		self.transport.send(
 			{
 				"status": (
 					"Models loaded successfully, ready for camera activation"
+				)
+			}
+		)
+		self.transport.send(
+			{
+				"debug": (
+					"Face detect: yunet+hog"
+					if self._yunet is not None
+					else "Face detect: hog-only (YuNet ONNX missing)"
 				)
 			}
 		)
@@ -1444,6 +1480,7 @@ class BlinkDetectorApplication:
 							luma,
 						)
 						self._cached_face = None
+						self._clear_landmark_track()
 						self._reset_capture_health()
 						if self._last_processed_frame_time > 0:
 							self._update_measured_gate_fps(
@@ -1454,6 +1491,7 @@ class BlinkDetectorApplication:
 						continue
 
 					self._cached_face = None
+					self._clear_landmark_track()
 					had_candidate = self.detection.cancel_on_face_lost(
 						current_time
 					)
@@ -1492,9 +1530,9 @@ class BlinkDetectorApplication:
 				trace_right_ap = None
 
 				gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-				# HOG: raw first; miss-only CLAHE/upsample retry inside _resolve_face.
+				# YuNet locates; HOG-refine is the 68-pt crop.
 				# Landmark CLAHE stays parked (CLAHE_ENABLED / L2-A).
-				face = self._resolve_face(detector, gray, buffers)
+				face = self._resolve_face(detector, gray, buffers, frame=frame)
 				if face is not None:
 					landmarks, left_eye, right_eye = get_face_landmarks(
 						predictor,
@@ -1523,6 +1561,14 @@ class BlinkDetectorApplication:
 								face_data, current_time
 							)
 						else:
+							self._fill_eye_landmarks_ui(
+								face_data,
+								left_eye,
+								right_eye,
+								buffers,
+								frame_width,
+								frame_height,
+							)
 							self._emit_soft_face_quality_skip(
 								face_data,
 								face,
@@ -1604,6 +1650,7 @@ class BlinkDetectorApplication:
 							)
 					else:
 						self._cached_face = None
+						self._clear_landmark_track()
 						self._face_miss_streak = 0
 						self._quality_miss_streak = 0
 						self._face_reacquire_frames = FACE_REACQUIRE_FRAMES

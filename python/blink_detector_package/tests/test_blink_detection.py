@@ -161,6 +161,17 @@ class PoseTests(unittest.TestCase):
 		face = _FakeFace(140, 160, left=170, top=80)
 		self.assertTrue(face_bbox_plausible(face, 480, 360))
 
+	def test_centered_eye_micro_box_rejected(self):
+		"""~44px HOG hit on an eye is miss, not too_far (Fifine 2.7.0)."""
+		eye = _FakeFace(44, 44, left=200, top=140)
+		self.assertFalse(face_bbox_plausible(eye, 480, 360))
+		zip_eye = _FakeFace(53, 53, left=180, top=120)
+		self.assertFalse(face_bbox_plausible(zip_eye, 480, 360))
+
+	def test_relative_min_width_allows_zip_8190_candidate(self):
+		face = _FakeFace(90, 91, left=170, top=80)
+		self.assertTrue(face_bbox_plausible(face, 480, 360))
+
 	def test_closeup_clipping_border_still_plausible(self):
 		"""Filled-frame close-up may touch edges; area fraction saves it."""
 		close = _FakeFace(400, 320, left=0, top=0)
