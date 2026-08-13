@@ -4,9 +4,17 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-08-13
+
 ### Fixed
 
-- Camera: stop locking onto an eye/eyebrow as a face (relative min bbox); YuNet locates, HOG-refine is the 68-pt crop (CNN rectangle never goes to the predictor); skip HOG-refine while the YuNet box is still; Phase A ignores non-ok faces; ignore OpenCV DNN graph-engine stderr
+- Camera: YuNet locates faces; HOG boxes feed 68-pt landmarks (no CNN crop to predictor); relative min bbox against eye/eyebrow false locks; skip HOG-refine while YuNet box is still; Phase A ignores non-ok faces; ignore OpenCV DNN graph-engine stderr
+- Camera: accept native streams and stop idle preview capture
+- CI: repair ProcessCleanup mocks for tsc; retry Windows shape-predictor download with curl
+
+### Changed
+
+- Docs: macOS Gatekeeper quarantine workaround in README
 
 ## [2.7.0] - 2026-08-12
 
