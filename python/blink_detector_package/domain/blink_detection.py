@@ -72,6 +72,11 @@ BILATERAL_MAX_SPREAD = 0.95
 # Stage 7: OCEC prob_open confirm (1=open, 0=closed). Relative drop vs live
 # open; missing samples skip (legacy NDJSON). Do not retune with LOOK_DOWN_*.
 OCEC_CONFIRM_MIN_DROP = 0.35
+# Short+shallow opening kill / no peak-waive. The 2026-08-12 down-left 1 Hz
+# storm was yaw≈1.1; CLASSIFIER_SIDE_YAW_WAIVE (0.35) is the crop/veto band
+# and was too broad — chat-bottom often lands |yaw| 0.35–0.80
+# (POG 2026-08-14 reject_opening FN).
+SIDE_GLANCE_OPENING_KILL_YAW = 0.80
 
 # EMA for session resting pitch (webcam-on-top bias compensation).
 RESTING_PITCH_ALPHA = 0.08
@@ -1750,10 +1755,14 @@ class BlinkDetectionState:
 					self.peak_opening_velocity >= opening_floor
 					or self.closed_frames >= max(2, MIN_CLOSED_FRAMES + 1)
 				)
-				# Side glance: 34ms landmark jitter has huge fake peak/openV
-				# (POG 2026-08-12 down-left: 5–10 credits/s, drop≈0.20, yaw≈1.1).
-				# Real blinks in this pose are deeper than LOOK_DOWN_SHORT_OPEN_DROP.
-				side_glance = abs(float(gate["yaw"])) >= 0.35
+				# Extreme side glance: 34ms landmark jitter has huge fake
+				# peak/openV (POG 2026-08-12 down-left: 5–10 credits/s,
+				# drop≈0.20, yaw≈1.1). Real blinks in this pose are deeper
+				# than LOOK_DOWN_SHORT_OPEN_DROP. Mild yaw (chat-bottom) must
+				# not use this kill — see SIDE_GLANCE_OPENING_KILL_YAW.
+				side_glance = (
+					abs(float(gate["yaw"])) >= SIDE_GLANCE_OPENING_KILL_YAW
+				)
 				if (
 					side_glance
 					and blink_duration < SHORT_BLINK_DURATION
@@ -1902,10 +1911,10 @@ class BlinkDetectionState:
 								eye_vel_ok = strong_vel >= max(
 									min_velocity, short_min
 								)
-							# Side 34ms one-eye jitter has huge fake peak/openV
-							# (POG 2026-08-12 right monitor: credits every
-							# cooldown, drop≈0.16–0.27). Do not undo the
-							# side-glance short+shallow opening kill.
+							# Extreme-side 34ms one-eye jitter has huge fake
+							# peak/openV (POG 2026-08-12 right monitor: credits
+							# every cooldown, drop≈0.16–0.27). Do not undo the
+							# SIDE_GLANCE_OPENING_KILL_YAW short+shallow kill.
 							side_short_shallow = (
 								side_glance
 								and blink_duration < SHORT_BLINK_DURATION
@@ -1984,6 +1993,20 @@ class BlinkDetectionState:
 				self._confirm_ocec_drop = strong_ocec_drop
 				info_pose["ocec_ok"] = ocec_ok
 				info_pose["ocec_drop"] = strong_ocec_drop
+				# Look-down one-frame abs often lands 0.031–0.034 vs 0.035
+				# (compressed live_open). If OCEC actually saw a close, that
+				# is independent V/closedness — do not skip-waive (drop None)
+				# or side-yaw skip (crop untrusted).
+				if (
+					not opening_ok
+					and ocec_ok
+					and strong_ocec_drop is not None
+					and strong_ocec_drop >= OCEC_CONFIRM_MIN_DROP
+					and abs(float(gate["yaw"] or 0.0))
+					< CLASSIFIER_SIDE_YAW_WAIVE
+				):
+					opening_ok = True
+					waives.append("ocec_opening")
 				gates_ok = (
 					duration_ok
 					and threshold_ok
@@ -2078,6 +2101,19 @@ class BlinkDetectionState:
 
 				if gates_ok:
 					if cooldown_remaining <= 0:
+						# Logistic was fit on EAR-only corpus completes
+						# (mean dur≈0.19, pose_weight≈0). Live frontal with a
+						# real OCEC close scores p≈0.14 < t=0.25 (POG 2026-08-14
+						# 2nd start: 62 reject_classifier, ocec_drop p50=0.95).
+						# Look-down pose_weight hid this; do not veto a confirmed
+						# close. Missing OCEC → keep Stage 4 veto.
+						if (
+							clf_veto
+							and strong_ocec_drop is not None
+							and strong_ocec_drop >= OCEC_CONFIRM_MIN_DROP
+						):
+							clf_veto = False
+							waives.append("ocec_clf")
 						if clf_veto:
 							self._reset_blink_tracking()
 							_arm_await_if_still_closed()

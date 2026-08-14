@@ -13,9 +13,10 @@ from typing import Any
 
 CLASSIFIER_ENABLED = True
 CLASSIFIER_RESCUE = False
-# Same band as FSM side_glance. Logistic learned "yaw = FP" from the
-# Stage-3.4 side-monitor storm and vetoed real side blinks; gates already
-# own that policy (short+yaw kill switch). Still score p for blinkDebug.
+# Crop/veto band (OCEC confirm skip + logistic). Not the FSM short+shallow
+# opening kill (`SIDE_GLANCE_OPENING_KILL_YAW` 0.80). Logistic learned
+# "yaw = FP" from the Stage-3.4 side-monitor storm and vetoed real side
+# blinks; gates already own that policy. Still score p for blinkDebug.
 CLASSIFIER_SIDE_YAW_WAIVE = 0.35
 
 FEATURE_NAMES = (

@@ -10,6 +10,7 @@ from blink_detector_package.domain.blink_detection import (
 	MIN_FACE_AREA_PX,
 	MIN_INTEROCULAR_PX,
 	MIN_OPENING_VELOCITY,
+	SIDE_GLANCE_OPENING_KILL_YAW,
 	BlinkDetectionState,
 	get_adaptive_ear_drop_threshold,
 	merge_eye_drops,
@@ -1137,7 +1138,7 @@ class BlinkDetectionTests(unittest.TestCase):
 		gate = evaluate_pose_gate(
 			pose, "normal", resting_pitch=state.resting_pitch
 		)
-		self.assertGreaterEqual(abs(pose["yaw"]), 0.35)
+		self.assertGreaterEqual(abs(pose["yaw"]), SIDE_GLANCE_OPENING_KILL_YAW)
 		self.assertGreaterEqual(float(gate.get("pose_weight") or 0), 0.5)
 		state.blink_in_progress = True
 		state.blink_start_time = t
@@ -1154,6 +1155,37 @@ class BlinkDetectionTests(unittest.TestCase):
 		credited, info = state.detect(0.26, t, pose=pose)
 		self.assertFalse(credited, msg=info)
 		self.assertEqual(info["phase"], "reject_opening")
+
+	def test_chat_bottom_mild_yaw_one_frame_credits(self):
+		"""Look-down |yaw| 0.35–0.80 must not use the yaw≈1.1 opening kill."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(
+			_frontal_landmarks(yaw_offset=8.0, pitch_shift=-35.0)
+		)
+		state.resting_pitch = pose["pitch"] - 0.20
+		gate = evaluate_pose_gate(
+			pose, "normal", resting_pitch=state.resting_pitch
+		)
+		self.assertGreaterEqual(abs(pose["yaw"]), 0.35)
+		self.assertLess(abs(pose["yaw"]), SIDE_GLANCE_OPENING_KILL_YAW)
+		self.assertGreaterEqual(float(gate.get("pose_weight") or 0), 0.5)
+		state.blink_in_progress = True
+		state.blink_start_time = t
+		state.closed_frames = 1
+		state.peak_closing_velocity = 2.2
+		state.peak_closing_velocity_measured = 2.2
+		state.peak_opening_velocity = 0.0
+		state.max_drop_percentage = 0.20
+		state._candidate_pose_delta = 0.0
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.235)
+		t += 0.05
+		credited, info = state.detect(0.26, t, pose=pose)
+		self.assertTrue(credited, msg=info)
+		self.assertEqual(info["phase"], "complete")
+		self.assertIn("ld_one_frame_peak", info.get("waives") or [])
 
 	def test_side_and_look_down_real_reopen_still_credits(self):
 		"""Side + look-down with a real V-shape still credits."""
@@ -1181,7 +1213,7 @@ class BlinkDetectionTests(unittest.TestCase):
 		state = BlinkDetectionState(target_fps=20)
 		t = _seed_open_eye(state, ear=0.28)
 		pose = estimate_head_pose(_frontal_landmarks(yaw_offset=18.0))
-		self.assertGreaterEqual(abs(pose["yaw"]), 0.35)
+		self.assertGreaterEqual(abs(pose["yaw"]), SIDE_GLANCE_OPENING_KILL_YAW)
 		state.ear_depressed = True
 		state.live_open_ear = 0.22
 		state.current_baseline_ear = 0.28
@@ -1214,7 +1246,7 @@ class BlinkDetectionTests(unittest.TestCase):
 		gate = evaluate_pose_gate(
 			pose, "normal", resting_pitch=state.resting_pitch
 		)
-		self.assertGreaterEqual(abs(pose["yaw"]), 0.35)
+		self.assertGreaterEqual(abs(pose["yaw"]), SIDE_GLANCE_OPENING_KILL_YAW)
 		self.assertGreaterEqual(float(gate.get("pose_weight") or 0), 0.5)
 		state.blink_in_progress = True
 		state.blink_start_time = t
@@ -1954,6 +1986,69 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertTrue(credited_any)
 		self.assertIn("complete", phases)
 
+	def test_ocec_opening_waives_look_down_abs_miss(self):
+		"""LD one-frame abs just under 0.035 + real OCEC close → credit."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.20
+		self.assertLess(abs(pose["yaw"]), 0.35)
+		state.live_open_ear = 0.20
+		state.live_open_ocec = 0.90
+		state.blink_in_progress = True
+		state.blink_start_time = t
+		state.closed_frames = 1
+		state.peak_closing_velocity = 1.2
+		state.peak_closing_velocity_measured = 1.2
+		state.peak_opening_velocity = 0.0
+		state.max_drop_percentage = 0.17
+		state._candidate_pose_delta = 0.0
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.16)
+		t += 0.05
+		credited, info = state.detect(
+			0.19,
+			t,
+			pose=pose,
+			left_ocec=0.08,
+			right_ocec=0.08,
+		)
+		self.assertTrue(credited, msg=info)
+		self.assertEqual(info["phase"], "complete")
+		self.assertIn("ocec_opening", info.get("waives") or [])
+
+	def test_ocec_opening_does_not_waive_when_still_open(self):
+		"""Same abs-miss shape but OCEC stays open → still reject_opening."""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.20
+		state.live_open_ear = 0.20
+		state.live_open_ocec = 0.90
+		state.blink_in_progress = True
+		state.blink_start_time = t
+		state.closed_frames = 1
+		state.peak_closing_velocity = 1.2
+		state.peak_closing_velocity_measured = 1.2
+		state.peak_opening_velocity = 0.0
+		state.max_drop_percentage = 0.17
+		state._candidate_pose_delta = 0.0
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.16)
+		t += 0.05
+		credited, info = state.detect(
+			0.19,
+			t,
+			pose=pose,
+			left_ocec=0.90,
+			right_ocec=0.90,
+		)
+		self.assertFalse(credited, msg=info)
+		self.assertEqual(info["phase"], "reject_opening")
+		self.assertNotIn("ocec_opening", info.get("waives") or [])
+
 	def test_look_down_real_blink_credited(self):
 		state = BlinkDetectionState(target_fps=15)
 		t = _seed_open_eye(state, ear=0.26)
@@ -2182,6 +2277,67 @@ class BlinkDetectionTests(unittest.TestCase):
 			self.assertEqual(info.get("phase"), "reject_classifier")
 			self.assertTrue(info.get("clf_veto"))
 			self.assertAlmostEqual(info.get("clf_p"), 0.01, places=5)
+		finally:
+			bd.classifier_score = original
+
+	def test_ocec_confirm_waives_classifier_veto(self):
+		"""Real OCEC close must not die on reject_classifier (frontal 2nd start)."""
+		from blink_detector_package.domain import blink_detection as bd
+
+		original = bd.classifier_score
+
+		def _always_veto(info, **kwargs):
+			return 0.01, True
+
+		bd.classifier_score = _always_veto
+		try:
+			state = BlinkDetectionState(target_fps=15)
+			t = _seed_open_eye(state, ear=0.28)
+			for _ in range(5):
+				t += 0.1
+				state.detect(
+					0.28,
+					t,
+					left_ear=0.28,
+					right_ear=0.28,
+					left_ocec=0.90,
+					right_ocec=0.90,
+				)
+			steps = (
+				(0.1, 0.16, 0.17, 0.15, 0.55, 0.52),
+				(0.1, 0.10, 0.11, 0.09, 0.20, 0.18),
+				(0.1, 0.08, 0.09, 0.07, 0.08, 0.07),
+				(0.1, 0.07, 0.08, 0.06, 0.05, 0.04),
+				(0.1, 0.22, 0.22, 0.22, 0.70, 0.72),
+				(0.1, 0.28, 0.28, 0.28, 0.90, 0.90),
+				(0.1, 0.28, 0.28, 0.28, 0.90, 0.90),
+			)
+			credited_any = False
+			phases = []
+			credited_info = None
+			last_info = None
+			for step in steps:
+				dt, ear, left, right, loc, roc = step
+				t += dt
+				credited, info = state.detect(
+					ear,
+					t,
+					left_ear=left,
+					right_ear=right,
+					left_ocec=loc,
+					right_ocec=roc,
+				)
+				last_info = info
+				if info:
+					phases.append(info.get("phase"))
+				if credited:
+					credited_any = True
+					credited_info = info
+			self.assertTrue(credited_any, msg=last_info)
+			self.assertIn("complete", phases)
+			self.assertNotIn("reject_classifier", phases)
+			self.assertIn("ocec_clf", (credited_info or {}).get("waives") or [])
+			self.assertFalse((credited_info or {}).get("clf_veto"))
 		finally:
 			bd.classifier_score = original
 

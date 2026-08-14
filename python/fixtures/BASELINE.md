@@ -171,3 +171,7 @@ Corpus floor held: overall F1 ≥ 0.90 and not below Stage 6 **0.929**; `frontal
 
 **Live soak (2026-08-14, ~14 min after rebuild, MSMF):** `lt_0.5s=0` (325 credits, median gap 1.88s). Side `|yaw|≥0.35` credits=9, min gap 1.13s (no 1 Hz). `reject_ocec=135` (112 look-down / 23 frontal); 95 shallow/short, 5 frontal deep — OCEC stayed open on EAR-shaped look-down. Phase0 `start_to_complete` 0.39 is expected (those would-be credits are now `reject_ocec`); do not treat as a gate fail. Flag stays **on**. Do not retune LOOK_DOWN_* / YuNet / open path.
 
+**Live look-down FN (2026-08-14 evening, ~10 min):** `reject_opening` 304 (277 look-down), not `reject_ocec` (42). Chat-bottom median yaw **−0.535**; short+shallow kill was tied to `|yaw|≥0.35` (too broad vs the yaw≈1.1 storm). Fix: `SIDE_GLANCE_OPENING_KILL_YAW=0.80` + `ocec_opening` waive when a real OCEC drop exists in the scored yaw band. Baked corpus after that change: overall F1 **0.929** (floor held; `frontal_calm` 0.976, `chat_look_down` 0.930). Do not disable OCEC for this FN.
+
+**Live frontal `reject_classifier` (2026-08-14, 2nd start ~83s):** 62 veto / 21 complete; `ocec_drop` p50=0.95 (real close) but `clf_p` p50=0.14 < baked `t=0.25`. Look-down `pose_weight` had been lifting p above threshold; frontal does not. Fix: `ocec_clf` waive — do not veto when OCEC confirmed. Missing OCEC keeps Stage 4. Do not retrain weights / lower `t` in the same pass.
+
