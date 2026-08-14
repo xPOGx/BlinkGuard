@@ -225,6 +225,20 @@ export const en: MessageCatalog = {
 	"camera.quality.medium": "Medium",
 	"camera.quality.high": "High",
 	"camera.quality.ultra": "Ultra",
+	"camera.device": "Camera",
+	"camera.deviceDesc":
+		"Pick which camera BlinkGuard should use. Automatic tries each device until one works. Refresh the list after plugging in a camera.",
+	"camera.deviceAria": "Camera device",
+	"camera.deviceAuto": "Automatic",
+	"camera.deviceRefresh": "Refresh",
+	"camera.deviceEmpty":
+		"No named cameras yet. Turn on camera detection or tap Refresh. Automatic still scans available devices.",
+	"camera.deviceUnavailable": "{name} (disconnected)",
+	"camera.deviceMissing":
+		"Saved camera “{name}” was not found. Using another camera this session.",
+	"camera.deviceFallback":
+		"Could not open “{name}”. Using another camera this session.",
+	"camera.dismissDeviceNotice": "Dismiss camera device notice",
 	"camera.calibration": "Calibration",
 	"camera.calibrationDesc":
 		"Two short steps: keep eyes open for about 8 seconds, then look at the camera and blink at least 6 times. This tunes blink thresholds and the credit vote to your face. Calibration can gently adapt when lighting drifts; use Calibrate for a hard reset.",

@@ -296,6 +296,13 @@ describe("PreferencesService", () => {
 
 		service.set("pauseAppRules", []);
 		expect(store.setCounts.get("pauseAppRules") ?? 0).toBe(0);
+
+		service.set("cameraDevice", null);
+		expect(store.setCounts.get("cameraDevice") ?? 0).toBe(0);
+		service.set("cameraDevice", { id: "pnp-1", index: 1, name: "USB" });
+		expect(store.setCounts.get("cameraDevice")).toBe(1);
+		service.set("cameraDevice", { id: "pnp-1", index: 1, name: "USB" });
+		expect(store.setCounts.get("cameraDevice")).toBe(1);
 	});
 
 	it("sanitizes invalid autoStopNoFaceMinutes on hydrate", () => {

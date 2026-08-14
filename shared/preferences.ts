@@ -1,5 +1,9 @@
 import { BLINK_RATE_LOW_MAX } from "./blink-rate";
 import {
+	type CameraDevicePref,
+	sanitizeCameraDevice,
+} from "./camera-devices";
+import {
 	sanitizeClassifierBias,
 	sanitizeClassifierThreshold,
 } from "./classifier-calibration";
@@ -371,6 +375,8 @@ export interface PersistedPreferences {
 	reminderInterval: number;
 	cameraEnabled: boolean;
 	cameraQuality: CameraQuality;
+	/** Preferred capture device; null = Automatic OpenCV index scan. */
+	cameraDevice: CameraDevicePref | null;
 	/** Stop tracking after sustained no-face while camera monitoring. */
 	autoStopNoFaceEnabled: boolean;
 	/** Minutes without a face before auto-stop (1…30). */
@@ -500,6 +506,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	reminderInterval: 3000,
 	cameraEnabled: false,
 	cameraQuality: "medium",
+	cameraDevice: null,
 	autoStopNoFaceEnabled: true,
 	autoStopNoFaceMinutes: AUTO_STOP_NO_FACE_MINUTES_DEFAULT,
 	blinkRateCoachingEnabled: true,
@@ -723,6 +730,7 @@ export function sanitizePersistedPreferences(
 		cameraQuality: isCameraQualityValue(record.cameraQuality)
 			? record.cameraQuality
 			: defaults.cameraQuality,
+		cameraDevice: sanitizeCameraDevice(record.cameraDevice),
 		autoStopNoFaceEnabled: asBoolean(
 			record.autoStopNoFaceEnabled,
 			defaults.autoStopNoFaceEnabled,

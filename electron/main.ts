@@ -40,6 +40,7 @@ import { TrayController } from "./infrastructure/tray/tray-controller";
 import { AutoUpdateService } from "./infrastructure/updates/auto-update-service";
 import { WindowManager } from "./infrastructure/windows/window-manager";
 import { IPC_CHANNELS } from "../shared/ipc-channels";
+import { sameCameraDevice } from "../shared/camera-devices";
 import { goalsConfigFromPreferences } from "../shared/preferences";
 
 if (process.platform === "darwin") {
@@ -145,6 +146,23 @@ function bootstrap(): void {
 			},
 			onCameraReady: () => {
 				windows.sendToMain(IPC_CHANNELS.cameraReady);
+			},
+			onCameraDevices: (payload) => {
+				windows.sendToMain(IPC_CHANNELS.cameraDevices, payload);
+			},
+			onCameraDeviceNotice: (notice) => {
+				windows.sendToMain(IPC_CHANNELS.cameraDeviceNotice, notice);
+			},
+			onCameraOpened: (meta) => {
+				const selected = preferences.cameraDevice;
+				if (!selected) return;
+				const next = {
+					id: selected.id || meta.id,
+					index: meta.index,
+					name: selected.name || meta.name,
+				};
+				if (sameCameraDevice(selected, next)) return;
+				preferencesService.set("cameraDevice", next);
 			},
 			isCameraWindowOpen: () => windows.isCameraOpen(),
 			shouldRetryCamera: () =>

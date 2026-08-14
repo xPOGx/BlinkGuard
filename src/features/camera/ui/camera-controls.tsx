@@ -22,6 +22,7 @@ import {
 import { EAR_CALIBRATION_MIN_SAMPLES } from "../../../../shared/ear-calibration";
 import { pluralKey, t as translate } from "../../../../shared/i18n";
 import type { CameraQuality } from "../../../../shared/preferences";
+import { CameraDevicePicker } from "./camera-device-picker";
 
 interface CameraControlsProps {
 	preferences: SettingsPreferences;
@@ -377,6 +378,11 @@ export function CameraControls({
 					</SettingRow>
 				</SettingPanel>
 			</SettingGrid>
+
+			<CameraDevicePicker
+				preferences={preferences}
+				setPreferences={setPreferences}
+			/>
 
 			{preferences.cameraEnabled ? (
 				<>

@@ -59,6 +59,7 @@ function createActions(
 			startEarCalibration: vi.fn(),
 			cancelEarCalibration: vi.fn(),
 			applyCameraQuality: vi.fn(),
+			applyCameraDevice: vi.fn(),
 			applyEarCalibration: vi.fn(),
 			applyClassifierCalibration: vi.fn(),
 		}) as never,
@@ -77,6 +78,7 @@ describe("PreferenceActions", () => {
 			startEarCalibration: vi.fn(),
 			cancelEarCalibration: vi.fn(),
 			applyCameraQuality: vi.fn(),
+			applyCameraDevice: vi.fn(),
 			applyEarCalibration: vi.fn(),
 			applyClassifierCalibration: vi.fn(),
 		};
@@ -213,6 +215,7 @@ describe("PreferenceActions", () => {
 			startEarCalibration: vi.fn(),
 			cancelEarCalibration: vi.fn(),
 			applyCameraQuality: vi.fn(),
+			applyCameraDevice: vi.fn(),
 			applyEarCalibration: vi.fn(),
 			applyClassifierCalibration: vi.fn(),
 		};
@@ -274,6 +277,7 @@ describe("PreferenceActions", () => {
 			trackingToggle: "Ctrl+B",
 		});
 		expect(sidecar.applyCameraQuality).toHaveBeenCalledWith("high");
+		expect(sidecar.applyCameraDevice).toHaveBeenCalled();
 		expect(sidecar.applyEarCalibration).toHaveBeenCalledWith(0.25);
 		expect(sidecar.applyClassifierCalibration).toHaveBeenCalledWith({
 			bias: 0.4,
@@ -304,6 +308,7 @@ describe("PreferenceActions", () => {
 			startEarCalibration: vi.fn(),
 			cancelEarCalibration: vi.fn(),
 			applyCameraQuality: vi.fn(),
+			applyCameraDevice: vi.fn(),
 			applyEarCalibration: vi.fn(),
 			applyClassifierCalibration: vi.fn(),
 		};
@@ -345,6 +350,7 @@ describe("PreferenceActions", () => {
 			startEarCalibration: vi.fn(),
 			cancelEarCalibration: vi.fn(),
 			applyCameraQuality: vi.fn(),
+			applyCameraDevice: vi.fn(),
 			applyEarCalibration: vi.fn(),
 			applyClassifierCalibration: vi.fn(),
 		};
@@ -373,6 +379,7 @@ describe("PreferenceActions", () => {
 		);
 		expect(preferences.current.locale).toBe("en");
 		expect(preferences.current.cameraQuality).toBe("medium");
+		expect(preferences.current.cameraDevice).toBeNull();
 		expect(preferences.current.earCalibration).toBeNull();
 		expect(preferences.current.classifierBias).toBeNull();
 		expect(preferences.current.isTracking).toBe(false);
@@ -382,6 +389,7 @@ describe("PreferenceActions", () => {
 			preferences.current.keyboardShortcuts,
 		);
 		expect(sidecar.applyCameraQuality).toHaveBeenCalledWith("medium");
+		expect(sidecar.applyCameraDevice).toHaveBeenCalledWith(null);
 		expect(sidecar.applyEarCalibration).toHaveBeenCalledWith(null);
 		expect(sidecar.applyClassifierCalibration).toHaveBeenCalledWith(null);
 		expect(tray.rebuildMenu).toHaveBeenCalledWith("en");
@@ -401,6 +409,7 @@ describe("PreferenceActions", () => {
 			startEarCalibration: vi.fn(),
 			cancelEarCalibration: vi.fn(),
 			applyCameraQuality: vi.fn(),
+			applyCameraDevice: vi.fn(),
 			applyEarCalibration: vi.fn(),
 			applyClassifierCalibration: vi.fn(),
 		};

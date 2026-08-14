@@ -5,6 +5,14 @@ import type {
 	ImportBackupResult,
 } from "../../../shared/backup";
 import type { BlinkStatsSnapshot } from "../../../shared/blink-stats";
+import {
+	type CameraDeviceNotice,
+	type CameraDevicePref,
+	type CameraDevicesPayload,
+	emptyCameraDevicesPayload,
+	sanitizeCameraDeviceNotice,
+	sanitizeCameraDevicesPayload,
+} from "../../../shared/camera-devices";
 import type {
 	DebugOverlayKind,
 	DebugSoundKind,
@@ -58,6 +66,15 @@ export const rendererIpc = {
 		subscribe(IPC_CHANNELS.cameraError, listener),
 	onCameraReady: (listener: () => void) =>
 		subscribe(IPC_CHANNELS.cameraReady, listener),
+	onCameraDevices: (listener: (payload: CameraDevicesPayload) => void) =>
+		subscribe(IPC_CHANNELS.cameraDevices, (payload) => {
+			listener(sanitizeCameraDevicesPayload(payload));
+		}),
+	onCameraDeviceNotice: (listener: (notice: CameraDeviceNotice) => void) =>
+		subscribe(IPC_CHANNELS.cameraDeviceNotice, (payload) => {
+			const notice = sanitizeCameraDeviceNotice(payload);
+			if (notice) listener(notice);
+		}),
 	onShortcutError: (listener: (payload: ShortcutErrorPayload) => void) =>
 		subscribe(IPC_CHANNELS.shortcutError, listener),
 	onCameraWindowClosed: (listener: () => void) =>
@@ -76,6 +93,16 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateCameraEnabled, enabled),
 	updateCameraQuality: (quality: CameraQuality) =>
 		send(IPC_CHANNELS.updateCameraQuality, quality),
+	updateCameraDevice: (device: CameraDevicePref | null) =>
+		send(IPC_CHANNELS.updateCameraDevice, device),
+	listCameraDevices: async (): Promise<CameraDevicesPayload> => {
+		try {
+			const result = await bridge()?.invoke(IPC_CHANNELS.listCameraDevices);
+			return sanitizeCameraDevicesPayload(result);
+		} catch {
+			return emptyCameraDevicesPayload();
+		}
+	},
 	updateAutoStopNoFaceEnabled: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateAutoStopNoFaceEnabled, enabled),
 	updateAutoStopNoFaceMinutes: (minutes: number) =>

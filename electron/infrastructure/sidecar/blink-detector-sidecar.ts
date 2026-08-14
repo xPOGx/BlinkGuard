@@ -23,6 +23,17 @@ import {
 	isCameraQuality,
 	toSidecarCameraQualityMessage,
 } from "../../../shared/camera-quality";
+import {
+	type CameraDeviceInfo,
+	type CameraDeviceNotice,
+	type CameraDevicePref,
+	type CameraDevicesPayload,
+	LIST_CAMERAS_TIMEOUT_MS,
+	emptyCameraDevicesPayload,
+	sanitizeCameraDeviceNotice,
+	sanitizeCameraDevicesPayload,
+	toSidecarCameraDeviceMessage,
+} from "../../../shared/camera-devices";
 import type {
 	AppPreferences,
 	CameraQuality,
@@ -43,6 +54,13 @@ interface SidecarCallbacks {
 	isCameraWindowOpen?: () => boolean;
 	onCalibrationProgress?: (payload: CalibrationProgressPayload) => void;
 	onCalibrationComplete?: (payload: CalibrationCompletePayload) => void;
+	onCameraDevices?: (payload: CameraDevicesPayload) => void;
+	onCameraDeviceNotice?: (notice: CameraDeviceNotice) => void;
+	onCameraOpened?: (meta: {
+		index: number;
+		name: string;
+		id: string;
+	}) => void;
 }
 
 interface FaceDataSample {
@@ -74,6 +92,8 @@ export class BlinkDetectorSidecar {
 	private cameraFlushTimer: ReturnType<typeof setTimeout> | null = null;
 	private pendingCameraStop = false;
 	private pendingCameraStart = false;
+	private devicesCache: CameraDeviceInfo[] = [];
+	private listWaiters: Array<(payload: CameraDevicesPayload) => void> = [];
 
 	constructor(
 		private readonly paths: AppPaths,
@@ -152,6 +172,7 @@ export class BlinkDetectorSidecar {
 			this.cameraReady = false;
 			this.clearCameraFlush();
 			this.cancelEarCalibration("Blink detector stopped");
+			this.failListWaiters();
 		});
 		child.on("error", (error) => {
 			console.error("Blink detector process error:", error);
@@ -162,6 +183,7 @@ export class BlinkDetectorSidecar {
 			this.cameraReady = false;
 			this.clearCameraFlush();
 			this.cancelEarCalibration("Blink detector error");
+			this.failListWaiters();
 		});
 		this.readStdout(child);
 		// OpenCV/MSMF often prints [WARN] to stderr while capture still works —
@@ -185,6 +207,19 @@ export class BlinkDetectorSidecar {
 			return true;
 		}
 		this.pendingCameraStart = true;
+		this.scheduleCameraFlush();
+		return true;
+	}
+
+	/** Force stop+start even when capture is already live (device switch). */
+	restartCamera(): boolean {
+		if (!this.running || !this.process?.stdin) {
+			console.error("Blink detector not running");
+			return false;
+		}
+		this.pendingCameraStop = true;
+		this.pendingCameraStart = true;
+		this.cameraReady = false;
 		this.scheduleCameraFlush();
 		return true;
 	}
@@ -238,9 +273,12 @@ export class BlinkDetectorSidecar {
 			this.write({ stop_camera: true });
 		}
 		if (start) {
-			// Quality/EAR before start so software resize/throttle use the preset.
+			// Quality/EAR/device before start so software resize/throttle use the preset.
 			this.applySessionConfig();
-			this.write({ start_camera: true });
+			this.write({
+				start_camera: true,
+				...toSidecarCameraDeviceMessage(this.preferences.cameraDevice),
+			});
 			// stop_camera clears Python send_video; restore preview if window open.
 			this.requestVideoIfPreviewOpen();
 		}
@@ -295,11 +333,45 @@ export class BlinkDetectorSidecar {
 		});
 	}
 
+	/** Push preferred capture device (or Automatic with null). */
+	applyCameraDevice(device?: CameraDevicePref | null): void {
+		const resolved =
+			device === undefined ? this.preferences.cameraDevice : device;
+		this.write(toSidecarCameraDeviceMessage(resolved ?? null));
+	}
+
 	/** Apply quality + calibration after models are ready. */
 	applySessionConfig(): void {
 		this.applyCameraQuality();
 		this.applyEarCalibration();
 		this.applyClassifierCalibration();
+		this.applyCameraDevice();
+	}
+
+	listDevices(
+		timeoutMs = LIST_CAMERAS_TIMEOUT_MS,
+	): Promise<CameraDevicesPayload> {
+		if (!this.running || !this.process?.stdin) {
+			return Promise.resolve({
+				...emptyCameraDevicesPayload(),
+				unavailable: true,
+			});
+		}
+		return new Promise((resolve) => {
+			const timer = setTimeout(() => {
+				this.listWaiters = this.listWaiters.filter((wait) => wait !== onPayload);
+				resolve({
+					devices: this.devicesCache,
+					unavailable: this.devicesCache.length === 0,
+				});
+			}, timeoutMs);
+			const onPayload = (payload: CameraDevicesPayload) => {
+				clearTimeout(timer);
+				resolve(payload);
+			};
+			this.listWaiters.push(onPayload);
+			this.write({ list_cameras: true });
+		});
 	}
 
 	/** Start Stage-0 EAR NDJSON recording in the sidecar (absolute path). */
@@ -499,8 +571,57 @@ export class BlinkDetectorSidecar {
 		});
 	}
 
+	private failListWaiters(): void {
+		const waiters = this.listWaiters;
+		this.listWaiters = [];
+		const payload: CameraDevicesPayload = {
+			...emptyCameraDevicesPayload(),
+			unavailable: true,
+		};
+		for (const wait of waiters) wait(payload);
+	}
+
+	private publishCameraDevices(payload: CameraDevicesPayload): void {
+		this.devicesCache = payload.devices;
+		const waiters = this.listWaiters;
+		this.listWaiters = [];
+		for (const wait of waiters) wait(payload);
+		this.callbacks.onCameraDevices?.(payload);
+	}
+
+	private handleCameraState(state: Record<string, unknown>): void {
+		const kind = state.kind;
+		if (kind === "camera_devices") {
+			this.publishCameraDevices(sanitizeCameraDevicesPayload(state));
+			return;
+		}
+		if (kind === "camera_device_missing" || kind === "camera_device_fallback") {
+			const notice = sanitizeCameraDeviceNotice({
+				code: kind === "camera_device_missing" ? "missing" : "fallback",
+				name: state.requested_name,
+			});
+			if (notice) this.callbacks.onCameraDeviceNotice?.(notice);
+			return;
+		}
+		if (kind === "camera_open_result" && state.ok === true) {
+			const index =
+				typeof state.index === "number" && Number.isInteger(state.index)
+					? state.index
+					: null;
+			if (index === null) return;
+			this.callbacks.onCameraOpened?.({
+				index,
+				name: typeof state.device_name === "string" ? state.device_name : "",
+				id: typeof state.device_id === "string" ? state.device_id : "",
+			});
+		}
+	}
+
 	private handleMessage(message: Record<string, any>): void {
 		this.debugLogger?.captureSidecarMessage(message);
+		if (message.cameraState && typeof message.cameraState === "object") {
+			this.handleCameraState(message.cameraState as Record<string, unknown>);
+		}
 		if (message.blinkDebug) {
 			this.sampleBlinkDebugForCalibration(
 				message.blinkDebug as Record<string, unknown>,

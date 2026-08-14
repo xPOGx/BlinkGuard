@@ -2,7 +2,10 @@ import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChildProcessRegistry } from "../../../electron/infrastructure/process/child-process-registry";
 import { BlinkDetectorSidecar } from "../../../electron/infrastructure/sidecar/blink-detector-sidecar";
-import { SIDECAR_STATUS, isBenignSidecarStderr } from "../../../electron/infrastructure/sidecar/protocol";
+import {
+	isBenignSidecarStderr,
+	SIDECAR_STATUS,
+} from "../../../electron/infrastructure/sidecar/protocol";
 import { DEFAULT_PREFERENCES } from "../../../shared/preferences";
 
 type FakeChild = EventEmitter & {
@@ -177,10 +180,7 @@ describe("BlinkDetectorSidecar EAR calibration samples", () => {
 		child: FakeChild,
 		faceData: Record<string, unknown>,
 	): void {
-		child.stdout.emit(
-			"data",
-			Buffer.from(`${JSON.stringify({ faceData })}\n`),
-		);
+		child.stdout.emit("data", Buffer.from(`${JSON.stringify({ faceData })}\n`));
 	}
 
 	it("samples Phase A EAR only when faceStatus is ok", () => {
@@ -246,10 +246,7 @@ describe("BlinkDetectorSidecar NDJSON routing", () => {
 	}
 
 	function emitJson(child: FakeChild, payload: Record<string, unknown>): void {
-		child.stdout.emit(
-			"data",
-			Buffer.from(`${JSON.stringify(payload)}\n`),
-		);
+		child.stdout.emit("data", Buffer.from(`${JSON.stringify(payload)}\n`));
 	}
 
 	it("routes blink, faceData, error, cameraReady, and videoStream", () => {
@@ -307,5 +304,136 @@ describe("BlinkDetectorSidecar NDJSON routing", () => {
 			blink: true,
 			ear: 0.2,
 		});
+	});
+});
+
+describe("BlinkDetectorSidecar camera device picker", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	function createSidecar(preferences = { ...DEFAULT_PREFERENCES }) {
+		const { child, stdinChunks } = createFakeChild();
+		const callbacks = {
+			onBlink: vi.fn(),
+			onFaceData: vi.fn(),
+			onVideoStream: vi.fn(),
+			onError: vi.fn(),
+			onCameraReady: vi.fn(),
+			onCameraDevices: vi.fn(),
+			onCameraDeviceNotice: vi.fn(),
+			onCameraOpened: vi.fn(),
+			shouldRetryCamera: () => false,
+		};
+		const sidecar = new BlinkDetectorSidecar(
+			{
+				root: "/app",
+				publicDir: "/app/public",
+				preload: "/app/preload.js",
+			} as never,
+			false,
+			new ChildProcessRegistry(),
+			preferences,
+			callbacks,
+		);
+		attachRunningProcess(sidecar, child);
+		return { sidecar, child, stdinChunks, callbacks };
+	}
+
+	function emitJson(child: FakeChild, payload: Record<string, unknown>): void {
+		child.stdout.emit("data", Buffer.from(`${JSON.stringify(payload)}\n`));
+	}
+
+	it("includes preferred camera_device on start_camera", () => {
+		const preferences = {
+			...DEFAULT_PREFERENCES,
+			cameraDevice: { id: "pnp-1", index: 1, name: "USB Webcam" },
+		};
+		const { sidecar, stdinChunks } = createSidecar(preferences);
+		expect(sidecar.startCamera()).toBe(true);
+		vi.advanceTimersByTime(75);
+		const writes = parseWrites(stdinChunks);
+		const start = writes.find((m) => m.start_camera === true);
+		expect(start).toMatchObject({
+			start_camera: true,
+			camera_device: { id: "pnp-1", index: 1, name: "USB Webcam" },
+		});
+	});
+
+	it("restartCamera emits stop+start even when cameraReady", () => {
+		const { sidecar, stdinChunks, child } = createSidecar();
+		emitJson(child, { status: SIDECAR_STATUS.cameraStarted });
+		expect(sidecar.isCameraReady).toBe(true);
+		stdinChunks.length = 0;
+		expect(sidecar.restartCamera()).toBe(true);
+		vi.advanceTimersByTime(75);
+		const writes = parseWrites(stdinChunks);
+		expect(writes.some((m) => m.stop_camera === true)).toBe(true);
+		expect(writes.some((m) => m.start_camera === true)).toBe(true);
+	});
+
+	it("listDevices writes list_cameras and does not start capture", async () => {
+		const { sidecar, stdinChunks, child, callbacks } = createSidecar();
+		const pending = sidecar.listDevices();
+		const listed = parseWrites(stdinChunks);
+		expect(listed.some((m) => m.list_cameras === true)).toBe(true);
+		expect(listed.some((m) => m.start_camera === true)).toBe(false);
+
+		emitJson(child, {
+			cameraState: {
+				kind: "camera_devices",
+				devices: [{ index: 0, name: "Integrated", id: "pnp-0" }],
+				names: ["Integrated"],
+				count: 1,
+				index_match: "soft",
+			},
+		});
+		await expect(pending).resolves.toEqual({
+			devices: [{ index: 0, name: "Integrated", id: "pnp-0" }],
+		});
+		expect(callbacks.onCameraDevices).toHaveBeenCalledOnce();
+	});
+
+	it("forwards missing/fallback notices and open-result index", () => {
+		const { child, callbacks } = createSidecar();
+		emitJson(child, {
+			cameraState: {
+				kind: "camera_device_missing",
+				requested_name: "USB Webcam",
+			},
+		});
+		expect(callbacks.onCameraDeviceNotice).toHaveBeenCalledWith({
+			code: "missing",
+			name: "USB Webcam",
+		});
+		emitJson(child, {
+			cameraState: {
+				kind: "camera_device_fallback",
+				requested_name: "USB Webcam",
+			},
+		});
+		expect(callbacks.onCameraDeviceNotice).toHaveBeenCalledWith({
+			code: "fallback",
+			name: "USB Webcam",
+		});
+		emitJson(child, {
+			cameraState: {
+				kind: "camera_open_result",
+				ok: true,
+				index: 1,
+				device_name: "USB Webcam",
+				device_id: "pnp-1",
+			},
+		});
+		expect(callbacks.onCameraOpened).toHaveBeenCalledWith({
+			index: 1,
+			name: "USB Webcam",
+			id: "pnp-1",
+		});
+		expect(callbacks.onError).not.toHaveBeenCalled();
 	});
 });

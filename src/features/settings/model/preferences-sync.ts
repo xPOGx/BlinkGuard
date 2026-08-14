@@ -1,4 +1,5 @@
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
+import { sameCameraDevice } from "../../../../shared/camera-devices";
 import {
 	type Point,
 	type Size,
@@ -45,6 +46,7 @@ export function sameRendererPrefs(
 		a.reminderInterval === b.reminderInterval &&
 		a.cameraEnabled === b.cameraEnabled &&
 		a.cameraQuality === b.cameraQuality &&
+		sameCameraDevice(a.cameraDevice, b.cameraDevice) &&
 		a.autoStopNoFaceEnabled === b.autoStopNoFaceEnabled &&
 		a.autoStopNoFaceMinutes === b.autoStopNoFaceMinutes &&
 		a.snoozeMinutes === b.snoozeMinutes &&
@@ -101,6 +103,12 @@ export function pushPreferenceDiff(
 	}
 	if (!previous || previous.cameraQuality !== next.cameraQuality) {
 		rendererIpc.updateCameraQuality(next.cameraQuality);
+	}
+	if (
+		!previous ||
+		!sameCameraDevice(previous.cameraDevice, next.cameraDevice)
+	) {
+		rendererIpc.updateCameraDevice(next.cameraDevice);
 	}
 	if (
 		!previous ||

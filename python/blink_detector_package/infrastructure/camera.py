@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -72,19 +73,40 @@ def is_mjpg_fourcc(code: str) -> bool:
 
 
 def enumerate_camera_device_names() -> list[str]:
-	"""Best-effort friendly camera names for diagnostics (OS APIs, not OpenCV).
+	"""Friendly names only (tests / debug). Prefer enumerate_camera_devices()."""
+	return [item["name"] for item in enumerate_camera_devices() if item.get("name")]
+
+
+def enumerate_camera_devices() -> list[dict]:
+	"""Best-effort OS inventory: [{name, id}, ...] (not OpenCV CAP indices).
 
 	Index order may not match OpenCV's CAP_* enumeration — treat as a device
 	inventory, and only as a soft hint when using the same numeric index.
 	"""
 	if sys.platform == "win32":
-		return _enumerate_windows_camera_names()
+		return _enumerate_windows_camera_devices()
 	if sys.platform == "darwin":
-		return _enumerate_darwin_camera_names()
-	return []
+		return _enumerate_darwin_camera_devices()
+	return _enumerate_linux_camera_devices()
 
 
-def _enumerate_windows_camera_names() -> list[str]:
+def _dedupe_devices(devices: list[dict]) -> list[dict]:
+	cleaned = []
+	seen = set()
+	for item in devices:
+		name = (item.get("name") or "").strip()
+		device_id = (item.get("id") or "").strip()
+		if not name and not device_id:
+			continue
+		key = device_id.lower() if device_id else f"name:{name.lower()}"
+		if key in seen:
+			continue
+		seen.add(key)
+		cleaned.append({"name": name, "id": device_id})
+	return cleaned
+
+
+def _enumerate_windows_camera_devices() -> list[dict]:
 	# PnP Camera/Image class — no extra Python deps (PyInstaller-friendly).
 	creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 	try:
@@ -97,7 +119,7 @@ def _enumerate_windows_camera_names() -> list[str]:
 				(
 					"Get-CimInstance Win32_PnPEntity | "
 					"Where-Object { $_.PNPClass -eq 'Camera' -or $_.PNPClass -eq 'Image' } | "
-					"Select-Object -ExpandProperty Name"
+					"ForEach-Object { '{0}`t{1}' -f $_.Name, $_.PNPDeviceID }"
 				),
 			],
 			capture_output=True,
@@ -109,18 +131,20 @@ def _enumerate_windows_camera_names() -> list[str]:
 		return []
 	if completed.returncode != 0:
 		return []
-	names = []
-	seen = set()
+	devices = []
 	for line in (completed.stdout or "").splitlines():
-		name = line.strip()
-		if not name or name in seen:
+		raw = line.strip()
+		if not raw:
 			continue
-		seen.add(name)
-		names.append(name)
-	return names
+		if "\t" in raw:
+			name, device_id = raw.split("\t", 1)
+		else:
+			name, device_id = raw, ""
+		devices.append({"name": name.strip(), "id": device_id.strip()})
+	return _dedupe_devices(devices)
 
 
-def _enumerate_darwin_camera_names() -> list[str]:
+def _enumerate_darwin_camera_devices() -> list[dict]:
 	try:
 		completed = subprocess.run(
 			["system_profiler", "SPCameraDataType", "-json"],
@@ -133,20 +157,46 @@ def _enumerate_darwin_camera_names() -> list[str]:
 	if completed.returncode != 0 or not completed.stdout:
 		return []
 	try:
-		import json
-
 		payload = json.loads(completed.stdout)
 	except Exception:
 		return []
-	names = []
-	seen = set()
+	devices = []
 	for item in payload.get("SPCameraDataType") or []:
 		name = (item.get("_name") or item.get("name") or "").strip()
-		if not name or name in seen:
+		device_id = (
+			item.get("unique_id")
+			or item.get("spcamera_unique-id")
+			or item.get("unique-id")
+			or ""
+		)
+		if isinstance(device_id, str):
+			device_id = device_id.strip()
+		else:
+			device_id = str(device_id) if device_id else ""
+		devices.append({"name": name, "id": device_id})
+	return _dedupe_devices(devices)
+
+
+def _enumerate_linux_camera_devices() -> list[dict]:
+	base = "/sys/class/video4linux"
+	if not os.path.isdir(base):
+		return []
+	try:
+		entries = sorted(os.listdir(base))
+	except OSError:
+		return []
+	devices = []
+	for entry in entries:
+		if not entry.startswith("video"):
 			continue
-		seen.add(name)
-		names.append(name)
-	return names
+		name_path = os.path.join(base, entry, "name")
+		try:
+			with open(name_path, encoding="utf-8", errors="replace") as handle:
+				name = handle.read().strip()
+		except OSError:
+			name = entry
+		devices.append({"name": name or entry, "id": f"/dev/{entry}"})
+	return _dedupe_devices(devices)
 
 
 @contextmanager
@@ -182,6 +232,11 @@ class OpenCVCamera:
 		self._no_face_failovers = 0
 		# Soft device inventory for diagnostics (may not match OpenCV indices).
 		self._device_names: list[str] = []
+		self._device_ids: list[str] = []
+		# User picker (Electron prefs). Empty = Automatic scan.
+		self._requested_id = ""
+		self._requested_name = ""
+		self._requested_index = None
 
 	def emit_camera_state(self, kind, **fields):
 		payload = {"kind": kind, **fields}
@@ -199,11 +254,96 @@ class OpenCVCamera:
 			return None
 		return self._device_names[index]
 
+	def _device_id_for_index(self, index) -> str | None:
+		if index is None or index < 0 or index >= len(self._device_ids):
+			return None
+		value = self._device_ids[index]
+		return value or None
+
+	def set_preferred_device(self, device):
+		"""Apply Electron `camera_device` (or None / {} for Automatic)."""
+		if not isinstance(device, dict):
+			self._requested_id = ""
+			self._requested_name = ""
+			self._requested_index = None
+			return
+		self._requested_id = str(device.get("id") or "").strip()
+		self._requested_name = str(device.get("name") or "").strip()
+		raw_index = device.get("index")
+		try:
+			index = int(raw_index)
+		except (TypeError, ValueError):
+			index = None
+		if index is not None and 0 <= index <= 4:
+			self._requested_index = index
+		else:
+			self._requested_index = None
+
+	def refresh_inventory(self):
+		self._refresh_device_inventory()
+
+	def _has_requested_device(self) -> bool:
+		return bool(self._requested_id or self._requested_name)
+
+	def _inventory_index_for_requested(self):
+		if self._requested_id:
+			wanted = self._requested_id.casefold()
+			for i, device_id in enumerate(self._device_ids):
+				if device_id and device_id.casefold() == wanted:
+					return i
+		if self._requested_name:
+			wanted = self._requested_name.casefold()
+			for i, name in enumerate(self._device_names):
+				if name and name.casefold() == wanted:
+					return i
+		return None
+
+	def _inventory_contains_requested(self) -> bool:
+		return self._inventory_index_for_requested() is not None
+
+	def _pin_failover_to_current_index(self) -> bool:
+		return (
+			self._inventory_contains_requested()
+			and self.camera_index is not None
+		)
+
+	def _opened_matches_request(self) -> bool:
+		# Soft inventory index ≠ OpenCV index. Reject only when a friendly
+		# name exists at this OpenCV index and disagrees with lastKnownName.
+		if not self._inventory_contains_requested() or not self._requested_name:
+			return True
+		got_name = self._device_name_for_index(self.camera_index)
+		if not got_name:
+			return True
+		return got_name.casefold() == self._requested_name.casefold()
+
+	def _reject_opened(self, capture):
+		try:
+			capture.release()
+		except Exception:
+			pass
+		self.camera_index = None
+		self.backend = None
+
+	def _emit_requested_notice(self, kind):
+		self.emit_camera_state(
+			kind,
+			requested_id=self._requested_id or None,
+			requested_name=self._requested_name or None,
+			requested_index=self._requested_index,
+		)
+
 	def _refresh_device_inventory(self):
-		self._device_names = enumerate_camera_device_names()
+		raw = enumerate_camera_devices()
+		self._device_names = [item.get("name") or "" for item in raw]
+		self._device_ids = [item.get("id") or "" for item in raw]
 		devices = [
-			{"index": i, "name": name}
-			for i, name in enumerate(self._device_names)
+			{
+				"index": i,
+				"name": self._device_names[i],
+				"id": self._device_ids[i],
+			}
+			for i in range(len(self._device_names))
 		]
 		self.emit_camera_state(
 			"camera_devices",
@@ -251,11 +391,20 @@ class OpenCVCamera:
 			seen.add(key)
 			pairs.append(key)
 
+		if self._requested_index is not None:
+			for backend in backends:
+				add(self._requested_index, backend)
+
 		if (
 			self._preferred_index is not None
 			and self._preferred_backend is not None
 		):
 			add(self._preferred_index, self._preferred_backend)
+
+		hint = self._inventory_index_for_requested()
+		if hint is not None:
+			for backend in backends:
+				add(hint, backend)
 
 		for index in range(5):
 			for backend in backends:
@@ -337,12 +486,16 @@ class OpenCVCamera:
 	def _try_open_pair(self, index, backend):
 		name = backend_name(backend)
 		device_name = self._device_name_for_index(index)
+		fields = {
+			"index": index,
+			"backend": backend,
+			"backend_name": name,
+			"device_name": device_name,
+			"device_id": self._device_id_for_index(index),
+		}
 		self.emit_camera_state(
 			"camera_open_attempt",
-			index=index,
-			backend=backend,
-			backend_name=name,
-			device_name=device_name,
+			**fields,
 			requested_wh=None,
 			requested_fps=None,
 			requested_fourcc=None,
@@ -364,10 +517,7 @@ class OpenCVCamera:
 				self.emit_camera_state(
 					"camera_open_result",
 					ok=False,
-					index=index,
-					backend=backend,
-					backend_name=name,
-					device_name=device_name,
+					**fields,
 					reject_reason="not_opened",
 				)
 				capture.release()
@@ -388,10 +538,7 @@ class OpenCVCamera:
 				self.emit_camera_state(
 					"camera_open_result",
 					ok=False,
-					index=index,
-					backend=backend,
-					backend_name=name,
-					device_name=device_name,
+					**fields,
 					actual_wh=actual_wh,
 					actual_fps=actual_fps,
 					mean_luma=luma,
@@ -420,10 +567,7 @@ class OpenCVCamera:
 			self.emit_camera_state(
 				"camera_open_result",
 				ok=True,
-				index=index,
-				backend=backend,
-				backend_name=name,
-				device_name=device_name,
+				**fields,
 				actual_wh=actual_wh,
 				actual_fps=actual_fps,
 				mean_luma=luma,
@@ -440,21 +584,14 @@ class OpenCVCamera:
 				}
 			)
 			self.transport.send(
-				{
-					"status": (
-						f"Found working camera at index {index}"
-					)
-				}
+				{"status": f"Found working camera at index {index}"}
 			)
 			return capture
 		except Exception as error:
 			self.emit_camera_state(
 				"camera_open_result",
 				ok=False,
-				index=index,
-				backend=backend,
-				backend_name=name,
-				device_name=device_name,
+				**fields,
 				reject_reason=f"exception:{error}",
 			)
 			self.transport.send(
@@ -482,6 +619,27 @@ class OpenCVCamera:
 				pass
 			self.capture = None
 
+	def _try_open_scan(self, require_name_match: bool):
+		for index, backend in self._candidate_pairs():
+			opened = self._try_open_pair(index, backend)
+			if opened is None:
+				continue
+			if require_name_match and not self._opened_matches_request():
+				self.transport.send(
+					{
+						"debug": (
+							"Opened index "
+							f"{index} name={self._device_name_for_index(index)!r} "
+							"does not match requested "
+							f"{self._requested_name!r}; continuing"
+						)
+					}
+				)
+				self._reject_opened(opened)
+				continue
+			return opened
+		return None
+
 	def start(self, reset_detection):
 		self.transport.send({"debug": "start_camera() called"})
 		if self.active and self.capture is not None:
@@ -491,6 +649,19 @@ class OpenCVCamera:
 		self._refresh_device_inventory()
 		self._release_capture()
 		self.active = False
+
+		missing = (
+			self._has_requested_device()
+			and not self._inventory_contains_requested()
+		)
+		if missing:
+			self._emit_requested_notice("camera_device_missing")
+
+		require_match = (
+			self._inventory_contains_requested()
+			and bool(self._requested_name)
+			and any(self._device_names)
+		)
 
 		max_retries = 10
 		retry_delay = 2
@@ -504,11 +675,10 @@ class OpenCVCamera:
 					}
 				)
 				self.transport.send({"debug": "Starting camera detection..."})
-				opened = None
-				for index, backend in self._candidate_pairs():
-					opened = self._try_open_pair(index, backend)
-					if opened is not None:
-						break
+				opened = self._try_open_scan(require_match)
+				if opened is None and require_match:
+					self._emit_requested_notice("camera_device_fallback")
+					opened = self._try_open_scan(False)
 
 				if opened is None:
 					self.transport.send(
@@ -580,6 +750,7 @@ class OpenCVCamera:
 			if self.backend is not None
 			else None,
 			"device_name": self._device_name_for_index(self.camera_index),
+			"device_id": self._device_id_for_index(self.camera_index),
 			"fourcc": self.fourcc,
 			"capture_wh": wh,
 			"capture_fps": fps,
@@ -587,16 +758,46 @@ class OpenCVCamera:
 			"target_fps": self.target_fps,
 		}
 
+	def _windows_peer_backend(self):
+		"""Opposite of the current Windows backend (MSMF↔DSHOW), else None."""
+		if sys.platform != "win32" or self.backend is None:
+			return None
+		msmf = getattr(cv2, "CAP_MSMF", None)
+		dshow = getattr(cv2, "CAP_DSHOW", None)
+		if self.backend == msmf:
+			return dshow
+		if self.backend == dshow:
+			return msmf
+		return None
+
 	def _failover_order(self):
 		"""Next (index, backend) pairs after the current open.
 
 		On Windows, prefer flipping MSMF↔DSHOW on the same index before
 		scanning other indices — the common “opens but no face” case.
+		When the user picked a device that is still in inventory, stay on
+		that OpenCV index (do not jump to virtual cams).
 		"""
-		pairs = self._candidate_pairs()
 		current = (self.camera_index, self.backend)
 		ordered = []
 		seen = set()
+		peer = self._windows_peer_backend()
+
+		def add_pair(pair):
+			if pair in seen or pair == current:
+				return
+			seen.add(pair)
+			ordered.append(pair)
+
+		if self._pin_failover_to_current_index():
+			index = self.camera_index
+			if peer is not None:
+				add_pair((index, peer))
+			for backend in self._platform_backends():
+				add_pair((index, backend))
+			return ordered
+
+		pairs = self._candidate_pairs()
 
 		def add(pair):
 			if pair in seen or pair not in pairs:
@@ -604,17 +805,8 @@ class OpenCVCamera:
 			seen.add(pair)
 			ordered.append(pair)
 
-		if (
-			sys.platform == "win32"
-			and self.camera_index is not None
-			and self.backend is not None
-		):
-			msmf = getattr(cv2, "CAP_MSMF", None)
-			dshow = getattr(cv2, "CAP_DSHOW", None)
-			if self.backend == msmf and dshow is not None:
-				add((self.camera_index, dshow))
-			elif self.backend == dshow and msmf is not None:
-				add((self.camera_index, msmf))
+		if peer is not None and self.camera_index is not None:
+			add((self.camera_index, peer))
 
 		for pair in pairs:
 			if pair != current:

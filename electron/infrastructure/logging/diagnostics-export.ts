@@ -147,6 +147,7 @@ function buildAlgorithmPrefs(
 	return {
 		cameraEnabled: preferences.cameraEnabled,
 		cameraQuality: preferences.cameraQuality,
+		cameraDevice: preferences.cameraDevice,
 		earCalibration: preferences.earCalibration,
 		classifierBias: preferences.classifierBias,
 		classifierThreshold: preferences.classifierThreshold,

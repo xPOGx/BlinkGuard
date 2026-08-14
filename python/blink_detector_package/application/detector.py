@@ -388,6 +388,7 @@ class BlinkDetectorApplication:
 		want_stop = False
 		want_start = False
 		want_video = False
+		want_list = False
 		record_trace_path = None
 		want_stop_trace = False
 		for data in batch:
@@ -398,6 +399,7 @@ class BlinkDetectorApplication:
 				"pose_strictness",
 				"ear_calibration",
 				"classifier_calibration",
+				"camera_device",
 			):
 				if key in data:
 					merged[key] = data[key]
@@ -408,6 +410,8 @@ class BlinkDetectorApplication:
 				want_start = True
 			if "request_video" in data:
 				want_video = True
+			if data.get("list_cameras"):
+				want_list = True
 			if "record_trace" in data:
 				record_trace_path = data["record_trace"]
 			if data.get("stop_trace"):
@@ -514,6 +518,9 @@ class BlinkDetectorApplication:
 						}
 					)
 
+			if want_list:
+				self.camera.refresh_inventory()
+
 			if want_start:
 				if self.camera.start(self.detection.reset):
 					self._cached_face = None
@@ -611,6 +618,8 @@ class BlinkDetectorApplication:
 		return {"max_width": 480, "quality": 50}
 
 	def _apply_config_dict(self, data):
+		if "camera_device" in data:
+			self.camera.set_preferred_device(data["camera_device"])
 		if "target_fps" in data:
 			self.camera.update_target_fps(data["target_fps"])
 			self.detection.set_target_fps(self.camera.target_fps)

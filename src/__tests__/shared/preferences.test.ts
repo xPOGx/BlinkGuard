@@ -200,6 +200,36 @@ describe("blink-rate coaching preference defaults", () => {
 	});
 });
 
+describe("cameraDevice preference", () => {
+	it("defaults cameraDevice to null (Automatic)", () => {
+		expect(DEFAULT_PREFERENCES.cameraDevice).toBeNull();
+	});
+
+	it("keeps a valid cameraDevice object", () => {
+		const prefs = sanitizePersistedPreferences({
+			cameraDevice: { id: "USB\\VID_046D", index: 1, name: "Logitech C170" },
+		});
+		expect(prefs.cameraDevice).toEqual({
+			id: "USB\\VID_046D",
+			index: 1,
+			name: "Logitech C170",
+		});
+	});
+
+	it("falls back to null when cameraDevice is invalid", () => {
+		expect(
+			sanitizePersistedPreferences({ cameraDevice: "usb" }).cameraDevice,
+		).toBeNull();
+		expect(
+			sanitizePersistedPreferences({ cameraDevice: { index: 9, name: "X" } })
+				.cameraDevice,
+		).toBeNull();
+		expect(
+			sanitizePersistedPreferences({ cameraDevice: { index: 0 } }).cameraDevice,
+		).toBeNull();
+	});
+});
+
 describe("auto-stop on no-face preference defaults", () => {
 	it("defaults enabled with 2 minutes", () => {
 		expect(DEFAULT_PREFERENCES.autoStopNoFaceEnabled).toBe(true);

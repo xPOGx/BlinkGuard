@@ -11,6 +11,7 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updateDarkMode: vi.fn(),
 		updateCameraEnabled: vi.fn(),
 		updateCameraQuality: vi.fn(),
+		updateCameraDevice: vi.fn(),
 		updateAutoStopNoFaceEnabled: vi.fn(),
 		updateAutoStopNoFaceMinutes: vi.fn(),
 		updateSnoozeMinutes: vi.fn(),
@@ -104,6 +105,16 @@ describe("sameRendererPrefs", () => {
 		).toBe(false);
 	});
 
+	it("detects cameraDevice preference changes", () => {
+		const base = { ...DEFAULT_RENDERER_PREFERENCES };
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				cameraDevice: { id: "pnp-1", index: 0, name: "Integrated" },
+			}),
+		).toBe(false);
+	});
+
 	it("detects snoozeMinutes preference changes", () => {
 		const base = { ...DEFAULT_RENDERER_PREFERENCES };
 		expect(
@@ -162,6 +173,7 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateLookAwayEnabled).not.toHaveBeenCalled();
 		expect(rendererIpc.updateKeyboardShortcuts).not.toHaveBeenCalled();
 		expect(rendererIpc.updateAutoStopNoFaceEnabled).not.toHaveBeenCalled();
+		expect(rendererIpc.updateCameraDevice).not.toHaveBeenCalled();
 	});
 
 	it("does not touch locale when only unrelated prefs change", () => {
@@ -348,6 +360,22 @@ describe("pushPreferenceDiff", () => {
 			next.pauseAppRules,
 		);
 		expect(rendererIpc.updatePauseOnFullscreen).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+	});
+
+	it("pushes only cameraDevice when the picker changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = {
+			...previous,
+			cameraDevice: { id: "pnp-1", index: 1, name: "USB Webcam" },
+		};
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateCameraDevice).toHaveBeenCalledWith(
+			next.cameraDevice,
+		);
+		expect(rendererIpc.updateCameraQuality).not.toHaveBeenCalled();
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 	});
 });

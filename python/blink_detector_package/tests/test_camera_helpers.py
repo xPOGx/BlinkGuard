@@ -180,15 +180,15 @@ class CameraHelperTests(unittest.TestCase):
 		# Avoid real PowerShell / system_profiler in unit tests.
 		import blink_detector_package.infrastructure.camera as camera_mod
 
-		original = camera_mod.enumerate_camera_device_names
-		camera_mod.enumerate_camera_device_names = lambda: [
-			"Integrated Camera",
-			"Logitech C170",
+		original = camera_mod.enumerate_camera_devices
+		camera_mod.enumerate_camera_devices = lambda: [
+			{"name": "Integrated Camera", "id": "pnp-0"},
+			{"name": "Logitech C170", "id": "pnp-1"},
 		]
 		try:
 			cam._refresh_device_inventory()
 		finally:
-			camera_mod.enumerate_camera_device_names = original
+			camera_mod.enumerate_camera_devices = original
 
 		states = [
 			e.get("cameraState")
@@ -201,7 +201,9 @@ class CameraHelperTests(unittest.TestCase):
 			devices_event["names"],
 			["Integrated Camera", "Logitech C170"],
 		)
+		self.assertEqual(devices_event["devices"][1]["id"], "pnp-1")
 		self.assertEqual(cam._device_name_for_index(1), "Logitech C170")
+		self.assertEqual(cam._device_id_for_index(1), "pnp-1")
 
 	def test_enumerate_camera_device_names_returns_list(self):
 		# Smoke: never raises; may be empty in CI/headless.
@@ -226,6 +228,130 @@ class CameraHelperTests(unittest.TestCase):
 		cam.update_processing_resolution([640, 480])
 		self.assertEqual(cam.target_fps, 20)
 		self.assertEqual(cam.processing_resolution, (640, 480))
+
+	def test_candidate_pairs_requested_index_first(self):
+		import cv2
+
+		from blink_detector_package.infrastructure.camera import OpenCVCamera
+
+		class _SilentTransport:
+			def send(self, _payload):
+				return None
+
+		cam = OpenCVCamera(_SilentTransport())
+		cam._platform_backends = lambda: [cv2.CAP_MSMF, cv2.CAP_DSHOW]
+		cam.set_preferred_device(
+			{"id": "pnp-usb", "index": 2, "name": "USB Webcam"}
+		)
+		pairs = cam._candidate_pairs()
+		self.assertEqual(pairs[0], (2, cv2.CAP_MSMF))
+		self.assertEqual(pairs[1], (2, cv2.CAP_DSHOW))
+
+	def test_failover_order_pins_selected_device_to_same_index(self):
+		import cv2
+
+		from blink_detector_package.infrastructure.camera import OpenCVCamera
+
+		class _SilentTransport:
+			def send(self, _payload):
+				return None
+
+		cam = OpenCVCamera(_SilentTransport())
+		cam._platform_backends = lambda: [cv2.CAP_MSMF, cv2.CAP_DSHOW]
+		cam.set_preferred_device(
+			{"id": "pnp-usb", "index": 1, "name": "USB Webcam"}
+		)
+		cam._device_names = ["Integrated Camera", "USB Webcam"]
+		cam._device_ids = ["pnp-0", "pnp-usb"]
+		cam.camera_index = 1
+		cam.backend = cv2.CAP_MSMF
+		ordered = cam._failover_order()
+		self.assertTrue(ordered)
+		self.assertTrue(all(index == 1 for index, _backend in ordered))
+		self.assertNotIn((0, cv2.CAP_MSMF), ordered)
+
+	def test_opened_matches_request_trusts_index_when_names_empty(self):
+		from blink_detector_package.infrastructure.camera import OpenCVCamera
+
+		class _SilentTransport:
+			def send(self, _payload):
+				return None
+
+		cam = OpenCVCamera(_SilentTransport())
+		cam.set_preferred_device(
+			{"id": "pnp-usb", "index": 1, "name": "USB Webcam"}
+		)
+		cam._device_names = ["", ""]
+		cam._device_ids = ["pnp-0", "pnp-usb"]
+		cam.camera_index = 0
+		self.assertTrue(cam._opened_matches_request())
+
+	def test_opened_matches_request_rejects_name_disagreement(self):
+		from blink_detector_package.infrastructure.camera import OpenCVCamera
+
+		class _SilentTransport:
+			def send(self, _payload):
+				return None
+
+		cam = OpenCVCamera(_SilentTransport())
+		cam.set_preferred_device(
+			{"id": "pnp-usb", "index": 1, "name": "USB Webcam"}
+		)
+		cam._device_names = ["Integrated Camera", "USB Webcam"]
+		cam._device_ids = ["pnp-0", "pnp-usb"]
+		cam.camera_index = 0
+		self.assertFalse(cam._opened_matches_request())
+		cam.camera_index = 1
+		self.assertTrue(cam._opened_matches_request())
+
+	def test_start_emits_missing_then_opens_fallback(self):
+		import cv2
+
+		from blink_detector_package.infrastructure.camera import OpenCVCamera
+		import blink_detector_package.infrastructure.camera as camera_mod
+
+		events = []
+
+		class _Transport:
+			def send(self, payload):
+				events.append(payload)
+
+		class _Cap:
+			def release(self):
+				return None
+
+		cam = OpenCVCamera(_Transport())
+		cam._platform_backends = lambda: [cv2.CAP_MSMF]
+		cam.set_preferred_device(
+			{"id": "gone", "index": 1, "name": "Gone Cam"}
+		)
+		original = camera_mod.enumerate_camera_devices
+		camera_mod.enumerate_camera_devices = lambda: [
+			{"name": "Integrated Camera", "id": "pnp-0"},
+		]
+
+		def _fake_try(index, backend):
+			if index != 0:
+				return None
+			cam.camera_index = index
+			cam.backend = backend
+			return _Cap()
+
+		cam._try_open_pair = _fake_try
+		try:
+			ok = cam.start(lambda: None)
+		finally:
+			camera_mod.enumerate_camera_devices = original
+
+		self.assertTrue(ok)
+		states = [
+			e.get("cameraState")
+			for e in events
+			if isinstance(e.get("cameraState"), dict)
+		]
+		kinds = [s.get("kind") for s in states]
+		self.assertIn("camera_device_missing", kinds)
+		self.assertEqual(cam.camera_index, 0)
 
 
 class CommandBatchTests(unittest.TestCase):
@@ -279,6 +405,86 @@ class CommandBatchTests(unittest.TestCase):
 		)
 		app.process_commands()
 		self.assertEqual(started, [(20, (640, 480))])
+
+	def test_list_cameras_refreshes_inventory_without_start(self):
+		from blink_detector_package.application.detector import (
+			BlinkDetectorApplication,
+		)
+
+		class _Transport:
+			def __init__(self):
+				import queue
+
+				self.command_queue = queue.Queue()
+
+			def send(self, _payload):
+				return None
+
+			def start_input_thread(self):
+				return None
+
+			def stop(self):
+				return None
+
+			def send_serialized(self, _line):
+				return None
+
+		transport = _Transport()
+		app = BlinkDetectorApplication(transport=transport)
+		refreshed = []
+		started = []
+		app.camera.refresh_inventory = lambda: refreshed.append(True)
+		app.camera.start = lambda reset: started.append(True) or True
+		transport.command_queue.put('{"list_cameras": true}')
+		app.process_commands()
+		self.assertEqual(refreshed, [True])
+		self.assertEqual(started, [])
+
+	def test_camera_device_applied_before_start(self):
+		from blink_detector_package.application.detector import (
+			BlinkDetectorApplication,
+		)
+
+		class _Transport:
+			def __init__(self):
+				import queue
+
+				self.command_queue = queue.Queue()
+
+			def send(self, _payload):
+				return None
+
+			def start_input_thread(self):
+				return None
+
+			def stop(self):
+				return None
+
+			def send_serialized(self, _line):
+				return None
+
+		transport = _Transport()
+		app = BlinkDetectorApplication(transport=transport)
+		seen = []
+
+		def _fake_start(reset):
+			seen.append(
+				(
+					app.camera._requested_id,
+					app.camera._requested_index,
+					app.camera._requested_name,
+				)
+			)
+			app.camera.active = True
+			return True
+
+		app.camera.start = _fake_start
+		transport.command_queue.put(
+			'{"start_camera": true, "camera_device": '
+			'{"id": "pnp-1", "index": 1, "name": "USB Webcam"}}'
+		)
+		app.process_commands()
+		self.assertEqual(seen, [("pnp-1", 1, "USB Webcam")])
 
 	def test_quit_sets_should_exit_without_camera(self):
 		from blink_detector_package.application.detector import (

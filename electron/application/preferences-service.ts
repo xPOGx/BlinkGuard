@@ -1,3 +1,4 @@
+import { sanitizeCameraDevice, sameCameraDevice } from "../../shared/camera-devices";
 import {
 	sanitizeClassifierBias,
 	sanitizeClassifierThreshold,
@@ -76,6 +77,12 @@ function samePreferenceValue(
 		return samePauseAppRules(
 			previous as PersistedPreferences["pauseAppRules"],
 			next as PersistedPreferences["pauseAppRules"],
+		);
+	}
+	if (key === "cameraDevice") {
+		return sameCameraDevice(
+			previous as PersistedPreferences["cameraDevice"],
+			next as PersistedPreferences["cameraDevice"],
 		);
 	}
 	return false;
@@ -178,6 +185,8 @@ export class PreferencesService {
 			next = sanitizeClassifierThreshold(value) as PersistedPreferences[K];
 		} else if (key === "pauseAppRules") {
 			next = sanitizePauseAppRules(value) as PersistedPreferences[K];
+		} else if (key === "cameraDevice") {
+			next = sanitizeCameraDevice(value) as PersistedPreferences[K];
 		}
 		// No-op equal writes: settings sync and dual IPC callers re-send often.
 		if (samePreferenceValue(key, this.current[key], next)) {

@@ -72,6 +72,9 @@ beforeEach(() => {
 				if (channel === IPC_CHANNELS.listPauseAppCandidates) {
 					return { lastFocused: null, running: [] };
 				}
+				if (channel === IPC_CHANNELS.listCameraDevices) {
+					return { devices: [] };
+				}
 				return { status: "error", message: "unexpected" };
 			}),
 			on: vi.fn((channel: string, listener: (...args: unknown[]) => void) => {

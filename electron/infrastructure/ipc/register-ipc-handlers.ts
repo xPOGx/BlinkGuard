@@ -2,6 +2,11 @@ import { ipcMain, shell, type IpcMainEvent, type IpcMainInvokeEvent } from "elec
 import { sanitizeClassifierCalibrationPayload } from "../../../shared/classifier-calibration";
 import { isValidEarCalibration } from "../../../shared/ear-calibration";
 import { isCameraQuality } from "../../../shared/camera-quality";
+import {
+	emptyCameraDevicesPayload,
+	sameCameraDevice,
+	sanitizeCameraDevice,
+} from "../../../shared/camera-devices";
 import { isBlinkRewardId } from "../../../shared/blink-rewards";
 import { isDebugOverlayKind, isDebugSoundKind } from "../../../shared/debug-preview";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
@@ -159,6 +164,15 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		if (!isCameraQuality(quality)) return;
 		preferences.set("cameraQuality", quality);
 		sidecar.applyCameraQuality(quality);
+	});
+	on(IPC_CHANNELS.updateCameraDevice, (_event, raw: unknown) => {
+		const next = sanitizeCameraDevice(raw);
+		if (sameCameraDevice(preferences.current.cameraDevice, next)) return;
+		preferences.set("cameraDevice", next);
+		sidecar.applyCameraDevice(next);
+		if (sidecar.isCameraReady) {
+			sidecar.restartCamera();
+		}
 	});
 	on(IPC_CHANNELS.updateAutoStopNoFaceEnabled, (_event, enabled: unknown) => {
 		preferences.set("autoStopNoFaceEnabled", enabled as boolean);
@@ -619,6 +633,18 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 				});
 			} catch {
 				return emptyPauseAppPicker();
+			}
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.listCameraDevices,
+		async (_event: IpcMainInvokeEvent) => {
+			interactions.logIpc(IPC_CHANNELS.listCameraDevices, []);
+			try {
+				return await sidecar.listDevices();
+			} catch {
+				return { ...emptyCameraDevicesPayload(), unavailable: true };
 			}
 		},
 	);
