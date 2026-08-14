@@ -4,9 +4,17 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-08-14
+
 ### Added
 
+- Camera: OCEC open/closed overlay to confirm blink credits (default on)
 - Product intro video (`docs/intro/blinkguard-intro.mp4`)
+
+### Fixed
+
+- Camera: credit look-down blinks rejected as opening or classifier
+- Camera: back off locate work when no face is visible (idle YuNet-only; throttle none IPC; debounce no-face toast)
 
 ## [2.8.0] - 2026-08-14
 
