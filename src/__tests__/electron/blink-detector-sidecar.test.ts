@@ -218,3 +218,94 @@ describe("isBenignSidecarStderr", () => {
 		expect(isBenignSidecarStderr("camera open failed")).toBe(false);
 	});
 });
+
+describe("BlinkDetectorSidecar NDJSON routing", () => {
+	function createSidecar() {
+		const { child } = createFakeChild();
+		const callbacks = {
+			onBlink: vi.fn(),
+			onFaceData: vi.fn(),
+			onVideoStream: vi.fn(),
+			onError: vi.fn(),
+			onCameraReady: vi.fn(),
+			shouldRetryCamera: () => false,
+		};
+		const sidecar = new BlinkDetectorSidecar(
+			{
+				root: "/app",
+				publicDir: "/app/public",
+				preload: "/app/preload.js",
+			} as never,
+			false,
+			new ChildProcessRegistry(),
+			{ ...DEFAULT_PREFERENCES },
+			callbacks,
+		);
+		attachRunningProcess(sidecar, child);
+		return { sidecar, child, callbacks };
+	}
+
+	function emitJson(child: FakeChild, payload: Record<string, unknown>): void {
+		child.stdout.emit(
+			"data",
+			Buffer.from(`${JSON.stringify(payload)}\n`),
+		);
+	}
+
+	it("routes blink, faceData, error, cameraReady, and videoStream", () => {
+		const { sidecar, child, callbacks } = createSidecar();
+
+		emitJson(child, { blink: true, ear: 0.12, time: 1.5 });
+		expect(callbacks.onBlink).toHaveBeenCalledWith({
+			blink: true,
+			ear: 0.12,
+			time: 1.5,
+		});
+
+		const faceData = { faceDetected: true, faceStatus: "ok", ear: 0.28 };
+		emitJson(child, { faceData });
+		expect(callbacks.onFaceData).toHaveBeenCalledWith(faceData);
+
+		emitJson(child, { error: "permission denied for camera" });
+		expect(callbacks.onError).toHaveBeenCalledWith(
+			"permission denied for camera",
+		);
+
+		emitJson(child, { status: SIDECAR_STATUS.cameraReady });
+		expect(sidecar.isCameraReady).toBe(true);
+		expect(callbacks.onCameraReady).toHaveBeenCalledOnce();
+
+		const frame = { jpeg: "abc" };
+		emitJson(child, { videoStream: frame });
+		expect(callbacks.onVideoStream).toHaveBeenCalledWith(frame);
+	});
+
+	it("ignores cameraState without treating it as a user-facing error", () => {
+		const { child, callbacks } = createSidecar();
+		emitJson(child, {
+			cameraState: { open: true, backend: "MSMF", black_ratio: 0 },
+		});
+		expect(callbacks.onError).not.toHaveBeenCalled();
+		expect(callbacks.onBlink).not.toHaveBeenCalled();
+		expect(callbacks.onFaceData).not.toHaveBeenCalled();
+		expect(callbacks.onCameraReady).not.toHaveBeenCalled();
+	});
+
+	it("skips invalid JSON lines without calling callbacks", () => {
+		const { child, callbacks } = createSidecar();
+		child.stdout.emit("data", Buffer.from("not-json\n"));
+		expect(callbacks.onBlink).not.toHaveBeenCalled();
+		expect(callbacks.onError).not.toHaveBeenCalled();
+	});
+
+	it("assembles a blink message split across stdout chunks", () => {
+		const { child, callbacks } = createSidecar();
+		child.stdout.emit("data", Buffer.from('{"blink":true,'));
+		expect(callbacks.onBlink).not.toHaveBeenCalled();
+		child.stdout.emit("data", Buffer.from('"ear":0.2}\n'));
+		expect(callbacks.onBlink).toHaveBeenCalledWith({
+			blink: true,
+			ear: 0.2,
+		});
+	});
+});

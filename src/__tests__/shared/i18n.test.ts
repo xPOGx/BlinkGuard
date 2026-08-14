@@ -4,15 +4,20 @@ import {
 	defaultLookAwayHint,
 	defaultLookAwayTitle,
 	defaultPopupMessage,
+	getCatalog,
 	pluralKey,
 	pluralSuffix,
+	resolveCatalog,
 	resolveExercisePrompts,
 	resolveLookAwayHint,
 	resolveLookAwayTitle,
 	resolvePopupMessage,
 	sanitizeLocale,
 	t,
+	type Locale,
 } from "../../../shared/i18n";
+import { en } from "../../../shared/i18n/en";
+import { uk } from "../../../shared/i18n/uk";
 import {
 	sanitizeExercisePrompts,
 	sanitizeLookAwayHint,
@@ -143,5 +148,23 @@ describe("locale-aware defaults", () => {
 		expect(sanitizeLookAwayTitle("  My title  ", "uk")).toBe("My title");
 		expect(sanitizeLookAwayHint(null, "uk")).toBe(defaultLookAwayHint("uk"));
 		expect(sanitizeLookAwayHint("  My hint  ", "en")).toBe("My hint");
+	});
+});
+
+describe("i18n catalog parity", () => {
+	it("has the same keys in en and uk catalogs", () => {
+		expect(Object.keys(uk).sort()).toEqual(Object.keys(en).sort());
+	});
+
+	it("resolveCatalog fills every EN key for uk", () => {
+		const catalog = resolveCatalog("uk");
+		expect(Object.keys(catalog).sort()).toEqual(Object.keys(en).sort());
+		expect(catalog["app.section.reminders"]).toBe("Нагадування");
+		expect(catalog["app.tagline"]).toBe(t("uk", "app.tagline"));
+	});
+
+	it("getCatalog falls back to English for an unknown locale", () => {
+		expect(getCatalog("uk")).toBe(uk);
+		expect(getCatalog("de" as Locale)).toBe(en);
 	});
 });

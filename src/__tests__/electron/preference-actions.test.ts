@@ -280,4 +280,105 @@ describe("PreferenceActions", () => {
 			snapshot,
 		);
 	});
+
+	it("resetPreferences stops tracking and restores defaults without replaying onboarding", () => {
+		const preferences = new PreferencesService(createStore());
+		preferences.set("isTracking", true);
+		preferences.set("locale", "uk");
+		preferences.set("cameraQuality", "high");
+		preferences.set("earCalibration", 0.25);
+		preferences.set("classifierBias", 0.4);
+		preferences.set("hasCompletedOnboarding", true);
+		preferences.set("launchAtLogin", true);
+		const reminders = { stop: vi.fn() };
+		const exercises = { stop: vi.fn() };
+		const lookAway = { stop: vi.fn() };
+		const focusPause = { recompute: vi.fn() };
+		const windows = {
+			sendPreferences: vi.fn(),
+			sendToMain: vi.fn(),
+			showCamera: vi.fn(),
+		};
+		const sidecar = {
+			startEarCalibration: vi.fn(),
+			cancelEarCalibration: vi.fn(),
+			applyCameraQuality: vi.fn(),
+			applyEarCalibration: vi.fn(),
+			applyClassifierCalibration: vi.fn(),
+		};
+		const shortcuts = { registerAll: vi.fn() };
+		const applyLaunchAtLogin = vi.fn();
+		const tray = { rebuildMenu: vi.fn() };
+		const actions = createActions(preferences, {
+			reminders,
+			exercises,
+			lookAway,
+			focusPause,
+			windows,
+			sidecar,
+			shortcuts,
+			applyLaunchAtLogin,
+			tray,
+		});
+
+		actions.resetPreferences();
+
+		expect(reminders.stop).toHaveBeenCalledWith(true);
+		expect(exercises.stop).toHaveBeenCalledOnce();
+		expect(lookAway.stop).toHaveBeenCalledOnce();
+		expect(sidecar.cancelEarCalibration).toHaveBeenCalledWith(
+			"Preferences reset",
+		);
+		expect(preferences.current.locale).toBe("en");
+		expect(preferences.current.cameraQuality).toBe("medium");
+		expect(preferences.current.earCalibration).toBeNull();
+		expect(preferences.current.classifierBias).toBeNull();
+		expect(preferences.current.isTracking).toBe(false);
+		expect(preferences.current.hasCompletedOnboarding).toBe(true);
+		expect(applyLaunchAtLogin).toHaveBeenCalledWith(false);
+		expect(shortcuts.registerAll).toHaveBeenCalledWith(
+			preferences.current.keyboardShortcuts,
+		);
+		expect(sidecar.applyCameraQuality).toHaveBeenCalledWith("medium");
+		expect(sidecar.applyEarCalibration).toHaveBeenCalledWith(null);
+		expect(sidecar.applyClassifierCalibration).toHaveBeenCalledWith(null);
+		expect(tray.rebuildMenu).toHaveBeenCalledWith("en");
+		expect(windows.sendPreferences).toHaveBeenCalledOnce();
+		expect(focusPause.recompute).toHaveBeenCalledOnce();
+	});
+
+	it("resetPreferences(true) skips stop when tracking is off and replays onboarding", () => {
+		const preferences = new PreferencesService(createStore());
+		preferences.set("isTracking", false);
+		preferences.set("hasCompletedOnboarding", true);
+		const reminders = { stop: vi.fn() };
+		const exercises = { stop: vi.fn() };
+		const lookAway = { stop: vi.fn() };
+		const focusPause = { recompute: vi.fn() };
+		const sidecar = {
+			startEarCalibration: vi.fn(),
+			cancelEarCalibration: vi.fn(),
+			applyCameraQuality: vi.fn(),
+			applyEarCalibration: vi.fn(),
+			applyClassifierCalibration: vi.fn(),
+		};
+		const actions = createActions(preferences, {
+			reminders,
+			exercises,
+			lookAway,
+			focusPause,
+			sidecar,
+		});
+
+		actions.resetPreferences(true);
+
+		expect(reminders.stop).not.toHaveBeenCalled();
+		expect(exercises.stop).toHaveBeenCalledOnce();
+		expect(lookAway.stop).toHaveBeenCalledOnce();
+		expect(sidecar.cancelEarCalibration).toHaveBeenCalledWith(
+			"Preferences reset",
+		);
+		expect(preferences.current.hasCompletedOnboarding).toBe(false);
+		expect(focusPause.recompute).toHaveBeenCalledOnce();
+	});
 });

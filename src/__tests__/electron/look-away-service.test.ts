@@ -233,4 +233,77 @@ describe("LookAwayService", () => {
 		expect(windows.showLookAway).not.toHaveBeenCalled();
 		expect(sound.play).not.toHaveBeenCalled();
 	});
+
+	it("does not show when the notification gate is closed", () => {
+		const preferences = createPreferences({ lookAwayInterval: 1 });
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const sound = createSound();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			sound,
+			{
+				notificationsAllowed: () => false,
+				pauseReason: () => "quiet-hours",
+			},
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(windows.showLookAway).not.toHaveBeenCalled();
+		expect(sound.play).not.toHaveBeenCalled();
+		expect(state.isLookAwayShowing).toBe(false);
+	});
+
+	it("clears showing state when showLookAway returns nothing", () => {
+		const preferences = createPreferences({ lookAwayInterval: 1 });
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 61_000);
+		const windows = createWindows();
+		windows.showLookAway = vi.fn(() => null);
+		const sound = createSound();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			sound,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(sound.play).toHaveBeenCalledWith("lookAway");
+		expect(windows.showLookAway).toHaveBeenCalledOnce();
+		expect(state.isLookAwayShowing).toBe(false);
+	});
+
+	it("resetTimer bumps lastLookAwayTime without opening a popup", () => {
+		const preferences = createPreferences({ lookAwayInterval: 1 });
+		const state = new AppRuntimeState();
+		const store = createStore();
+		const dueAt = Date.now() - 61_000;
+		store.set("lastLookAwayTime", dueAt);
+		const windows = createWindows();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			createSound(),
+		);
+
+		vi.setSystemTime(Date.now() + 1_000);
+		service.resetTimer();
+
+		expect(store.get("lastLookAwayTime", 0)).toBeGreaterThan(dueAt);
+		expect(windows.showLookAway).not.toHaveBeenCalled();
+	});
 });

@@ -1,0 +1,41 @@
+import { describe, expect, it } from "vitest";
+import {
+	NdjsonBuffer,
+	encodeSidecarMessage,
+} from "../../../electron/infrastructure/sidecar/protocol";
+
+describe("NdjsonBuffer", () => {
+	it("returns nothing until a newline arrives", () => {
+		const buffer = new NdjsonBuffer();
+		expect(buffer.push('{"blink":true')).toEqual([]);
+		expect(buffer.push(',"ear":0.2')).toEqual([]);
+	});
+
+	it("emits a complete line after a split chunk", () => {
+		const buffer = new NdjsonBuffer();
+		expect(buffer.push('{"blink":true')).toEqual([]);
+		expect(buffer.push(',"ear":0.2}\n')).toEqual(['{"blink":true,"ear":0.2}']);
+	});
+
+	it("emits multiple lines from one chunk and keeps a trailing partial", () => {
+		const buffer = new NdjsonBuffer();
+		expect(buffer.push('{"a":1}\n{"b":2}\n{"c":')).toEqual([
+			'{"a":1}',
+			'{"b":2}',
+		]);
+		expect(buffer.push("3}\n")).toEqual(['{"c":3}']);
+	});
+
+	it("accepts Buffer chunks", () => {
+		const buffer = new NdjsonBuffer();
+		expect(buffer.push(Buffer.from('{"ok":true}\n'))).toEqual(['{"ok":true}']);
+	});
+});
+
+describe("encodeSidecarMessage", () => {
+	it("writes one JSON object per newline-terminated line", () => {
+		expect(encodeSidecarMessage({ start_camera: true })).toBe(
+			'{"start_camera":true}\n',
+		);
+	});
+});
