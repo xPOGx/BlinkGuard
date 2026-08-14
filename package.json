@@ -27,6 +27,7 @@
 		"build:windows": "node scripts/prepare-python-windows.js && tsc && vite build && electron-builder --win nsis --config.win.signExecutable=false --publish never",
 		"build:windows:publish": "node scripts/publish-windows.js",
 		"generate:installer-assets": "node scripts/generate-installer-assets.js",
+		"generate:intro-video": "node scripts/intro_video/generate-intro-video.js",
 		"remove-quarantine": "node scripts/remove-quarantine.js",
 		"remove-quarantine:dmg": "node scripts/remove-quarantine.js --clean-dmg",
 		"lint": "npx @biomejs/biome check --write src",

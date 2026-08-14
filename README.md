@@ -26,6 +26,12 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 - **Diagnostics export** — local logs and interaction trail for support
 - **Cross-platform packaging** — Windows and macOS (Electron Builder)
 
+## Intro
+
+[![Watch the BlinkGuard intro](docs/intro/poster.png)](docs/intro/blinkguard-intro.mp4)
+
+Silent 18-second 1080p overview. Regenerate with `npm run generate:intro-video` after README screenshots change.
+
 ## Screenshots
 
 ![Reminders settings](docs/screenshots/settings-reminders.png)

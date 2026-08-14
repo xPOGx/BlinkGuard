@@ -96,3 +96,7 @@ docs/screenshots/_*.ps1
 docs/screenshots/_*.png
 docs/screenshots/_*.txt
 
+# Intro-video intermediates — committed outputs live in docs/intro/
+scripts/intro_video/_scratch/**
+!scripts/intro_video/_scratch/README.md
+

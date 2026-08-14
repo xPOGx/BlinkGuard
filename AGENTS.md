@@ -27,7 +27,7 @@ Pragmatic Clean Architecture with a thin `electron/main.ts` composition root. Fe
 Cursor rules under `.cursor/rules/` and project skills under `.cursor/skills/` document these seams (note: `.cursor/` is gitignored locally). Human-facing README/architecture docs may lag; prefer the rules when placing new code. Skills:
 
 - `blink-detector-sidecar` — NDJSON protocol, rebuild, JSONL analysis + Stage-0 EAR-trace corpus / `metrics.py` F1 gate + Stage-4 harvest/train via `python/log_tools/`
-- `readme-screenshots` — README product PNGs via `scripts/screenshot_tools/` (Windows)
+- `readme-screenshots` — README product PNGs via `scripts/screenshot_tools/` (Windows); intro MP4 via `npm run generate:intro-video`
 - `i18n-en-uk` — EN+UK catalogs, plurals, popup `data-i18n`
 - `preferences-sync-loops` — main↔renderer prefs bounce prevention
 - `ui-reuse` — read `.cursor/skills/ui-reuse/catalog.json` before creating/changing UI; reuse atoms/molecules/organisms

@@ -4,6 +4,10 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+### Added
+
+- Product intro video (`docs/intro/blinkguard-intro.mp4`)
+
 ## [2.8.0] - 2026-08-14
 
 ### Added
