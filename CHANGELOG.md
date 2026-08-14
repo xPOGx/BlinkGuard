@@ -4,9 +4,25 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-08-14
+
 ### Added
 
+- Achievements catalog and Progress tab
+- Camera device picker persisted in settings
+- Per-app foreground blocklist to pause reminders
 - Session: pause tracking on lid close, lock, and display sleep; restore after wake
+- Eye-care popups: keyboard a11y and click-through
+
+### Fixed
+
+- Camera: keep Logitech C170 face detect in daylight
+- Camera: keep desk-distance faces after lean-back
+- Settings: reset scroll when switching pages
+
+### Changed
+
+- Docs: Ko-fi and Open Collective in Support
 
 ## [2.7.1] - 2026-08-13
 

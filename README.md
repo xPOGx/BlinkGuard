@@ -16,8 +16,8 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 - **Customizable reminder popup** — drag to reposition, resize with edge handles, custom message, colors, and transparency
 - **Global keyboard shortcuts** — multi-action bindings (default includes `Ctrl+I`; rebindable)
 - **Sounds** — optional notification sounds for blink and exercise popups (per-kind volume)
-- **Quiet hours & fullscreen soft-pause** — hide popups when you ask for quiet time or go fullscreen
-- **Progress** — stats, goals/streaks, blink levels, rewards shop, and share-card preview in one nav section
+- **Quiet hours, fullscreen, and per-app pause** — hide popups during quiet time, fullscreen, or listed foreground apps
+- **Progress** — stats, goals/streaks, blink levels, achievements, rewards shop, and share-card preview in one nav section
 - **Backup** — export/import local prefs and stats as JSON
 - **Dark / light mode** · **EN / UK** localization
 - **Persistent preferences** — saved locally via `electron-store` (reset-to-defaults supported)
