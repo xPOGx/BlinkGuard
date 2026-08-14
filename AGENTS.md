@@ -10,7 +10,7 @@ Pragmatic Clean Architecture with a thin `electron/main.ts` composition root. Fe
 
 | Path | Notes |
 |---|---|
-| `shared/` | IPC channel constants/whitelists + preference types/defaults, backup envelope (`backup.ts`), diagnostics export result, profile image export (`profile-export.ts`), auto-update status (`auto-update.ts`), GitHub release notes (`release-notes.ts`), EAR-trace recording result (`trace-recording.ts`), camera quality / EAR / personal classifier calibration (`classifier-calibration.ts`), blink-rate (face-visible BPM coverage in camera mode) / blink-stats / blink-rewards / blink-profile (level math), `i18n/` (no Electron imports) |
+| `shared/` | IPC channel constants/whitelists + preference types/defaults, backup envelope (`backup.ts`), diagnostics export result, profile image export (`profile-export.ts`), auto-update status (`auto-update.ts`), GitHub release notes (`release-notes.ts`), EAR-trace recording result (`trace-recording.ts`), camera quality / EAR / personal classifier calibration (`classifier-calibration.ts`), blink-rate (face-visible BPM coverage in camera mode) / blink-stats / blink-rewards / blink-profile (level math), achievements catalog (`achievements.ts`), `i18n/` (no Electron imports) |
 | `electron/domain/` | Pure policies (`reminder-policy`, `focus-policy`, `session-activity-policy`, `blink-rate-coaching`) |
 | `electron/application/` | Runtime state + preferences / reminder / exercise / look-away / tracking-session (Start/Stop, including no-face auto-stop, pauses eye-care only when `eyeCareIndependentOfTracking` is false; default independent) / blink-stats / blink-rate-coaching / focus-pause / session-pause / preference-actions / deferred-tracking-restore and ports |
 | `electron/infrastructure/` | IPC, windows, lifecycle/power, sidecar, shortcuts, sound, store, process cleanup, paths/logging, profile PNG export, focus (Win+Mac fullscreen + foreground process/title probe + running-app picker list; stub elsewhere), session activity (Win+Mac lid / display-sleep probe; stub elsewhere), auto-update (`AutoUpdateService`: GitHub `/releases/latest` only; always re-check feed even when a package is staged so Restart installs current latest, not a sticky older download) |
@@ -18,7 +18,7 @@ Pragmatic Clean Architecture with a thin `electron/main.ts` composition root. Fe
 | `electron/preload.ts` | `contextBridge`; whitelists from `shared/ipc-channels` |
 | `src/app.tsx` | Settings shell (`BlinkGuardHomepage`) |
 | `src/components/` | Shared React UI (1 file = 1 component); catalog in `.cursor/skills/ui-reuse/catalog.json` |
-| `src/features/*` | Feature `model/` + `ui/` (reminders, camera, exercises, look-away, popup-appearance, statistics, profile, rewards, settings, onboarding, about, shortcuts, debug) |
+| `src/features/*` | Feature `model/` + `ui/` (reminders, camera, exercises, look-away, popup-appearance, statistics, profile, achievements, rewards, settings, onboarding, about, shortcuts, debug) |
 | `src/shared/ipc/` | Renderer IPC adapter |
 | `public/js`, `public/css` | Vanilla popup scripts/styles; panel transparency via CSS alpha in `theme.js` (not `BrowserWindow.setOpacity`); frosted panels use `.popup-glass` underlay blur; interactive dialog a11y in `popup-a11y.js` |
 | `python/blink_detector.py` | Thin entry |

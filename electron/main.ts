@@ -83,6 +83,8 @@ function bootstrap(): void {
 				weeklyBlinkGoal: preferences.weeklyBlinkGoal,
 				weeklyTrackingMinutesGoal: preferences.weeklyTrackingMinutesGoal,
 			}),
+		() => preferences.hasCompletedOnboarding,
+		() => preferences.earCalibration != null,
 	);
 	const state = new AppRuntimeState();
 	const processes = new ChildProcessRegistry();
@@ -173,6 +175,9 @@ function bootstrap(): void {
 					typeof payload.classifierBias === "number"
 				) {
 					windows.sendPreferences();
+				}
+				if (payload.baseline !== null) {
+					blinkStats.reconcileAchievements({ celebrate: "live" });
 				}
 				windows.sendToMain(IPC_CHANNELS.earCalibrationComplete, payload);
 			},
@@ -344,7 +349,10 @@ function bootstrap(): void {
 		checkForUpdates: () => autoUpdates.checkForUpdates({ interactive: true }),
 		installUpdate: () => autoUpdates.installUpdate(),
 		interactions: interactionLogger,
-		onShellReady: () => trackingRestore.onShellReady(),
+		onShellReady: () => {
+			blinkStats.reconcileAchievements({ celebrate: "summary" });
+			trackingRestore.onShellReady();
+		},
 		onSnoozeMinutesChanged: () => tray.rebuildMenu(),
 	});
 

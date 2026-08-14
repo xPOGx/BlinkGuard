@@ -35,6 +35,8 @@ export function ProfilePanel() {
 			todayBlinks: snapshot.today.blinks,
 			availableBlinks: snapshot.totals.available,
 			hasFlair: snapshot.hasStatsFlair,
+			achievementsUnlocked: snapshot.achievementsUnlocked,
+			achievementsTotal: snapshot.achievementsTotal,
 			progressRatio: progress.ratio,
 			progressCurrent: progress.current,
 			progressNeeded: progress.needed,
@@ -52,6 +54,8 @@ export function ProfilePanel() {
 			snapshot.streak.current,
 			snapshot.today.blinks,
 			snapshot.hasStatsFlair,
+			snapshot.achievementsUnlocked,
+			snapshot.achievementsTotal,
 		],
 	);
 
@@ -112,6 +116,12 @@ export function ProfilePanel() {
 										{t("stats.flair.badge")}
 									</span>
 								) : null}
+								<span className="inline-flex items-center rounded border border-teal-600/40 bg-teal-600/10 px-2 py-0.5 text-[11px] font-semibold uppercase leading-none tracking-wide text-teal-700 dark:text-teal-300">
+									{t("achievements.badge", {
+										unlocked: snapshot.achievementsUnlocked,
+										total: snapshot.achievementsTotal,
+									})}
+								</span>
 							</div>
 						</div>
 						<div>

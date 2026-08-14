@@ -23,6 +23,7 @@ import {
 	rewardOffers,
 	shiftDateKey,
 	spendBlinks,
+	toBlinkStatsSnapshot,
 	toDayChart,
 	todaySummary,
 	toMonthChart,
@@ -245,9 +246,27 @@ describe("blink-stats helpers", () => {
 		expect(normalized.totalBlinks).toBe(2);
 		expect(normalized.spentBlinks).toBe(0);
 		expect(normalized.unlockedRewardIds).toEqual([]);
+		expect(normalized.unlockedAchievementIds).toEqual([]);
 		expect(normalized.streakShieldCharges).toBe(0);
 		expect(normalized.rewardPurchaseCounts).toEqual({});
 		expect(normalized.shopDiscountLevel).toBe(0);
+	});
+
+	it("keeps valid achievement ids on normalize and snapshot", () => {
+		const normalized = normalizeBlinkStatsState({
+			days: [],
+			unlockedAchievementIds: ["firstBlink", "nope", "firstBlink"],
+			totalBlinks: 1,
+		});
+		expect(normalized.unlockedAchievementIds).toEqual(["firstBlink"]);
+		const snapshot = toBlinkStatsSnapshot(normalized);
+		expect(snapshot.unlockedAchievementIds).toEqual(["firstBlink"]);
+		expect(snapshot.achievementsUnlocked).toBe(1);
+		expect(snapshot.achievementsTotal).toBe(18);
+		expect(snapshot.achievementProgress.blinks1k).toEqual({
+			current: 1,
+			target: 1_000,
+		});
 	});
 
 	it("computes daily and weekly goal progress", () => {

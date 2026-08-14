@@ -1,4 +1,10 @@
 import {
+	achievementSnapshotFields,
+	isAchievementId,
+	type AchievementId,
+	type AchievementProgress,
+} from "./achievements";
+import {
 	BLINK_REWARD_IDS,
 	BLINK_REWARDS,
 	discountedRewardCost,
@@ -42,6 +48,8 @@ export type BlinkStatsState = {
 	spentBlinks: number;
 	/** One-time reward unlocks (e.g. statsFlair). */
 	unlockedRewardIds: BlinkRewardId[];
+	/** One-time achievement unlocks. */
+	unlockedAchievementIds: AchievementId[];
 	/** Purchased streak-shield charges (0 or 1). */
 	streakShieldCharges: number;
 	/** Local dates where a streak shield already covered a miss. */
@@ -115,6 +123,7 @@ export const DEFAULT_BLINK_STATS: BlinkStatsState = {
 	totalBlinks: 0,
 	spentBlinks: 0,
 	unlockedRewardIds: [],
+	unlockedAchievementIds: [],
 	streakShieldCharges: 0,
 	streakShieldUsedDates: [],
 	rewardPurchaseCounts: {},
@@ -160,6 +169,7 @@ function cloneState(state: BlinkStatsState): BlinkStatsState {
 		totalBlinks: state.totalBlinks,
 		spentBlinks: state.spentBlinks,
 		unlockedRewardIds: [...state.unlockedRewardIds],
+		unlockedAchievementIds: [...state.unlockedAchievementIds],
 		streakShieldCharges: state.streakShieldCharges,
 		streakShieldUsedDates: [...state.streakShieldUsedDates],
 		rewardPurchaseCounts: { ...state.rewardPurchaseCounts },
@@ -193,6 +203,7 @@ export function pruneDays(
 		totalBlinks: state.totalBlinks,
 		spentBlinks: state.spentBlinks,
 		unlockedRewardIds: state.unlockedRewardIds,
+		unlockedAchievementIds: state.unlockedAchievementIds,
 		streakShieldCharges: state.streakShieldCharges,
 		streakShieldUsedDates: state.streakShieldUsedDates.filter(
 			(date) => date >= cutoff,
@@ -677,6 +688,10 @@ export type BlinkStatsSnapshot = {
 	rewards: RewardOffer[];
 	/** True when stats-flair cosmetic is unlocked. */
 	hasStatsFlair: boolean;
+	unlockedAchievementIds: AchievementId[];
+	achievementsUnlocked: number;
+	achievementsTotal: number;
+	achievementProgress: Partial<Record<AchievementId, AchievementProgress>>;
 };
 
 export function toBlinkStatsSnapshot(
@@ -709,6 +724,13 @@ export function toBlinkStatsSnapshot(
 		streak,
 		rewards: rewardOffers(state),
 		hasStatsFlair: state.unlockedRewardIds.includes("statsFlair"),
+		...achievementSnapshotFields({
+			stats: state,
+			streak: streak.current,
+			goals,
+			hasCompletedOnboarding: false,
+			hasEarCalibration: false,
+		}),
 	};
 }
 
@@ -795,6 +817,15 @@ export function normalizeBlinkStatsState(raw: unknown): BlinkStatsState {
 		}
 	}
 
+	const unlockedAchievementIds: AchievementId[] = [];
+	if (Array.isArray(record.unlockedAchievementIds)) {
+		for (const id of record.unlockedAchievementIds) {
+			if (isAchievementId(id) && !unlockedAchievementIds.includes(id)) {
+				unlockedAchievementIds.push(id);
+			}
+		}
+	}
+
 	let streakShieldCharges = nonNegativeInt(record.streakShieldCharges) ?? 0;
 	streakShieldCharges = Math.min(1, streakShieldCharges);
 
@@ -844,6 +875,7 @@ export function normalizeBlinkStatsState(raw: unknown): BlinkStatsState {
 		totalBlinks: Math.max(totalBlinks, daysSum),
 		spentBlinks,
 		unlockedRewardIds,
+		unlockedAchievementIds,
 		streakShieldCharges,
 		streakShieldUsedDates,
 		rewardPurchaseCounts,

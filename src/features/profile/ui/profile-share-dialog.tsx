@@ -20,6 +20,7 @@ export type ProfileShareToggles = {
 	available: boolean;
 	date: boolean;
 	flair: boolean;
+	achievements: boolean;
 	dark: boolean;
 };
 
@@ -34,6 +35,7 @@ export function defaultShareToggles(dark: boolean): ProfileShareToggles {
 		available: true,
 		date: true,
 		flair: true,
+		achievements: true,
 		dark,
 	};
 }
@@ -50,6 +52,8 @@ export type ProfileShareDialogData = {
 	todayBlinks: number;
 	availableBlinks: number;
 	hasFlair: boolean;
+	achievementsUnlocked: number;
+	achievementsTotal: number;
 	progressRatio: number;
 	progressCurrent: number;
 	progressNeeded: number;
@@ -113,6 +117,15 @@ function buildCardInput(
 		stats.push({
 			label: t("profile.share.card.availableLabel"),
 			value: String(data.availableBlinks),
+		});
+	}
+	if (toggles.achievements) {
+		stats.push({
+			label: t("profile.share.card.achievementsLabel"),
+			value: t("achievements.badge", {
+				unlocked: data.achievementsUnlocked,
+				total: data.achievementsTotal,
+			}),
 		});
 	}
 
@@ -243,6 +256,7 @@ export function ProfileShareDialog({
 			label: t("profile.share.toggle.flair"),
 			show: frozenData.hasFlair,
 		},
+		{ key: "achievements", label: t("profile.share.toggle.achievements") },
 	];
 
 	return (

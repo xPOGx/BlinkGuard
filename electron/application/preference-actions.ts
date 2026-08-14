@@ -164,6 +164,14 @@ export class PreferenceActions {
 					this.blinkStats.getSnapshot(),
 				);
 			}
+		} else if (applyPrefs) {
+			this.blinkStats.reconcileAchievements({ celebrate: "summary" });
+			if (this.blinkStats.isLivePushEnabled()) {
+				this.windows.sendToMain(
+					IPC_CHANNELS.loadBlinkStats,
+					this.blinkStats.getSnapshot(),
+				);
+			}
 		}
 	}
 }

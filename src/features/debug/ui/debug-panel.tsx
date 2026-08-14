@@ -255,6 +255,42 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 
 			<SettingPanel>
 				<SettingRow
+					title={t("debug.achievements.title")}
+					description={t("debug.achievements.desc")}
+				>
+					<div className="space-y-3">
+						<SettingRow
+							title={t("debug.achievements.preview")}
+							description={t("debug.achievements.previewDesc")}
+							action={
+								<Button
+									type="button"
+									variant="secondary"
+									onClick={() => rendererIpc.debugPreviewAchievement()}
+								>
+									{t("debug.achievements.preview")}
+								</Button>
+							}
+						/>
+						<SettingRow
+							title={t("debug.achievements.previewSummary")}
+							description={t("debug.achievements.previewSummaryDesc")}
+							action={
+								<Button
+									type="button"
+									variant="secondary"
+									onClick={() => rendererIpc.debugPreviewAchievementSummary(3)}
+								>
+									{t("debug.achievements.previewSummary")}
+								</Button>
+							}
+						/>
+					</div>
+				</SettingRow>
+			</SettingPanel>
+
+			<SettingPanel>
+				<SettingRow
 					title={t("debug.trace.title")}
 					description={t("debug.trace.desc")}
 				>
@@ -265,8 +301,7 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 								variant="secondary"
 								disabled={traceRecording}
 								onClick={async () => {
-									const result =
-										await rendererIpc.startTraceRecording();
+									const result = await rendererIpc.startTraceRecording();
 									if (result.status === "started") {
 										setTraceRecording(true);
 										const base = result.path
@@ -275,9 +310,7 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 												})
 											: t("debug.trace.startedNoPath");
 										setTraceStatus(
-											result.message
-												? `${base} — ${result.message}`
-												: base,
+											result.message ? `${base} — ${result.message}` : base,
 										);
 										return;
 									}
@@ -285,9 +318,7 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 										setTraceStatus(t("debug.trace.cancelled"));
 										return;
 									}
-									setTraceStatus(
-										result.message || t("debug.trace.error"),
-									);
+									setTraceStatus(result.message || t("debug.trace.error"));
 								}}
 							>
 								{t("debug.trace.start")}
@@ -297,16 +328,13 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 								variant="secondary"
 								disabled={!traceRecording}
 								onClick={async () => {
-									const result =
-										await rendererIpc.stopTraceRecording();
+									const result = await rendererIpc.stopTraceRecording();
 									setTraceRecording(false);
 									if (result.status === "stopped") {
 										setTraceStatus(t("debug.trace.stopped"));
 										return;
 									}
-									setTraceStatus(
-										result.message || t("debug.trace.error"),
-									);
+									setTraceStatus(result.message || t("debug.trace.error"));
 								}}
 							>
 								{t("debug.trace.stop")}

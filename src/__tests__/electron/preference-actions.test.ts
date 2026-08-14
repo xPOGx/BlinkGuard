@@ -48,6 +48,7 @@ function createActions(
 			invalidateCharts: vi.fn(),
 			isLivePushEnabled: () => false,
 			getSnapshot: vi.fn(),
+			reconcileAchievements: vi.fn(),
 		}) as never,
 		(overrides.windows ?? {
 			sendPreferences: vi.fn(),
@@ -139,7 +140,10 @@ describe("PreferenceActions", () => {
 	it("showCameraWindow enables camera only when it was off", () => {
 		const preferences = new PreferencesService(createStore());
 		preferences.set("cameraEnabled", false);
-		const reminders = { ensureCameraActive: vi.fn(), stopCameraIfIdle: vi.fn() };
+		const reminders = {
+			ensureCameraActive: vi.fn(),
+			stopCameraIfIdle: vi.fn(),
+		};
 		const windows = {
 			sendPreferences: vi.fn(),
 			sendToMain: vi.fn(),
@@ -165,7 +169,10 @@ describe("PreferenceActions", () => {
 		const preferences = new PreferencesService(createStore());
 		preferences.set("cameraEnabled", true);
 		preferences.set("isTracking", false);
-		const reminders = { ensureCameraActive: vi.fn(), stopCameraIfIdle: vi.fn() };
+		const reminders = {
+			ensureCameraActive: vi.fn(),
+			stopCameraIfIdle: vi.fn(),
+		};
 		const windows = {
 			sendPreferences: vi.fn(),
 			sendToMain: vi.fn(),
@@ -195,6 +202,7 @@ describe("PreferenceActions", () => {
 			isLivePushEnabled: () => true,
 			getSnapshot: vi.fn(() => snapshot),
 			replaceState: vi.fn(),
+			reconcileAchievements: vi.fn(),
 		};
 		const windows = {
 			sendPreferences: vi.fn(),
@@ -245,6 +253,7 @@ describe("PreferenceActions", () => {
 				totalBlinks: 40,
 				spentBlinks: 0,
 				unlockedRewardIds: [],
+				unlockedAchievementIds: [],
 				streakShieldCharges: 0,
 				streakShieldUsedDates: [],
 				rewardPurchaseCounts: {},
@@ -279,6 +288,39 @@ describe("PreferenceActions", () => {
 			IPC_CHANNELS.loadBlinkStats,
 			snapshot,
 		);
+		expect(blinkStats.reconcileAchievements).not.toHaveBeenCalled();
+	});
+
+	it("applyBackup prefs-only reconciles achievements after prefs replace", () => {
+		const preferences = new PreferencesService(createStore());
+		const blinkStats = {
+			invalidateCharts: vi.fn(),
+			isLivePushEnabled: () => false,
+			getSnapshot: vi.fn(),
+			replaceState: vi.fn(),
+			reconcileAchievements: vi.fn(),
+		};
+		const sidecar = {
+			startEarCalibration: vi.fn(),
+			cancelEarCalibration: vi.fn(),
+			applyCameraQuality: vi.fn(),
+			applyEarCalibration: vi.fn(),
+			applyClassifierCalibration: vi.fn(),
+		};
+		const actions = createActions(preferences, { blinkStats, sidecar });
+
+		actions.applyBackup("preferences", {
+			preferences: {
+				...preferences.current,
+				hasCompletedOnboarding: true,
+				earCalibration: 0.25,
+			},
+		});
+
+		expect(blinkStats.replaceState).not.toHaveBeenCalled();
+		expect(blinkStats.reconcileAchievements).toHaveBeenCalledWith({
+			celebrate: "summary",
+		});
 	});
 
 	it("resetPreferences stops tracking and restores defaults without replaying onboarding", () => {

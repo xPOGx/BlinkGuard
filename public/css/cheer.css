@@ -80,6 +80,13 @@ body.cheer-body {
 	white-space: nowrap;
 }
 
+.cheer-text--stacked .cheer-message,
+.cheer-text--stacked .cheer-subtitle {
+	white-space: normal;
+	text-align: center;
+	max-width: 20rem;
+}
+
 .cheer-particle {
 	position: absolute;
 	z-index: 1;

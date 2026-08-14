@@ -15,6 +15,7 @@ import { useAutoUpdate } from "@/features/about/model/use-auto-update";
 import { AboutPanel } from "@/features/about/ui/about-panel";
 import { UpdateDialog } from "@/features/about/ui/update-dialog";
 import { UpdateToast } from "@/features/about/ui/update-toast";
+import { AchievementsPanel } from "@/features/achievements/ui/achievements-panel";
 import { useCameraStatus } from "@/features/camera/model/use-camera-status";
 import { CameraControls } from "@/features/camera/ui/camera-controls";
 import { CameraErrorBanner } from "@/features/camera/ui/camera-error-banner";
@@ -55,7 +56,7 @@ type SectionId =
 	| "about"
 	| "debug";
 
-type ProgressTabId = "statistics" | "profile" | "rewards";
+type ProgressTabId = "statistics" | "profile" | "achievements" | "rewards";
 
 export default function BlinkGuardHomepage() {
 	const {
@@ -171,6 +172,7 @@ function SettingsShell({
 	const progressTabs = [
 		{ id: "statistics" as const, label: t("app.progress.tab.statistics") },
 		{ id: "profile" as const, label: t("app.progress.tab.profile") },
+		{ id: "achievements" as const, label: t("app.progress.tab.achievements") },
 		{ id: "rewards" as const, label: t("app.progress.tab.rewards") },
 	];
 	const active = sections.find((item) => item.id === section) ?? sections[0];
@@ -301,6 +303,7 @@ function SettingsShell({
 										</>
 									)}
 									{progressTab === "profile" && <ProfilePanel />}
+									{progressTab === "achievements" && <AchievementsPanel />}
 									{progressTab === "rewards" && <RewardsShopPanel />}
 								</div>
 							</div>

@@ -182,6 +182,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		if (!isValidEarCalibration(baseline)) return;
 		preferences.set("earCalibration", baseline);
 		sidecar.applyEarCalibration(baseline);
+		blinkStats.reconcileAchievements({ celebrate: "live" });
 	});
 	on(IPC_CHANNELS.updateClassifierCalibration, (_event, payload: unknown) => {
 		const parsed = sanitizeClassifierCalibrationPayload(payload);
@@ -338,6 +339,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	});
 	on(IPC_CHANNELS.updateHasCompletedOnboarding, (_event, completed: unknown) => {
 		preferences.set("hasCompletedOnboarding", Boolean(completed));
+		if (completed) {
+			blinkStats.reconcileAchievements({ celebrate: "live" });
+		}
 	});
 	on(IPC_CHANNELS.updateQuietHoursEnabled, (_event, enabled: unknown) => {
 		preferences.set("quietHoursEnabled", Boolean(enabled));
@@ -400,6 +404,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		const resolved =
 			typeof level === "number" && Number.isFinite(level) ? level : undefined;
 		blinkStats.previewLevelUp(resolved);
+	});
+	on(IPC_CHANNELS.debugPreviewAchievement, (_event, id: unknown) => {
+		blinkStats.previewAchievement(id);
+	});
+	on(IPC_CHANNELS.debugPreviewAchievementSummary, (_event, count: unknown) => {
+		blinkStats.previewAchievementSummary(count);
 	});
 	on(
 		IPC_CHANNELS.debugSetProfileLevel,

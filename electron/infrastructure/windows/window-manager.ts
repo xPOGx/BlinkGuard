@@ -1,5 +1,9 @@
 import { BrowserWindow, screen } from "electron";
 import path from "node:path";
+import {
+	achievementTitleKey,
+	type CheerCelebration,
+} from "../../../shared/achievements";
 import type { DebugOverlayKind } from "../../../shared/debug-preview";
 import {
 	pluralKey,
@@ -341,21 +345,21 @@ export class WindowManager {
 		return !!this.blinkRateCoach && !this.blinkRateCoach.isDestroyed();
 	}
 
-	/** Short celebration toast after spending blinks on Cheer. */
-	showCheerToast(
-		celebration?: { kind?: "cheer" | "levelUp"; level?: number },
-	): void {
+	/** Short celebration toast after Cheer / level-up / achievement. */
+	showCheerToast(celebration?: CheerCelebration): void {
 		if (this.cheerToast && !this.cheerToast.isDestroyed()) {
 			this.hideCheerToast();
 		}
-		const isLevelUp = celebration?.kind === "levelUp";
+		const kind = celebration?.kind ?? "cheer";
+		const isStacked = kind !== "cheer";
 		const level =
-			typeof celebration?.level === "number" &&
+			celebration?.kind === "levelUp" &&
+			typeof celebration.level === "number" &&
 			Number.isFinite(celebration.level)
 				? Math.max(1, Math.floor(celebration.level))
 				: 1;
 		const width = 360;
-		const height = isLevelUp ? 140 : 120;
+		const height = isStacked ? 140 : 120;
 		const { x, y } = getTopCenterPopupPosition(width);
 		const popup = createPanelWindow(
 			{
@@ -371,10 +375,26 @@ export class WindowManager {
 		void popup.loadFile(path.join(this.paths.publicDir, "cheer.html"));
 		popup.webContents.on("did-finish-load", () => {
 			this.sendI18n(popup);
-			if (isLevelUp) {
+			if (isStacked) {
 				const locale = this.preferences.locale === "uk" ? "uk" : "en";
-				const message = t(locale, "popup.levelUp.message", { level });
-				const subtitle = t(locale, "popup.levelUp.subtitle");
+				let message = t(locale, "popup.levelUp.message", { level });
+				let subtitle = t(locale, "popup.levelUp.subtitle");
+				if (celebration?.kind === "achievement") {
+					message = t(locale, achievementTitleKey(celebration.id));
+					subtitle = t(locale, "popup.achievement.subtitle");
+				} else if (celebration?.kind === "achievementSummary") {
+					const count =
+						typeof celebration.count === "number" &&
+						Number.isFinite(celebration.count)
+							? Math.max(1, Math.floor(celebration.count))
+							: 1;
+					message = t(locale, "popup.achievementSummary.message");
+					subtitle = t(
+						locale,
+						pluralKey("popup.achievementSummary.subtitle", locale, count),
+						{ n: count },
+					);
+				}
 				void popup.webContents.executeJavaScript(
 					`(() => {
 						const msg = document.getElementById("cheer-message");

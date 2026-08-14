@@ -35,6 +35,7 @@ describe("backup document", () => {
 			totalBlinks: 12,
 			spentBlinks: 2,
 			unlockedRewardIds: ["statsFlair" as const],
+			unlockedAchievementIds: ["firstBlink" as const],
 			streakShieldCharges: 1,
 			streakShieldUsedDates: ["2026-07-30"],
 		};
@@ -62,6 +63,9 @@ describe("backup document", () => {
 		expect(parsed.value.blinkStats?.totalBlinks).toBe(12);
 		expect(parsed.value.blinkStats?.days[0]?.blinks).toBe(12);
 		expect(parsed.value.blinkStats?.unlockedRewardIds).toContain("statsFlair");
+		expect(parsed.value.blinkStats?.unlockedAchievementIds).toContain(
+			"firstBlink",
+		);
 	});
 
 	it("rejects wrong schema or version without applying soft defaults", () => {

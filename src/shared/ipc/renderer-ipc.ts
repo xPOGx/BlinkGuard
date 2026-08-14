@@ -209,6 +209,10 @@ export const rendererIpc = {
 	debugPreviewCheer: () => send(IPC_CHANNELS.debugPreviewCheer),
 	debugPreviewLevelUp: (level?: number) =>
 		send(IPC_CHANNELS.debugPreviewLevelUp, level),
+	debugPreviewAchievement: (id?: string) =>
+		send(IPC_CHANNELS.debugPreviewAchievement, id),
+	debugPreviewAchievementSummary: (count?: number) =>
+		send(IPC_CHANNELS.debugPreviewAchievementSummary, count),
 	debugSetProfileLevel: (level: number, celebrate = false) =>
 		send(IPC_CHANNELS.debugSetProfileLevel, level, celebrate),
 	debugSetShopReward: (

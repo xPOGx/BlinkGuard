@@ -37,19 +37,28 @@ import {
 	goalProgress,
 	rewardOffers,
 } from "../../shared/blink-stats";
+import {
+	achievementSnapshotFields,
+	evaluateAchievements,
+	isAchievementId,
+	mergeUnlockedAchievementIds,
+	newlyUnlockedAchievements,
+	type AchievementId,
+	type CheerCelebration,
+} from "../../shared/achievements";
 import type { Locale } from "../../shared/i18n";
 import {
 	DEFAULT_GOALS_CONFIG,
 } from "../../shared/preferences";
 import type { PreferenceStore } from "./ports/preference-store";
 
+export type { CheerCelebration };
+
+export type AchievementCelebrateMode = "none" | "live" | "summary";
+
 const TRACKING_FLUSH_MS = 15_000;
 const PUSH_THROTTLE_MS = 1_000;
 const RATE_TICK_MS = 1_000;
-
-export type CheerCelebration =
-	| { kind: "cheer" }
-	| { kind: "levelUp"; level: number };
 
 export type CheerRewardEffects = {
 	onCheer?: (celebration?: CheerCelebration) => void;
@@ -98,6 +107,8 @@ export class BlinkStatsService {
 		private readonly getGoals: () => GoalsConfig = () => ({
 			...DEFAULT_GOALS_CONFIG,
 		}),
+		private readonly getHasCompletedOnboarding: () => boolean = () => false,
+		private readonly getHasEarCalibration: () => boolean = () => false,
 	) {
 		this.state = normalizeBlinkStatsState(
 			this.store.get(BLINK_STATS_STORE_KEY, DEFAULT_BLINK_STATS),
@@ -164,6 +175,24 @@ export class BlinkStatsService {
 		this.cheerEffects.onCheer?.({ kind: "levelUp", level: resolved });
 	}
 
+	/** Dev Debug: play an achievement toast without changing stats. */
+	previewAchievement(id?: unknown): void {
+		const resolved = isAchievementId(id) ? id : "firstBlink";
+		this.cheerEffects.onCheer?.({ kind: "achievement", id: resolved });
+	}
+
+	/** Dev Debug: play the bulk-unlock summary toast without changing stats. */
+	previewAchievementSummary(count?: unknown): void {
+		const resolved =
+			typeof count === "number" && Number.isFinite(count)
+				? Math.max(1, Math.floor(count))
+				: 3;
+		this.cheerEffects.onCheer?.({
+			kind: "achievementSummary",
+			count: resolved,
+		});
+	}
+
 	/**
 	 * Dev Debug: set lifetime blinks to the threshold for `level`.
 	 * When `celebrate` is true, fires level-up FX for that level.
@@ -178,11 +207,13 @@ export class BlinkStatsService {
 			spentBlinks: Math.min(this.state.spentBlinks, totalBlinks),
 			days: this.state.days,
 			unlockedRewardIds: [...this.state.unlockedRewardIds],
+			unlockedAchievementIds: [...this.state.unlockedAchievementIds],
 			streakShieldUsedDates: [...this.state.streakShieldUsedDates],
 			rewardPurchaseCounts: { ...this.state.rewardPurchaseCounts },
 		};
 		this.markChartsDirty();
 		this.persist();
+		this.applyNewAchievements();
 		this.schedulePush(true);
 		if (celebrate) {
 			this.cheerEffects.onCheer?.({ kind: "levelUp", level: nextLevel });
@@ -200,6 +231,7 @@ export class BlinkStatsService {
 		const next = {
 			...this.state,
 			unlockedRewardIds: [...this.state.unlockedRewardIds],
+			unlockedAchievementIds: [...this.state.unlockedAchievementIds],
 			streakShieldUsedDates: [...this.state.streakShieldUsedDates],
 			rewardPurchaseCounts: { ...this.state.rewardPurchaseCounts },
 			days: this.state.days,
@@ -242,6 +274,7 @@ export class BlinkStatsService {
 		const next = {
 			...this.state,
 			unlockedRewardIds: [...this.state.unlockedRewardIds],
+			unlockedAchievementIds: [...this.state.unlockedAchievementIds],
 			streakShieldUsedDates: [...this.state.streakShieldUsedDates],
 			rewardPurchaseCounts: { ...this.state.rewardPurchaseCounts },
 			days: this.state.days,
@@ -300,6 +333,7 @@ export class BlinkStatsService {
 				hourlyBlinks: [...day.hourlyBlinks],
 			})),
 			unlockedRewardIds: [...this.state.unlockedRewardIds],
+			unlockedAchievementIds: [...this.state.unlockedAchievementIds],
 			streakShieldUsedDates: [...this.state.streakShieldUsedDates],
 		};
 	}
@@ -322,6 +356,7 @@ export class BlinkStatsService {
 		this.rateSessionStartedAt = null;
 		this.state = normalizeBlinkStatsState(state);
 		this.persist();
+		this.reconcileAchievements({ celebrate: "summary" });
 		if (wasTracking) {
 			this.onTrackingStart();
 		} else {
@@ -345,6 +380,13 @@ export class BlinkStatsService {
 		const locale = this.getLocale();
 		const goals = this.getGoals();
 		const streakResult = computeStreak(this.state, goals, now);
+		const achievementFields = achievementSnapshotFields({
+			stats: this.state,
+			streak: streakResult.streak.current,
+			goals,
+			hasCompletedOnboarding: this.getHasCompletedOnboarding(),
+			hasEarCalibration: this.getHasEarCalibration(),
+		});
 
 		if (
 			this.chartsDirty ||
@@ -370,7 +412,7 @@ export class BlinkStatsService {
 			};
 			this.chartsDirty = false;
 			this.cachedLocale = locale;
-			return full;
+			return { ...full, ...achievementFields };
 		}
 
 		return {
@@ -385,6 +427,7 @@ export class BlinkStatsService {
 			streak: streakResult.streak,
 			rewards: rewardOffers(this.state),
 			hasStatsFlair: this.state.unlockedRewardIds.includes("statsFlair"),
+			...achievementFields,
 		};
 	}
 
@@ -399,7 +442,10 @@ export class BlinkStatsService {
 		);
 		this.markChartsDirty();
 		this.persist();
-		if (nextLevel > prevLevel) {
+		const newly = this.applyNewAchievements(now);
+		if (newly.length > 0) {
+			this.celebrateAchievements(newly, "live");
+		} else if (nextLevel > prevLevel) {
 			this.cheerEffects.onCheer?.({ kind: "levelUp", level: nextLevel });
 		}
 		this.schedulePush();
@@ -426,8 +472,11 @@ export class BlinkStatsService {
 		this.state = next;
 		this.markChartsDirty();
 		this.persist();
+		const newly = this.applyNewAchievements();
 		if (rewardId === "cheer") {
 			this.cheerEffects.onCheer?.({ kind: "cheer" });
+		} else {
+			this.celebrateAchievements(newly, "live");
 		}
 		this.schedulePush(true);
 		return true;
@@ -444,6 +493,7 @@ export class BlinkStatsService {
 		this.persist();
 		this.startFlushTimer();
 		if (this.livePushEnabled) this.startRateTick();
+		this.reconcileAchievements({ celebrate: "live" }, now);
 		this.schedulePush();
 	}
 
@@ -475,9 +525,11 @@ export class BlinkStatsService {
 			...DEFAULT_BLINK_STATS,
 			days: [],
 			unlockedRewardIds: [],
+			unlockedAchievementIds: [],
 			streakShieldUsedDates: [],
 		};
 		this.persist();
+		this.reconcileAchievements({ celebrate: "none" });
 		if (wasTracking) {
 			this.onTrackingStart();
 		} else {
@@ -495,6 +547,64 @@ export class BlinkStatsService {
 			clearTimeout(this.pushTimer);
 			this.pushTimer = null;
 		}
+	}
+
+	/**
+	 * Re-evaluate achievements from current stats + prefs getters.
+	 * Persists newly earned ids and optionally celebrates.
+	 */
+	reconcileAchievements(
+		options: { celebrate?: AchievementCelebrateMode } = {},
+		now: Date = new Date(),
+	): AchievementId[] {
+		const newly = this.applyNewAchievements(now);
+		this.celebrateAchievements(newly, options.celebrate ?? "live");
+		if (newly.length > 0) this.schedulePush(true);
+		return newly;
+	}
+
+	private applyNewAchievements(now: Date = new Date()): AchievementId[] {
+		this.reconcileStreak(now);
+		const goals = this.getGoals();
+		const streak = computeStreak(this.state, goals, now).streak.current;
+		const earned = evaluateAchievements({
+			stats: this.state,
+			streak,
+			goals,
+			hasCompletedOnboarding: this.getHasCompletedOnboarding(),
+			hasEarCalibration: this.getHasEarCalibration(),
+		});
+		const newly = newlyUnlockedAchievements(
+			this.state.unlockedAchievementIds,
+			earned,
+		);
+		if (newly.length === 0) return [];
+		this.state = {
+			...this.state,
+			unlockedAchievementIds: mergeUnlockedAchievementIds(
+				this.state.unlockedAchievementIds,
+				earned,
+			),
+		};
+		this.persist();
+		return newly;
+	}
+
+	private celebrateAchievements(
+		newly: AchievementId[],
+		mode: AchievementCelebrateMode,
+	): void {
+		if (mode === "none" || newly.length === 0) return;
+		if (mode === "summary" || newly.length > 1) {
+			this.cheerEffects.onCheer?.({
+				kind: "achievementSummary",
+				count: newly.length,
+			});
+			return;
+		}
+		const id = newly[0];
+		if (!id) return;
+		this.cheerEffects.onCheer?.({ kind: "achievement", id });
 	}
 
 	/** Apply shield consumption for past misses and persist if changed. */
@@ -604,6 +714,7 @@ export class BlinkStatsService {
 			if (elapsed <= 0) return;
 			this.state = addTrackingMs(this.state, elapsed, now);
 			this.persist();
+			this.reconcileAchievements({ celebrate: "live" }, now);
 			return;
 		}
 
@@ -612,6 +723,7 @@ export class BlinkStatsService {
 		if (elapsed <= 0) return;
 		this.state = addTrackingMs(this.state, elapsed, now);
 		this.persist();
+		this.reconcileAchievements({ celebrate: "live" }, now);
 	}
 
 	private startFlushTimer(): void {

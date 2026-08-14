@@ -109,6 +109,20 @@ describe("settings shell", () => {
 		).toBeDefined();
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.subscribeBlinkStats);
 
+		fireEvent.click(screen.getByRole("tab", { name: "Achievements" }));
+		expect(screen.getByText("First blink")).toBeDefined();
+		expect(screen.getByText("Calibrated")).toBeDefined();
+
+		fireEvent.click(
+			screen.getByRole("button", { name: "Start, 0 of 3 unlocked" }),
+		);
+		expect(screen.queryByText("First blink")).toBeNull();
+		expect(screen.getByText("Calibrated")).toBeDefined();
+		fireEvent.click(
+			screen.getByRole("button", { name: "Start, 0 of 3 unlocked" }),
+		);
+		expect(screen.getByText("First blink")).toBeDefined();
+
 		fireEvent.click(screen.getByRole("button", { name: "About" }));
 		expect(screen.getByText("What it is")).toBeDefined();
 		expect(screen.getByText("Open source")).toBeDefined();

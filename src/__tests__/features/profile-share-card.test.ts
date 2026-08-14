@@ -64,4 +64,15 @@ describe("resolveShareCardContent", () => {
 		expect(content.stats).toHaveLength(2);
 		expect(content.progressRatio).toBe(1);
 	});
+
+	it("keeps an achievements count among share stats", () => {
+		const content = resolveShareCardContent({
+			brand: "BlinkGuard",
+			level: 4,
+			levelLabel: "Level 4",
+			stats: [{ label: "Achievements", value: "12/18" }],
+			dark: false,
+		});
+		expect(content.stats).toEqual([{ label: "Achievements", value: "12/18" }]);
+	});
 });

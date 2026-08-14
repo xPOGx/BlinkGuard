@@ -4,6 +4,8 @@ import type { PreferenceStore } from "../../../electron/application/ports/prefer
 import { BLINK_REWARDS } from "../../../shared/blink-rewards";
 import {
 	BLINK_STATS_STORE_KEY,
+	DEFAULT_BLINK_STATS,
+	emptyDayStats,
 	localDateKey,
 } from "../../../shared/blink-stats";
 
@@ -106,16 +108,19 @@ describe("BlinkStatsService", () => {
 	it("purchaseReward persists spent unlocks and clears them on reset", () => {
 		const store = createStore();
 		const onCheer = vi.fn();
-		const service = new BlinkStatsService(store, () => "en", () => ({
-			goalsEnabled: true,
-			dailyBlinkGoal: 10,
-			dailyTrackingMinutesGoal: 0,
-			weeklyBlinkGoal: 0,
-			weeklyTrackingMinutesGoal: 0,
-		}));
+		const service = new BlinkStatsService(
+			store,
+			() => "en",
+			() => ({
+				goalsEnabled: true,
+				dailyBlinkGoal: 10,
+				dailyTrackingMinutesGoal: 0,
+				weeklyBlinkGoal: 0,
+				weeklyTrackingMinutesGoal: 0,
+			}),
+		);
 		service.setCheerEffects({ onCheer });
-		const need =
-			BLINK_REWARDS.statsFlair.cost + BLINK_REWARDS.cheer.cost;
+		const need = BLINK_REWARDS.statsFlair.cost + BLINK_REWARDS.cheer.cost;
 		for (let i = 0; i < need; i += 1) service.recordBlink();
 		onCheer.mockClear();
 
@@ -144,13 +149,17 @@ describe("BlinkStatsService", () => {
 	it("debug reward grants and previewCheer skip spend", () => {
 		const store = createStore();
 		const onCheer = vi.fn();
-		const service = new BlinkStatsService(store, () => "en", () => ({
-			goalsEnabled: false,
-			dailyBlinkGoal: 0,
-			dailyTrackingMinutesGoal: 0,
-			weeklyBlinkGoal: 0,
-			weeklyTrackingMinutesGoal: 0,
-		}));
+		const service = new BlinkStatsService(
+			store,
+			() => "en",
+			() => ({
+				goalsEnabled: false,
+				dailyBlinkGoal: 0,
+				dailyTrackingMinutesGoal: 0,
+				weeklyBlinkGoal: 0,
+				weeklyTrackingMinutesGoal: 0,
+			}),
+		);
 		service.setCheerEffects({ onCheer });
 
 		expect(service.getSnapshot().hasStatsFlair).toBe(false);
@@ -174,13 +183,17 @@ describe("BlinkStatsService", () => {
 
 	it("debug shop discount level applies without spending", () => {
 		const store = createStore();
-		const service = new BlinkStatsService(store, () => "en", () => ({
-			goalsEnabled: false,
-			dailyBlinkGoal: 0,
-			dailyTrackingMinutesGoal: 0,
-			weeklyBlinkGoal: 0,
-			weeklyTrackingMinutesGoal: 0,
-		}));
+		const service = new BlinkStatsService(
+			store,
+			() => "en",
+			() => ({
+				goalsEnabled: false,
+				dailyBlinkGoal: 0,
+				dailyTrackingMinutesGoal: 0,
+				weeklyBlinkGoal: 0,
+				weeklyTrackingMinutesGoal: 0,
+			}),
+		);
 
 		service.setDebugShopDiscountLevel(3);
 		const offers = service.getSnapshot().rewards;
@@ -373,6 +386,7 @@ describe("BlinkStatsService", () => {
 			totalBlinks: 40,
 			spentBlinks: 5,
 			unlockedRewardIds: ["statsFlair"],
+			unlockedAchievementIds: [],
 			streakShieldCharges: 1,
 			streakShieldUsedDates: [],
 			rewardPurchaseCounts: { statsFlair: 1 },
@@ -388,6 +402,124 @@ describe("BlinkStatsService", () => {
 		service.reset();
 		expect(service.getPersistedState().totalBlinks).toBe(0);
 		expect(service.getPersistedState().days).toEqual([]);
+		service.dispose();
+	});
+
+	it("grants retro achievements once with a summary toast", () => {
+		const store = createStore();
+		store.set(BLINK_STATS_STORE_KEY, {
+			...DEFAULT_BLINK_STATS,
+			days: [
+				{
+					...emptyDayStats("2026-08-01"),
+					blinks: 1200,
+					sessions: 2,
+					trackingMs: 60_000,
+				},
+			],
+			totalBlinks: 1200,
+		});
+		const onCheer = vi.fn();
+		const service = new BlinkStatsService(
+			store,
+			() => "en",
+			() => ({
+				goalsEnabled: false,
+				dailyBlinkGoal: 0,
+				dailyTrackingMinutesGoal: 0,
+				weeklyBlinkGoal: 0,
+				weeklyTrackingMinutesGoal: 0,
+			}),
+			() => true,
+			() => true,
+		);
+		service.setCheerEffects({ onCheer });
+
+		const first = service.reconcileAchievements({ celebrate: "summary" });
+		expect(first).toEqual(
+			expect.arrayContaining([
+				"firstBlink",
+				"firstSession",
+				"gettingStarted",
+				"blinks1k",
+				"calibrated",
+			]),
+		);
+		expect(onCheer).toHaveBeenCalledTimes(1);
+		expect(onCheer.mock.calls[0]?.[0]).toMatchObject({
+			kind: "achievementSummary",
+			count: first.length,
+		});
+
+		onCheer.mockClear();
+		expect(service.reconcileAchievements({ celebrate: "summary" })).toEqual([]);
+		expect(onCheer).not.toHaveBeenCalled();
+		expect(service.getSnapshot().achievementsUnlocked).toBe(first.length);
+		service.dispose();
+	});
+
+	it("grants missing achievements on import with a summary toast", () => {
+		const store = createStore();
+		const onCheer = vi.fn();
+		const service = new BlinkStatsService(store);
+		service.setCheerEffects({ onCheer });
+
+		service.replaceState({
+			...DEFAULT_BLINK_STATS,
+			days: [
+				{
+					...emptyDayStats("2026-08-01"),
+					blinks: 1200,
+					sessions: 1,
+				},
+			],
+			totalBlinks: 1200,
+			unlockedAchievementIds: [],
+		});
+
+		expect(onCheer).toHaveBeenCalledTimes(1);
+		expect(onCheer.mock.calls[0]?.[0]).toMatchObject({
+			kind: "achievementSummary",
+		});
+		expect(service.getSnapshot().unlockedAchievementIds).toEqual(
+			expect.arrayContaining(["firstBlink", "firstSession", "blinks1k"]),
+		);
+		service.dispose();
+	});
+
+	it("celebrates a live first blink once then stays quiet", () => {
+		const store = createStore();
+		const onCheer = vi.fn();
+		const service = new BlinkStatsService(store);
+		service.setCheerEffects({ onCheer });
+
+		service.recordBlink();
+		expect(onCheer).toHaveBeenCalledWith({
+			kind: "achievement",
+			id: "firstBlink",
+		});
+		onCheer.mockClear();
+		service.recordBlink();
+		expect(onCheer).not.toHaveBeenCalled();
+		service.dispose();
+	});
+
+	it("keeps the cheer toast when unlocking firstCheer", () => {
+		const store = createStore();
+		const onCheer = vi.fn();
+		const service = new BlinkStatsService(store);
+		service.setCheerEffects({ onCheer });
+		for (let i = 0; i < BLINK_REWARDS.cheer.cost; i += 1) {
+			service.recordBlink();
+		}
+		onCheer.mockClear();
+
+		expect(service.purchaseReward("cheer")).toBe(true);
+		expect(onCheer).toHaveBeenCalledTimes(1);
+		expect(onCheer).toHaveBeenCalledWith({ kind: "cheer" });
+		expect(service.getSnapshot().unlockedAchievementIds).toContain(
+			"firstCheer",
+		);
 		service.dispose();
 	});
 });
