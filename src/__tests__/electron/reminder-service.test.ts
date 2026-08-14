@@ -794,4 +794,137 @@ describe("ReminderService preview camera", () => {
 
 		expect(sidecar.stopCamera).not.toHaveBeenCalled();
 	});
+
+	it("pauseForSession keeps isTracking and stops stats without a stopped popup", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: true,
+		});
+		const store = createStore();
+		const stats = {
+			recordBlink: vi.fn(),
+			onTrackingStart: vi.fn(),
+			onTrackingStop: vi.fn(),
+			onFaceVisibility: vi.fn(),
+			setFaceCoverageMode: vi.fn(),
+		};
+		const sidecar = createSidecar();
+		const windows = createWindows();
+		const sound = createSound();
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			windows,
+			sidecar,
+			sound,
+			store,
+			stats,
+		);
+
+		service.start(3000);
+		expect(preferences.isTracking).toBe(true);
+		expect(store.get("isTracking")).toBe(true);
+		vi.mocked(sidecar.stopCamera).mockClear();
+		stats.onTrackingStop.mockClear();
+		windows.showReminder.mockClear();
+		vi.mocked(sound.play).mockClear();
+
+		service.pauseForSession();
+
+		expect(preferences.isTracking).toBe(true);
+		expect(store.get("isTracking")).toBe(true);
+		expect(stats.onTrackingStop).toHaveBeenCalledTimes(1);
+		expect(sidecar.stopCamera).toHaveBeenCalled();
+		expect(service.isCameraSoftPaused).toBe(true);
+		expect(windows.showReminder).not.toHaveBeenCalledWith("stopped");
+		expect(sound.play).not.toHaveBeenCalledWith("stopped");
+	});
+
+	it("resumeAfterSleep does not persist a tracking restart when already on", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: false,
+		});
+		const store = createStore();
+		const stats = {
+			recordBlink: vi.fn(),
+			onTrackingStart: vi.fn(),
+			onTrackingStop: vi.fn(),
+			onFaceVisibility: vi.fn(),
+			setFaceCoverageMode: vi.fn(),
+		};
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			createWindows(),
+			createSidecar({ isRunning: false, isCameraReady: false }),
+			createSound(),
+			store,
+			stats,
+		);
+
+		service.start(3000);
+		service.pauseForSession();
+		stats.onTrackingStart.mockClear();
+		const setTrackingWrites: unknown[] = [];
+		const innerSet = store.set.bind(store);
+		store.set = (key, value) => {
+			if (key === "isTracking") setTrackingWrites.push(value);
+			innerSet(key, value);
+		};
+
+		service.resumeAfterSleep();
+
+		expect(preferences.isTracking).toBe(true);
+		expect(setTrackingWrites).toEqual([]);
+		expect(stats.onTrackingStart).toHaveBeenCalledTimes(1);
+	});
+
+	it("keeps the camera paused when session still holds after focus resume", () => {
+		const preferences = createPreferences({ cameraEnabled: true });
+		const sidecar = createSidecar({ isCameraReady: false });
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			createWindows(),
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+
+		service.pauseCameraForFocus("session");
+		vi.mocked(sidecar.startCamera).mockClear();
+		service.resumeCameraIfNeeded("focus");
+		expect(service.isCameraSoftPaused).toBe(true);
+		expect(sidecar.startCamera).not.toHaveBeenCalled();
+
+		service.resumeCameraIfNeeded("session");
+		expect(service.isCameraSoftPaused).toBe(false);
+		expect(sidecar.startCamera).toHaveBeenCalled();
+	});
+
+	it("pauseCameraForClamshell keeps tracking and falls back to timer reminders", () => {
+		const preferences = createPreferences({ cameraEnabled: true });
+		const sidecar = createSidecar();
+		const state = new AppRuntimeState();
+		const service = new ReminderService(
+			preferences,
+			state,
+			createWindows(),
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+
+		service.start(3000);
+		vi.mocked(sidecar.stopCamera).mockClear();
+		service.pauseCameraForClamshell();
+
+		expect(preferences.isTracking).toBe(true);
+		expect(service.isCameraSoftPaused).toBe(true);
+		expect(sidecar.stopCamera).toHaveBeenCalled();
+		expect(state.blinkReminderActive).toBe(true);
+		expect(state.blinkInterval).not.toBeNull();
+		service.ensureStopped();
+	});
 });

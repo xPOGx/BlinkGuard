@@ -4,6 +4,10 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+### Added
+
+- Session: pause tracking on lid close, lock, and display sleep; restore after wake
+
 ## [2.7.1] - 2026-08-13
 
 ### Fixed

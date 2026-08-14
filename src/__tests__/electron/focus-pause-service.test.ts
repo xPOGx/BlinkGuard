@@ -149,6 +149,24 @@ describe("FocusPauseService app-rule / fullscreen / quiet hours", () => {
 		expect(service.pauseReason()).toBe("fullscreen");
 		expect(pauseCameraForFocus).toHaveBeenCalled();
 	});
+
+	it("overlays session-idle on top of other pause reasons", () => {
+		const { service, sendToMain, closeReminder } = makeService();
+
+		service.setSessionIdle(true);
+
+		expect(service.pauseReason()).toBe("session-idle");
+		expect(service.notificationsAllowed()).toBe(false);
+		expect(closeReminder).toHaveBeenCalled();
+		expect(sendToMain).toHaveBeenCalledWith("focus-pause-state", {
+			reason: "session-idle",
+			fullscreenDetectionSupported: true,
+		});
+
+		service.setSessionIdle(false);
+		expect(service.pauseReason()).toBeNull();
+		expect(service.notificationsAllowed()).toBe(true);
+	});
 });
 
 describe("FocusPauseService lastExternalForeground", () => {

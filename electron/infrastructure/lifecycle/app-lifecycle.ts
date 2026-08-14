@@ -1,10 +1,7 @@
 import { app, powerMonitor } from "electron";
 import type { AppRuntimeState } from "../../application/app-runtime-state";
 import type { BlinkStatsService } from "../../application/blink-stats-service";
-import type { ExerciseService } from "../../application/exercise-service";
-import type { LookAwayService } from "../../application/look-away-service";
-import type { ReminderService } from "../../application/reminder-service";
-import type { AppPreferences } from "../../../shared/preferences";
+import type { SessionPauseService } from "../../application/session-pause-service";
 import type { ProcessCleanup } from "../process/process-cleanup";
 import type { WindowManager } from "../windows/window-manager";
 
@@ -14,11 +11,8 @@ export class AppLifecycle {
 	private trayDestroy: (() => void) | null = null;
 
 	constructor(
-		private readonly preferences: AppPreferences,
 		private readonly state: AppRuntimeState,
-		private readonly reminders: ReminderService,
-		private readonly exercises: ExerciseService,
-		private readonly lookAway: LookAwayService,
+		private readonly sessionPause: Pick<SessionPauseService, "setPowerFlags">,
 		private readonly windows: WindowManager,
 		private readonly cleanup: ProcessCleanup,
 		private readonly blinkStats: BlinkStatsService,
@@ -41,18 +35,16 @@ export class AppLifecycle {
 			void this.shutdown().then(() => app.quit());
 		});
 		powerMonitor.on("suspend", () => {
-			this.state.wasTrackingBeforeSleep = this.preferences.isTracking;
-			this.state.wasCameraEnabledBeforeSleep = this.preferences.cameraEnabled;
-			if (this.preferences.isTracking) this.reminders.ensureStopped();
+			this.sessionPause.setPowerFlags({ suspended: true });
 		});
 		powerMonitor.on("resume", () => {
-			this.exercises.resetTimer();
-			this.lookAway.resetTimer();
-			if (this.state.wasTrackingBeforeSleep) {
-				this.reminders.resumeAfterSleep(
-					this.state.wasCameraEnabledBeforeSleep,
-				);
-			}
+			this.sessionPause.setPowerFlags({ suspended: false });
+		});
+		powerMonitor.on("lock-screen", () => {
+			this.sessionPause.setPowerFlags({ locked: true });
+		});
+		powerMonitor.on("unlock-screen", () => {
+			this.sessionPause.setPowerFlags({ locked: false });
 		});
 		this.registerProcessSignals();
 	}

@@ -174,7 +174,7 @@ export const rendererIpc = {
 	updateLocale: (locale: string) => send(IPC_CHANNELS.updateLocale, locale),
 	onFocusPauseState: (
 		listener: (payload: {
-			reason: "quiet-hours" | "fullscreen" | "app-rule" | null;
+			reason: "quiet-hours" | "fullscreen" | "app-rule" | "session-idle" | null;
 			fullscreenDetectionSupported: boolean;
 		}) => void,
 	) => subscribe(IPC_CHANNELS.focusPauseState, listener),

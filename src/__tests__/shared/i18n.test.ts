@@ -38,6 +38,8 @@ describe("i18n t()", () => {
 		expect(t("uk", "popup.clickThrough")).toContain("попапи");
 		expect(t("en", "tray.snoozeExercise", { n: 5 })).toContain("5");
 		expect(t("uk", "tray.snoozeLookAway", { n: 2 })).toContain("2");
+		expect(t("en", "session.paused")).toBe("Paused: screen off");
+		expect(t("uk", "session.paused")).toBe("Пауза: екран вимкнено");
 	});
 
 	it("interpolates variables", () => {

@@ -404,6 +404,7 @@ export const uk: MessageCatalog = {
 		"Ховати спливаючі вікна моргання, вправ і «подивіться вдалину» у цей локальний час",
 	"quietHours.toggleAria": "Перемкнути тихі години",
 	"quietHours.paused": "Пауза: тихі години",
+	"session.paused": "Пауза: екран вимкнено",
 	"fullscreen.title": "Пауза на повноекранному режимі",
 	"fullscreen.description":
 		"Автопауза спливаючих вікон (і камери), коли інша програма на весь екран. У Windows, якщо вимкнено, для ігор краще Borderless Windowed або віконний режим.",

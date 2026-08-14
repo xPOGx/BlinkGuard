@@ -14,31 +14,31 @@ vi.mock("electron", () => ({ app, powerMonitor }));
 
 import { AppRuntimeState } from "../../../electron/application/app-runtime-state";
 import { AppLifecycle } from "../../../electron/infrastructure/lifecycle/app-lifecycle";
-import { DEFAULT_PREFERENCES } from "../../../shared/preferences";
 
 describe("AppLifecycle shutdown order", () => {
 	beforeEach(() => {
 		app.removeAllListeners();
 		app.quit.mockClear();
+		powerMonitor.on.mockClear();
 	});
 
 	afterEach(() => {
 		vi.useRealTimers();
 	});
 
-	function createLifecycle(cleanupRun: () => Promise<void>) {
+	function createLifecycle(
+		cleanupRun: () => Promise<void>,
+		sessionPause = { setPowerFlags: vi.fn() },
+	) {
 		const destroyAll = vi.fn();
 		const lifecycle = new AppLifecycle(
-			{ ...DEFAULT_PREFERENCES },
 			new AppRuntimeState(),
-			{} as never,
-			{} as never,
-			{} as never,
+			sessionPause,
 			{ destroyAll } as never,
 			{ run: cleanupRun, processes: {} as never } as never,
 			{ dispose: vi.fn() } as never,
 		);
-		return { lifecycle, destroyAll };
+		return { lifecycle, destroyAll, sessionPause };
 	}
 
 	it("listens for window-all-closed so Electron does not auto-quit", () => {
@@ -71,5 +71,27 @@ describe("AppLifecycle shutdown order", () => {
 		releaseCleanup();
 		await shuttingDown;
 		expect(order).toEqual(["cleanup-start", "cleanup-done", "destroyAll"]);
+	});
+
+	it("forwards suspend, resume, lock, and unlock to session pause", () => {
+		const handlers = new Map<string, () => void>();
+		powerMonitor.on.mockImplementation((event: string, handler: () => void) => {
+			handlers.set(event, handler);
+		});
+		const { lifecycle, sessionPause } = createLifecycle(async () => {});
+		lifecycle.register();
+
+		handlers.get("suspend")?.();
+		expect(sessionPause.setPowerFlags).toHaveBeenCalledWith({
+			suspended: true,
+		});
+		handlers.get("resume")?.();
+		expect(sessionPause.setPowerFlags).toHaveBeenCalledWith({
+			suspended: false,
+		});
+		handlers.get("lock-screen")?.();
+		expect(sessionPause.setPowerFlags).toHaveBeenCalledWith({ locked: true });
+		handlers.get("unlock-screen")?.();
+		expect(sessionPause.setPowerFlags).toHaveBeenCalledWith({ locked: false });
 	});
 });

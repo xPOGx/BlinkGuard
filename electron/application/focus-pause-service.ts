@@ -5,7 +5,10 @@ import {
 	resolveFocusPauseReason,
 	type FocusPauseReason,
 } from "../domain/focus-policy";
-import type { NotificationGate } from "./ports/notification-gate";
+import type {
+	NotificationGate,
+	NotificationPauseReason,
+} from "./ports/notification-gate";
 import type { FocusForegroundSnapshot } from "./ports/focus-environment-port";
 import { EMPTY_FOREGROUND_SNAPSHOT } from "./ports/focus-environment-port";
 import type { ReminderService } from "./reminder-service";
@@ -20,12 +23,13 @@ export interface FocusPauseWindowsPort {
 }
 
 export interface FocusPauseStatePayload {
-	reason: FocusPauseReason;
+	reason: NotificationPauseReason;
 	fullscreenDetectionSupported: boolean;
 }
 
 export class FocusPauseService implements NotificationGate {
 	private reason: FocusPauseReason = null;
+	private sessionIdle = false;
 	private cameraPausedForFocus = false;
 	private foreground: FocusForegroundSnapshot = EMPTY_FOREGROUND_SNAPSHOT;
 	private lastExternal: PauseAppRule | null = null;
@@ -40,11 +44,20 @@ export class FocusPauseService implements NotificationGate {
 	) {}
 
 	notificationsAllowed(): boolean {
-		return this.reason === null;
+		return !this.sessionIdle && this.reason === null;
 	}
 
-	pauseReason(): FocusPauseReason {
+	pauseReason(): NotificationPauseReason {
+		if (this.sessionIdle) return "session-idle";
 		return this.reason;
+	}
+
+	/** Full session pause (sleep / lock / display off) overlays other gates. */
+	setSessionIdle(idle: boolean): void {
+		if (this.sessionIdle === idle) return;
+		this.sessionIdle = idle;
+		if (idle) this.closeInterruptiveUi();
+		this.pushState();
 	}
 
 	setForeground(snapshot: FocusForegroundSnapshot): void {
@@ -125,7 +138,7 @@ export class FocusPauseService implements NotificationGate {
 
 	pushState(): void {
 		const payload: FocusPauseStatePayload = {
-			reason: this.reason,
+			reason: this.pauseReason(),
 			fullscreenDetectionSupported: this.fullscreenDetectionSupported,
 		};
 		this.windows.sendToMain(this.focusPauseChannel, payload);

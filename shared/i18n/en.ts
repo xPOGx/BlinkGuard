@@ -395,6 +395,7 @@ export const en: MessageCatalog = {
 		"Hide blink, exercise, and look-away popups during this local-time window",
 	"quietHours.toggleAria": "Toggle quiet hours",
 	"quietHours.paused": "Paused: quiet hours",
+	"session.paused": "Paused: screen off",
 	"fullscreen.title": "Pause while fullscreen",
 	"fullscreen.description":
 		"Auto-pause popups (and the camera) when another app is fullscreen. On Windows, prefer Borderless Windowed or Windowed mode if you leave this off while gaming.",

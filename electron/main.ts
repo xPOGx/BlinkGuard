@@ -12,6 +12,7 @@ import { PreferenceActions } from "./application/preference-actions";
 import { PreferencesService } from "./application/preferences-service";
 import { DeferredTrackingRestore } from "./application/deferred-tracking-restore";
 import { ReminderService } from "./application/reminder-service";
+import { SessionPauseService } from "./application/session-pause-service";
 import {
 	startTrackingSession,
 	stopTrackingSession,
@@ -30,6 +31,7 @@ import {
 	killOrphanedSidecarProcesses,
 	ProcessCleanup,
 } from "./infrastructure/process/process-cleanup";
+import { createSessionActivity } from "./infrastructure/session-activity/create-session-activity";
 import { BlinkDetectorSidecar } from "./infrastructure/sidecar/blink-detector-sidecar";
 import { ShortcutController } from "./infrastructure/shortcuts/shortcut-controller";
 import { NotificationSoundPlayer } from "./infrastructure/sound/notification-sound-player";
@@ -232,6 +234,17 @@ function bootstrap(): void {
 			showStatus,
 		),
 	);
+	const sessionPause = new SessionPauseService(
+		preferences,
+		state,
+		reminders,
+		exercises,
+		lookAway,
+		focusPause,
+	);
+	const sessionActivity = createSessionActivity((snapshot) => {
+		sessionPause.setEnvironment(snapshot);
+	});
 	const shortcuts = new ShortcutController(
 		preferences,
 		state,
@@ -254,11 +267,8 @@ function bootstrap(): void {
 		() => processCleanup.run(),
 	);
 	const lifecycle = new AppLifecycle(
-		preferences,
 		state,
-		reminders,
-		exercises,
-		lookAway,
+		sessionPause,
 		windows,
 		processCleanup,
 		blinkStats,
@@ -267,6 +277,8 @@ function bootstrap(): void {
 			focusMonitor.stop();
 			focusPause.stopQuietHoursWatch();
 			focusEnvironment.dispose?.();
+			sessionActivity.dispose();
+			sessionPause.dispose();
 			blinkRateCoaching.dispose();
 			autoUpdates.dispose();
 		},
@@ -376,6 +388,7 @@ function bootstrap(): void {
 
 		focusPause.startQuietHoursWatch();
 		focusMonitor.start();
+		sessionActivity.start();
 		windows.setOnMainLoaded(() => {
 			focusPause.pushState();
 		});

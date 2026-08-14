@@ -27,9 +27,11 @@ const ALLOW_ALL_GATE: NotificationGate = {
 	pauseReason: () => null,
 };
 
+export type CameraPauseReason = "focus" | "session";
+
 export class ReminderService {
 	private lastDetectedBlinkAt = 0;
-	private cameraSoftPaused = false;
+	private readonly cameraPauseReasons = new Set<CameraPauseReason>();
 	private trackingSessionStop: ((showStatus: boolean) => void) | null = null;
 
 	constructor(
@@ -76,7 +78,7 @@ export class ReminderService {
 	ensureStopped(): void {
 		this.state.clearReminderTimers();
 		this.state.isAutoResuming = false;
-		this.cameraSoftPaused = false;
+		this.cameraPauseReasons.clear();
 		this.coaching?.stop();
 		this.setTracking(false);
 		this.sidecar.stopCamera();
@@ -175,14 +177,53 @@ export class ReminderService {
 		}, NO_FACE_DEBOUNCE_MS);
 	}
 
-	resumeAfterSleep(useCamera: boolean): void {
+	/**
+	 * Pause reminder loops and camera without clearing persisted isTracking.
+	 * Stats stop so lid-closed time does not count as tracking minutes.
+	 */
+	pauseForSession(): void {
+		this.state.clearReminderTimers();
+		this.pauseCameraForFocus("session");
+		if (this.preferences.isTracking) this.stats?.onTrackingStop();
+	}
+
+	/**
+	 * Soft-pause the camera while the lid is closed but an external display
+	 * is still on. Timer blink reminders keep running.
+	 */
+	pauseCameraForClamshell(): void {
+		this.pauseCameraForFocus("session");
+		if (!this.preferences.isTracking) return;
+		this.state.clearReminderTimers();
+		this.startTimerLoop(false);
+	}
+
+	/**
+	 * Restore loops after sleep / lid-open. Does not persist isTracking.
+	 * `releaseCamera` drops the session camera hold; `restoreStats` restarts
+	 * tracking-minute accrual after {@link pauseForSession}.
+	 */
+	resumeAfterSleep(
+		options: { releaseCamera?: boolean; restoreStats?: boolean } = {},
+	): void {
+		const releaseCamera = options.releaseCamera ?? true;
+		const restoreStats = options.restoreStats ?? true;
+		if (releaseCamera) this.cameraPauseReasons.delete("session");
 		this.state.isAutoResuming = true;
 		this.creditBlink("sleep");
-		this.setTracking(true);
-		if (useCamera) {
-			this.startCameraMonitoring(false);
-		} else {
-			this.startTimerLoop();
+		if (restoreStats && this.preferences.isTracking) {
+			this.stats?.onTrackingStart();
+		}
+		this.state.clearReminderTimers();
+		if (this.preferences.isTracking) {
+			if (
+				this.preferences.cameraEnabled &&
+				this.cameraPauseReasons.size === 0
+			) {
+				this.startCameraMonitoring(false);
+			} else if (!this.preferences.cameraEnabled || !releaseCamera) {
+				this.startTimerLoop(false);
+			}
 		}
 		this.windows.sendPreferences();
 		setTimeout(() => {
@@ -267,9 +308,11 @@ export class ReminderService {
 		this.sidecar.stopCamera();
 	}
 
-	/** Soft-pause camera during fullscreen without clearing isTracking. */
-	pauseCameraForFocus(): void {
-		this.cameraSoftPaused = true;
+	/** Soft-pause camera during fullscreen / session without clearing isTracking. */
+	pauseCameraForFocus(reason: CameraPauseReason = "focus"): void {
+		const alreadyPaused = this.cameraPauseReasons.size > 0;
+		this.cameraPauseReasons.add(reason);
+		if (alreadyPaused) return;
 		this.coaching?.stop();
 		this.sidecar.stopCamera();
 		this.resetFaceTracking();
@@ -277,9 +320,10 @@ export class ReminderService {
 		this.windows.closeReminder();
 	}
 
-	/** Resume camera after fullscreen if the user is still tracking with camera on. */
-	resumeCameraIfNeeded(): void {
-		this.cameraSoftPaused = false;
+	/** Resume camera after fullscreen / session if tracking still wants capture. */
+	resumeCameraIfNeeded(reason: CameraPauseReason = "focus"): void {
+		this.cameraPauseReasons.delete(reason);
+		if (this.cameraPauseReasons.size > 0) return;
 		if (!this.preferences.isTracking || !this.preferences.cameraEnabled) {
 			return;
 		}
@@ -291,14 +335,14 @@ export class ReminderService {
 	}
 
 	get isCameraSoftPaused(): boolean {
-		return this.cameraSoftPaused;
+		return this.cameraPauseReasons.size > 0;
 	}
 
-	private startTimerLoop(): void {
+	private startTimerLoop(showImmediately = true): void {
 		this.stats?.setFaceCoverageMode(false);
 		this.coaching?.stop();
 		this.state.blinkReminderActive = true;
-		this.showBlinkReminder();
+		if (showImmediately) this.showBlinkReminder();
 		this.state.blinkInterval = setInterval(() => {
 			if (this.state.blinkReminderActive && this.preferences.isTracking) {
 				this.showBlinkReminder();
@@ -454,7 +498,7 @@ export class ReminderService {
 				isTracking: this.preferences.isTracking,
 				cameraEnabled: this.preferences.cameraEnabled,
 				autoStopNoFaceEnabled: this.preferences.autoStopNoFaceEnabled,
-				cameraSoftPaused: this.cameraSoftPaused,
+				cameraSoftPaused: this.isCameraSoftPaused,
 			})
 		) {
 			return;
@@ -470,7 +514,7 @@ export class ReminderService {
 					isTracking: this.preferences.isTracking,
 					cameraEnabled: this.preferences.cameraEnabled,
 					autoStopNoFaceEnabled: this.preferences.autoStopNoFaceEnabled,
-					cameraSoftPaused: this.cameraSoftPaused,
+					cameraSoftPaused: this.isCameraSoftPaused,
 				})
 			) {
 				return;

@@ -26,9 +26,9 @@ infrastructure (store, windows, process, sidecar adapters)
 |---|---|
 | `electron/main.ts` | Thin Vite entry + composition root: creates services/adapters, connects sidecar callbacks, and starts lifecycle. |
 | `electron/preload.ts` | `contextBridge` (`ipcRenderer`, `popupAPI`) + channel whitelists from `shared/`. |
-| `electron/domain/` | Pure policies (e.g. `reminder-policy.ts`). |
-| `electron/application/` | `AppRuntimeState`, preferences/reminder/exercise services, plus storage/runtime ports. |
-| `electron/infrastructure/` | Electron/Node adapters for IPC, windows, lifecycle/power, sidecar spawn/protocol, shortcuts, sound, store, process cleanup, paths and logging. |
+| `electron/domain/` | Pure policies (e.g. `reminder-policy.ts`, `focus-policy.ts`, `session-activity-policy.ts`). |
+| `electron/application/` | Runtime state; preferences / reminder / exercise / look-away / focus-pause / session-pause services, plus ports. |
+| `electron/infrastructure/` | Electron/Node adapters for IPC, windows, lifecycle/power, sidecar, shortcuts, sound, store, process cleanup, paths/logging, focus, session activity (Win+Mac lid / display-sleep; stub elsewhere). |
 | `shared/` | Electron-free contracts: IPC channel names, preference types/defaults, ms↔seconds helpers. |
 | `src/app.tsx` | React settings shell / layout. |
 | `src/features/*` | Feature UI + hooks (`settings`, `reminders`, `camera`, `exercises`, `popup-appearance`, `shortcuts`). |

@@ -57,7 +57,7 @@ export function QuietHoursFocusSettings({
 }: QuietHoursFocusSettingsProps) {
 	const t = useT();
 	const [pauseReason, setPauseReason] = useState<
-		"quiet-hours" | "fullscreen" | "app-rule" | null
+		"quiet-hours" | "fullscreen" | "app-rule" | "session-idle" | null
 	>(null);
 	const [fullscreenDetectionSupported, setFullscreenDetectionSupported] =
 		useState<boolean | null>(null);
@@ -89,13 +89,15 @@ export function QuietHoursFocusSettings({
 	}, []);
 
 	const statusLabel =
-		pauseReason === "quiet-hours"
-			? t("quietHours.paused")
-			: pauseReason === "fullscreen"
-				? t("fullscreen.paused")
-				: pauseReason === "app-rule"
-					? t("appRules.paused")
-					: null;
+		pauseReason === "session-idle"
+			? t("session.paused")
+			: pauseReason === "quiet-hours"
+				? t("quietHours.paused")
+				: pauseReason === "fullscreen"
+					? t("fullscreen.paused")
+					: pauseReason === "app-rule"
+						? t("appRules.paused")
+						: null;
 
 	const fullscreenUnsupported = fullscreenDetectionSupported === false;
 	const rules = preferences.pauseAppRules;
