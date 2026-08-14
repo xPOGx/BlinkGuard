@@ -145,6 +145,45 @@ describe("settings shell", () => {
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.unsubscribeBlinkStats);
 	});
 
+	it("resets content scroll when switching sections and progress tabs", () => {
+		render(<App />);
+
+		const remindersScroller = document.querySelector(
+			"main .overflow-y-auto",
+		) as HTMLElement;
+		expect(remindersScroller).toBeInstanceOf(HTMLElement);
+		remindersScroller.scrollTop = 120;
+		const canObserveScroll = remindersScroller.scrollTop === 120;
+
+		fireEvent.click(screen.getByRole("button", { name: "Camera" }));
+		const cameraScroller = document.querySelector(
+			"main .overflow-y-auto",
+		) as HTMLElement;
+		expect(cameraScroller).toBeInstanceOf(HTMLElement);
+		expect(cameraScroller).not.toBe(remindersScroller);
+		if (canObserveScroll) {
+			expect(cameraScroller.scrollTop).toBe(0);
+		}
+
+		fireEvent.click(screen.getByRole("button", { name: "Progress" }));
+		const statsScroller = document.querySelector(
+			"main .overflow-y-auto",
+		) as HTMLElement;
+		expect(statsScroller).toBeInstanceOf(HTMLElement);
+		statsScroller.scrollTop = 80;
+		const canObserveProgressScroll = statsScroller.scrollTop === 80;
+
+		fireEvent.click(screen.getByRole("tab", { name: "Profile" }));
+		const profileScroller = document.querySelector(
+			"main .overflow-y-auto",
+		) as HTMLElement;
+		expect(profileScroller).toBeInstanceOf(HTMLElement);
+		expect(profileScroller).not.toBe(statsScroller);
+		if (canObserveProgressScroll) {
+			expect(profileScroller.scrollTop).toBe(0);
+		}
+	});
+
 	it("disables fullscreen pause toggle when detection is unsupported", () => {
 		render(<App />);
 		hydratePreferences({ hasCompletedOnboarding: true });
