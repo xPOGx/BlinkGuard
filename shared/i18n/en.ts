@@ -402,6 +402,28 @@ export const en: MessageCatalog = {
 		"Fullscreen pause is available on Windows and macOS.",
 	"fullscreen.toggleAria": "Toggle pause while fullscreen",
 	"fullscreen.paused": "Paused: fullscreen / gaming",
+	"appRules.title": "Pause for specific apps",
+	"appRules.description":
+		"Auto-pause popups (and the camera) only while a matching app is in front — even if it is not fullscreen. Process is the exe or app name (Zoom.exe, zoom.us); window title is a substring.",
+	"appRules.unsupportedDescription":
+		"App pause rules are available on Windows and macOS.",
+	"appRules.processLabel": "Process",
+	"appRules.titleLabel": "Window title",
+	"appRules.addLastFocused": "Add last focused app",
+	"appRules.addLastFocusedNamed": "Add last focused: {name}",
+	"appRules.addLastFocusedEmpty":
+		"Switch to the app you want to pause for, then come back here.",
+	"appRules.runningLabel": "Running apps",
+	"appRules.runningPlaceholder": "Pick a running app",
+	"appRules.runningAria": "Add a pause rule from a running app",
+	"appRules.runningEmpty":
+		"No other apps found. Open the app, then refresh this list.",
+	"appRules.manual": "Or type the process and window title",
+	"appRules.add": "Add manually",
+	"appRules.removeAria": "Remove rule {n}",
+	"appRules.paused": "Paused: matching app",
+	"appRules.foregroundHint":
+		"Pause only while the listed app is in front, not merely because it is running. This settings window does not count — switch to the app to test.",
 
 	// Shortcuts
 	"shortcut.title": "Keyboard shortcuts",

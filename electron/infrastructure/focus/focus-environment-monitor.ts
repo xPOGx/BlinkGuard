@@ -1,22 +1,31 @@
 import type { FocusEnvironmentPort } from "../../application/ports/focus-environment-port";
+import {
+	EMPTY_FOREGROUND_SNAPSHOT,
+	sameForegroundSnapshot,
+	type FocusForegroundSnapshot,
+} from "../../application/ports/focus-environment-port";
 
 const DEFAULT_POLL_MS = 1500;
 
 /**
  * Polls the environment port on an interval so callers can read a fresh-ish
- * fullscreen signal without blocking the main process on every tick.
+ * foreground snapshot without blocking the main process on every tick.
  */
 export class FocusEnvironmentMonitor {
 	private timer: ReturnType<typeof setInterval> | null = null;
-	private fullscreen = false;
+	private snapshot: FocusForegroundSnapshot = EMPTY_FOREGROUND_SNAPSHOT;
 
 	constructor(
 		private readonly environment: FocusEnvironmentPort,
-		private readonly onChange?: (isFullscreen: boolean) => void,
+		private readonly onChange?: (snapshot: FocusForegroundSnapshot) => void,
 	) {}
 
 	get isFullscreen(): boolean {
-		return this.fullscreen;
+		return this.snapshot.isFullscreen;
+	}
+
+	get foreground(): FocusForegroundSnapshot {
+		return this.snapshot;
 	}
 
 	start(pollMs = DEFAULT_POLL_MS): void {
@@ -31,9 +40,9 @@ export class FocusEnvironmentMonitor {
 	}
 
 	private tick(): void {
-		const next = this.environment.isOtherAppFullscreen();
-		if (next === this.fullscreen) return;
-		this.fullscreen = next;
+		const next = this.environment.probeForeground();
+		if (sameForegroundSnapshot(next, this.snapshot)) return;
+		this.snapshot = next;
 		this.onChange?.(next);
 	}
 }

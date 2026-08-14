@@ -77,6 +77,8 @@ export const IPC_CHANNELS = {
 	updateQuietHoursStart: "update-quiet-hours-start",
 	updateQuietHoursEnd: "update-quiet-hours-end",
 	updatePauseOnFullscreen: "update-pause-on-fullscreen",
+	updatePauseAppRules: "update-pause-app-rules",
+	listPauseAppCandidates: "list-pause-app-candidates",
 	focusPauseState: "focus-pause-state",
 	updateBlinkRateCoachingEnabled: "update-blink-rate-coaching-enabled",
 	updateBlinkRateThreshold: "update-blink-rate-threshold",
@@ -185,6 +187,7 @@ export const MAIN_RENDERER_SEND_CHANNELS = [
 	IPC_CHANNELS.updateQuietHoursStart,
 	IPC_CHANNELS.updateQuietHoursEnd,
 	IPC_CHANNELS.updatePauseOnFullscreen,
+	IPC_CHANNELS.updatePauseAppRules,
 	IPC_CHANNELS.updateBlinkRateCoachingEnabled,
 	IPC_CHANNELS.updateBlinkRateThreshold,
 	IPC_CHANNELS.updateLocale,
@@ -213,4 +216,5 @@ export const MAIN_RENDERER_INVOKE_CHANNELS = [
 	IPC_CHANNELS.importBackup,
 	IPC_CHANNELS.startTraceRecording,
 	IPC_CHANNELS.stopTraceRecording,
+	IPC_CHANNELS.listPauseAppCandidates,
 ] as const;

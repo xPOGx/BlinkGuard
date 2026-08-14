@@ -38,6 +38,7 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updateQuietHoursStart: vi.fn(),
 		updateQuietHoursEnd: vi.fn(),
 		updatePauseOnFullscreen: vi.fn(),
+		updatePauseAppRules: vi.fn(),
 		updateBlinkRateCoachingEnabled: vi.fn(),
 		updateBlinkRateThreshold: vi.fn(),
 		updateLocale: vi.fn(),
@@ -308,6 +309,12 @@ describe("pushPreferenceDiff", () => {
 				weeklyTrackingMinutesGoal: 120,
 			}),
 		).toBe(false);
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				pauseAppRules: [{ processName: "zoom", windowTitle: "" }],
+			}),
+		).toBe(false);
 	});
 
 	it("pushes classifier calibration as one payload and does not touch locale", () => {
@@ -325,6 +332,22 @@ describe("pushPreferenceDiff", () => {
 			threshold: 0.2,
 		});
 		expect(rendererIpc.updateEarCalibration).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+	});
+
+	it("pushes only pauseAppRules when the blocklist changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = {
+			...previous,
+			pauseAppRules: [{ processName: "Zoom.exe", windowTitle: "" }],
+		};
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updatePauseAppRules).toHaveBeenCalledWith(
+			next.pauseAppRules,
+		);
+		expect(rendererIpc.updatePauseOnFullscreen).not.toHaveBeenCalled();
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 	});
 });

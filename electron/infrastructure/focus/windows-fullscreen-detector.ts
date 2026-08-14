@@ -1,18 +1,20 @@
-import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BrowserWindow, screen } from "electron";
-import type { FocusEnvironmentPort } from "../../application/ports/focus-environment-port";
-import {
-	isNearFullscreenCover,
-	parseProbeBounds,
-} from "./fullscreen-geometry";
+import { BrowserWindow } from "electron";
+import type {
+	FocusEnvironmentPort,
+	FocusForegroundSnapshot,
+} from "../../application/ports/focus-environment-port";
+import type { PauseAppRule } from "../../../shared/preferences";
+import { FocusHostSession } from "./focus-host-session";
 
 const HOST_SCRIPT = `
 Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 public static class BlinkGuardFg {
   [StructLayout(LayoutKind.Sequential)]
   public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
@@ -20,22 +22,77 @@ public static class BlinkGuardFg {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr hWnd);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+  [DllImport("kernel32.dll", SetLastError = true)] public static extern IntPtr OpenProcess(uint dwDesiredAccess, bool bInheritHandle, uint dwProcessId);
+  [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] public static extern bool QueryFullProcessImageName(IntPtr hProcess, uint dwFlags, StringBuilder lpExeName, ref uint lpdwSize);
+  [DllImport("kernel32.dll", SetLastError = true)] public static extern bool CloseHandle(IntPtr hObject);
+  public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
 }
 "@ | Out-Null
+
+function Sanitize-Token([string]$Value) {
+  if ([string]::IsNullOrEmpty($Value)) { return "" }
+  return (($Value -replace '[|\\r\\n]+', ' ').Trim())
+}
+
+function Get-FgIdentity([IntPtr]$Hwnd) {
+  $titleSb = New-Object System.Text.StringBuilder 512
+  [void][BlinkGuardFg]::GetWindowText($Hwnd, $titleSb, $titleSb.Capacity)
+  $title = Sanitize-Token $titleSb.ToString()
+  $procId = [uint32]0
+  [void][BlinkGuardFg]::GetWindowThreadProcessId($Hwnd, [ref]$procId)
+  $proc = ""
+  if ($procId -ne 0) {
+    $handle = [BlinkGuardFg]::OpenProcess([BlinkGuardFg]::PROCESS_QUERY_LIMITED_INFORMATION, $false, $procId)
+    if ($handle -ne [IntPtr]::Zero) {
+      try {
+        $size = [uint32]1024
+        $pathSb = New-Object System.Text.StringBuilder 1024
+        if ([BlinkGuardFg]::QueryFullProcessImageName($handle, 0, $pathSb, [ref]$size)) {
+          $proc = Sanitize-Token ([System.IO.Path]::GetFileName($pathSb.ToString()))
+        }
+      } finally {
+        [void][BlinkGuardFg]::CloseHandle($handle)
+      }
+    }
+  }
+  return "$proc|$title"
+}
 
 function Test-Fullscreen([string[]]$Exclude) {
   $hwnd = [BlinkGuardFg]::GetForegroundWindow()
   if ($hwnd -eq [IntPtr]::Zero) { return "0" }
   $id = $hwnd.ToInt64().ToString()
   if ($Exclude -contains $id) { return "0" }
-  if (-not [BlinkGuardFg]::IsWindowVisible($hwnd)) { return "0" }
-  if ([BlinkGuardFg]::IsIconic($hwnd)) { return "0" }
+  $tail = Get-FgIdentity $hwnd
+  if (-not [BlinkGuardFg]::IsWindowVisible($hwnd)) { return "0|||$tail" }
+  if ([BlinkGuardFg]::IsIconic($hwnd)) { return "0|||$tail" }
   $rect = New-Object BlinkGuardFg+RECT
-  if (-not [BlinkGuardFg]::GetWindowRect($hwnd, [ref]$rect)) { return "0" }
+  if (-not [BlinkGuardFg]::GetWindowRect($hwnd, [ref]$rect)) { return "0|||$tail" }
   $w = $rect.Right - $rect.Left
   $h = $rect.Bottom - $rect.Top
-  if ($w -le 0 -or $h -le 0) { return "0" }
-  return "1|$id|$($rect.Left)|$($rect.Top)|$($rect.Right)|$($rect.Bottom)"
+  if ($w -le 0 -or $h -le 0) { return "0|||$tail" }
+  return "1|$id|$($rect.Left)|$($rect.Top)|$($rect.Right)|$($rect.Bottom)|$tail"
+}
+
+function List-Apps([string[]]$Exclude) {
+  $items = @()
+  Get-Process -ErrorAction SilentlyContinue | ForEach-Object {
+    try {
+      if ($_.MainWindowHandle -eq [IntPtr]::Zero) { return }
+      $id = $_.MainWindowHandle.ToInt64().ToString()
+      if ($Exclude -contains $id) { return }
+      $title = Sanitize-Token ([string]$_.MainWindowTitle)
+      $name = [string]$_.ProcessName
+      if ([string]::IsNullOrEmpty($name)) { return }
+      $proc = Sanitize-Token ($name + ".exe")
+      $items += @{ p = $proc; t = $title }
+    } catch {}
+  }
+  $json = ConvertTo-Json -Compress -InputObject @($items)
+  if ($null -eq $json -or $json -eq "") { $json = "[]" }
+  return "L$json"
 }
 
 while ($true) {
@@ -43,36 +100,56 @@ while ($true) {
   if ($null -eq $line) { break }
   $line = $line.Trim()
   if ($line -eq "q") { break }
-  if ($line.StartsWith("c ")) {
+  if ($line.StartsWith("c ") -or $line.StartsWith("l ")) {
     $exclude = @()
     $rest = $line.Substring(2).Trim()
     if ($rest.Length -gt 0) {
       $exclude = $rest.Split(",") | Where-Object { $_ -ne "" }
     }
-    Write-Output (Test-Fullscreen $exclude)
+    if ($line.StartsWith("l ")) {
+      Write-Output (List-Apps $exclude)
+    } else {
+      Write-Output (Test-Fullscreen $exclude)
+    }
     [Console]::Out.Flush()
   }
 }
 `.trimStart();
 
 /**
- * Windows foreground fullscreen probe via a long-running PowerShell host
- * (Win32 GetForegroundWindow / GetWindowRect). No native Node addon.
+ * Windows foreground probe via a long-running PowerShell host
+ * (Win32 GetForegroundWindow / GetWindowRect / process image / title).
+ * Protocol: `c` → `0` | `0|||proc|title` | `1|hwnd|l|t|r|b|proc|title`;
+ * `l` → `L[{p,t},…]`.
  */
 export class WindowsFullscreenDetector implements FocusEnvironmentPort {
-	private host: ChildProcessWithoutNullStreams | null = null;
-	private buffer = "";
-	private pending: {
-		resolve: (value: string) => void;
-		reject: (error: Error) => void;
-	} | null = null;
-	private lastResult = false;
-	private inFlight = false;
 	private scriptPath: string | null = null;
+	private readonly session = new FocusHostSession(() =>
+		spawn(
+			"powershell.exe",
+			[
+				"-NoProfile",
+				"-NonInteractive",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				this.ensureScriptPath(),
+			],
+			{ stdio: ["pipe", "pipe", "pipe"], windowsHide: true },
+		),
+	);
 
 	isOtherAppFullscreen(): boolean {
-		void this.refresh();
-		return this.lastResult;
+		return this.probeForeground().isFullscreen;
+	}
+
+	probeForeground(): FocusForegroundSnapshot {
+		this.session.refreshProbe(ownWindowHwnds().join(","));
+		return this.session.snapshot;
+	}
+
+	listRunningApps(): Promise<PauseAppRule[]> {
+		return this.session.listRunningApps(ownWindowHwnds().join(","));
 	}
 
 	supportsFullscreenDetection(): boolean {
@@ -80,19 +157,7 @@ export class WindowsFullscreenDetector implements FocusEnvironmentPort {
 	}
 
 	dispose(): void {
-		if (this.pending) {
-			this.pending.reject(new Error("fullscreen detector disposed"));
-			this.pending = null;
-		}
-		if (this.host && !this.host.killed) {
-			try {
-				this.host.stdin.write("q\n");
-			} catch {
-				/* ignore */
-			}
-			this.host.kill();
-		}
-		this.host = null;
+		this.session.dispose();
 	}
 
 	private ensureScriptPath(): string {
@@ -101,93 +166,6 @@ export class WindowsFullscreenDetector implements FocusEnvironmentPort {
 		fs.writeFileSync(file, HOST_SCRIPT, "utf8");
 		this.scriptPath = file;
 		return file;
-	}
-
-	private ensureHost(): ChildProcessWithoutNullStreams | null {
-		if (this.host && !this.host.killed) return this.host;
-		try {
-			const child = spawn(
-				"powershell.exe",
-				[
-					"-NoProfile",
-					"-NonInteractive",
-					"-ExecutionPolicy",
-					"Bypass",
-					"-File",
-					this.ensureScriptPath(),
-				],
-				{ stdio: ["pipe", "pipe", "pipe"], windowsHide: true },
-			);
-			child.stdout.setEncoding("utf8");
-			child.stdout.on("data", (chunk: string) => {
-				this.buffer += chunk;
-				const newline = this.buffer.indexOf("\n");
-				if (newline === -1) return;
-				const line = this.buffer.slice(0, newline).trim();
-				this.buffer = this.buffer.slice(newline + 1);
-				if (this.pending) {
-					const { resolve } = this.pending;
-					this.pending = null;
-					resolve(line);
-				}
-			});
-			child.on("exit", () => {
-				this.host = null;
-				if (this.pending) {
-					this.pending.reject(new Error("fullscreen host exited"));
-					this.pending = null;
-				}
-			});
-			this.host = child;
-			return child;
-		} catch {
-			return null;
-		}
-	}
-
-	private async refresh(): Promise<void> {
-		if (this.inFlight) return;
-		this.inFlight = true;
-		try {
-			const line = await this.query();
-			this.lastResult = this.interpret(line);
-		} catch {
-			this.lastResult = false;
-		} finally {
-			this.inFlight = false;
-		}
-	}
-
-	private query(): Promise<string> {
-		const host = this.ensureHost();
-		if (!host) return Promise.resolve("0");
-		if (this.pending) {
-			return Promise.resolve(this.lastResult ? "1" : "0");
-		}
-		const handles = ownWindowHwnds().join(",");
-		return new Promise<string>((resolve, reject) => {
-			this.pending = { resolve, reject };
-			try {
-				host.stdin.write(`c ${handles}\n`);
-			} catch (error) {
-				this.pending = null;
-				reject(error instanceof Error ? error : new Error(String(error)));
-			}
-			setTimeout(() => {
-				if (this.pending?.resolve === resolve) {
-					this.pending = null;
-					reject(new Error("fullscreen probe timed out"));
-				}
-			}, 1500);
-		});
-	}
-
-	private interpret(line: string): boolean {
-		const bounds = parseProbeBounds(line);
-		if (!bounds) return false;
-
-		const display = screen.getDisplayMatching(bounds);
-		return isNearFullscreenCover(bounds, display.bounds);
 	}
 }
 

@@ -5,12 +5,14 @@ import {
 import {
 	DEFAULT_PREFERENCES,
 	sameKeyboardShortcuts,
+	samePauseAppRules,
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeExercisePrompts,
 	sanitizeKeyboardShortcuts,
 	sanitizeLookAwayHint,
 	sanitizeLookAwayTitle,
+	sanitizePauseAppRules,
 	sanitizePersistedPreferences,
 	sanitizeSnoozeMinutes,
 	sanitizeSoundVolume,
@@ -68,6 +70,12 @@ function samePreferenceValue(
 		return sameKeyboardShortcuts(
 			previous as KeyboardShortcuts,
 			next as KeyboardShortcuts,
+		);
+	}
+	if (key === "pauseAppRules") {
+		return samePauseAppRules(
+			previous as PersistedPreferences["pauseAppRules"],
+			next as PersistedPreferences["pauseAppRules"],
 		);
 	}
 	return false;
@@ -168,6 +176,8 @@ export class PreferencesService {
 			next = sanitizeClassifierBias(value) as PersistedPreferences[K];
 		} else if (key === "classifierThreshold") {
 			next = sanitizeClassifierThreshold(value) as PersistedPreferences[K];
+		} else if (key === "pauseAppRules") {
+			next = sanitizePauseAppRules(value) as PersistedPreferences[K];
 		}
 		// No-op equal writes: settings sync and dual IPC callers re-send often.
 		if (samePreferenceValue(key, this.current[key], next)) {

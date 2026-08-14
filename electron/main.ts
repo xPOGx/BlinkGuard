@@ -205,8 +205,8 @@ function bootstrap(): void {
 	gateHolder.current = focusPause;
 	const focusMonitor = new FocusEnvironmentMonitor(
 		focusEnvironment,
-		(isFullscreen) => {
-			focusPause.setFullscreen(isFullscreen);
+		(snapshot) => {
+			focusPause.setForeground(snapshot);
 		},
 	);
 
@@ -327,6 +327,7 @@ function bootstrap(): void {
 		windows,
 		blinkStats,
 		focusPause,
+		focusEnvironment,
 		sound,
 		checkForUpdates: () => autoUpdates.checkForUpdates({ interactive: true }),
 		installUpdate: () => autoUpdates.installUpdate(),

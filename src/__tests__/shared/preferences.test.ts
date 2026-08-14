@@ -20,6 +20,9 @@ import {
 	sanitizeKeyboardShortcuts,
 	sanitizeLookAwayHint,
 	sanitizeLookAwayTitle,
+	sanitizePauseAppCandidates,
+	sanitizePauseAppPickerPayload,
+	sanitizePauseAppRules,
 	sanitizePersistedPreferences,
 	sanitizeSnoozeMinutes,
 	sanitizeSoundVolume,
@@ -173,6 +176,7 @@ describe("quiet hours / focus preference defaults", () => {
 		expect(DEFAULT_PREFERENCES.quietHoursStart).toBe("22:00");
 		expect(DEFAULT_PREFERENCES.quietHoursEnd).toBe("08:00");
 		expect(DEFAULT_PREFERENCES.pauseOnFullscreen).toBe(true);
+		expect(DEFAULT_PREFERENCES.pauseAppRules).toEqual([]);
 	});
 });
 
@@ -317,5 +321,107 @@ describe("sanitizeLookAwayTitle / Hint", () => {
 	it("trims non-empty values", () => {
 		expect(sanitizeLookAwayTitle("  Hello  ")).toBe("Hello");
 		expect(sanitizeLookAwayHint("  Far away  ")).toBe("Far away");
+	});
+});
+
+describe("sanitizePauseAppRules", () => {
+	it("returns empty for non-arrays and empty drafts", () => {
+		expect(sanitizePauseAppRules(null)).toEqual([]);
+		expect(sanitizePauseAppRules("zoom")).toEqual([]);
+		expect(
+			sanitizePauseAppRules([{ processName: "  ", windowTitle: "" }]),
+		).toEqual([]);
+	});
+
+	it("trims fields, drops invalid items, and clamps length", () => {
+		expect(
+			sanitizePauseAppRules([
+				{ processName: "  Zoom.exe  ", windowTitle: "" },
+				{ processName: "", windowTitle: "  Meeting  " },
+				{ notARule: true },
+				"nope",
+				{
+					processName: "x".repeat(200),
+					windowTitle: "y".repeat(200),
+				},
+			]),
+		).toEqual([
+			{ processName: "Zoom.exe", windowTitle: "" },
+			{ processName: "", windowTitle: "Meeting" },
+			{ processName: "x".repeat(128), windowTitle: "y".repeat(128) },
+		]);
+	});
+
+	it("caps the list at 32 rules", () => {
+		const input = Array.from({ length: 40 }, (_, i) => ({
+			processName: `app${i}`,
+			windowTitle: "",
+		}));
+		expect(sanitizePauseAppRules(input)).toHaveLength(32);
+		expect(sanitizePauseAppRules(input)[31]).toEqual({
+			processName: "app31",
+			windowTitle: "",
+		});
+	});
+
+	it("hydrates missing pauseAppRules to []", () => {
+		expect(sanitizePersistedPreferences({}).pauseAppRules).toEqual([]);
+	});
+});
+
+describe("sanitizePauseAppCandidates", () => {
+	it("accepts host {p,t} rows and drops empties", () => {
+		expect(
+			sanitizePauseAppCandidates([
+				{ p: " Zoom.exe ", t: "Meeting" },
+				{ processName: "chrome.exe", windowTitle: "" },
+				{ p: "", t: "" },
+				"nope",
+			]),
+		).toEqual([
+			{ processName: "Zoom.exe", windowTitle: "Meeting" },
+			{ processName: "chrome.exe", windowTitle: "" },
+		]);
+	});
+
+	it("dedupes and caps picker rows at 64", () => {
+		const input = Array.from({ length: 80 }, (_, i) => ({
+			p: `app${i}.exe`,
+			t: "",
+		}));
+		input.push({ p: "app0.exe", t: "" });
+		expect(sanitizePauseAppCandidates(input)).toHaveLength(64);
+		expect(sanitizePauseAppCandidates(input)[0]).toEqual({
+			processName: "app0.exe",
+			windowTitle: "",
+		});
+	});
+});
+
+describe("sanitizePauseAppPickerPayload", () => {
+	it("returns an empty picker for garbage", () => {
+		expect(sanitizePauseAppPickerPayload(null)).toEqual({
+			lastFocused: null,
+			running: [],
+		});
+		expect(sanitizePauseAppPickerPayload({ status: "error" })).toEqual({
+			lastFocused: null,
+			running: [],
+		});
+	});
+
+	it("keeps lastFocused and running", () => {
+		expect(
+			sanitizePauseAppPickerPayload({
+				lastFocused: { p: "Zoom.exe", t: "ignored-for-parse" },
+				running: [{ processName: "chrome.exe", windowTitle: "Docs" }],
+			}),
+		).toEqual({
+			lastFocused: {
+				processName: "Zoom.exe",
+				windowTitle: "ignored-for-parse",
+			},
+			running: [{ processName: "chrome.exe", windowTitle: "Docs" }],
+		});
 	});
 });

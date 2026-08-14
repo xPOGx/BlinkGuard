@@ -18,10 +18,16 @@ describe("createFocusEnvironment", () => {
 		vi.clearAllMocks();
 	});
 
-	it("returns unsupported stub on linux", () => {
+	it("returns unsupported stub on linux", async () => {
 		const env = createFocusEnvironment("linux");
 		expect(env.supportsFullscreenDetection()).toBe(false);
 		expect(env.isOtherAppFullscreen()).toBe(false);
+		expect(env.probeForeground()).toEqual({
+			isFullscreen: false,
+			processName: null,
+			windowTitle: null,
+		});
+		await expect(env.listRunningApps()).resolves.toEqual([]);
 	});
 
 	it("returns a supported detector on win32", () => {

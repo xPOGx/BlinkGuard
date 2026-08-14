@@ -33,6 +33,98 @@ export interface PopupColors {
 
 export type CameraQuality = "performance" | "medium" | "high" | "ultra";
 
+/** Foreground match rule; empty fields are wildcards. Both empty is dropped. */
+export type PauseAppRule = {
+	processName: string;
+	windowTitle: string;
+};
+
+export const PAUSE_APP_RULE_FIELD_MAX = 128;
+export const PAUSE_APP_RULES_MAX = 32;
+export const PAUSE_APP_CANDIDATES_MAX = 64;
+
+export type PauseAppPickerPayload = {
+	lastFocused: PauseAppRule | null;
+	running: PauseAppRule[];
+};
+
+export function emptyPauseAppPicker(): PauseAppPickerPayload {
+	return { lastFocused: null, running: [] };
+}
+
+function pauseAppRuleFromUnknown(item: unknown): PauseAppRule | null {
+	if (!item || typeof item !== "object") return null;
+	const record = item as Record<string, unknown>;
+	const processRaw =
+		typeof record.processName === "string"
+			? record.processName
+			: typeof record.p === "string"
+				? record.p
+				: "";
+	const titleRaw =
+		typeof record.windowTitle === "string"
+			? record.windowTitle
+			: typeof record.t === "string"
+				? record.t
+				: "";
+	const processName = processRaw.trim().slice(0, PAUSE_APP_RULE_FIELD_MAX);
+	const windowTitle = titleRaw.trim().slice(0, PAUSE_APP_RULE_FIELD_MAX);
+	if (!processName && !windowTitle) return null;
+	return { processName, windowTitle };
+}
+
+/** Deduped running-app picker rows (process+title); not the persisted cap. */
+export function sanitizePauseAppCandidates(input: unknown): PauseAppRule[] {
+	if (!Array.isArray(input)) return [];
+	const seen = new Set<string>();
+	const cleaned: PauseAppRule[] = [];
+	for (const item of input) {
+		const rule = pauseAppRuleFromUnknown(item);
+		if (!rule) continue;
+		const key = `${rule.processName.toLowerCase()}\0${rule.windowTitle.toLowerCase()}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		cleaned.push(rule);
+		if (cleaned.length >= PAUSE_APP_CANDIDATES_MAX) break;
+	}
+	return cleaned;
+}
+
+export function sanitizePauseAppPickerPayload(
+	input: unknown,
+): PauseAppPickerPayload {
+	if (!input || typeof input !== "object") return emptyPauseAppPicker();
+	const record = input as Record<string, unknown>;
+	return {
+		lastFocused: pauseAppRuleFromUnknown(record.lastFocused),
+		running: sanitizePauseAppCandidates(record.running),
+	};
+}
+
+export function samePauseAppRules(a: PauseAppRule[], b: PauseAppRule[]): boolean {
+	return (
+		a.length === b.length &&
+		a.every(
+			(rule, index) =>
+				rule.processName === b[index].processName &&
+				rule.windowTitle === b[index].windowTitle,
+		)
+	);
+}
+
+/** Coerce stored/IPC app-rule blocklist; empty list disables the feature. */
+export function sanitizePauseAppRules(input: unknown): PauseAppRule[] {
+	if (!Array.isArray(input)) return [];
+	const cleaned: PauseAppRule[] = [];
+	for (const item of input) {
+		const rule = pauseAppRuleFromUnknown(item);
+		if (!rule) continue;
+		cleaned.push(rule);
+		if (cleaned.length >= PAUSE_APP_RULES_MAX) break;
+	}
+	return cleaned;
+}
+
 const BLINK_RATE_THRESHOLD_MIN = 1;
 const BLINK_RATE_THRESHOLD_MAX = 60;
 
@@ -338,6 +430,8 @@ export interface PersistedPreferences {
 	quietHoursEnd: string;
 	/** Suppress interruptive popups while another app is fullscreen. */
 	pauseOnFullscreen: boolean;
+	/** Foreground process/title blocklist; empty = off. */
+	pauseAppRules: PauseAppRule[];
 	/** First-run setup completed or skipped; false until Finish/Skip. */
 	hasCompletedOnboarding: boolean;
 	/** UI language for settings and popups. */
@@ -442,6 +536,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	quietHoursStart: "22:00",
 	quietHoursEnd: "08:00",
 	pauseOnFullscreen: true,
+	pauseAppRules: [],
 	hasCompletedOnboarding: false,
 	locale: "en",
 	goalsEnabled: DEFAULT_GOALS_CONFIG.goalsEnabled,
@@ -700,6 +795,7 @@ export function sanitizePersistedPreferences(
 			record.pauseOnFullscreen,
 			defaults.pauseOnFullscreen,
 		),
+		pauseAppRules: sanitizePauseAppRules(record.pauseAppRules),
 		hasCompletedOnboarding: asBoolean(
 			record.hasCompletedOnboarding,
 			defaults.hasCompletedOnboarding,

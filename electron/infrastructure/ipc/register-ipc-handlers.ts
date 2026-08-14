@@ -5,17 +5,20 @@ import { isCameraQuality } from "../../../shared/camera-quality";
 import { isBlinkRewardId } from "../../../shared/blink-rewards";
 import { isDebugOverlayKind, isDebugSoundKind } from "../../../shared/debug-preview";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
-import type { Point, PopupColors, Size } from "../../../shared/preferences";
+import type { PauseAppRule, Point, PopupColors, Size } from "../../../shared/preferences";
 import {
 	sameKeyboardShortcuts,
 	findDuplicateShortcutActions,
 	sanitizeGoalsConfig,
 	sanitizeKeyboardShortcuts,
+	sanitizePauseAppPickerPayload,
+	emptyPauseAppPicker,
 } from "../../../shared/preferences";
 import type { AppRuntimeState } from "../../application/app-runtime-state";
 import type { BlinkStatsService } from "../../application/blink-stats-service";
 import type { ExerciseService } from "../../application/exercise-service";
 import type { FocusPauseService } from "../../application/focus-pause-service";
+import type { FocusEnvironmentPort } from "../../application/ports/focus-environment-port";
 import type { LookAwayService } from "../../application/look-away-service";
 import type { PreferenceActions } from "../../application/preference-actions";
 import type { PreferencesService } from "../../application/preferences-service";
@@ -62,6 +65,7 @@ interface IpcDependencies {
 	windows: WindowManager;
 	blinkStats: BlinkStatsService;
 	focusPause: FocusPauseService;
+	focusEnvironment: FocusEnvironmentPort;
 	sound: NotificationSoundPort;
 	checkForUpdates: () => void;
 	installUpdate: () => void;
@@ -85,6 +89,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		windows,
 		blinkStats,
 		focusPause,
+		focusEnvironment,
 		sound,
 		checkForUpdates,
 		installUpdate,
@@ -354,6 +359,10 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		preferences.set("pauseOnFullscreen", Boolean(enabled));
 		focusPause.recompute();
 	});
+	on(IPC_CHANNELS.updatePauseAppRules, (_event, rules: unknown) => {
+		preferences.set("pauseAppRules", rules as PauseAppRule[]);
+		focusPause.recompute();
+	});
 	on(
 		IPC_CHANNELS.updateBlinkRateCoachingEnabled,
 		(_event, enabled: unknown) => {
@@ -585,6 +594,22 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		async (_event: IpcMainInvokeEvent) => {
 			interactions.logIpc(IPC_CHANNELS.stopTraceRecording, []);
 			return stopTraceRecordingSession(sidecar);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.listPauseAppCandidates,
+		async (_event: IpcMainInvokeEvent) => {
+			interactions.logIpc(IPC_CHANNELS.listPauseAppCandidates, []);
+			try {
+				const running = await focusEnvironment.listRunningApps();
+				return sanitizePauseAppPickerPayload({
+					lastFocused: focusPause.lastExternalForeground(),
+					running,
+				});
+			} catch {
+				return emptyPauseAppPicker();
+			}
 		},
 	);
 }

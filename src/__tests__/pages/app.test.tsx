@@ -69,6 +69,9 @@ beforeEach(() => {
 						],
 					};
 				}
+				if (channel === IPC_CHANNELS.listPauseAppCandidates) {
+					return { lastFocused: null, running: [] };
+				}
 				return { status: "error", message: "unexpected" };
 			}),
 			on: vi.fn((channel: string, listener: (...args: unknown[]) => void) => {

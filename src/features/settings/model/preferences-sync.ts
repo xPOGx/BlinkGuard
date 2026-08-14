@@ -3,6 +3,7 @@ import {
 	type Point,
 	type Size,
 	sameKeyboardShortcuts,
+	samePauseAppRules,
 } from "../../../../shared/preferences";
 import type { SettingsPreferences } from "./preferences";
 
@@ -76,6 +77,7 @@ export function sameRendererPrefs(
 		a.quietHoursStart === b.quietHoursStart &&
 		a.quietHoursEnd === b.quietHoursEnd &&
 		a.pauseOnFullscreen === b.pauseOnFullscreen &&
+		samePauseAppRules(a.pauseAppRules, b.pauseAppRules) &&
 		a.hasCompletedOnboarding === b.hasCompletedOnboarding &&
 		a.locale === b.locale &&
 		a.goalsEnabled === b.goalsEnabled &&
@@ -205,6 +207,12 @@ export function pushPreferenceDiff(
 	}
 	if (!previous || previous.pauseOnFullscreen !== next.pauseOnFullscreen) {
 		rendererIpc.updatePauseOnFullscreen(next.pauseOnFullscreen);
+	}
+	if (
+		!previous ||
+		!samePauseAppRules(previous.pauseAppRules, next.pauseAppRules)
+	) {
+		rendererIpc.updatePauseAppRules(next.pauseAppRules);
 	}
 	if (
 		!previous ||

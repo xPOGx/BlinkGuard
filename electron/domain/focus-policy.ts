@@ -1,4 +1,53 @@
-export type FocusPauseReason = "quiet-hours" | "fullscreen" | null;
+import type { PauseAppRule } from "../../shared/preferences";
+
+export type FocusPauseReason = "quiet-hours" | "fullscreen" | "app-rule" | null;
+
+export type PauseAppForeground = {
+	processName: string;
+	windowTitle: string;
+};
+
+function processBasename(value: string): string {
+	const trimmed = value.trim();
+	if (!trimmed) return "";
+	const segments = trimmed.split(/[/\\]/);
+	return (segments[segments.length - 1] ?? trimmed).toLowerCase();
+}
+
+function stripExeSuffix(name: string): string {
+	return name.replace(/\.exe$/i, "");
+}
+
+function processFieldMatches(ruleProcess: string, foregroundProcess: string): boolean {
+	const rule = processBasename(ruleProcess);
+	if (!rule) return true;
+	const foreground = processBasename(foregroundProcess);
+	if (!foreground) return false;
+	const ruleBare = stripExeSuffix(rule);
+	const foregroundBare = stripExeSuffix(foreground);
+	return foreground.includes(rule) || foregroundBare.includes(ruleBare);
+}
+
+export function matchesPauseAppRule(
+	rule: PauseAppRule,
+	foreground: PauseAppForeground,
+): boolean {
+	const process = rule.processName.trim();
+	const title = rule.windowTitle.trim();
+	if (!process && !title) return false;
+	const processOk = processFieldMatches(process, foreground.processName);
+	const titleOk =
+		!title ||
+		foreground.windowTitle.toLowerCase().includes(title.toLowerCase());
+	return processOk && titleOk;
+}
+
+export function foregroundMatchesAppRules(
+	rules: readonly PauseAppRule[],
+	foreground: PauseAppForeground,
+): boolean {
+	return rules.some((rule) => matchesPauseAppRule(rule, foreground));
+}
 
 const HH_MM = /^(\d{1,2}):(\d{2})(?::\d{2})?$/;
 
@@ -56,22 +105,25 @@ export function isInQuietHours(
 	return nowMinutes >= startMinutes || nowMinutes < endMinutes;
 }
 
-export function resolveFocusPauseReason(input: {
+export type ResolveFocusPauseInput = {
 	quietHoursEnabled: boolean;
 	inQuietHours: boolean;
 	pauseOnFullscreen: boolean;
 	isFullscreen: boolean;
-}): FocusPauseReason {
+	appRuleMatched: boolean;
+};
+
+export function resolveFocusPauseReason(
+	input: ResolveFocusPauseInput,
+): FocusPauseReason {
 	if (input.quietHoursEnabled && input.inQuietHours) return "quiet-hours";
 	if (input.pauseOnFullscreen && input.isFullscreen) return "fullscreen";
+	if (input.appRuleMatched) return "app-rule";
 	return null;
 }
 
-export function shouldSuppressNotifications(input: {
-	quietHoursEnabled: boolean;
-	inQuietHours: boolean;
-	pauseOnFullscreen: boolean;
-	isFullscreen: boolean;
-}): boolean {
+export function shouldSuppressNotifications(
+	input: ResolveFocusPauseInput,
+): boolean {
 	return resolveFocusPauseReason(input) !== null;
 }

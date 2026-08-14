@@ -11,12 +11,16 @@ import type {
 } from "../../../shared/debug-preview";
 import type { ExportDiagnosticsResult } from "../../../shared/diagnostics";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
-import type {
-	CameraQuality,
-	KeyboardShortcuts,
-	PopupColors,
-	RendererPreferences,
-	ShortcutErrorPayload,
+import {
+	type CameraQuality,
+	emptyPauseAppPicker,
+	type KeyboardShortcuts,
+	type PauseAppPickerPayload,
+	type PauseAppRule,
+	type PopupColors,
+	type RendererPreferences,
+	type ShortcutErrorPayload,
+	sanitizePauseAppPickerPayload,
 } from "../../../shared/preferences";
 import type { ExportProfileImageResult } from "../../../shared/profile-export";
 import type { GetReleaseNotesResult } from "../../../shared/release-notes";
@@ -151,6 +155,18 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateQuietHoursEnd, value),
 	updatePauseOnFullscreen: (enabled: boolean) =>
 		send(IPC_CHANNELS.updatePauseOnFullscreen, enabled),
+	updatePauseAppRules: (rules: PauseAppRule[]) =>
+		send(IPC_CHANNELS.updatePauseAppRules, rules),
+	listPauseAppCandidates: async (): Promise<PauseAppPickerPayload> => {
+		try {
+			const result = await bridge()?.invoke(
+				IPC_CHANNELS.listPauseAppCandidates,
+			);
+			return sanitizePauseAppPickerPayload(result);
+		} catch {
+			return emptyPauseAppPicker();
+		}
+	},
 	updateBlinkRateCoachingEnabled: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateBlinkRateCoachingEnabled, enabled),
 	updateBlinkRateThreshold: (threshold: number) =>
@@ -158,7 +174,7 @@ export const rendererIpc = {
 	updateLocale: (locale: string) => send(IPC_CHANNELS.updateLocale, locale),
 	onFocusPauseState: (
 		listener: (payload: {
-			reason: "quiet-hours" | "fullscreen" | null;
+			reason: "quiet-hours" | "fullscreen" | "app-rule" | null;
 			fullscreenDetectionSupported: boolean;
 		}) => void,
 	) => subscribe(IPC_CHANNELS.focusPauseState, listener),

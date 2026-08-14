@@ -183,9 +183,7 @@ describe("PreferencesService", () => {
 		expect(service.current.lookAwayTitle).toBe(
 			DEFAULT_PREFERENCES.lookAwayTitle,
 		);
-		expect(service.current.lookAwayHint).toBe(
-			DEFAULT_PREFERENCES.lookAwayHint,
-		);
+		expect(service.current.lookAwayHint).toBe(DEFAULT_PREFERENCES.lookAwayHint);
 	});
 
 	it("sanitizes blinkRateThresholdPerMin on load and set()", () => {
@@ -295,6 +293,9 @@ describe("PreferencesService", () => {
 		service.set("soundVolume", 150);
 		expect(service.current.soundVolume).toBe(100);
 		expect(store.setCounts.get("soundVolume")).toBe(2);
+
+		service.set("pauseAppRules", []);
+		expect(store.setCounts.get("pauseAppRules") ?? 0).toBe(0);
 	});
 
 	it("sanitizes invalid autoStopNoFaceMinutes on hydrate", () => {
@@ -439,5 +440,28 @@ describe("PreferencesService", () => {
 		expect(service.current.cameraQuality).toBe(
 			DEFAULT_PREFERENCES.cameraQuality,
 		);
+	});
+
+	it("sanitizes pauseAppRules on set() and hydrates missing to []", () => {
+		const store = new FakePreferenceStore();
+		const service = new PreferencesService(store);
+		expect(service.current.pauseAppRules).toEqual([]);
+
+		service.set("pauseAppRules", [
+			{ processName: "  zoom  ", windowTitle: "" },
+			{ processName: "", windowTitle: "  " },
+		] as never);
+		expect(service.current.pauseAppRules).toEqual([
+			{ processName: "zoom", windowTitle: "" },
+		]);
+		expect(store.get("pauseAppRules")).toEqual([
+			{ processName: "zoom", windowTitle: "" },
+		]);
+
+		service.set("pauseAppRules", [{ processName: "zoom", windowTitle: "" }]);
+		expect(store.setCounts.get("pauseAppRules")).toBe(1);
+
+		service.set("pauseAppRules", [{ processName: "", windowTitle: "" }]);
+		expect(service.current.pauseAppRules).toEqual([]);
 	});
 });

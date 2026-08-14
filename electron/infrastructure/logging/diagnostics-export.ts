@@ -161,6 +161,7 @@ function buildAlgorithmPrefs(
 		quietHoursStart: preferences.quietHoursStart,
 		quietHoursEnd: preferences.quietHoursEnd,
 		pauseOnFullscreen: preferences.pauseOnFullscreen,
+		pauseAppRules: preferences.pauseAppRules,
 	};
 }
 

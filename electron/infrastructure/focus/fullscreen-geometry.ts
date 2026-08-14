@@ -1,3 +1,9 @@
+import {
+	sanitizePauseAppCandidates,
+	type PauseAppRule,
+} from "../../../shared/preferences";
+import type { FocusForegroundSnapshot } from "../../application/ports/focus-environment-port";
+
 /** Minimum fraction of display area a window must cover to count as fullscreen. */
 export const FULLSCREEN_COVER_RATIO = 0.95;
 
@@ -40,6 +46,7 @@ export function isNearFullscreenCover(
 
 /**
  * Parse a probe line `1|id|left|top|right|bottom` into bounds, or null.
+ * Extra trailing fields (process/title) are ignored.
  */
 export function parseProbeBounds(line: string): RectBounds | null {
 	if (!line || line === "0") return null;
@@ -54,4 +61,73 @@ export function parseProbeBounds(line: string): RectBounds | null {
 	const height = Math.max(0, bottom - top);
 	if (width === 0 || height === 0) return null;
 	return { x: left, y: top, width, height };
+}
+
+function identityTokens(
+	processName: string | undefined,
+	windowTitle: string | undefined,
+): { processName: string | null; windowTitle: string | null } {
+	return {
+		processName: processName?.trim() || null,
+		windowTitle: windowTitle?.trim() || null,
+	};
+}
+
+/**
+ * Parse trailing process/title from a probe line:
+ * `0|||proc|title`, `F|||proc|title`, or `1|id|l|t|r|b|proc|title`.
+ */
+export function parseForegroundIdentity(line: string): {
+	processName: string | null;
+	windowTitle: string | null;
+} {
+	if (!line) return { processName: null, windowTitle: null };
+	const parts = line.split("|");
+	const kind = parts[0];
+	if (kind === "1") {
+		if (parts.length < 8) return { processName: null, windowTitle: null };
+		return identityTokens(parts[6], parts[7]);
+	}
+	if (kind === "0" || kind === "F") {
+		if (parts.length < 5) return { processName: null, windowTitle: null };
+		return identityTokens(parts[3], parts[4]);
+	}
+	return { processName: null, windowTitle: null };
+}
+
+/**
+ * Probe line → snapshot. `F…` is macOS Space fullscreen; otherwise cover-ratio.
+ */
+export function interpretForegroundSnapshot(
+	line: string,
+	displayBounds: (bounds: RectBounds) => RectBounds,
+): FocusForegroundSnapshot {
+	const identity = parseForegroundIdentity(line);
+	let isFullscreen = line.startsWith("F");
+	if (!isFullscreen) {
+		const bounds = parseProbeBounds(line);
+		if (bounds) {
+			isFullscreen = isNearFullscreenCover(bounds, displayBounds(bounds));
+		}
+	}
+	return {
+		isFullscreen,
+		processName: identity.processName,
+		windowTitle: identity.windowTitle,
+	};
+}
+
+/**
+ * Parse a running-app list line `L[{...}]` from the Win/mac host.
+ * Host JSON uses `{p,t}` keys; extra/invalid rows are dropped.
+ */
+export function parseRunningAppListLine(line: string): PauseAppRule[] {
+	if (!line.startsWith("L")) return [];
+	try {
+		const raw: unknown = JSON.parse(line.slice(1));
+		const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
+		return sanitizePauseAppCandidates(arr);
+	} catch {
+		return [];
+	}
 }

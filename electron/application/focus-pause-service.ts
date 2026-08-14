@@ -1,10 +1,13 @@
-import type { AppPreferences } from "../../shared/preferences";
+import type { AppPreferences, PauseAppRule } from "../../shared/preferences";
 import {
+	foregroundMatchesAppRules,
 	isInQuietHours,
 	resolveFocusPauseReason,
 	type FocusPauseReason,
 } from "../domain/focus-policy";
 import type { NotificationGate } from "./ports/notification-gate";
+import type { FocusForegroundSnapshot } from "./ports/focus-environment-port";
+import { EMPTY_FOREGROUND_SNAPSHOT } from "./ports/focus-environment-port";
 import type { ReminderService } from "./reminder-service";
 
 export interface FocusPauseWindowsPort {
@@ -23,8 +26,9 @@ export interface FocusPauseStatePayload {
 
 export class FocusPauseService implements NotificationGate {
 	private reason: FocusPauseReason = null;
-	private cameraPausedForFullscreen = false;
-	private isFullscreen = false;
+	private cameraPausedForFocus = false;
+	private foreground: FocusForegroundSnapshot = EMPTY_FOREGROUND_SNAPSHOT;
+	private lastExternal: PauseAppRule | null = null;
 	private quietHoursTimer: ReturnType<typeof setInterval> | null = null;
 
 	constructor(
@@ -43,13 +47,38 @@ export class FocusPauseService implements NotificationGate {
 		return this.reason;
 	}
 
-	setFullscreen(isFullscreen: boolean): void {
-		this.isFullscreen = isFullscreen;
+	setForeground(snapshot: FocusForegroundSnapshot): void {
+		this.foreground = snapshot;
+		const processName = snapshot.processName?.trim() ?? "";
+		if (processName) {
+			this.lastExternal = { processName, windowTitle: "" };
+		} else {
+			const windowTitle = snapshot.windowTitle?.trim() ?? "";
+			if (windowTitle) {
+				this.lastExternal = { processName: "", windowTitle };
+			}
+		}
 		this.recompute();
 	}
 
-	/** Re-evaluate quiet hours / fullscreen and apply side effects. */
+	/** Last non-empty foreground identity; survives BlinkGuard-focused empty probes. */
+	lastExternalForeground(): PauseAppRule | null {
+		return this.lastExternal ? { ...this.lastExternal } : null;
+	}
+
+	setFullscreen(isFullscreen: boolean): void {
+		this.setForeground({ ...this.foreground, isFullscreen });
+	}
+
+	/** Re-evaluate quiet hours / fullscreen / app rules and apply side effects. */
 	recompute(): void {
+		const appRuleMatched = foregroundMatchesAppRules(
+			this.preferences.pauseAppRules,
+			{
+				processName: this.foreground.processName ?? "",
+				windowTitle: this.foreground.windowTitle ?? "",
+			},
+		);
 		const next = resolveFocusPauseReason({
 			quietHoursEnabled: this.preferences.quietHoursEnabled,
 			inQuietHours: isInQuietHours(
@@ -58,19 +87,21 @@ export class FocusPauseService implements NotificationGate {
 				this.preferences.quietHoursEnd,
 			),
 			pauseOnFullscreen: this.preferences.pauseOnFullscreen,
-			isFullscreen: this.isFullscreen,
+			isFullscreen: this.foreground.isFullscreen,
+			appRuleMatched,
 		});
 
 		if (next !== null && this.reason === null) {
 			this.closeInterruptiveUi();
 		}
 
-		const fullscreenActive =
-			this.preferences.pauseOnFullscreen && this.isFullscreen;
-		if (fullscreenActive && !this.cameraPausedForFullscreen) {
-			this.pauseCameraForFullscreen();
-		} else if (!fullscreenActive && this.cameraPausedForFullscreen) {
-			this.resumeCameraAfterFullscreen();
+		const cameraShouldPause =
+			(this.preferences.pauseOnFullscreen && this.foreground.isFullscreen) ||
+			appRuleMatched;
+		if (cameraShouldPause && !this.cameraPausedForFocus) {
+			this.pauseCameraForFocus();
+		} else if (!cameraShouldPause && this.cameraPausedForFocus) {
+			this.resumeCameraAfterFocus();
 		}
 
 		const changed = next !== this.reason;
@@ -108,16 +139,16 @@ export class FocusPauseService implements NotificationGate {
 		this.windows.hideBlinkRateCoach();
 	}
 
-	private pauseCameraForFullscreen(): void {
+	private pauseCameraForFocus(): void {
 		if (!this.preferences.isTracking || !this.preferences.cameraEnabled) {
 			return;
 		}
 		this.reminders.pauseCameraForFocus();
-		this.cameraPausedForFullscreen = true;
+		this.cameraPausedForFocus = true;
 	}
 
-	private resumeCameraAfterFullscreen(): void {
-		this.cameraPausedForFullscreen = false;
+	private resumeCameraAfterFocus(): void {
+		this.cameraPausedForFocus = false;
 		this.reminders.resumeCameraIfNeeded();
 	}
 }

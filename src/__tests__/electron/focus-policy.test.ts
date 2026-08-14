@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+	foregroundMatchesAppRules,
 	isInQuietHours,
 	isValidQuietHoursTime,
+	matchesPauseAppRule,
 	normalizeQuietHoursTime,
 	parseQuietHoursMinutes,
 	resolveFocusPauseReason,
@@ -63,6 +65,7 @@ describe("resolveFocusPauseReason", () => {
 				inQuietHours: true,
 				pauseOnFullscreen: true,
 				isFullscreen: true,
+				appRuleMatched: true,
 			}),
 		).toBe("quiet-hours");
 	});
@@ -74,6 +77,28 @@ describe("resolveFocusPauseReason", () => {
 				inQuietHours: false,
 				pauseOnFullscreen: true,
 				isFullscreen: true,
+				appRuleMatched: false,
+			}),
+		).toBe("fullscreen");
+	});
+
+	it("returns app-rule after quiet hours and fullscreen", () => {
+		expect(
+			resolveFocusPauseReason({
+				quietHoursEnabled: true,
+				inQuietHours: false,
+				pauseOnFullscreen: true,
+				isFullscreen: false,
+				appRuleMatched: true,
+			}),
+		).toBe("app-rule");
+		expect(
+			resolveFocusPauseReason({
+				quietHoursEnabled: false,
+				inQuietHours: false,
+				pauseOnFullscreen: true,
+				isFullscreen: true,
+				appRuleMatched: true,
 			}),
 		).toBe("fullscreen");
 	});
@@ -85,7 +110,85 @@ describe("resolveFocusPauseReason", () => {
 				inQuietHours: true,
 				pauseOnFullscreen: false,
 				isFullscreen: true,
+				appRuleMatched: false,
 			}),
+		).toBe(false);
+	});
+});
+
+describe("pause app-rule matching", () => {
+	const zoom = { processName: "Zoom.exe", windowTitle: "Zoom Meeting" };
+
+	it("matches process-only substring and ignores .exe", () => {
+		expect(
+			matchesPauseAppRule({ processName: "zoom", windowTitle: "" }, zoom),
+		).toBe(true);
+		expect(
+			matchesPauseAppRule(
+				{ processName: "ZOOM.EXE", windowTitle: "" },
+				{
+					processName: "zoom",
+					windowTitle: "",
+				},
+			),
+		).toBe(true);
+	});
+
+	it("matches title-only substring case-insensitively", () => {
+		expect(
+			matchesPauseAppRule({ processName: "", windowTitle: "meeting" }, zoom),
+		).toBe(true);
+		expect(
+			matchesPauseAppRule({ processName: "", windowTitle: "Teams" }, zoom),
+		).toBe(false);
+	});
+
+	it("requires both fields when both are set", () => {
+		expect(
+			matchesPauseAppRule(
+				{ processName: "zoom", windowTitle: "Meeting" },
+				zoom,
+			),
+		).toBe(true);
+		expect(
+			matchesPauseAppRule({ processName: "zoom", windowTitle: "Teams" }, zoom),
+		).toBe(false);
+		expect(
+			matchesPauseAppRule(
+				{ processName: "chrome", windowTitle: "Meeting" },
+				zoom,
+			),
+		).toBe(false);
+	});
+
+	it("compares process basename and misses empty rules", () => {
+		expect(
+			matchesPauseAppRule(
+				{ processName: "Zoom.exe", windowTitle: "" },
+				{
+					processName: "C:/Program Files/Zoom/Zoom.exe",
+					windowTitle: "",
+				},
+			),
+		).toBe(true);
+		expect(
+			matchesPauseAppRule(
+				{ processName: "zoom", windowTitle: "" },
+				{
+					processName: "",
+					windowTitle: "Zoom Meeting",
+				},
+			),
+		).toBe(false);
+		expect(
+			matchesPauseAppRule({ processName: "", windowTitle: "" }, zoom),
+		).toBe(false);
+		expect(foregroundMatchesAppRules([], zoom)).toBe(false);
+		expect(
+			foregroundMatchesAppRules(
+				[{ processName: "discord", windowTitle: "" }],
+				zoom,
+			),
 		).toBe(false);
 	});
 });

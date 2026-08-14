@@ -411,6 +411,28 @@ export const uk: MessageCatalog = {
 		"Пауза на повноекранному режимі доступна у Windows і macOS.",
 	"fullscreen.toggleAria": "Перемкнути паузу на повноекранному режимі",
 	"fullscreen.paused": "Пауза: повний екран / гра",
+	"appRules.title": "Пауза для програм",
+	"appRules.description":
+		"Автопауза спливаючих вікон (і камери), лише коли програма зі списку на передньому плані — навіть не на весь екран. Процес — exe або назва додатка (Zoom.exe, zoom.us); заголовок вікна — підрядок.",
+	"appRules.unsupportedDescription":
+		"Правила паузи для програм доступні у Windows і macOS.",
+	"appRules.processLabel": "Процес",
+	"appRules.titleLabel": "Заголовок вікна",
+	"appRules.addLastFocused": "Додати останню програму",
+	"appRules.addLastFocusedNamed": "Додати останню: {name}",
+	"appRules.addLastFocusedEmpty":
+		"Перемкніться на потрібну програму, потім поверніться сюди.",
+	"appRules.runningLabel": "Запущені програми",
+	"appRules.runningPlaceholder": "Обрати запущену програму",
+	"appRules.runningAria": "Додати правило з запущеної програми",
+	"appRules.runningEmpty":
+		"Інших програм не знайдено. Відкрийте програму й оновіть список.",
+	"appRules.manual": "Або введіть процес і заголовок вікна вручну",
+	"appRules.add": "Додати вручну",
+	"appRules.removeAria": "Видалити правило {n}",
+	"appRules.paused": "Пауза: відповідна програма",
+	"appRules.foregroundHint":
+		"Пауза лише коли програма зі списку на передньому плані, а не тому що процес запущений. Це вікно налаштувань не рахується — перемкнись на програму, щоб перевірити.",
 
 	// Shortcuts
 	"shortcut.title": "Гарячі клавіші",
