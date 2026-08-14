@@ -36,10 +36,13 @@ from blink_detector_package.infrastructure.camera import (
 from blink_detector_package.infrastructure.models import load_models
 from blink_detector_package.infrastructure.transport import NdjsonTransport
 from blink_detector_package.infrastructure.vision import (
+	DETECT_STAT_NAMES,
+	FACE_RETRY_LOG_KINDS,
 	PreallocatedBuffers,
 	encode_frame,
 	eye_intensity_aperture,
 	get_face_landmarks,
+	resize_to_processing,
 	run_face_detect,
 	stabilize_face_rect,
 )
@@ -231,41 +234,26 @@ class BlinkDetectorApplication:
 		self._reset_capture_health()
 
 	def _reset_capture_health(self):
+		self._reset_health_window()
+		self._black_streak_start = None
+		self._no_face_streak_start = None
+		self._session_face_ok = 0
+		self._session_frames = 0
+		self._last_health_emit = 0.0
 		self._health_window_start = time.time()
+
+	def _reset_health_window(self, current_time=None):
 		self._health_frames = 0
 		self._health_black = 0
 		self._health_luma_sum = 0.0
 		self._health_face_ok = 0
 		self._health_face_none = 0
 		self._health_face_too_far = 0
-		self._black_streak_start = None
-		self._no_face_streak_start = None
-		self._session_face_ok = 0
-		self._session_frames = 0
-		self._last_health_emit = 0.0
-
-	def _note_frame_health(self, frame, face_status, current_time):
-		luma = mean_luma(frame)
-		black = is_black_frame(frame)
-		self._health_frames += 1
-		self._health_luma_sum += luma
-		if black:
-			self._health_black += 1
-			if self._black_streak_start is None:
-				self._black_streak_start = current_time
-		else:
-			self._black_streak_start = None
-
-		if face_status == "ok":
-			self._health_face_ok += 1
-		elif face_status == "too_far":
-			self._health_face_too_far += 1
-		else:
-			self._health_face_none += 1
-
-		if current_time - self._last_health_emit >= HEALTH_INTERVAL_S:
-			self._emit_camera_health(current_time)
-		return black, luma
+		for name in DETECT_STAT_NAMES:
+			setattr(self, f"_health_{name}", 0)
+		if current_time is not None:
+			self._health_window_start = current_time
+			self._last_health_emit = current_time
 
 	def _frame_luma_and_black(self, frame, current_time):
 		"""Track black streak / luma without committing faceStatus counts yet."""
@@ -327,6 +315,10 @@ class BlinkDetectorApplication:
 		loop_fps = (
 			round(1.0 / self._loop_dt_ema, 2) if self._loop_dt_ema > 0 else None
 		)
+		detect_stats = {
+			name: int(getattr(self, f"_health_{name}", 0) or 0)
+			for name in DETECT_STAT_NAMES
+		}
 		self.camera.emit_camera_state(
 			"camera_health",
 			frames=self._health_frames,
@@ -340,6 +332,7 @@ class BlinkDetectorApplication:
 			loop_fps=loop_fps,
 			gate_fps=round(float(self.detection.target_fps), 2),
 			**meta,
+			**detect_stats,
 		)
 		self.transport.send(
 			{
@@ -348,19 +341,17 @@ class BlinkDetectorApplication:
 					f"frames={self._health_frames} "
 					f"luma={mean:.1f} black={black_ratio:.2f} "
 					f"face_ok={face_ok} face_none={face_none} "
+					f"yunet_hit={detect_stats['yunet_hit']} "
+					f"yunet_enh={detect_stats['yunet_enhanced_hit']} "
+					f"hog_refine_miss={detect_stats['hog_refine_miss']} "
+					f"yunet_crop={detect_stats['yunet_crop']} "
+					f"hog_full={detect_stats['hog_full_hit']} "
 					f"loop_fps={loop_fps} gate_fps={self.detection.target_fps:.1f} "
 					f"backend={meta.get('backend_name')}"
 				)
 			}
 		)
-		self._health_window_start = current_time
-		self._health_frames = 0
-		self._health_black = 0
-		self._health_luma_sum = 0.0
-		self._health_face_ok = 0
-		self._health_face_none = 0
-		self._health_face_too_far = 0
-		self._last_health_emit = current_time
+		self._reset_health_window(current_time)
 
 	def process_commands(self):
 		"""Drain stdin batch: apply config before stop/start to avoid MSMF thrash."""
@@ -789,10 +780,11 @@ class BlinkDetectorApplication:
 	def _resolve_face(self, detector, gray, buffers=None, frame=None):
 		"""Run face detect on interval; otherwise reuse largest bbox.
 
-		YuNet locates a real face; HOG-refine inside that ROI supplies the
-		crop shape_predictor was trained on. Never feed the CNN box to 68-pt.
-		Skip HOG-refine while the YuNet box is still (reuse last HOG crop).
-		Hold/EMA tiny box jitter so the HOG crop (and 68-pt) stay still.
+		YuNet locates a real face; HOG-refine inside that ROI is the preferred
+		crop for shape_predictor. Skip HOG-refine while the YuNet box is still
+		(reuse last crop). If refine misses, keep a plausible YuNet box rather
+		than dropping the face. Hold/EMA tiny box jitter so the crop (and
+		68-pt) stay still.
 		After a hard face loss, force every-frame detect for
 		FACE_REACQUIRE_FRAMES. Do not force every-frame detect during an
 		in-progress blink. Brief miss hold keeps last bbox.
@@ -816,10 +808,11 @@ class BlinkDetectorApplication:
 				yunet=self._yunet,
 				prev_face=self._cached_face,
 			)
+			self._harvest_detect_stats(buffers)
 			if face is not None:
 				self._last_face_detect = retry_kind or "hog"
 				if (
-					retry_kind in ("clahe", "upsample")
+					retry_kind in FACE_RETRY_LOG_KINDS
 					and face is not self._cached_face
 				):
 					self._maybe_log_hog_retry(retry_kind)
@@ -848,6 +841,15 @@ class BlinkDetectorApplication:
 		if self._face_reacquire_frames > 0:
 			self._face_reacquire_frames -= 1
 		return self._cached_face
+
+	def _harvest_detect_stats(self, buffers):
+		"""Fold per-call locate flags into the 3s camera_health window."""
+		if buffers is None:
+			return
+		for name in DETECT_STAT_NAMES:
+			value = int(getattr(buffers, f"stat_{name}", 0) or 0)
+			attr = f"_health_{name}"
+			setattr(self, attr, getattr(self, attr) + value)
 
 	def _maybe_log_hog_retry(self, retry_kind):
 		"""Rate-limited debug when miss-only HOG retry recovers a face."""
@@ -1458,14 +1460,10 @@ class BlinkDetectorApplication:
 					time.sleep(0.1)
 					continue
 
-				# Native capture size; quality preset is software-only.
-				current_shape = frame.shape[:2]
-				target_shape = self.camera.processing_resolution[::-1]
-				if current_shape != target_shape:
-					frame = cv2.resize(
-						frame,
-						self.camera.processing_resolution,
-					)
+				# Native capture size; quality preset is an aspect-preserving cap.
+				frame = resize_to_processing(
+					frame, self.camera.processing_resolution
+				)
 
 				face_data = default_face_data.copy()
 				# Black / empty capture: skip HOG (avoids junk mouth boxes) but

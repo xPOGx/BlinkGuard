@@ -9,6 +9,8 @@ import numpy as np
 from blink_detector_package.domain.blink_detection import FACE_MISS_HOLD_FRAMES
 from blink_detector_package.infrastructure.vision import (
 	PreallocatedBuffers,
+	HIGHLIGHT_COMPRESS_LUMA,
+	compress_highlights,
 	prepare_hog_detect_gray,
 	run_hog_face_detect,
 )
@@ -216,6 +218,40 @@ class HogDetectRetryTests(unittest.TestCase):
 		)
 		self.assertIsNone(face)
 		self.assertIsNone(kind)
+
+	def test_compress_retry_after_clahe_miss(self):
+		hit = _FakeFace()
+		calls = []
+
+		def detector(gray, upsample):
+			calls.append((upsample, int(gray.mean())))
+			# 1=raw, 2=CLAHE, 3=highlight compress (all upsample=0).
+			if upsample == 0 and len(calls) >= 3:
+				return [hit]
+			return []
+
+		def select_largest(faces):
+			return faces[0] if faces else None
+
+		gray = np.full((64, 64), 180, dtype=np.uint8)
+		self.assertGreaterEqual(float(gray.mean()), HIGHLIGHT_COMPRESS_LUMA)
+		face, kind = run_hog_face_detect(
+			detector,
+			gray,
+			select_largest,
+			PreallocatedBuffers(),
+		)
+		self.assertIs(face, hit)
+		self.assertEqual(kind, "compress")
+		self.assertEqual(len(calls), 3)
+		self.assertEqual([c[0] for c in calls], [0, 0, 0])
+		self.assertLess(calls[-1][1], calls[0][1])
+
+	def test_compress_highlights_darkens(self):
+		gray = np.full((32, 32), 200, dtype=np.uint8)
+		out = compress_highlights(gray)
+		self.assertIsNotNone(out)
+		self.assertLess(float(out.mean()), float(gray.mean()))
 
 
 if __name__ == "__main__":

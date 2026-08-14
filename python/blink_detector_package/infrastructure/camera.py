@@ -366,7 +366,8 @@ class OpenCVCamera:
 			# Prefer MSMF first. Do NOT switch back to DSHOW-first without new
 			# Export diagnostics — DSHOW + forced MJPG + 4:3 snap produced
 			# sustained black frames (luma≈0.3) on that machine; MSMF worked.
-			# (Separate tester uses Logitech C170 — different failure mode.)
+			# (Logitech C170 / Fatar: healthy capture, daylight detect miss —
+			# fix locate in vision.py / aspect-fit, not this open path.)
 			# DSHOW remains failover. Skip CAP_ANY (re-enters MSMF).
 			# Also locked: no FOURCC / size / FPS CAP_PROP on open.
 			return [cv2.CAP_MSMF, cv2.CAP_DSHOW]

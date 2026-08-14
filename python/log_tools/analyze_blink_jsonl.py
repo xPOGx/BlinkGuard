@@ -132,6 +132,23 @@ def _print_camera_state_summary(states: list) -> None:
 				f"  black_ratio: p50={pct(blacks, 0.5):.3f} "
 				f"p90={pct(blacks, 0.9):.3f} last={blacks[-1]:.3f}"
 			)
+		detect_keys = (
+			"face_ok",
+			"face_none",
+			"face_too_far",
+			"yunet_hit",
+			"yunet_enhanced_hit",
+			"hog_refine_miss",
+			"yunet_crop",
+			"hog_full_hit",
+		)
+		detect_parts = []
+		for key in detect_keys:
+			vals = [int(s[key]) for s in health if s.get(key) is not None]
+			if vals:
+				detect_parts.append(f"{key}={sum(vals)}")
+		if detect_parts:
+			print("  detect: " + " ".join(detect_parts))
 	opens = [s for _, s in states if s.get("kind") == "camera_open_result"]
 	if opens:
 		ok = sum(1 for s in opens if s.get("ok") is True)

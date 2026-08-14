@@ -33,14 +33,29 @@ HOG_DETECT_CLAHE_TILE = (8, 8)
 HOG_MIN_SCORE = 0.30
 
 # YuNet locates a real face (anti eye-as-face / side-light miss).
-# shape_predictor_68 is trained on dlib HOG boxes — never feed the padded
-# CNN rectangle to 68-pt. After a YuNet hit, HOG-refine inside that ROI
-# and use the HOG rect. YuNet+HOG-miss is a miss, not a CNN crop.
-# Score in models.load_yunet.
+# shape_predictor_68 is trained on dlib HOG boxes — prefer HOG-refine inside
+# that ROI. If refine misses on a plausible YuNet box, use the YuNet rect
+# (bright/side-light C170) rather than dropping the face. Do not fall
+# through to full-frame HOG on a YuNet hit (eye-as-face). Score in
+# models.load_yunet.
 YUNET_PAD_X = 0.05
 YUNET_PAD_Y = 0.05
 HOG_REFINE_PAD = 0.35
 HOG_REFINE_MIN_IOU = 0.25
+# C170 daylight: mean luma ≥~90 → HOG/YuNet miss on a valid preview.
+# Locate-only (never the 68-pt gray): LAB-CLAHE BGR retry + highlight compress.
+HIGHLIGHT_COMPRESS_LUMA = 90.0
+HIGHLIGHT_COMPRESS_ALPHA = 0.70
+DETECT_STAT_NAMES = (
+	"yunet_hit",
+	"yunet_enhanced_hit",
+	"hog_refine_miss",
+	"yunet_crop",
+	"hog_full_hit",
+)
+FACE_RETRY_LOG_KINDS = frozenset(
+	("clahe", "upsample", "compress", "yunet")
+)
 # Box hold swallows detector px noise so the HOG crop (and thus 68-pt)
 # does not jitter. Keep tight so look-down can still move the crop.
 FACE_BOX_HOLD_IOU = 0.93
@@ -191,6 +206,16 @@ class PreallocatedBuffers:
 		self.last_yunet_rect = None
 		self.last_refine_kind = None
 		self.yunet_input_size = None
+		self.reset_detect_stats()
+
+	def reset_detect_stats(self):
+		"""Per-call locate counters for camera_health (C170 triage)."""
+		for name in DETECT_STAT_NAMES:
+			setattr(self, f"stat_{name}", 0)
+
+	def bump_detect_stat(self, name):
+		attr = f"stat_{name}"
+		setattr(self, attr, int(getattr(self, attr, 0)) + 1)
 
 	def clear_landmark_track(self):
 		"""Kept for detector face-loss calls; landmarks are not temporally held."""
@@ -271,6 +296,101 @@ def apply_clahe_roi_blended(gray_out, gray_src, roi, clahe, blend=CLAHE_BLEND):
 	return 1
 
 
+def _mean_u8(gray) -> float:
+	if gray is None or getattr(gray, "size", 0) == 0:
+		return 0.0
+	return float(np.mean(gray))
+
+
+def compress_highlights(gray, alpha=HIGHLIGHT_COMPRESS_ALPHA):
+	"""Darken a bright gray for locate retry. Not used by the predictor."""
+	if gray is None or gray.size < 64:
+		return None
+	try:
+		return cv2.convertScaleAbs(gray, alpha=float(alpha), beta=0)
+	except Exception:
+		return None
+
+
+def enhance_bgr_for_detect(bgr, buffers=None):
+	"""LAB-CLAHE on L — YuNet miss retry for side light / blown highlights."""
+	if bgr is None or getattr(bgr, "ndim", 0) != 3 or bgr.size < 64:
+		return None
+	try:
+		lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
+		light, a_ch, b_ch = cv2.split(lab)
+		if buffers is not None:
+			clahe = buffers.hog_detect_clahe()
+		else:
+			clahe = cv2.createCLAHE(
+				clipLimit=HOG_DETECT_CLAHE_CLIP,
+				tileGridSize=HOG_DETECT_CLAHE_TILE,
+			)
+		light = clahe.apply(light)
+		return cv2.cvtColor(
+			cv2.merge((light, a_ch, b_ch)), cv2.COLOR_LAB2BGR
+		)
+	except Exception:
+		return None
+
+
+def _bump_detect_stat(buffers, name):
+	if buffers is not None:
+		buffers.bump_detect_stat(name)
+
+
+def _remember_yunet(buffers, yunet_face, kind):
+	if buffers is None:
+		return
+	buffers.last_yunet_rect = yunet_face
+	buffers.last_refine_kind = kind
+
+
+def fit_processing_size(native_wh, preset_wh):
+	"""Largest size inside the quality preset that keeps native aspect.
+
+	C170 MSMF is 640×360; High/Ultra preset is 640×480. Stretching 16:9
+	into 4:3 warps faces and YuNet/HOG miss in daylight. Fit, don't stretch.
+	"""
+	try:
+		nw = int(native_wh[0])
+		nh = int(native_wh[1])
+		pw = int(preset_wh[0])
+		ph = int(preset_wh[1])
+	except (TypeError, ValueError, IndexError):
+		try:
+			return (int(preset_wh[0]), int(preset_wh[1]))
+		except (TypeError, ValueError, IndexError):
+			return (320, 240)
+	if nw < 2 or nh < 2:
+		return (max(2, pw), max(2, ph))
+	if pw < 2 or ph < 2:
+		return (nw, nh)
+	scale = min(pw / float(nw), ph / float(nh))
+	width = max(2, int(round(nw * scale)))
+	height = max(2, int(round(nh * scale)))
+	return (width, height)
+
+
+def resize_to_processing(frame, preset_wh):
+	"""Software resize that preserves aspect (quality preset is a cap)."""
+	if frame is None or getattr(frame, "size", 0) == 0:
+		return frame
+	try:
+		native_wh = (int(frame.shape[1]), int(frame.shape[0]))
+	except (TypeError, AttributeError, ValueError, IndexError):
+		return frame
+	target = fit_processing_size(native_wh, preset_wh)
+	if native_wh == target:
+		return frame
+	interp = (
+		cv2.INTER_AREA
+		if target[0] * target[1] < native_wh[0] * native_wh[1]
+		else cv2.INTER_LINEAR
+	)
+	return cv2.resize(frame, target, interpolation=interp)
+
+
 def prepare_hog_detect_gray(gray, buffers):
 	"""
 	Full-frame mild CLAHE for HOG miss retry only.
@@ -322,28 +442,45 @@ def _select_plausible_face(faces, gray, select_largest):
 	return select_largest(kept)
 
 
+def _hog_plausible(detector, search_gray, frame_gray, select_largest, upsample=0):
+	faces = hog_detect_rects(detector, search_gray, upsample)
+	return _select_plausible_face(faces, frame_gray, select_largest)
+
+
+def _hog_compress_retry(detector, search_gray, frame_gray, select_largest):
+	if _mean_u8(search_gray) < HIGHLIGHT_COMPRESS_LUMA:
+		return None
+	compressed = compress_highlights(search_gray)
+	if compressed is None:
+		return None
+	return _hog_plausible(detector, compressed, frame_gray, select_largest)
+
+
 def run_hog_face_detect(detector, gray, select_largest, buffers=None):
 	"""
 	HOG face detect with miss-only retries.
 
-	Order: raw upsample=0 → full-frame CLAHE upsample=0 → raw upsample=1.
+	Order: raw upsample=0 → full-frame CLAHE upsample=0 → highlight
+	compress (bright frames) → raw upsample=1.
 	Drops weak HOG scores and small edge-glued boxes (clutter FPs).
-	Returns (face_or_None, retry_kind) where retry_kind is None|"clahe"|"upsample".
+	Returns (face_or_None, retry_kind) where retry_kind is
+	None|"clahe"|"compress"|"upsample".
 	"""
-	faces = hog_detect_rects(detector, gray, 0)
-	face = _select_plausible_face(faces, gray, select_largest)
+	face = _hog_plausible(detector, gray, gray, select_largest, 0)
 	if face is not None:
 		return face, None
 
 	enhanced = prepare_hog_detect_gray(gray, buffers)
 	if enhanced is not None:
-		faces = hog_detect_rects(detector, enhanced, 0)
-		face = _select_plausible_face(faces, gray, select_largest)
+		face = _hog_plausible(detector, enhanced, gray, select_largest, 0)
 		if face is not None:
 			return face, "clahe"
 
-	faces = hog_detect_rects(detector, gray, 1)
-	face = _select_plausible_face(faces, gray, select_largest)
+	face = _hog_compress_retry(detector, gray, gray, select_largest)
+	if face is not None:
+		return face, "compress"
+
+	face = _hog_plausible(detector, gray, gray, select_largest, 1)
 	if face is not None:
 		return face, "upsample"
 	return None, None
@@ -406,6 +543,12 @@ def hog_refine_yunet_box(detector, gray, yunet_rect, select_largest, buffers=Non
 			face = _pick(enhanced, 0)
 			if face is not None:
 				return face, "clahe"
+	if _mean_u8(roi) >= HIGHLIGHT_COMPRESS_LUMA:
+		compressed = compress_highlights(roi)
+		if compressed is not None:
+			face = _pick(compressed, 0)
+			if face is not None:
+				return face, "compress"
 	# No upsample=1 here: YuNet already sized a real face. Pyramid on the
 	# ROI was extra cost and the old eye-as-face vector. Full-frame
 	# upsample stays on the YuNet-miss path only.
@@ -589,22 +732,35 @@ def run_face_detect(
 	prev_face=None,
 ):
 	"""
-	YuNet locates; HOG-refine supplies the 68-pt crop.
+	YuNet locates; HOG-refine supplies the 68-pt crop when it can.
 
 	If YuNet hits, HOG runs inside that ROI unless the YuNet box has not
-	moved since the last successful refine (reuse prev_face). Only the
-	HOG rect goes to the predictor — never the CNN rectangle.
-	YuNet+HOG-miss is a miss (hold last HOG crop upstream); do not fall
-	through to full-frame HOG (eye-as-face). If YuNet is missing/misses,
-	full-frame HOG miss chain (size gate still applies).
+	moved since the last successful refine (reuse prev_face). Prefer the
+	HOG rect for the predictor. YuNet+HOG-miss on a plausible box uses
+	the YuNet rect (`kind="yunet"`) — do not fall through to full-frame
+	HOG (eye-as-face). Raw YuNet miss retries LAB-CLAHE BGR. If YuNet is
+	missing/misses, full-frame HOG miss chain (size gate still applies).
 	Returns (face_or_None, kind) where kind is
-	"hog"|"clahe"|"upsample"|None.
+	"hog"|"clahe"|"compress"|"upsample"|"yunet"|None.
 	"""
+	if buffers is not None:
+		buffers.reset_detect_stats()
 	if yunet is not None and bgr is not None:
 		yunet_face, _size = run_yunet_face_detect(
 			yunet, bgr, select_largest, buffers=buffers
 		)
+		enhanced_hit = False
+		if yunet_face is None:
+			enhanced = enhance_bgr_for_detect(bgr, buffers)
+			if enhanced is not None:
+				yunet_face, _size = run_yunet_face_detect(
+					yunet, enhanced, select_largest, buffers=buffers
+				)
+				enhanced_hit = yunet_face is not None
 		if yunet_face is not None:
+			_bump_detect_stat(buffers, "yunet_hit")
+			if enhanced_hit:
+				_bump_detect_stat(buffers, "yunet_enhanced_hit")
 			last_yunet = (
 				getattr(buffers, "last_yunet_rect", None)
 				if buffers is not None
@@ -620,20 +776,19 @@ def run_face_detect(
 				select_largest,
 				buffers,
 			)
-			if buffers is not None:
-				if hog_face is not None:
-					buffers.last_yunet_rect = yunet_face
-					buffers.last_refine_kind = hog_kind or "hog"
-				else:
-					buffers.last_yunet_rect = None
-					buffers.last_refine_kind = None
 			if hog_face is not None:
+				_remember_yunet(buffers, yunet_face, hog_kind or "hog")
 				return hog_face, hog_kind or "hog"
-			return None, None
+			_bump_detect_stat(buffers, "hog_refine_miss")
+			_bump_detect_stat(buffers, "yunet_crop")
+			_remember_yunet(buffers, yunet_face, "yunet")
+			return yunet_face, "yunet"
 		if buffers is not None:
 			buffers.last_yunet_rect = None
 			buffers.last_refine_kind = None
 	face, kind = run_hog_face_detect(detector, gray, select_largest, buffers)
+	if face is not None:
+		_bump_detect_stat(buffers, "hog_full_hit")
 	if face is not None and kind is None:
 		return face, "hog"
 	return face, kind

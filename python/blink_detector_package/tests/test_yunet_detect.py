@@ -14,8 +14,10 @@ from blink_detector_package.infrastructure.models import (
 from blink_detector_package.infrastructure.vision import (
 	PreallocatedBuffers,
 	box_iou,
+	fit_processing_size,
 	hog_refine_yunet_box,
 	pad_xywh_to_box,
+	resize_to_processing,
 	run_face_detect,
 	run_yunet_face_detect,
 	stabilize_face_rect,
@@ -61,6 +63,17 @@ class _FakeYunet:
 	def detect(self, bgr):
 		del bgr
 		self.detect_calls += 1
+		return 1, self.faces
+
+
+class _SecondCallYunet(_FakeYunet):
+	"""Miss on the first detect (raw), hit on the second (LAB-CLAHE retry)."""
+
+	def detect(self, bgr):
+		del bgr
+		self.detect_calls += 1
+		if self.detect_calls == 1:
+			return 1, None
 		return 1, self.faces
 
 
@@ -148,7 +161,7 @@ class YunetDetectTests(unittest.TestCase):
 	def test_missing_yunet_model_returns_none(self):
 		self.assertIsNone(load_yunet(r"C:\no-such-yunet.onnx"))
 
-	def test_yunet_hit_hog_miss_is_not_a_cnn_crop(self):
+	def test_yunet_hit_hog_miss_uses_yunet_crop(self):
 		calls = []
 
 		def detector(gray, upsample):
@@ -159,16 +172,21 @@ class YunetDetectTests(unittest.TestCase):
 			[[100.0, 50.0, 180.0, 200.0] + [0.0] * 10 + [0.8]],
 			dtype=np.float32,
 		)
+		buffers = PreallocatedBuffers()
 		face, kind = run_face_detect(
 			detector,
 			_gray(),
 			_select_largest,
-			PreallocatedBuffers(),
+			buffers,
 			bgr=_bgr(),
 			yunet=_FakeYunet(faces),
 		)
-		self.assertIsNone(face)
-		self.assertIsNone(kind)
+		self.assertIsNotNone(face)
+		self.assertEqual(kind, "yunet")
+		self.assertEqual(buffers.stat_yunet_hit, 1)
+		self.assertEqual(buffers.stat_hog_refine_miss, 1)
+		self.assertEqual(buffers.stat_yunet_crop, 1)
+		self.assertEqual(buffers.stat_hog_full_hit, 0)
 		self.assertGreater(len(calls), 0)
 		upsamples = [upsample for _shape, upsample in calls]
 		self.assertNotIn(1, upsamples)
@@ -451,6 +469,56 @@ class YunetDetectTests(unittest.TestCase):
 
 		self.assertAlmostEqual(vision_mod.YUNET_PAD_X, 0.05)
 		self.assertAlmostEqual(vision_mod.YUNET_PAD_Y, 0.05)
+
+	def test_yunet_lab_clahe_retry_hits(self):
+		faces = np.array(
+			[[100.0, 50.0, 180.0, 200.0] + [0.0] * 10 + [0.8]],
+			dtype=np.float32,
+		)
+		yunet = _SecondCallYunet(faces)
+		buffers = PreallocatedBuffers()
+		face, kind = run_face_detect(
+			lambda gray, upsample: [],
+			_gray(),
+			_select_largest,
+			buffers,
+			bgr=_bgr(),
+			yunet=yunet,
+		)
+		self.assertIsNotNone(face)
+		self.assertEqual(kind, "yunet")
+		self.assertEqual(yunet.detect_calls, 2)
+		self.assertEqual(buffers.stat_yunet_hit, 1)
+		self.assertEqual(buffers.stat_yunet_enhanced_hit, 1)
+		self.assertEqual(buffers.stat_yunet_crop, 1)
+
+	def test_fit_processing_size_keeps_c170_aspect(self):
+		self.assertEqual(
+			fit_processing_size((640, 360), (640, 480)),
+			(640, 360),
+		)
+		self.assertEqual(
+			fit_processing_size((640, 360), (320, 240)),
+			(320, 180),
+		)
+		self.assertEqual(
+			fit_processing_size((1920, 1080), (640, 480)),
+			(640, 360),
+		)
+		self.assertEqual(
+			fit_processing_size((640, 480), (640, 480)),
+			(640, 480),
+		)
+
+	def test_resize_to_processing_does_not_stretch(self):
+		frame = np.zeros((360, 640, 3), dtype=np.uint8)
+		out = resize_to_processing(frame, (640, 480))
+		self.assertEqual(out.shape[1], 640)
+		self.assertEqual(out.shape[0], 360)
+		self.assertIs(out, frame)
+		tall = resize_to_processing(frame, (320, 240))
+		self.assertEqual(tall.shape[1], 320)
+		self.assertEqual(tall.shape[0], 180)
 
 
 if __name__ == "__main__":
