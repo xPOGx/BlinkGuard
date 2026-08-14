@@ -20,6 +20,7 @@ from blink_detector_package.domain import (
 from blink_detector_package.infrastructure.head_pose import estimate_head_pose
 from blink_detector_package.domain.blink_detection import (
 	DEFAULT_TARGET_FPS,
+	FACE_IDLE_DETECT_INTERVAL,
 	FACE_MISS_HOLD_FRAMES,
 	FACE_QUALITY_HOLD_FRAMES,
 	FACE_REACQUIRE_FRAMES,
@@ -59,6 +60,35 @@ NO_FACE_DATA = json.dumps(
 		}
 	}
 )
+# Idle none IPC — edge plus ~3 Hz. Toast debounce already lives in Electron.
+NO_FACE_EMIT_INTERVAL_S = 1.0 / 3.0
+# Wake often enough to drain stdin; do not 1ms-spin while waiting for the next frame.
+PACE_COMMAND_SLICE_S = 0.02
+
+
+def pace_wait_s(
+	now,
+	last_frame_time,
+	frame_interval,
+	slice_s=PACE_COMMAND_SLICE_S,
+):
+	"""Seconds to sleep before the next paced frame (0 = process now)."""
+	try:
+		interval = float(frame_interval)
+	except (TypeError, ValueError):
+		return 0.0
+	if interval <= 0:
+		return 0.0
+	remaining = interval - (now - last_frame_time)
+	if remaining <= 0:
+		return 0.0
+	try:
+		cap = float(slice_s)
+	except (TypeError, ValueError):
+		cap = PACE_COMMAND_SLICE_S
+	if cap <= 0:
+		return remaining
+	return remaining if remaining < cap else cap
 
 
 class TraceRecorder:
@@ -216,6 +246,8 @@ class BlinkDetectorApplication:
 		self._face_miss_streak = 0
 		self._quality_miss_streak = 0
 		self._face_reacquire_frames = 0
+		self._last_no_face_emit = 0.0
+		self._last_emitted_face_status = None
 		self._last_clahe_roi_count = 0
 		self._last_skip_debug_time = 0.0
 		self._last_skip_debug_phase = None
@@ -241,6 +273,8 @@ class BlinkDetectorApplication:
 		self._session_frames = 0
 		self._last_health_emit = 0.0
 		self._health_window_start = time.time()
+		self._last_no_face_emit = 0.0
+		self._last_emitted_face_status = None
 
 	def _reset_health_window(self, current_time=None):
 		self._health_frames = 0
@@ -303,6 +337,8 @@ class BlinkDetectorApplication:
 		self._cached_face = None
 		self._clear_landmark_track()
 		self._reset_capture_health()
+		if ok:
+			self._begin_face_reacquire(force=True)
 		return ok
 
 	def _emit_camera_health(self, current_time):
@@ -777,6 +813,28 @@ class BlinkDetectorApplication:
 		if buf is not None:
 			buf.clear_landmark_track()
 
+	def _begin_face_reacquire(self, force=False):
+		"""Start the every-frame heavy-locate burst after a real loss / reopen."""
+		if force or self._face_reacquire_frames <= 0:
+			self._face_reacquire_frames = FACE_REACQUIRE_FRAMES
+
+	def _face_detect_interval_now(self):
+		interval = max(1, int(self.face_detect_interval))
+		if self._cached_face is None and self._face_reacquire_frames <= 0:
+			return max(interval, FACE_IDLE_DETECT_INTERVAL)
+		return interval
+
+	def _should_run_face_detect(self):
+		if self._face_reacquire_frames > 0:
+			return True
+		if self._frames_since_face_detect <= 0:
+			return True
+		return self._frames_since_face_detect >= self._face_detect_interval_now()
+
+	def _use_heavy_face_retries(self):
+		"""Full HOG miss chain: no YuNet, or still in the re-acquire burst."""
+		return self._yunet is None or self._face_reacquire_frames > 0
+
 	def _resolve_face(self, detector, gray, buffers=None, frame=None):
 		"""Run face detect on interval; otherwise reuse largest bbox.
 
@@ -785,20 +843,15 @@ class BlinkDetectorApplication:
 		(reuse last crop). If refine misses, keep a plausible YuNet box rather
 		than dropping the face. Hold/EMA tiny box jitter so the crop (and
 		68-pt) stay still.
-		After a hard face loss, force every-frame detect for
-		FACE_REACQUIRE_FRAMES. Do not force every-frame detect during an
-		in-progress blink. Brief miss hold keeps last bbox.
+		After a hard face loss (had a cache), force every-frame detect with
+		heavy retries for FACE_REACQUIRE_FRAMES. Then idle-miss uses
+		FACE_IDLE_DETECT_INTERVAL and YuNet-only locate. Do not reset the
+		burst on every subsequent miss. Brief miss hold keeps last bbox.
 
 		Micro-boxes (eye-as-face, ~44px on 480) fail face_bbox_plausible and
 		count as miss, not too_far.
 		"""
-		interval = self.face_detect_interval
-		should_detect = (
-			self._cached_face is None
-			or self._frames_since_face_detect >= interval
-			or self._face_reacquire_frames > 0
-		)
-		if should_detect:
+		if self._should_run_face_detect():
 			face, retry_kind = run_face_detect(
 				detector,
 				gray,
@@ -807,6 +860,7 @@ class BlinkDetectorApplication:
 				bgr=frame,
 				yunet=self._yunet,
 				prev_face=self._cached_face,
+				heavy_retries=self._use_heavy_face_retries(),
 			)
 			self._harvest_detect_stats(buffers)
 			if face is not None:
@@ -830,16 +884,18 @@ class BlinkDetectorApplication:
 			):
 				self._frames_since_face_detect = 1
 				return self._cached_face
+			had_cache = self._cached_face is not None
 			self._cached_face = None
 			self._last_face_detect = None
 			self._clear_landmark_track()
-			self._face_reacquire_frames = FACE_REACQUIRE_FRAMES
+			if had_cache:
+				self._begin_face_reacquire()
+			elif self._face_reacquire_frames > 0:
+				self._face_reacquire_frames -= 1
 			self._frames_since_face_detect = 1
 			return None
 
 		self._frames_since_face_detect += 1
-		if self._face_reacquire_frames > 0:
-			self._face_reacquire_frames -= 1
 		return self._cached_face
 
 	def _harvest_detect_stats(self, buffers):
@@ -876,7 +932,7 @@ class BlinkDetectorApplication:
 		self._clear_landmark_track()
 		self._face_miss_streak = 0
 		self._quality_miss_streak = 0
-		self._face_reacquire_frames = FACE_REACQUIRE_FRAMES
+		self._begin_face_reacquire()
 		self._last_clahe_roi_count = 0
 		had_candidate = False
 		if self.detection.blink_in_progress:
@@ -998,6 +1054,28 @@ class BlinkDetectorApplication:
 			face=None,
 			credited=False,
 		)
+
+	def _should_emit_no_face(self, current_time):
+		"""Emit immediately on ok/too_far → none; throttle idle none repeats."""
+		edge = self._last_emitted_face_status != "none"
+		if (
+			not edge
+			and (current_time - self._last_no_face_emit) < NO_FACE_EMIT_INTERVAL_S
+		):
+			return False
+		self._last_emitted_face_status = "none"
+		self._last_no_face_emit = current_time
+		return True
+
+	def _emit_face_data(self, face_data, current_time):
+		status = face_data.get("faceStatus") or "none"
+		if status == "none":
+			if not self._should_emit_no_face(current_time):
+				return
+			self.transport.send_serialized(NO_FACE_DATA)
+			return
+		self._last_emitted_face_status = status
+		self.transport.send({"faceData": face_data})
 
 	def _blink_debug_payload(self, blink_info, face=None, credited=False):
 		"""Structured + human-readable blink debug for tuning."""
@@ -1449,8 +1527,11 @@ class BlinkDetectorApplication:
 				current_time = time.time()
 				# Recompute each frame so live target_fps updates take effect.
 				frame_interval = 1.0 / self.camera.target_fps
-				if current_time - last_frame_time < frame_interval:
-					time.sleep(0.001)
+				wait_s = pace_wait_s(
+					current_time, last_frame_time, frame_interval
+				)
+				if wait_s > 0:
+					time.sleep(wait_s)
 					continue
 				last_frame_time = current_time
 
@@ -1489,6 +1570,7 @@ class BlinkDetectorApplication:
 						self._cached_face = None
 						self._clear_landmark_track()
 						self._reset_capture_health()
+						self._begin_face_reacquire(force=True)
 						if self._last_processed_frame_time > 0:
 							self._update_measured_gate_fps(
 								current_time,
@@ -1509,7 +1591,9 @@ class BlinkDetectorApplication:
 						luma=luma,
 						frame=frame,
 					)
-					self.transport.send_serialized(NO_FACE_DATA)
+					self._emit_face_data(
+						{"faceStatus": "none"}, current_time
+					)
 					if self.send_video:
 						self._emit_video_stream(frame)
 					if self._last_processed_frame_time > 0:
@@ -1656,11 +1740,7 @@ class BlinkDetectorApplication:
 								0.0,
 							)
 					else:
-						self._cached_face = None
-						self._clear_landmark_track()
-						self._face_miss_streak = 0
 						self._quality_miss_streak = 0
-						self._face_reacquire_frames = FACE_REACQUIRE_FRAMES
 						self._last_clahe_roi_count = 0
 						had_candidate = self.detection.cancel_on_face_lost(
 							current_time
@@ -1691,10 +1771,7 @@ class BlinkDetectorApplication:
 					frame_count += 1
 					continue
 
-				if face_data.get("faceStatus") == "none":
-					self.transport.send_serialized(NO_FACE_DATA)
-				else:
-					self.transport.send({"faceData": face_data})
+				self._emit_face_data(face_data, current_time)
 
 				if self.send_video:
 					self._emit_video_stream(frame, face_data)

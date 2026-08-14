@@ -66,13 +66,13 @@ describe("camera quality presets", () => {
 		expect(CAMERA_QUALITY_PRESETS.high).toEqual({
 			targetFps: 20,
 			processingResolution: [640, 480],
-			faceDetectInterval: 1,
+			faceDetectInterval: 2,
 			poseStrictness: "normal",
 		});
 		expect(CAMERA_QUALITY_PRESETS.ultra).toEqual({
 			targetFps: 30,
 			processingResolution: [640, 480],
-			faceDetectInterval: 1,
+			faceDetectInterval: 2,
 			poseStrictness: "normal",
 		});
 	});
@@ -85,13 +85,13 @@ describe("camera quality presets", () => {
 		expect(toSidecarCameraQualityMessage("high")).toEqual({
 			target_fps: 20,
 			processing_resolution: [640, 480],
-			face_detect_interval: 1,
+			face_detect_interval: 2,
 			pose_strictness: "normal",
 		});
 		expect(toSidecarCameraQualityMessage("ultra")).toEqual({
 			target_fps: 30,
 			processing_resolution: [640, 480],
-			face_detect_interval: 1,
+			face_detect_interval: 2,
 			pose_strictness: "normal",
 		});
 	});

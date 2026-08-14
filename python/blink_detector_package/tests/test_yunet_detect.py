@@ -365,6 +365,26 @@ class YunetDetectTests(unittest.TestCase):
 		self.assertEqual(kind, "upsample")
 		self.assertEqual(calls, [0, 0, 1])
 
+	def test_idle_yunet_miss_skips_full_frame_hog(self):
+		calls = []
+
+		def detector(gray, upsample):
+			calls.append(upsample)
+			return []
+
+		face, kind = run_face_detect(
+			detector,
+			_gray(),
+			_select_largest,
+			PreallocatedBuffers(),
+			bgr=_bgr(),
+			yunet=_FakeYunet(None),
+			heavy_retries=False,
+		)
+		self.assertIsNone(face)
+		self.assertIsNone(kind)
+		self.assertEqual(calls, [])
+
 	def test_yunet_micro_falls_through_to_hog(self):
 		hit = _FakeFace()
 

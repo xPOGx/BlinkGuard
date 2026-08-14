@@ -3,6 +3,8 @@ import {
 	BLINK_CREDIT_DEBOUNCE_MS,
 	BLINK_SNOOZE_MS,
 	CAMERA_POLL_INTERVAL_MS,
+	FACE_RETURN_DEBOUNCE_MS,
+	NO_FACE_DEBOUNCE_MS,
 	REMINDER_POPUP_VISIBLE_MS,
 	autoStopNoFaceDelayMs,
 	nextTimerReminderDelay,
@@ -18,6 +20,8 @@ describe("reminder-policy", () => {
 		expect(CAMERA_POLL_INTERVAL_MS).toBe(100);
 		expect(BLINK_CREDIT_DEBOUNCE_MS).toBe(150);
 		expect(BLINK_SNOOZE_MS).toBe(5 * 60 * 1000);
+		expect(NO_FACE_DEBOUNCE_MS).toBe(750);
+		expect(FACE_RETURN_DEBOUNCE_MS).toBe(500);
 	});
 
 	it("converts auto-stop minutes to milliseconds", () => {

@@ -6,7 +6,6 @@ import time
 from contextlib import contextmanager
 
 import cv2
-import numpy as np
 
 # OpenCV MSMF + HW transforms often fails stream selection on Win10/11;
 # disable unless the user already set the env.
@@ -33,11 +32,12 @@ def mean_luma(frame) -> float:
 	"""Average brightness of a BGR/gray frame (0–255)."""
 	if frame is None or getattr(frame, "size", 0) == 0:
 		return 0.0
+	# cv2.mean is one pass — avoid split() copies on every detector frame.
+	channels = cv2.mean(frame)
 	if len(frame.shape) == 2:
-		return float(np.mean(frame))
-	# BGR: cheap luma approx without full cvtColor on every health sample.
-	b, g, r = cv2.split(frame)
-	return float(0.114 * np.mean(b) + 0.587 * np.mean(g) + 0.299 * np.mean(r))
+		return float(channels[0])
+	b, g, r = channels[0], channels[1], channels[2]
+	return float(0.114 * b + 0.587 * g + 0.299 * r)
 
 
 def is_black_frame(frame, threshold=BLACK_LUMA_THRESHOLD) -> bool:

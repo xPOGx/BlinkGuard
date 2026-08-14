@@ -3,6 +3,7 @@ import type { AppPreferences } from "../../shared/preferences";
 import {
 	BLINK_CREDIT_DEBOUNCE_MS,
 	CAMERA_POLL_INTERVAL_MS,
+	FACE_RETURN_DEBOUNCE_MS,
 	NO_FACE_DEBOUNCE_MS,
 	REMINDER_POPUP_VISIBLE_MS,
 	autoStopNoFaceDelayMs,
@@ -149,14 +150,26 @@ export class ReminderService {
 	onFaceDetection(faceDetected: boolean): void {
 		if (!this.preferences.isTracking || !this.preferences.cameraEnabled) return;
 		if (faceDetected) {
-			const wasDetected = this.state.isFaceDetected;
-			this.state.isFaceDetected = true;
 			this.cancelNoFaceDebounce();
-			this.cancelNoFaceAutoStop();
-			this.windows.hideNoFace();
-			if (!wasDetected) this.creditBlink("face-return");
+			if (this.state.isFaceDetected && !this.windows.hasNoFace()) {
+				this.cancelFaceReturnDebounce();
+				return;
+			}
+			if (this.state.faceReturnDebounceTimer) return;
+			this.state.faceReturnDebounceTimer = setTimeout(() => {
+				this.state.faceReturnDebounceTimer = null;
+				if (!this.preferences.isTracking || !this.preferences.cameraEnabled) {
+					return;
+				}
+				const wasDetected = this.state.isFaceDetected;
+				this.state.isFaceDetected = true;
+				this.cancelNoFaceAutoStop();
+				if (this.windows.hasNoFace()) this.windows.hideNoFace();
+				if (!wasDetected) this.creditBlink("face-return");
+			}, FACE_RETURN_DEBOUNCE_MS);
 			return;
 		}
+		this.cancelFaceReturnDebounce();
 		if (
 			this.state.noFaceDebounceTimer ||
 			this.windows.hasNoFace()
@@ -474,6 +487,7 @@ export class ReminderService {
 		this.state.isFaceDetected = false;
 		this.cancelNoFaceDebounce();
 		this.cancelNoFaceAutoStop();
+		this.cancelFaceReturnDebounce();
 		this.windows.hideNoFace();
 		this.windows.hideBlinkRateCoach();
 	}
@@ -482,6 +496,13 @@ export class ReminderService {
 		if (this.state.noFaceDebounceTimer) {
 			clearTimeout(this.state.noFaceDebounceTimer);
 			this.state.noFaceDebounceTimer = null;
+		}
+	}
+
+	private cancelFaceReturnDebounce(): void {
+		if (this.state.faceReturnDebounceTimer) {
+			clearTimeout(this.state.faceReturnDebounceTimer);
+			this.state.faceReturnDebounceTimer = null;
 		}
 	}
 

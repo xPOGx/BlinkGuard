@@ -32,15 +32,16 @@ export const CAMERA_QUALITY_PRESETS: Readonly<
 	high: {
 		targetFps: 20,
 		processingResolution: [640, 480],
-		faceDetectInterval: 1,
+		faceDetectInterval: 2,
 		poseStrictness: "normal",
 	},
 	// Ultra = 30 FPS at High resolution — needs a strong machine / good light;
 	// preview JPEG stays throttled in the sidecar so UI encode does not cap the loop.
+	// Locate every other frame: 68-pt / EAR still run each tick on the held box.
 	ultra: {
 		targetFps: 30,
 		processingResolution: [640, 480],
-		faceDetectInterval: 1,
+		faceDetectInterval: 2,
 		poseStrictness: "normal",
 	},
 };

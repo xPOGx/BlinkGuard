@@ -44,6 +44,15 @@ class HogDetectRetryTests(unittest.TestCase):
 	def test_face_miss_hold_is_twelve(self):
 		self.assertEqual(FACE_MISS_HOLD_FRAMES, 12)
 
+	def test_idle_detect_interval_is_six(self):
+		from blink_detector_package.domain.blink_detection import (
+			FACE_IDLE_DETECT_INTERVAL,
+			FACE_REACQUIRE_FRAMES,
+		)
+
+		self.assertEqual(FACE_IDLE_DETECT_INTERVAL, 6)
+		self.assertEqual(FACE_REACQUIRE_FRAMES, 15)
+
 	def test_prepare_hog_detect_gray_returns_enhanced_copy(self):
 		gray = np.linspace(0, 255, 80 * 100, dtype=np.uint8).reshape(80, 100)
 		buffers = PreallocatedBuffers()

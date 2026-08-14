@@ -730,6 +730,7 @@ def run_face_detect(
 	bgr=None,
 	yunet=None,
 	prev_face=None,
+	heavy_retries=True,
 ):
 	"""
 	YuNet locates; HOG-refine supplies the 68-pt crop when it can.
@@ -738,8 +739,12 @@ def run_face_detect(
 	moved since the last successful refine (reuse prev_face). Prefer the
 	HOG rect for the predictor. YuNet+HOG-miss on a plausible box uses
 	the YuNet rect (`kind="yunet"`) — do not fall through to full-frame
-	HOG (eye-as-face). Raw YuNet miss retries LAB-CLAHE BGR. If YuNet is
-	missing/misses, full-frame HOG miss chain (size gate still applies).
+	HOG (eye-as-face). Raw YuNet miss retries LAB-CLAHE BGR.
+
+	Idle miss (`heavy_retries=False`) with YuNet present stops after that
+	locate (+ LAB-CLAHE retry) — skip the full-frame HOG pyramid. Burst
+	re-acquire, hog-only (no YuNet), and default callers keep the miss
+	chain (CLAHE / compress / upsample=1). Size gate still applies.
 	Returns (face_or_None, kind) where kind is
 	"hog"|"clahe"|"compress"|"upsample"|"yunet"|None.
 	"""
@@ -786,6 +791,8 @@ def run_face_detect(
 		if buffers is not None:
 			buffers.last_yunet_rect = None
 			buffers.last_refine_kind = None
+		if not heavy_retries:
+			return None, None
 	face, kind = run_hog_face_detect(detector, gray, select_largest, buffers)
 	if face is not None:
 		_bump_detect_stat(buffers, "hog_full_hit")

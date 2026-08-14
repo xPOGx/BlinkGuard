@@ -26,6 +26,12 @@ class CameraHelperTests(unittest.TestCase):
 		self.assertLess(mean_luma(frame), 1.0)
 		self.assertTrue(is_black_frame(frame))
 
+	def test_mean_luma_bright_bgr_matches_weighted_channels(self):
+		frame = np.zeros((20, 20, 3), dtype=np.uint8)
+		frame[:, :] = (10, 200, 30)
+		expected = 0.114 * 10 + 0.587 * 200 + 0.299 * 30
+		self.assertAlmostEqual(mean_luma(frame), expected, places=4)
+
 	def test_mean_luma_bright_gray(self):
 		frame = np.full((40, 40), 180, dtype=np.uint8)
 		self.assertGreater(mean_luma(frame), BLACK_LUMA_THRESHOLD)

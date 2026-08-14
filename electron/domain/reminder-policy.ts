@@ -14,6 +14,8 @@ export const BLINK_SNOOZE_MS = PROMPT_SNOOZE_MS;
 export const EXERCISE_POPUP_VISIBLE_MS = 30_000;
 /** Debounce before treating no-face as confirmed (also arms auto-stop). */
 export const NO_FACE_DEBOUNCE_MS = 750;
+/** Debounce before hiding the no-face toast / crediting face-return. */
+export const FACE_RETURN_DEBOUNCE_MS = 500;
 
 export type BlinkCreditSource =
 	| "detected"

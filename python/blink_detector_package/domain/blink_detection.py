@@ -202,8 +202,11 @@ MIN_INTEROCULAR_PX = 12.0
 FACE_MISS_HOLD_FRAMES = 12
 # Landmark quality blip mid-blink: skip EAR but do not cancel yet.
 FACE_QUALITY_HOLD_FRAMES = 2
-# After face loss, force every-frame HOG for this many frames (re-acquire).
+# After face loss, force every-frame locate (heavy retries) for this many frames.
 FACE_REACQUIRE_FRAMES = 15
+# After the re-acquire burst, skip full-frame detect this often while idle-miss.
+# 6 frames ≈ 0.4s at medium 15 FPS — YuNet still sees a walk-back quickly.
+FACE_IDLE_DETECT_INTERVAL = 6
 # Session baseline drift vs live_open → gentle auto-recalibrate (frontal only).
 BASELINE_DRIFT_RATIO = 0.12
 BASELINE_DRIFT_HOLD_S = 60.0

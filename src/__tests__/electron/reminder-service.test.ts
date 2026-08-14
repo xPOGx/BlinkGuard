@@ -10,6 +10,7 @@ import { stopTrackingSession } from "../../../electron/application/tracking-sess
 import {
 	BLINK_CREDIT_DEBOUNCE_MS,
 	BLINK_SNOOZE_MS,
+	FACE_RETURN_DEBOUNCE_MS,
 	NO_FACE_DEBOUNCE_MS,
 	nextTimerReminderDelay,
 	REMINDER_POPUP_VISIBLE_MS,
@@ -54,6 +55,7 @@ function createPreferences(
 function createWindows() {
 	const api = {
 		reminderOpen: false,
+		hasNoFaceWindow: false,
 		lastPopup: null as unknown,
 		showReminder: vi.fn((_kind: "starting" | "blink" | "stopped") => {
 			api.reminderOpen = true;
@@ -71,9 +73,13 @@ function createWindows() {
 			return false;
 		}),
 		hasReminder: vi.fn(() => api.reminderOpen),
-		showNoFace: vi.fn(),
-		hideNoFace: vi.fn(),
-		hasNoFace: vi.fn(() => false),
+		showNoFace: vi.fn(() => {
+			api.hasNoFaceWindow = true;
+		}),
+		hideNoFace: vi.fn(() => {
+			api.hasNoFaceWindow = false;
+		}),
+		hasNoFace: vi.fn(() => api.hasNoFaceWindow),
 		showBlinkRateCoach: vi.fn(),
 		hideBlinkRateCoach: vi.fn(),
 		hasBlinkRateCoach: vi.fn(() => false),
@@ -577,8 +583,14 @@ describe("ReminderService auto-stop on no face", () => {
 		expect(state.noFaceAutoStopTimer).not.toBeNull();
 
 		service.onFaceDetection(true);
+		expect(state.noFaceAutoStopTimer).not.toBeNull();
+		expect(state.isFaceDetected).toBe(false);
+		expect(windows.hideNoFace).not.toHaveBeenCalled();
+
+		vi.advanceTimersByTime(FACE_RETURN_DEBOUNCE_MS);
 		expect(state.noFaceAutoStopTimer).toBeNull();
 		expect(state.isFaceDetected).toBe(true);
+		expect(windows.hideNoFace).toHaveBeenCalled();
 
 		vi.advanceTimersByTime(2 * 60 * 1000);
 		expect(preferences.isTracking).toBe(true);
@@ -701,6 +713,87 @@ describe("ReminderService auto-stop on no face", () => {
 		expect(lookAway.stop).toHaveBeenCalledOnce();
 		expect(windows.showReminder).toHaveBeenCalledWith("stopped");
 		expect(windows.sendPreferences).toHaveBeenCalled();
+	});
+});
+
+describe("ReminderService no-face toast hysteresis", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it("does not hide the toast on a one-frame face hit", () => {
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const service = new ReminderService(
+			createPreferences(),
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			createStore(),
+		);
+
+		service.onFaceDetection(false);
+		vi.advanceTimersByTime(NO_FACE_DEBOUNCE_MS);
+		expect(windows.showNoFace).toHaveBeenCalledOnce();
+		expect(windows.hasNoFace()).toBe(true);
+
+		service.onFaceDetection(true);
+		expect(windows.hideNoFace).not.toHaveBeenCalled();
+		expect(windows.hasNoFace()).toBe(true);
+
+		service.onFaceDetection(false);
+		vi.advanceTimersByTime(FACE_RETURN_DEBOUNCE_MS);
+		expect(windows.hideNoFace).not.toHaveBeenCalled();
+		expect(windows.hasNoFace()).toBe(true);
+		expect(state.isFaceDetected).toBe(false);
+	});
+
+	it("hides the toast and credits face-return after a confirmed face", () => {
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const service = new ReminderService(
+			createPreferences(),
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			createStore(),
+		);
+		const blinkBefore = state.lastBlinkTime;
+
+		service.onFaceDetection(false);
+		vi.advanceTimersByTime(NO_FACE_DEBOUNCE_MS);
+
+		service.onFaceDetection(true);
+		vi.advanceTimersByTime(FACE_RETURN_DEBOUNCE_MS);
+
+		expect(windows.hideNoFace).toHaveBeenCalledOnce();
+		expect(state.isFaceDetected).toBe(true);
+		expect(state.lastBlinkTime).toBeGreaterThan(blinkBefore);
+	});
+
+	it("does not call hideNoFace on every true frame once the face is confirmed", () => {
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		const windows = createWindows();
+		const service = new ReminderService(
+			createPreferences(),
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			createStore(),
+		);
+
+		service.onFaceDetection(true);
+		service.onFaceDetection(true);
+		expect(windows.hideNoFace).not.toHaveBeenCalled();
+		expect(state.faceReturnDebounceTimer).toBeNull();
 	});
 });
 
