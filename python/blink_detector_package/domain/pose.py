@@ -237,8 +237,10 @@ def select_largest_face(faces):
 FACE_EDGE_BORDER_PX = 3
 FACE_EDGE_MIN_AREA_FRAC = 0.12
 # Centered ~44px HOG hits on an eye/eyebrow (Fifine upsample=1) are not a
-# face. 18% of 480px ≈ 86px — zip area ≤2809 miss, 8190+ can still pass.
-MIN_FACE_WIDTH_FRAC = 0.18
+# face. 0.18 of 640px ≈ 115px also killed a real C930e desk face after a
+# short lean-back (working boxes were ~19% of frame; chair ≈14–16%).
+# 0.12 of 480 ≈ 58px still rejects 44px / 53px eyes; 90px zip-8190 passes.
+MIN_FACE_WIDTH_FRAC = 0.12
 
 
 def face_bbox_plausible(face, frame_w, frame_h):

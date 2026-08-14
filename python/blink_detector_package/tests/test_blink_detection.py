@@ -172,6 +172,13 @@ class PoseTests(unittest.TestCase):
 		face = _FakeFace(90, 91, left=170, top=80)
 		self.assertTrue(face_bbox_plausible(face, 480, 360))
 
+	def test_chair_distance_face_on_640_is_plausible(self):
+		"""C930e High/Ultra 640-wide: lean-back ~14% width is a face, not an eye."""
+		chair = _FakeFace(90, 100, left=270, top=80)
+		self.assertTrue(face_bbox_plausible(chair, 640, 360))
+		too_small = _FakeFace(70, 78, left=280, top=90)
+		self.assertFalse(face_bbox_plausible(too_small, 640, 360))
+
 	def test_closeup_clipping_border_still_plausible(self):
 		"""Filled-frame close-up may touch edges; area fraction saves it."""
 		close = _FakeFace(400, 320, left=0, top=0)
