@@ -122,7 +122,7 @@ See `AGENTS.md` for Cursor Cloud–specific notes.
 
 ### Optional camera sidecar
 
-Only needed if you want OpenCV/dlib blink detection or the live camera preview. You need a webcam, [Git LFS](https://git-lfs.com/) for the landmarks model, the committed YuNet ONNX (`electron/assets/models/face_detection_yunet_2023mar.onnx`), and a Python toolchain that can install `dlib`.
+Only needed if you want OpenCV/dlib blink detection or the live camera preview. You need a webcam, [Git LFS](https://git-lfs.com/) for the landmarks model, the committed YuNet ONNX (`electron/assets/models/face_detection_yunet_2023mar.onnx`), optional OCEC confirm ONNX (`electron/assets/models/ocec_s.onnx`), and a Python toolchain that can install `dlib`.
 
 **Python version:** use **3.11** (same as CI). Very new releases (e.g. **3.14**) often have no prebuilt `dlib` wheel on Windows; `pip` then tries to compile from source and fails without a C++ toolchain.
 

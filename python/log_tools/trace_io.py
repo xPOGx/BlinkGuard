@@ -22,6 +22,8 @@ TRACE_FRAME_KEYS = (
 	"luma",
 	"left_aperture",
 	"right_aperture",
+	"left_ocec",
+	"right_ocec",
 )
 
 
@@ -83,7 +85,7 @@ def label_path_for_trace(trace_path: Path) -> Path:
 
 	Stage-3 reprocess outputs use `session.repro.ndjson` / `session.u2.ndjson`
 	suffixes — strip a trailing `.repro` / `.u1` / `.u2` / `.u3` / `.pnp` / `.ap`
-	so labels still resolve to the original `session.labels.json`.
+	/ `.ocec` so labels still resolve to the original `session.labels.json`.
 	"""
 	name = trace_path.name
 	if name.endswith(".ndjson"):
@@ -92,7 +94,7 @@ def label_path_for_trace(trace_path: Path) -> Path:
 		stem = name[: -len(".jsonl")]
 	else:
 		stem = trace_path.stem
-	for suffix in (".repro", ".u1", ".u2", ".u3", ".pnp", ".ap"):
+	for suffix in (".repro", ".u1", ".u2", ".u3", ".pnp", ".ap", ".ocec"):
 		if stem.endswith(suffix):
 			stem = stem[: -len(suffix)]
 			break

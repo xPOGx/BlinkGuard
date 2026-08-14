@@ -10,6 +10,7 @@ Usage (from python/):
   venv\\Scripts\\python.exe log_tools\\reprocess_video.py path\\to\\session.avi
   venv\\Scripts\\python.exe log_tools\\reprocess_video.py path\\to\\session.ndjson --upscale 2
   venv\\Scripts\\python.exe log_tools\\reprocess_video.py session.avi --upscale 1 --out out.ndjson
+  venv\\Scripts\\python.exe log_tools\\reprocess_video.py session.ndjson --ocec
 """
 
 from __future__ import annotations
@@ -46,8 +47,14 @@ from blink_detector_package.infrastructure.vision import (  # noqa: E402
 	eye_intensity_aperture,
 	get_face_landmarks,
 	get_landmark_roi_upscale,
+	get_ocec_enabled,
 	run_face_detect,
 	set_landmark_roi_upscale,
+	set_ocec_enabled,
+)
+from blink_detector_package.infrastructure.ocec import (  # noqa: E402
+	load_ocec,
+	score_eye_open,
 )
 from trace_io import (  # noqa: E402
 	label_path_for_trace,
@@ -104,6 +111,7 @@ def reprocess_video(
 	header: dict[str, Any] | None = None,
 	upscale: int | None = None,
 	face_detect_interval: int = 1,
+	ocec_net=None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
 	"""
 	Run YuNet/HOG + shape_predictor over avi frames; return (header, frames).
@@ -176,6 +184,7 @@ def reprocess_video(
 					t=float(meta["t"]),
 					video_index=target,
 					upscale=applied_upscale,
+					ocec_net=ocec_net,
 				)
 				face = frame_row.pop("_face", face)
 				out_frames.append(frame_row)
@@ -204,6 +213,7 @@ def reprocess_video(
 					t=t,
 					video_index=index,
 					upscale=applied_upscale,
+					ocec_net=ocec_net,
 				)
 				face = frame_row.pop("_face", face)
 				out_frames.append(frame_row)
@@ -221,6 +231,7 @@ def reprocess_video(
 			"reprocessed": True,
 			"landmark_roi_upscale": applied_upscale,
 			"intensity_aperture": True,
+			"ocec": ocec_net is not None,
 			"source_tool": "log_tools/reprocess_video.py",
 		}
 	)
@@ -244,6 +255,7 @@ def _process_bgr(
 	t: float,
 	video_index: int,
 	upscale: int,
+	ocec_net=None,
 ) -> dict[str, Any]:
 	gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
 	face = face_holder[0]
@@ -292,6 +304,8 @@ def _process_bgr(
 	avg_ear = (left_ear + right_ear) * 0.5
 	left_aperture = eye_intensity_aperture(gray, left_eye)
 	right_aperture = eye_intensity_aperture(gray, right_eye)
+	left_ocec = score_eye_open(ocec_net, bgr, left_eye)
+	right_ocec = score_eye_open(ocec_net, bgr, right_eye)
 	pose = estimate_head_pose(
 		landmarks,
 		image_size=(int(bgr.shape[1]), int(bgr.shape[0])),
@@ -313,6 +327,12 @@ def _process_bgr(
 			),
 			"right_aperture": (
 				float(right_aperture) if right_aperture is not None else None
+			),
+			"left_ocec": (
+				float(left_ocec) if left_ocec is not None else None
+			),
+			"right_ocec": (
+				float(right_ocec) if right_ocec is not None else None
 			),
 			"_face": face,
 		}
@@ -360,6 +380,11 @@ def main(argv: list[str] | None = None) -> int:
 		default=1,
 		help="HOG detect every N frames (default 1)",
 	)
+	parser.add_argument(
+		"--ocec",
+		action="store_true",
+		help="Score OCEC prob_open into the trace (writes *.ocec.ndjson by default)",
+	)
 	args = parser.parse_args(argv)
 
 	try:
@@ -371,13 +396,28 @@ def main(argv: list[str] | None = None) -> int:
 	out = args.out
 	if out is None:
 		stem = args.path.stem
-		if stem.endswith(".repro"):
-			stem = stem[: -len(".repro")]
-		out = args.path.with_name(f"{stem}.repro.ndjson")
+		for suffix in (".repro", ".ocec", ".ap"):
+			if stem.endswith(suffix):
+				stem = stem[: -len(suffix)]
+				break
+		tag = "ocec" if args.ocec else "repro"
+		out = args.path.with_name(f"{stem}.{tag}.ndjson")
+
+	ocec_net = None
+	prev_ocec = None
+	if args.ocec:
+		prev_ocec = get_ocec_enabled()
+		set_ocec_enabled(True)
+		ocec_net = load_ocec()
+		if ocec_net is None:
+			set_ocec_enabled(prev_ocec)
+			print("error: OCEC ONNX missing or unusable", file=sys.stderr)
+			return 1
 
 	print(f"avi: {avi}")
 	print(f"timing frames: {len(frames) or 'fps-derived'}")
 	print(f"upscale: {args.upscale if args.upscale is not None else get_landmark_roi_upscale()}")
+	print(f"ocec: {'on' if ocec_net is not None else 'off'}")
 	started = time.time()
 	try:
 		out_header, out_frames = reprocess_video(
@@ -386,10 +426,14 @@ def main(argv: list[str] | None = None) -> int:
 			header=header,
 			upscale=args.upscale,
 			face_detect_interval=args.face_detect_interval,
+			ocec_net=ocec_net,
 		)
 	except RuntimeError as error:
 		print(f"error: {error}", file=sys.stderr)
 		return 1
+	finally:
+		if prev_ocec is not None:
+			set_ocec_enabled(prev_ocec)
 	write_trace(out, out_header, out_frames)
 	elapsed = time.time() - started
 	ok = sum(1 for f in out_frames if f.get("face_status") == "ok")

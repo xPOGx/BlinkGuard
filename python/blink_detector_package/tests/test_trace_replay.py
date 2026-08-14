@@ -134,6 +134,13 @@ class TraceReplayTests(unittest.TestCase):
 			self.assertEqual(header.get("schema"), "blinkguard.ear_trace.v1")
 			self.assertGreater(len(frames), 10)
 
+	def test_label_path_strips_ocec_suffix(self):
+		path = Path("fixtures/sessions/frontal_calm.ocec.ndjson")
+		self.assertEqual(
+			label_path_for_trace(path).name,
+			"frontal_calm.labels.json",
+		)
+
 	def test_human_corpus_f1_floor(self):
 		"""Regression floor vs Stage-0 video-verified labels (skip if missing)."""
 		sessions = _PYTHON / "fixtures" / "sessions"

@@ -166,6 +166,16 @@ def replay_trace(
 				if frame.get("right_aperture") is not None
 				else None
 			),
+			left_ocec=(
+				float(frame["left_ocec"])
+				if frame.get("left_ocec") is not None
+				else None
+			),
+			right_ocec=(
+				float(frame["right_ocec"])
+				if frame.get("right_ocec") is not None
+				else None
+			),
 		)
 		if not info:
 			continue

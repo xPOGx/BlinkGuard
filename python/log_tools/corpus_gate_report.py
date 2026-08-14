@@ -48,6 +48,7 @@ KNOWN_REJECTS = (
 	"reject_cooldown",
 	"reject_yaw",
 	"reject_aperture",
+	"reject_ocec",
 	"reject_classifier",
 )
 

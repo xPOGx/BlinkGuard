@@ -1807,6 +1807,153 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertTrue(credited_any)
 		self.assertIn("complete", phases)
 
+	def test_ocec_confirm_rejects_when_open(self):
+		"""EAR-shaped blink but OCEC stays open → reject_ocec."""
+		state = BlinkDetectionState(target_fps=15)
+		t = _seed_open_eye(state, ear=0.28)
+		for _ in range(5):
+			t += 0.1
+			state.detect(
+				0.28,
+				t,
+				left_ear=0.28,
+				right_ear=0.28,
+				left_ocec=0.90,
+				right_ocec=0.90,
+			)
+		steps = (
+			(0.1, 0.16, 0.17, 0.15, 0.90, 0.90),
+			(0.1, 0.10, 0.11, 0.09, 0.88, 0.88),
+			(0.1, 0.08, 0.09, 0.07, 0.88, 0.87),
+			(0.1, 0.07, 0.08, 0.06, 0.89, 0.89),
+			(0.1, 0.22, 0.22, 0.22, 0.90, 0.90),
+			(0.1, 0.28, 0.28, 0.28, 0.90, 0.90),
+			(0.1, 0.28, 0.28, 0.28, 0.90, 0.90),
+		)
+		credited_any = False
+		phases = []
+		for step in steps:
+			dt, ear, left, right, loc, roc = step
+			t += dt
+			credited, info = state.detect(
+				ear,
+				t,
+				left_ear=left,
+				right_ear=right,
+				left_ocec=loc,
+				right_ocec=roc,
+			)
+			if info:
+				phases.append(info.get("phase"))
+			if credited:
+				credited_any = True
+		self.assertFalse(credited_any)
+		self.assertIn("reject_ocec", phases)
+
+	def test_ocec_confirm_skips_on_side_yaw(self):
+		"""|yaw|≥0.35: shallow OCEC must not veto (same band as classifier)."""
+		state = BlinkDetectionState(target_fps=15)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks(yaw_offset=18.0))
+		self.assertGreaterEqual(abs(pose["yaw"]), 0.35)
+		self.assertFalse(
+			evaluate_pose_gate(pose, "normal")["extreme_yaw"]
+		)
+		for _ in range(5):
+			t += 0.1
+			state.detect(
+				0.28,
+				t,
+				left_ear=0.28,
+				right_ear=0.28,
+				left_ocec=0.90,
+				right_ocec=0.90,
+				pose=pose,
+			)
+		steps = (
+			(0.1, 0.16, 0.17, 0.15, 0.90, 0.90),
+			(0.1, 0.10, 0.11, 0.09, 0.88, 0.88),
+			(0.1, 0.08, 0.09, 0.07, 0.88, 0.87),
+			(0.1, 0.07, 0.08, 0.06, 0.89, 0.89),
+			(0.1, 0.22, 0.22, 0.22, 0.90, 0.90),
+			(0.1, 0.28, 0.28, 0.28, 0.90, 0.90),
+			(0.1, 0.28, 0.28, 0.28, 0.90, 0.90),
+		)
+		credited_any = False
+		phases = []
+		for step in steps:
+			dt, ear, left, right, loc, roc = step
+			t += dt
+			credited, info = state.detect(
+				ear,
+				t,
+				left_ear=left,
+				right_ear=right,
+				left_ocec=loc,
+				right_ocec=roc,
+				pose=pose,
+			)
+			if info:
+				phases.append(info.get("phase"))
+			if credited:
+				credited_any = True
+		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+		self.assertNotIn("reject_ocec", phases)
+
+	def test_ocec_confirm_credits_when_both_deep(self):
+		state = BlinkDetectionState(target_fps=15)
+		t = _seed_open_eye(state, ear=0.28)
+		for _ in range(5):
+			t += 0.1
+			state.detect(
+				0.28,
+				t,
+				left_ear=0.28,
+				right_ear=0.28,
+				left_ocec=0.90,
+				right_ocec=0.90,
+			)
+		steps = (
+			(0.1, 0.16, 0.17, 0.15, 0.55, 0.52),
+			(0.1, 0.10, 0.11, 0.09, 0.20, 0.18),
+			(0.1, 0.08, 0.09, 0.07, 0.08, 0.07),
+			(0.1, 0.07, 0.08, 0.06, 0.05, 0.04),
+			(0.1, 0.22, 0.22, 0.22, 0.70, 0.72),
+			(0.1, 0.28, 0.28, 0.28, 0.90, 0.90),
+			(0.1, 0.28, 0.28, 0.28, 0.90, 0.90),
+		)
+		credited_any = False
+		phases = []
+		last_info = None
+		for step in steps:
+			dt, ear, left, right, loc, roc = step
+			t += dt
+			credited, info = state.detect(
+				ear,
+				t,
+				left_ear=left,
+				right_ear=right,
+				left_ocec=loc,
+				right_ocec=roc,
+			)
+			last_info = info
+			if info:
+				phases.append(info.get("phase"))
+			if credited:
+				credited_any = True
+		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+		self.assertTrue(last_info.get("ocec_ok"))
+
+	def test_ocec_none_keeps_legacy_behaviour(self):
+		"""No OCEC args → same credit path as without Stage 7."""
+		state = BlinkDetectionState(target_fps=15)
+		t = _seed_open_eye(state, ear=0.28)
+		credited_any, _t, _info, phases = _feed(state, t, _CREDIT_STEPS)
+		self.assertTrue(credited_any)
+		self.assertIn("complete", phases)
+
 	def test_look_down_real_blink_credited(self):
 		state = BlinkDetectionState(target_fps=15)
 		t = _seed_open_eye(state, ear=0.26)

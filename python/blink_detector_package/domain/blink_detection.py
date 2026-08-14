@@ -1,6 +1,9 @@
 from collections import deque
 
-from blink_detector_package.domain.classifier import score as classifier_score
+from blink_detector_package.domain.classifier import (
+	CLASSIFIER_SIDE_YAW_WAIVE,
+	score as classifier_score,
+)
 from blink_detector_package.domain.pose import (
 	evaluate_pose_gate,
 	get_pose_profile,
@@ -65,6 +68,10 @@ EAR_ASYMMETRY_SKIP = 0.55
 
 # Max relative |L-R| drop spread vs mean drop for bilateral agreement.
 BILATERAL_MAX_SPREAD = 0.95
+
+# Stage 7: OCEC prob_open confirm (1=open, 0=closed). Relative drop vs live
+# open; missing samples skip (legacy NDJSON). Do not retune with LOOK_DOWN_*.
+OCEC_CONFIRM_MIN_DROP = 0.35
 
 # EMA for session resting pitch (webcam-on-top bias compensation).
 RESTING_PITCH_ALPHA = 0.08
@@ -462,6 +469,14 @@ class BlinkDetectionState:
 		self._had_right_aperture = False
 		self._confirm_aperture_ok = None
 		self._confirm_aperture_drop = None
+		# Stage 7 OCEC confirm (optional; skip when samples missing).
+		self.live_open_ocec = 0.0
+		self.max_left_ocec_drop = 0.0
+		self.max_right_ocec_drop = 0.0
+		self._had_left_ocec = False
+		self._had_right_ocec = False
+		self._confirm_ocec_ok = None
+		self._confirm_ocec_drop = None
 
 	def set_target_fps(self, fps):
 		"""Update expected camera FPS for duration / short-velocity gates."""
@@ -584,6 +599,86 @@ class BlinkDetectionState:
 			alpha = LIVE_OPEN_FALL_ALPHA
 			self.live_open_aperture = (
 				(1 - alpha) * self.live_open_aperture + alpha * ap
+			)
+
+	def _ref_ocec(self):
+		"""Open-lid OCEC prob_open reference for Stage 7 confirm."""
+		return float(self.live_open_ocec or 0.0)
+
+	def _compute_ocec_drop(self, ocec):
+		ref = self._ref_ocec()
+		if ref <= 0 or ocec is None:
+			return None
+		return max(0.0, (ref - float(ocec)) / ref)
+
+	def _accumulate_ocec_drops(self, left_ocec, right_ocec):
+		"""Update peak per-eye OCEC drops while a candidate is active."""
+		left_d = self._compute_ocec_drop(left_ocec)
+		right_d = self._compute_ocec_drop(right_ocec)
+		if left_d is not None:
+			self._had_left_ocec = True
+			if left_d > self.max_left_ocec_drop:
+				self.max_left_ocec_drop = left_d
+		if right_d is not None:
+			self._had_right_ocec = True
+			if right_d > self.max_right_ocec_drop:
+				self.max_right_ocec_drop = right_d
+
+	def _confirm_ocec_for_credit(self, yaw=0.0):
+		"""
+		Stage 7 credit confirm.
+
+		Returns (ok, strong_ocec_drop_or_None).
+		No OCEC samples → skip confirm (legacy traces / disabled).
+		`|yaw| ≥ CLASSIFIER_SIDE_YAW_WAIVE` → skip (side crop unreliable;
+		same band as Stage 4 logistic). Do not retune LOOK_DOWN_*.
+		"""
+		had_any = self._had_left_ocec or self._had_right_ocec
+		if not had_any:
+			return True, None
+		use_left = self.max_left_drop >= self.max_right_drop
+		drop = None
+		if use_left and self._had_left_ocec:
+			drop = self.max_left_ocec_drop
+		elif (not use_left) and self._had_right_ocec:
+			drop = self.max_right_ocec_drop
+		if drop is None:
+			return True, None
+		if abs(float(yaw or 0.0)) >= CLASSIFIER_SIDE_YAW_WAIVE:
+			return True, drop
+		return drop >= float(OCEC_CONFIRM_MIN_DROP), drop
+
+	def _update_live_open_ocec(self, left_ocec, right_ocec, closing_velocity):
+		"""
+		Track open OCEC prob_open (same rise/fall as live_open_aperture).
+
+		Frozen during an active candidate so drops are vs pre-blink open.
+		"""
+		samples = [
+			float(v)
+			for v in (left_ocec, right_ocec)
+			if v is not None
+		]
+		if not samples:
+			return
+		val = sum(samples) / len(samples)
+		if val <= 0:
+			return
+		if self.live_open_ocec <= 0:
+			self.live_open_ocec = val
+			return
+		if self.blink_in_progress:
+			return
+		if val >= self.live_open_ocec * 0.92:
+			alpha = LIVE_OPEN_RISE_ALPHA
+			self.live_open_ocec = (
+				(1 - alpha) * self.live_open_ocec + alpha * val
+			)
+			return
+		if closing_velocity <= LIVE_OPEN_FALL_MAX_CLOSING_VEL:
+			alpha = LIVE_OPEN_FALL_ALPHA
+			self.live_open_ocec = (
+				(1 - alpha) * self.live_open_ocec + alpha * val
 			)
 
 	def _update_live_open_ear(self, ear_smooth, closing_velocity, current_time):
@@ -882,6 +977,12 @@ class BlinkDetectionState:
 		self._had_right_aperture = False
 		self._confirm_aperture_ok = None
 		self._confirm_aperture_drop = None
+		self.max_left_ocec_drop = 0.0
+		self.max_right_ocec_drop = 0.0
+		self._had_left_ocec = False
+		self._had_right_ocec = False
+		self._confirm_ocec_ok = None
+		self._confirm_ocec_drop = None
 
 	def cancel_on_face_lost(self, current_time=None):
 		"""
@@ -1090,6 +1191,8 @@ class BlinkDetectionState:
 		pose=None,
 		left_aperture=None,
 		right_aperture=None,
+		left_ocec=None,
+		right_ocec=None,
 	):
 		"""
 		Run blink state machine.
@@ -1097,6 +1200,7 @@ class BlinkDetectionState:
 		Optional left/right EAR enable bilateral gates.
 		Optional pose dict (yaw/pitch/valid) enables pose gates.
 		Optional left/right intensity aperture (Stage 3.5) confirms credit.
+		Optional left/right OCEC prob_open (Stage 7) confirms credit.
 		`current_ear` is raw avg EAR; FSM uses a short rolling mean.
 		"""
 		ear_raw = float(current_ear)
@@ -1198,6 +1302,7 @@ class BlinkDetectionState:
 		self._update_live_open_aperture(
 			left_aperture, right_aperture, closing_velocity
 		)
+		self._update_live_open_ocec(left_ocec, right_ocec, closing_velocity)
 
 		if len(self.baseline_ear_values) < 5 and self.current_baseline_ear <= 0:
 			return False, None
@@ -1289,6 +1394,7 @@ class BlinkDetectionState:
 			"treat_as_look_down": treat_as_look_down,
 			"live_open_ear": self.live_open_ear,
 			"live_open_aperture": self.live_open_aperture,
+			"live_open_ocec": self.live_open_ocec,
 			"close_band_ear": close_band_ear,
 			"resting_pitch": self.resting_pitch,
 			"pose_strictness": self.pose_strictness,
@@ -1297,6 +1403,8 @@ class BlinkDetectionState:
 			"right_ear": right_ear,
 			"left_aperture": left_aperture,
 			"right_aperture": right_aperture,
+			"left_ocec": left_ocec,
+			"right_ocec": right_ocec,
 			"eyes_closed": self.eyes_closed,
 			"awaiting_reopen": self.awaiting_reopen,
 			"target_fps": self.target_fps,
@@ -1305,6 +1413,8 @@ class BlinkDetectionState:
 			"right_drop": right_drop,
 			"aperture_drop": self._confirm_aperture_drop,
 			"aperture_ok": self._confirm_aperture_ok,
+			"ocec_drop": self._confirm_ocec_drop,
+			"ocec_ok": self._confirm_ocec_ok,
 			**ear_fields,
 		}
 		if has_both:
@@ -1313,6 +1423,7 @@ class BlinkDetectionState:
 		# Track per-eye aperture drops during an active candidate.
 		if self.blink_in_progress:
 			self._accumulate_aperture_drops(left_aperture, right_aperture)
+			self._accumulate_ocec_drops(left_ocec, right_ocec)
 
 		# Block new blink starts until lids clearly reopen (anti look-down storm).
 		if (
@@ -1455,6 +1566,13 @@ class BlinkDetectionState:
 			self._confirm_aperture_ok = None
 			self._confirm_aperture_drop = None
 			self._accumulate_aperture_drops(left_aperture, right_aperture)
+			self.max_left_ocec_drop = 0.0
+			self.max_right_ocec_drop = 0.0
+			self._had_left_ocec = False
+			self._had_right_ocec = False
+			self._confirm_ocec_ok = None
+			self._confirm_ocec_drop = None
+			self._accumulate_ocec_drops(left_ocec, right_ocec)
 			self._candidate_yaw = float(gate.get("yaw") or 0.0)
 			self._candidate_pitch = float(gate.get("pitch") or 0.0)
 			# One-frame blinks never accumulate in-candidate Δpose — seed with
@@ -1465,6 +1583,9 @@ class BlinkDetectionState:
 			info_pose["pose_delta"] = self._candidate_pose_delta
 			info_pose["aperture_drop"] = max(
 				self.max_left_ap_drop, self.max_right_ap_drop
+			) or None
+			info_pose["ocec_drop"] = max(
+				self.max_left_ocec_drop, self.max_right_ocec_drop
 			) or None
 			return False, {
 				"baseline": ref,
@@ -1856,6 +1977,13 @@ class BlinkDetectionState:
 				self._confirm_aperture_drop = strong_ap_drop
 				info_pose["aperture_ok"] = aperture_ok
 				info_pose["aperture_drop"] = strong_ap_drop
+				ocec_ok, strong_ocec_drop = self._confirm_ocec_for_credit(
+					yaw=gate["yaw"],
+				)
+				self._confirm_ocec_ok = ocec_ok
+				self._confirm_ocec_drop = strong_ocec_drop
+				info_pose["ocec_ok"] = ocec_ok
+				info_pose["ocec_drop"] = strong_ocec_drop
 				gates_ok = (
 					duration_ok
 					and threshold_ok
@@ -1864,6 +1992,7 @@ class BlinkDetectionState:
 					and bilateral_ok
 					and motion_ok
 					and aperture_ok
+					and ocec_ok
 					and gate["allow_credit"]
 					# Never credit on duration-max while still mid/closed —
 					# must have reopened past recovery_level.
@@ -1926,6 +2055,8 @@ class BlinkDetectionState:
 						"right_drop": right_drop_at_end,
 						"aperture_drop": strong_ap_drop,
 						"aperture_ok": aperture_ok,
+						"ocec_drop": strong_ocec_drop,
+						"ocec_ok": ocec_ok,
 						"pose_delta": pose_delta_at_end,
 						"ear": ear_smooth,
 						"ear_raw": ear_raw,
@@ -1981,6 +2112,8 @@ class BlinkDetectionState:
 					reason = "reject_bilateral"
 				elif not aperture_ok:
 					reason = "reject_aperture"
+				elif not ocec_ok:
+					reason = "reject_ocec"
 				elif not motion_ok:
 					reason = "reject_motion"
 				else:
@@ -2005,6 +2138,7 @@ class BlinkDetectionState:
 		self.current_baseline_ear = 0.0
 		self.live_open_ear = 0.0
 		self.live_open_aperture = 0.0
+		self.live_open_ocec = 0.0
 		self.ear_depressed = False
 		self._live_open_stable_since = None
 		self._prev_ear_for_live = None
@@ -2038,6 +2172,12 @@ class BlinkDetectionState:
 		self._had_right_aperture = False
 		self._confirm_aperture_ok = None
 		self._confirm_aperture_drop = None
+		self.max_left_ocec_drop = 0.0
+		self.max_right_ocec_drop = 0.0
+		self._had_left_ocec = False
+		self._had_right_ocec = False
+		self._confirm_ocec_ok = None
+		self._confirm_ocec_drop = None
 		self._ear_window.clear()
 		self.left_track = EyeTrack()
 		self.right_track = EyeTrack()

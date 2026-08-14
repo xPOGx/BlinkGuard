@@ -5,5 +5,12 @@ This product includes software originally based on ScreenBlink
 (https://github.com/katunli/ScreenBlink) by Katun Li.
 Copyright (c) Katun Li and ScreenBlink contributors.
 
+This product includes the YuNet face detector ONNX from the OpenCV Zoo
+(https://github.com/opencv/opencv_zoo), Apache License 2.0.
+
+This product includes the OCEC open/closed-eye classifier
+(https://github.com/PINTO0309/OCEC) by Katsuya Hyodo, MIT License.
+Copyright (c) 2025 Katsuya Hyodo.
+
 BlinkGuard is distributed under the MIT License. See the LICENSE file
 in this repository for the full license text.

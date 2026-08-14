@@ -362,6 +362,8 @@ def main() -> int:
 		"reject_opening",
 		"reject_bilateral",
 		"reject_motion",
+		"reject_aperture",
+		"reject_ocec",
 		"skip_face_lost",
 		"skip_face_quality",
 	):
@@ -380,6 +382,8 @@ def main() -> int:
 		if phase == "skip_face_quality":
 			stats(phase, bucket, "face_area")
 			stats(phase, bucket, "interocular")
+		if phase == "reject_ocec":
+			stats(phase, bucket, "ocec_drop")
 
 	# Scenario hint: credits closer than 0.5s often mean FP storms
 	times = [t for t, bd in rows if bd.get("credited")]

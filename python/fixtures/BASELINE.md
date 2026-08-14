@@ -156,3 +156,18 @@ Telemetry only: `blinkDebug.waives` / `reject_gate` forwarded from FSM `_outcome
 
 Fired: `synthetic_peak`, `frontal_opening_peak`, `ld_short_duration`, `ld_one_frame_peak`, `motion_peak`, `stronger_eye`; rejects include `reject_opening` (dominant on side monitors), `reject_duration`, `reject_classifier` (1), `reject_motion`, `reject_recovery`, `reject_threshold`.
 
+## Stage 7 — OCEC confirm (`OCEC_ENABLED=True`)
+
+2nd closedness overlay: OCEC `prob_open` on 6-pt eye crops via OpenCV DNN (`ocec_s.onnx`). EAR FSM start/`live_open` unchanged; credit confirm on stronger EAR eye (`reject_ocec` if relative drop &lt; `OCEC_CONFIRM_MIN_DROP` 0.35). Skip confirm when `|yaw| ≥ 0.35` (same band as Stage 4 — side crop is unreliable). Missing OCEC → skip confirm (baked Stage 6 behaviour). Not a `detector_backend`. Do not retune LOOK_DOWN_* / YuNet / open path in the same pass.
+
+**Fair A/B (2026-08-14):** join `left_ocec`/`right_ocec` from `reprocess_video.py --ocec` onto **baked Stage 6 EAR** by `video_index` (do not replay reprocessed EAR — that mixes locate drift with confirm). Match window **0.45s**.
+
+| Path | P | R | F1 | tp | fp | fn |
+|---|---|---|---|---|---|---|
+| Baked EAR (no OCEC fields) | 0.950 | 0.910 | **0.929** | 151 | 8 | 15 |
+| Baked EAR + joined OCEC | 0.962 | 0.904 | **0.932** | 150 | 6 | 16 |
+
+Corpus floor held: overall F1 ≥ 0.90 and not below Stage 6 **0.929**; `frontal_calm` F1 0.976 → **0.974** (≥ 0.88). `side_monitor_*` unchanged (yaw waive). Confirm killed 2 FP (`frontal_calm` t0+0.3s, `chat_look_down` one look-down-ish credit) and 1 later frontal TP via `reject_cooldown` cascade (not a direct `reject_ocec` on that blink). Full YuNet+HOG reprocess stays ~0.88 F1 — geometry A/B only, not this gate.
+
+**Live soak (2026-08-14, ~14 min after rebuild, MSMF):** `lt_0.5s=0` (325 credits, median gap 1.88s). Side `|yaw|≥0.35` credits=9, min gap 1.13s (no 1 Hz). `reject_ocec=135` (112 look-down / 23 frontal); 95 shallow/short, 5 frontal deep — OCEC stayed open on EAR-shaped look-down. Phase0 `start_to_complete` 0.39 is expected (those would-be credits are now `reject_ocec`); do not treat as a gate fail. Flag stays **on**. Do not retune LOOK_DOWN_* / YuNet / open path.
+

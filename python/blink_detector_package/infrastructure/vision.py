@@ -78,6 +78,14 @@ APERTURE_SCANLINES = 5
 APERTURE_X_LO = 0.15
 APERTURE_X_HI = 0.85
 
+# Stage 7: OCEC confirm (2nd closedness, credit only). Corpus join A/B + live
+# soak held 2026-08-14. Revert only if JSONL storms / clipped blinks return.
+# Not a detector_backend — landmarks stay dlib 68-pt.
+OCEC_ENABLED = True
+OCEC_PAD_RATIO = 0.35
+OCEC_MIN_CROP_W = 8
+OCEC_MIN_CROP_H = 6
+
 
 def get_landmark_roi_upscale() -> int:
 	return int(LANDMARK_ROI_UPSCALE)
@@ -103,6 +111,52 @@ def set_intensity_aperture_enabled(enabled: bool) -> bool:
 	global INTENSITY_APERTURE_ENABLED
 	INTENSITY_APERTURE_ENABLED = bool(enabled)
 	return INTENSITY_APERTURE_ENABLED
+
+
+def get_ocec_enabled() -> bool:
+	return bool(OCEC_ENABLED)
+
+
+def set_ocec_enabled(enabled: bool) -> bool:
+	"""Enable/disable Stage 7 OCEC scoring. Returns applied value."""
+	global OCEC_ENABLED
+	OCEC_ENABLED = bool(enabled)
+	return OCEC_ENABLED
+
+
+def crop_eye_bgr(image, eye_pts, pad_ratio=OCEC_PAD_RATIO):
+	"""
+	Padded 6-pt eye crop for OCEC (BGR or gray→BGR).
+
+	Returns a small uint8 HxWx3 crop, or None when the box is unusable.
+	"""
+	if image is None or eye_pts is None:
+		return None
+	pts = np.asarray(eye_pts, dtype=np.float64)
+	if pts.shape != (6, 2):
+		return None
+	xs = pts[:, 0]
+	ys = pts[:, 1]
+	eye_width = float(xs.max() - xs.min())
+	if eye_width < 4.0:
+		return None
+	pad = eye_width * float(pad_ratio)
+	x0 = int(np.floor(xs.min() - pad))
+	y0 = int(np.floor(ys.min() - pad))
+	x1 = int(np.ceil(xs.max() + pad))
+	y1 = int(np.ceil(ys.max() + pad))
+	h_img, w_img = image.shape[:2]
+	x0, y0, x1, y1 = _clamp_roi(x0, y0, x1, y1, w_img, h_img)
+	if (x1 - x0) < OCEC_MIN_CROP_W or (y1 - y0) < OCEC_MIN_CROP_H:
+		return None
+	crop = image[y0:y1, x0:x1]
+	if crop.size == 0:
+		return None
+	if crop.ndim == 2:
+		return cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
+	if crop.ndim == 3 and crop.shape[2] >= 3:
+		return crop[:, :, :3]
+	return None
 
 
 def eye_intensity_aperture(gray, eye_pts):

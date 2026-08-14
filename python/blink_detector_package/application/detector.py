@@ -25,6 +25,7 @@ from blink_detector_package.domain.blink_detection import (
 	FACE_QUALITY_HOLD_FRAMES,
 	FACE_REACQUIRE_FRAMES,
 )
+from blink_detector_package.domain.classifier import CLASSIFIER_SIDE_YAW_WAIVE
 from blink_detector_package.domain.ear import calculate_ear_fast
 from blink_detector_package.infrastructure.camera import (
 	BLACK_STREAK_S,
@@ -43,10 +44,12 @@ from blink_detector_package.infrastructure.vision import (
 	encode_frame,
 	eye_intensity_aperture,
 	get_face_landmarks,
+	get_ocec_enabled,
 	resize_to_processing,
 	run_face_detect,
 	stabilize_face_rect,
 )
+from blink_detector_package.infrastructure.ocec import load_ocec, score_eye_open
 
 NO_FACE_DATA = json.dumps(
 	{
@@ -255,6 +258,7 @@ class BlinkDetectorApplication:
 		self._last_hog_retry_log_time = 0.0
 		self._last_face_detect = None
 		self._yunet = None
+		self._ocec = None
 		self._vision_buffers = None
 		# Preview follows target_fps (Ultra=30); encode stays light via size/q.
 		self._last_video_emit = 0.0
@@ -595,6 +599,8 @@ class BlinkDetectorApplication:
 		interocular=None,
 		left_aperture=None,
 		right_aperture=None,
+		left_ocec=None,
+		right_ocec=None,
 	):
 		if not self.trace.active:
 			return
@@ -619,6 +625,12 @@ class BlinkDetectorApplication:
 			),
 			"right_aperture": (
 				float(right_aperture) if right_aperture is not None else None
+			),
+			"left_ocec": (
+				float(left_ocec) if left_ocec is not None else None
+			),
+			"right_ocec": (
+				float(right_ocec) if right_ocec is not None else None
 			),
 		}
 		self.trace.write_frame(payload, bgr=frame)
@@ -1163,6 +1175,16 @@ class BlinkDetectorApplication:
 				if blink_info.get("aperture_ok") is not None
 				else None
 			),
+			"left_ocec": _opt_float("left_ocec"),
+			"right_ocec": _opt_float("right_ocec"),
+			"ocec_l": _opt_float("left_ocec"),
+			"ocec_r": _opt_float("right_ocec"),
+			"ocec_drop": _opt_float("ocec_drop"),
+			"ocec_ok": (
+				bool(blink_info["ocec_ok"])
+				if blink_info.get("ocec_ok") is not None
+				else None
+			),
 			"clf_p": _opt_float("clf_p"),
 			"clf_veto": (
 				bool(blink_info["clf_veto"])
@@ -1278,6 +1300,23 @@ class BlinkDetectorApplication:
 			)
 		face_data["eyeLandmarks"] = buffers.normalized_landmarks.copy()
 
+	def _score_ocec_eyes(self, frame, left_eye, right_eye, pose):
+		"""OCEC prob_open per eye, or (None, None) when disabled / side yaw."""
+		if self._ocec is None:
+			return None, None
+		yaw = 0.0
+		if isinstance(pose, dict):
+			try:
+				yaw = float(pose.get("yaw") or 0.0)
+			except (TypeError, ValueError):
+				yaw = 0.0
+		if abs(yaw) >= CLASSIFIER_SIDE_YAW_WAIVE:
+			return None, None
+		return (
+			score_eye_open(self._ocec, frame, left_eye),
+			score_eye_open(self._ocec, frame, right_eye),
+		)
+
 	def _handle_detection(
 		self,
 		face_data,
@@ -1289,6 +1328,8 @@ class BlinkDetectorApplication:
 		face,
 		left_aperture=None,
 		right_aperture=None,
+		left_ocec=None,
+		right_ocec=None,
 	):
 		blink_detected, blink_info = self.detection.detect(
 			avg_ear,
@@ -1298,6 +1339,8 @@ class BlinkDetectorApplication:
 			pose=pose,
 			left_aperture=left_aperture,
 			right_aperture=right_aperture,
+			left_ocec=left_ocec,
+			right_ocec=right_ocec,
 		)
 		phase = (blink_info or {}).get("phase")
 		if blink_detected and blink_info:
@@ -1443,6 +1486,7 @@ class BlinkDetectorApplication:
 		)
 		detector, predictor, predictor_path, yunet = load_models()
 		self._yunet = yunet
+		self._ocec = load_ocec() if get_ocec_enabled() else None
 		if detector is None or predictor is None:
 			self.transport.send(
 				{
@@ -1472,6 +1516,18 @@ class BlinkDetectorApplication:
 				)
 			}
 		)
+		if get_ocec_enabled():
+			self.transport.send(
+				{
+					"debug": (
+						"OCEC confirm: on"
+						if self._ocec is not None
+						else "OCEC confirm: on but ONNX missing (skip)"
+					)
+				}
+			)
+		else:
+			self.transport.send({"debug": "OCEC confirm: off"})
 		self.transport.send(
 			{
 				"debug": (
@@ -1619,6 +1675,8 @@ class BlinkDetectorApplication:
 				trace_iod = None
 				trace_left_ap = None
 				trace_right_ap = None
+				trace_left_ocec = None
+				trace_right_ocec = None
 
 				gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 				# YuNet locates; HOG-refine is the 68-pt crop.
@@ -1682,12 +1740,17 @@ class BlinkDetectorApplication:
 							landmarks,
 							image_size=(frame_width, frame_height),
 						)
+						left_ocec, right_ocec = self._score_ocec_eyes(
+							frame, left_eye, right_eye, pose
+						)
 						trace_left = left_ear
 						trace_right = right_ear
 						trace_avg = avg_ear
 						trace_pose = pose
 						trace_left_ap = left_aperture
 						trace_right_ap = right_aperture
+						trace_left_ocec = left_ocec
+						trace_right_ocec = right_ocec
 						face_data["faceDetected"] = True
 						face_data["faceStatus"] = "ok"
 						face_data["ear"] = float(avg_ear)
@@ -1715,6 +1778,8 @@ class BlinkDetectorApplication:
 							face,
 							left_aperture=left_aperture,
 							right_aperture=right_aperture,
+							left_ocec=left_ocec,
+							right_ocec=right_ocec,
 						)
 				else:
 					if face is not None:
@@ -1760,6 +1825,8 @@ class BlinkDetectorApplication:
 					interocular=trace_iod,
 					left_aperture=trace_left_ap,
 					right_aperture=trace_right_ap,
+					left_ocec=trace_left_ocec,
+					right_ocec=trace_right_ocec,
 				)
 				self._commit_frame_health(
 					luma,

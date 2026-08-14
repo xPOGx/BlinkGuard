@@ -68,6 +68,7 @@ venv\Scripts\python.exe log_tools\train_classifier.py
 
 Stage 3.2 live pose: `infrastructure/head_pose.py` (`solvePnP`); labels also resolve for `*.pnp.ndjson`.
 Stage 3.5 aperture: reprocess writes `left_aperture`/`right_aperture`; use `--out session.ap.ndjson` (labels strip `.ap`).
+Stage 7 OCEC confirm: `reprocess_video.py --ocec` writes `left_ocec`/`right_ocec` → `session.ocec.ndjson` (labels strip `.ocec`). Fair A/B joins those fields onto baked EAR by `video_index` (see BASELINE Stage 7); full reprocess EAR is geometry-only. Live flag `OCEC_ENABLED=True` (soak held). Missing fields skip confirm.
 
 ## Scenarios
 

@@ -79,6 +79,7 @@ electron/resources/blink_detector.exe
 
 # Stage-0 companion camera video (large MJPG AVI; keep local / AppData)
 python/fixtures/sessions/*.avi
+python/fixtures/sessions/*.ocec.ndjson
 *.avi
 
 # Blink JSONL agent probes — reusable tools live in python/log_tools/;
