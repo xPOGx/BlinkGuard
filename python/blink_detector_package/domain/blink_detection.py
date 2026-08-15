@@ -1,4 +1,5 @@
 from collections import deque
+from statistics import median
 
 from blink_detector_package.domain.classifier import (
 	CLASSIFIER_SIDE_YAW_WAIVE,
@@ -85,6 +86,19 @@ RESTING_PITCH_OPEN_DROP_MAX = 0.12
 # Allow tiny upward noise; larger rises are look-down and must not chase
 # resting (POG 2026-08-09: resting climb killed look_down → frontal FP storm).
 RESTING_PITCH_UP_EPS = 0.01
+# Too-low seed (camera-look then desk) never climbed, so screen-center stayed
+# full look-down (POG 2026-08-15: rest≈−0.05 vs desk≈0.17). Recover only after
+# open-eye pitch holds a tight band longer than a glance (chase test is 2s).
+RESTING_PITCH_STABLE_S = 6.0
+RESTING_PITCH_STABLE_BAND = 0.04
+RESTING_PITCH_UP_ALPHA = 0.02
+# Recent samples in the current rise band (≈8s at 30 FPS).
+RESTING_PITCH_RISE_SAMPLES = 240
+# Typical desk pitch = 20th percentile over this window. A 6s look-down hold
+# must not become the new rest (POG 2026-08-15: rest climbed to ~0.19, bottom
+# blinks ran frontal gates and died).
+RESTING_PITCH_FLOOR_S = 30.0
+RESTING_PITCH_FLOOR_Q = 0.20
 
 # Live open-eye EAR tracks *current* lid height (frontal or look-down).
 # Gates use this ref so look-down open (~0.73 of frontal) is "open", not
@@ -437,6 +451,11 @@ class BlinkDetectionState:
 		self.ear_calibration = None
 		# Session resting pitch (EMA); None until first open-eye sample.
 		self.resting_pitch = None
+		self._resting_rise_center = None
+		self._resting_rise_open_s = 0.0
+		self._resting_rise_last_t = None
+		self._resting_rise_pitches = deque(maxlen=RESTING_PITCH_RISE_SAMPLES)
+		self._resting_pitch_hist = deque()
 		# After credit (or sustained low EAR): must see open eyes before next start.
 		self.awaiting_reopen = False
 		self.awaiting_reopen_since = None
@@ -652,6 +671,15 @@ class BlinkDetectionState:
 		if abs(float(yaw or 0.0)) >= CLASSIFIER_SIDE_YAW_WAIVE:
 			return True, drop
 		return drop >= float(OCEC_CONFIRM_MIN_DROP), drop
+
+	def _ocec_waives_ear_miss(self, yaw, ocec_ok, strong_ocec_drop):
+		"""True when OCEC saw a close in the scored yaw band (not side crop)."""
+		return (
+			bool(ocec_ok)
+			and strong_ocec_drop is not None
+			and strong_ocec_drop >= OCEC_CONFIRM_MIN_DROP
+			and abs(float(yaw or 0.0)) < CLASSIFIER_SIDE_YAW_WAIVE
+		)
 
 	def _update_live_open_ocec(self, left_ocec, right_ocec, closing_velocity):
 		"""
@@ -1049,30 +1077,110 @@ class BlinkDetectionState:
 			return 0.0
 		return max(0.0, (ref - eye_ear) / ref)
 
-	def _update_resting_pitch(self, pose, ear_drop_percentage):
+	def _reset_resting_rise_band(self, pitch=None):
+		self._resting_rise_open_s = 0.0
+		self._resting_rise_center = pitch
+		self._resting_rise_pitches.clear()
+		if pitch is not None:
+			self._resting_rise_pitches.append(float(pitch))
+
+	def _record_open_pitch(self, now, pitch):
+		"""Keep a 30s open-eye pitch history for the desk-floor percentile."""
+		self._resting_pitch_hist.append((float(now), float(pitch)))
+		cutoff = float(now) - RESTING_PITCH_FLOOR_S
+		while self._resting_pitch_hist and self._resting_pitch_hist[0][0] < cutoff:
+			self._resting_pitch_hist.popleft()
+
+	def _pitch_floor_q(self, q=None):
+		vals = [p for _t, p in self._resting_pitch_hist]
+		if not vals:
+			return None
+		frac = RESTING_PITCH_FLOOR_Q if q is None else float(q)
+		ordered = sorted(vals)
+		index = int(round((len(ordered) - 1) * frac))
+		index = max(0, min(len(ordered) - 1, index))
+		return float(ordered[index])
+
+	def _update_resting_pitch(self, pose, ear_drop_percentage, current_time):
 		"""
 		Track resting pitch while eyes are open (webcam bias compensation).
 
-		Do not raise resting into a sustained look-down — chasing pitch_delta→0
-		disables look_down gates and credits eyelid drift as frontal blinks.
+		Do not raise resting into a look-down — chasing pitch_delta→0
+		disables look_down gates (brief glance *or* a 6s chat-bottom hold).
+		A too-low camera-look seed may slowly rise toward the *desk* floor
+		(20th percentile of ~30s) minus the look-down deadzone, not toward
+		the current look-down band.
 		"""
+		now = float(current_time)
 		if not pose or not pose.get("valid", False):
+			self._reset_resting_rise_band()
+			self._resting_rise_last_t = now
 			return
-		if self.blink_in_progress or self.eyes_closed or self.awaiting_reopen:
-			return
-		if ear_drop_percentage > RESTING_PITCH_OPEN_DROP_MAX:
+		if (
+			self.blink_in_progress
+			or self.eyes_closed
+			or self.awaiting_reopen
+			or ear_drop_percentage > RESTING_PITCH_OPEN_DROP_MAX
+		):
+			# Pause the rise clock; do not count blink/hold gaps as open-eye.
+			self._resting_rise_last_t = now
 			return
 		pitch = float(pose.get("pitch", 0.0))
+		self._record_open_pitch(now, pitch)
 		if self.resting_pitch is None:
 			self.resting_pitch = pitch
+			self._reset_resting_rise_band(pitch)
+			self._resting_rise_last_t = now
 			return
+
+		dt = 0.0
+		if self._resting_rise_last_t is not None:
+			dt = max(0.0, now - float(self._resting_rise_last_t))
+		self._resting_rise_last_t = now
+
 		# Higher pitch = more look-down in our landmark heuristic.
 		if pitch > self.resting_pitch + RESTING_PITCH_UP_EPS:
+			self._accumulate_resting_rise(pitch, dt)
 			return
+		self._reset_resting_rise_band(pitch)
 		alpha = RESTING_PITCH_ALPHA
 		self.resting_pitch = (
 			(1 - alpha) * self.resting_pitch + alpha * pitch
 		)
+
+	def _accumulate_resting_rise(self, pitch, dt):
+		center = self._resting_rise_center
+		if (
+			center is None
+			or abs(pitch - float(center)) > RESTING_PITCH_STABLE_BAND
+		):
+			self._reset_resting_rise_band(pitch)
+			return
+		self._resting_rise_open_s += float(dt)
+		self._resting_rise_pitches.append(float(pitch))
+		if self._resting_rise_open_s + 1e-9 < RESTING_PITCH_STABLE_S:
+			return
+		if not self._resting_rise_pitches:
+			return
+		band_median = float(median(self._resting_rise_pitches))
+		floor_q = self._pitch_floor_q()
+		if floor_q is None:
+			return
+		# Band is a look-down excursion vs typical desk — do not climb rest.
+		if abs(band_median - floor_q) > RESTING_PITCH_STABLE_BAND:
+			return
+		d0 = float(
+			get_pose_profile(self.pose_strictness)["pitch_look_down_delta"]
+		)
+		target = min(band_median, floor_q) - d0
+		if target <= float(self.resting_pitch):
+			return
+		gap = target - float(self.resting_pitch)
+		if gap <= RESTING_PITCH_UP_EPS:
+			self.resting_pitch = target
+			return
+		alpha = RESTING_PITCH_UP_ALPHA
+		self.resting_pitch = float(self.resting_pitch) + alpha * gap
 
 	def _update_recent_pose_motion(self, gate, pose=None):
 		"""EMA of per-frame |Δyaw|+|Δpitch| for one-frame motion rejects."""
@@ -1220,7 +1328,7 @@ class BlinkDetectionState:
 				(self.current_baseline_ear - ear_smooth)
 				/ self.current_baseline_ear,
 			)
-		self._update_resting_pitch(pose, pre_drop)
+		self._update_resting_pitch(pose, pre_drop, current_time)
 
 		gate = evaluate_pose_gate(
 			pose,
@@ -1997,16 +2105,20 @@ class BlinkDetectionState:
 				# (compressed live_open). If OCEC actually saw a close, that
 				# is independent V/closedness — do not skip-waive (drop None)
 				# or side-yaw skip (crop untrusted).
-				if (
-					not opening_ok
-					and ocec_ok
-					and strong_ocec_drop is not None
-					and strong_ocec_drop >= OCEC_CONFIRM_MIN_DROP
-					and abs(float(gate["yaw"] or 0.0))
-					< CLASSIFIER_SIDE_YAW_WAIVE
-				):
+				ocec_ear_waive = self._ocec_waives_ear_miss(
+					gate["yaw"],
+					ocec_ok,
+					strong_ocec_drop,
+				)
+				if not opening_ok and ocec_ear_waive:
 					opening_ok = True
 					waives.append("ocec_opening")
+				# Same 1-frame LD shape: relative EAR drop 0.14–0.18 vs
+				# adaptive 0.17–0.19 while OCEC drop p50≈0.93 (POG 2026-08-15
+				# reject_threshold). Do not retune LOOK_DOWN_* / threshold_mult.
+				if not threshold_ok and ocec_ear_waive:
+					threshold_ok = True
+					waives.append("ocec_threshold")
 				gates_ok = (
 					duration_ok
 					and threshold_ok
@@ -2219,6 +2331,9 @@ class BlinkDetectionState:
 		self.right_track = EyeTrack()
 		self._merge_label = None
 		self.resting_pitch = None
+		self._reset_resting_rise_band()
+		self._resting_rise_last_t = None
+		self._resting_pitch_hist.clear()
 		self.awaiting_reopen = False
 		self.awaiting_reopen_since = None
 		self.eyes_closed = False

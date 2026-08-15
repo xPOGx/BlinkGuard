@@ -175,3 +175,9 @@ Corpus floor held: overall F1 ≥ 0.90 and not below Stage 6 **0.929**; `frontal
 
 **Live frontal `reject_classifier` (2026-08-14, 2nd start ~83s):** 62 veto / 21 complete; `ocec_drop` p50=0.95 (real close) but `clf_p` p50=0.14 < baked `t=0.25`. Look-down `pose_weight` had been lifting p above threshold; frontal does not. Fix: `ocec_clf` waive — do not veto when OCEC confirmed. Missing OCEC keeps Stage 4. Do not retrain weights / lower `t` in the same pass.
 
+**Live desk rest stuck low (2026-08-15):** `_update_resting_pitch` only lowered rest; a camera-look seed ≈−0.05 vs desk ≈0.17 kept `pose_weight=1`. After 6s of open-eye pitch in a tight band that matches the ~30s 20th-percentile desk floor, rest may rise toward `min(band, floor) − pitch_look_down_delta`. A 6s chat-bottom hold must not become rest. Do not retune LOOK_DOWN_* / OCEC in that pass.
+
+**Live look-down `reject_threshold` (2026-08-15 evening, ~7 min after resting-pitch floor):** 30 rejects, all 1-frame; drop p50=0.159 vs threshold p50=0.170; abs p50=0.035 (already over 0.03); `ocec_drop≥0.35` on 21/30. Fix: `ocec_threshold` waive (same scored-yaw band as `ocec_opening`). Baked corpus F1 **0.926** (no OCEC fields). Do not retune `look_down_threshold_mult` / LOOK_DOWN_* in the same pass. Missing start at screen-bottom is a separate `skip_await_open` / close-band issue — not this waive.
+
+**Soak (2026-08-15, ~9 min after `ocec_threshold` rebuild):** waive `ocec_threshold`=23 (11 completes). Leftover `reject_threshold`=13 and `reject_opening`=66 all `ocec_drop<0.35` (not ignored real closes). `lt_0.5s=0`.
+

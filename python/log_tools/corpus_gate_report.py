@@ -36,6 +36,9 @@ KNOWN_WAIVES = (
 	"ld_short_duration",
 	"motion_peak",
 	"stronger_eye",
+	"ocec_opening",
+	"ocec_threshold",
+	"ocec_clf",
 )
 KNOWN_REJECTS = (
 	"reject_duration",

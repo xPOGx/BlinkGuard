@@ -10,6 +10,7 @@ from blink_detector_package.domain.blink_detection import (
 	MIN_FACE_AREA_PX,
 	MIN_INTEROCULAR_PX,
 	MIN_OPENING_VELOCITY,
+	RESTING_PITCH_STABLE_S,
 	SIDE_GLANCE_OPENING_KILL_YAW,
 	BlinkDetectionState,
 	get_adaptive_ear_drop_threshold,
@@ -100,6 +101,45 @@ def _feed(state, t, steps, pose=None):
 			credited_any = True
 			credited_info = info
 	return credited_any, t, credited_info or last_info, phases
+
+
+def _eval_ld_one_frame(
+	*,
+	live_open_ear,
+	max_drop,
+	opening_velocity,
+	window_ear,
+	detect_ear,
+	left_ocec,
+	right_ocec,
+):
+	"""Seed a look-down one-frame candidate and eval on the next frame."""
+	state = BlinkDetectionState(target_fps=20)
+	t = _seed_open_eye(state, ear=0.28)
+	pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+	state.resting_pitch = pose["pitch"] - 0.20
+	state.live_open_ear = live_open_ear
+	state.live_open_ocec = 0.90
+	state.blink_in_progress = True
+	state.blink_start_time = t
+	state.closed_frames = 1
+	state.peak_closing_velocity = 1.2
+	state.peak_closing_velocity_measured = 1.2
+	state.peak_opening_velocity = opening_velocity
+	state.max_drop_percentage = max_drop
+	state._candidate_pose_delta = 0.0
+	state._ear_window.clear()
+	for _ in range(3):
+		state._ear_window.append(window_ear)
+	t += 0.05
+	credited, info = state.detect(
+		detect_ear,
+		t,
+		pose=pose,
+		left_ocec=left_ocec,
+		right_ocec=right_ocec,
+	)
+	return credited, info, pose
 
 
 # Deep close + hold (≥2 closed) + reopen past smooth recovery lag.
@@ -327,6 +367,70 @@ class BlinkDetectionTests(unittest.TestCase):
 			t += 0.05
 			state.detect(0.28, t, pose=low)
 		self.assertLess(state.resting_pitch, before)
+
+	def test_resting_pitch_recovers_from_too_low_seed(self):
+		"""Desk webcam bias after a camera-look seed must not stay full look-down."""
+		state = BlinkDetectionState()
+		t = _seed_open_eye(state, ear=0.28)
+		desk = estimate_head_pose(_frontal_landmarks())
+		desk_pitch = desk["pitch"]
+		state.resting_pitch = desk_pitch - 0.20
+		before = state.resting_pitch
+		gate0 = evaluate_pose_gate(
+			desk, "normal", resting_pitch=state.resting_pitch
+		)
+		self.assertTrue(gate0["look_down"])
+		self.assertGreater(gate0["pose_weight"], 0.8)
+		dt = 0.05
+		# Hold the desk pose past the glance window, then let the slow rise
+		# EMA reach the look-down deadzone (not a 2s glance).
+		frames = int(RESTING_PITCH_STABLE_S / dt) + 250
+		for _ in range(frames):
+			t += dt
+			state.detect(0.28, t, pose=desk)
+		self.assertGreater(state.resting_pitch, before + 0.04)
+		gate1 = evaluate_pose_gate(
+			desk, "normal", resting_pitch=state.resting_pitch
+		)
+		self.assertLess(gate1["pose_weight"], gate0["pose_weight"] - 0.3)
+		self.assertFalse(gate1["look_down"])
+
+	def test_resting_pitch_short_look_down_pulse_does_not_raise(self):
+		"""A 2s screen-bottom glance must not climb rest (anti-FP)."""
+		state = BlinkDetectionState()
+		t = _seed_open_eye(state, ear=0.28)
+		desk = estimate_head_pose(_frontal_landmarks())
+		down = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = desk["pitch"]
+		before = state.resting_pitch
+		self.assertGreater(down["pitch"], before + 0.05)
+		for _ in range(40):
+			t += 0.05
+			state.detect(0.28, t, pose=down)
+		self.assertLessEqual(state.resting_pitch, before + 1e-6)
+
+	def test_resting_pitch_sustained_look_down_does_not_chase(self):
+		"""Chat-bottom hold (>6s) must not become the new rest (POG 2026-08-15)."""
+		state = BlinkDetectionState()
+		t = _seed_open_eye(state, ear=0.28)
+		desk = estimate_head_pose(_frontal_landmarks())
+		down = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = desk["pitch"]
+		dt = 0.05
+		for _ in range(int(4.0 / dt)):
+			t += dt
+			state.detect(0.28, t, pose=desk)
+		before = state.resting_pitch
+		self.assertGreater(down["pitch"], before + 0.08)
+		for _ in range(int(8.0 / dt)):
+			t += dt
+			state.detect(0.28, t, pose=down)
+		self.assertLessEqual(state.resting_pitch, before + 1e-6)
+		gate = evaluate_pose_gate(
+			down, "normal", resting_pitch=state.resting_pitch
+		)
+		self.assertTrue(gate["look_down"])
+		self.assertGreater(gate["pose_weight"], 0.5)
 
 	def test_look_down_mild_ear_oscillation_no_credit_storm(self):
 		"""Screen-bottom eyelid drift must not credit ~1 Hz without a blink."""
@@ -1988,66 +2092,65 @@ class BlinkDetectionTests(unittest.TestCase):
 
 	def test_ocec_opening_waives_look_down_abs_miss(self):
 		"""LD one-frame abs just under 0.035 + real OCEC close → credit."""
-		state = BlinkDetectionState(target_fps=20)
-		t = _seed_open_eye(state, ear=0.28)
-		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
-		state.resting_pitch = pose["pitch"] - 0.20
-		self.assertLess(abs(pose["yaw"]), 0.35)
-		state.live_open_ear = 0.20
-		state.live_open_ocec = 0.90
-		state.blink_in_progress = True
-		state.blink_start_time = t
-		state.closed_frames = 1
-		state.peak_closing_velocity = 1.2
-		state.peak_closing_velocity_measured = 1.2
-		state.peak_opening_velocity = 0.0
-		state.max_drop_percentage = 0.17
-		state._candidate_pose_delta = 0.0
-		state._ear_window.clear()
-		for _ in range(3):
-			state._ear_window.append(0.16)
-		t += 0.05
-		credited, info = state.detect(
-			0.19,
-			t,
-			pose=pose,
+		credited, info, pose = _eval_ld_one_frame(
+			live_open_ear=0.20,
+			max_drop=0.17,
+			opening_velocity=0.0,
+			window_ear=0.16,
+			detect_ear=0.19,
 			left_ocec=0.08,
 			right_ocec=0.08,
 		)
+		self.assertLess(abs(pose["yaw"]), 0.35)
 		self.assertTrue(credited, msg=info)
 		self.assertEqual(info["phase"], "complete")
 		self.assertIn("ocec_opening", info.get("waives") or [])
 
 	def test_ocec_opening_does_not_waive_when_still_open(self):
 		"""Same abs-miss shape but OCEC stays open → still reject_opening."""
-		state = BlinkDetectionState(target_fps=20)
-		t = _seed_open_eye(state, ear=0.28)
-		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
-		state.resting_pitch = pose["pitch"] - 0.20
-		state.live_open_ear = 0.20
-		state.live_open_ocec = 0.90
-		state.blink_in_progress = True
-		state.blink_start_time = t
-		state.closed_frames = 1
-		state.peak_closing_velocity = 1.2
-		state.peak_closing_velocity_measured = 1.2
-		state.peak_opening_velocity = 0.0
-		state.max_drop_percentage = 0.17
-		state._candidate_pose_delta = 0.0
-		state._ear_window.clear()
-		for _ in range(3):
-			state._ear_window.append(0.16)
-		t += 0.05
-		credited, info = state.detect(
-			0.19,
-			t,
-			pose=pose,
+		credited, info, _pose = _eval_ld_one_frame(
+			live_open_ear=0.20,
+			max_drop=0.17,
+			opening_velocity=0.0,
+			window_ear=0.16,
+			detect_ear=0.19,
 			left_ocec=0.90,
 			right_ocec=0.90,
 		)
 		self.assertFalse(credited, msg=info)
 		self.assertEqual(info["phase"], "reject_opening")
 		self.assertNotIn("ocec_opening", info.get("waives") or [])
+
+	def test_ocec_threshold_waives_look_down_relative_miss(self):
+		"""LD one-frame relative drop just under adaptive + real OCEC → credit."""
+		credited, info, pose = _eval_ld_one_frame(
+			live_open_ear=0.24,
+			max_drop=0.148,
+			opening_velocity=0.40,
+			window_ear=0.20,
+			detect_ear=0.22,
+			left_ocec=0.08,
+			right_ocec=0.08,
+		)
+		self.assertLess(abs(pose["yaw"]), 0.35)
+		self.assertTrue(credited, msg=info)
+		self.assertEqual(info["phase"], "complete")
+		self.assertIn("ocec_threshold", info.get("waives") or [])
+
+	def test_ocec_threshold_does_not_waive_when_still_open(self):
+		"""Same relative-miss shape but OCEC stays open → still reject_threshold."""
+		credited, info, _pose = _eval_ld_one_frame(
+			live_open_ear=0.24,
+			max_drop=0.148,
+			opening_velocity=0.40,
+			window_ear=0.20,
+			detect_ear=0.22,
+			left_ocec=0.90,
+			right_ocec=0.90,
+		)
+		self.assertFalse(credited, msg=info)
+		self.assertEqual(info["phase"], "reject_threshold")
+		self.assertNotIn("ocec_threshold", info.get("waives") or [])
 
 	def test_look_down_real_blink_credited(self):
 		state = BlinkDetectionState(target_fps=15)
