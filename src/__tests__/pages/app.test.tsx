@@ -159,6 +159,11 @@ describe("settings shell", () => {
 		const canObserveScroll = remindersScroller.scrollTop === 120;
 
 		fireEvent.click(screen.getByRole("button", { name: "Camera" }));
+		expect(screen.getByRole("tab", { name: "Setup" })).toBeDefined();
+		expect(screen.getByText("Camera Detection")).toBeDefined();
+		expect(screen.getByText("Camera Quality")).toBeDefined();
+		expect(screen.queryByText("MGD Mode")).toBeNull();
+
 		const cameraScroller = document.querySelector(
 			"main .overflow-y-auto",
 		) as HTMLElement;
@@ -166,6 +171,22 @@ describe("settings shell", () => {
 		expect(cameraScroller).not.toBe(remindersScroller);
 		if (canObserveScroll) {
 			expect(cameraScroller.scrollTop).toBe(0);
+		}
+		cameraScroller.scrollTop = 80;
+		const canObserveCameraScroll = cameraScroller.scrollTop === 80;
+
+		fireEvent.click(screen.getByRole("tab", { name: "Tuning" }));
+		expect(screen.getByText("Calibration")).toBeDefined();
+		expect(screen.getByText("MGD Mode")).toBeDefined();
+		expect(screen.queryByText("Camera Detection")).toBeNull();
+
+		const tuningScroller = document.querySelector(
+			"main .overflow-y-auto",
+		) as HTMLElement;
+		expect(tuningScroller).toBeInstanceOf(HTMLElement);
+		expect(tuningScroller).not.toBe(cameraScroller);
+		if (canObserveCameraScroll) {
+			expect(tuningScroller.scrollTop).toBe(0);
 		}
 
 		fireEvent.click(screen.getByRole("button", { name: "Progress" }));
@@ -433,6 +454,7 @@ describe("settings shell", () => {
 		);
 
 		fireEvent.click(screen.getByRole("button", { name: "Camera" }));
+		fireEvent.click(screen.getByRole("tab", { name: "Tuning" }));
 		send.mockClear();
 		fireEvent.click(
 			screen.getByRole("switch", { name: "Toggle blink rate coaching" }),

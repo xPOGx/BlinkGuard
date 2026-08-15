@@ -16,7 +16,7 @@ Pragmatic Clean Architecture with a thin `electron/main.ts` composition root. Fe
 | `electron/infrastructure/` | IPC, windows, lifecycle/power, sidecar, shortcuts, sound, store, process cleanup, paths/logging, profile PNG export, focus (Win+Mac fullscreen + foreground process/title probe + running-app picker list; stub elsewhere), session activity (Win+Mac lid / display-sleep probe; stub elsewhere), auto-update (`AutoUpdateService`: GitHub `/releases/latest` only; always re-check feed even when a package is staged so Restart installs current latest, not a sticky older download) |
 | `electron/main.ts` | Vite entry/composition root only: constructs collaborators, connects callbacks, starts lifecycle; cold-start tracking restore waits for renderer `shellReady` (after boot splash). Boot splash is static HTML (`index.html` + round `/boot-icon.png`); dismiss + `shellReady` from renderer. Splash/window chrome theme follows persisted `darkMode` via `?dark=` + `BrowserWindow.backgroundColor` |
 | `electron/preload.ts` | `contextBridge`; whitelists from `shared/ipc-channels` |
-| `src/app.tsx` | Settings shell (`BlinkGuardHomepage`) |
+| `src/app.tsx` | Settings shell (`BlinkGuardHomepage`); Camera Setup / Tuning tabs; Progress tabs |
 | `src/components/` | Shared React UI (1 file = 1 component); catalog in `.cursor/skills/ui-reuse/catalog.json` |
 | `src/features/*` | Feature `model/` + `ui/` (reminders, camera, exercises, look-away, popup-appearance, statistics, profile, achievements, rewards, settings, onboarding, about, shortcuts, debug) |
 | `src/shared/ipc/` | Renderer IPC adapter |

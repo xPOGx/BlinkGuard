@@ -8,17 +8,20 @@ import {
 	Settings,
 	Timer,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { dismissBootSplash } from "@/boot-splash";
-import { SectionTabs } from "@/components/section-tabs";
+import { type SectionTabItem, SectionTabs } from "@/components/section-tabs";
 import { useAutoUpdate } from "@/features/about/model/use-auto-update";
 import { AboutPanel } from "@/features/about/ui/about-panel";
 import { UpdateDialog } from "@/features/about/ui/update-dialog";
 import { UpdateToast } from "@/features/about/ui/update-toast";
 import { AchievementsPanel } from "@/features/achievements/ui/achievements-panel";
+import { useCameraCalibration } from "@/features/camera/model/use-camera-calibration";
 import { useCameraStatus } from "@/features/camera/model/use-camera-status";
-import { CameraControls } from "@/features/camera/ui/camera-controls";
-import { CameraErrorBanner } from "@/features/camera/ui/camera-error-banner";
+import {
+	CameraControls,
+	type CameraTabId,
+} from "@/features/camera/ui/camera-controls";
 import { DebugPanel } from "@/features/debug/ui/debug-panel";
 import { ExerciseSettings } from "@/features/exercises/ui/exercise-settings";
 import { EyeCareIndependenceSettings } from "@/features/exercises/ui/eye-care-independence-settings";
@@ -57,6 +60,86 @@ type SectionId =
 	| "debug";
 
 type ProgressTabId = "statistics" | "profile" | "achievements" | "rewards";
+
+const MAIN_SCROLL_CLASS =
+	"min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] [scrollbar-gutter:stable] px-4 py-4 sm:px-6 sm:py-5";
+
+function TabbedSection<T extends string>({
+	items,
+	value,
+	onChange,
+	"aria-label": ariaLabel,
+	maxWidthClass,
+	children,
+}: {
+	items: readonly SectionTabItem<T>[];
+	value: T;
+	onChange: (id: T) => void;
+	"aria-label": string;
+	maxWidthClass: string;
+	children: ReactNode;
+}) {
+	return (
+		<>
+			<div className="shrink-0 border-b border-border bg-background px-4 pt-4 pb-3 sm:px-6 sm:pt-5">
+				<div className={cn("mx-auto", maxWidthClass)}>
+					<SectionTabs
+						aria-label={ariaLabel}
+						items={items}
+						value={value}
+						onChange={onChange}
+					/>
+				</div>
+			</div>
+			<div key={value} className={MAIN_SCROLL_CLASS}>
+				<div className={cn("mx-auto flex flex-col gap-4", maxWidthClass)}>
+					{children}
+				</div>
+			</div>
+		</>
+	);
+}
+
+function CameraSection({
+	preferences,
+	setPreferences,
+	camera,
+	tab,
+	onTabChange,
+}: {
+	preferences: ReturnType<typeof usePreferences>["preferences"];
+	setPreferences: ReturnType<typeof usePreferences>["setPreferences"];
+	camera: ReturnType<typeof useCameraStatus>;
+	tab: CameraTabId;
+	onTabChange: (id: CameraTabId) => void;
+}) {
+	const t = useT();
+	const calibration = useCameraCalibration(preferences, setPreferences);
+	const cameraTabs = [
+		{ id: "setup" as const, label: t("app.camera.tab.setup") },
+		{ id: "tuning" as const, label: t("app.camera.tab.tuning") },
+	];
+	return (
+		<TabbedSection
+			aria-label={t("app.camera.tabsAria")}
+			items={cameraTabs}
+			value={tab}
+			onChange={onTabChange}
+			maxWidthClass="max-w-3xl"
+		>
+			<CameraControls
+				tab={tab}
+				preferences={preferences}
+				setPreferences={setPreferences}
+				isWindowOpen={camera.isWindowOpen}
+				setIsWindowOpen={camera.setIsWindowOpen}
+				calibration={calibration}
+				error={camera.error}
+				onDismissError={() => camera.setError(null)}
+			/>
+		</TabbedSection>
+	);
+}
 
 export default function BlinkGuardHomepage() {
 	const {
@@ -109,6 +192,7 @@ function SettingsShell({
 	const autoUpdate = useAutoUpdate();
 	const [section, setSection] = useState<SectionId>("reminders");
 	const [progressTab, setProgressTab] = useState<ProgressTabId>("statistics");
+	const [cameraTab, setCameraTab] = useState<CameraTabId>("setup");
 	const sections: {
 		id: SectionId;
 		label: string;
@@ -280,44 +364,38 @@ function SettingsShell({
 
 				<main className="flex min-h-0 flex-1 flex-col overflow-hidden">
 					{section === "progress" ? (
-						<>
-							<div className="shrink-0 border-b border-border bg-background px-4 pt-4 pb-3 sm:px-6 sm:pt-5">
-								<div className="mx-auto max-w-4xl">
-									<SectionTabs
-										aria-label={t("app.progress.tabsAria")}
-										items={progressTabs}
-										value={progressTab}
-										onChange={setProgressTab}
+						<TabbedSection
+							aria-label={t("app.progress.tabsAria")}
+							items={progressTabs}
+							value={progressTab}
+							onChange={setProgressTab}
+							maxWidthClass="max-w-4xl"
+						>
+							{progressTab === "statistics" && (
+								<>
+									<GoalsSettings
+										preferences={preferences}
+										setPreferences={setPreferences}
 									/>
-								</div>
-							</div>
-							<div
-								key={progressTab}
-								className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] [scrollbar-gutter:stable] px-4 py-4 sm:px-6 sm:py-5"
-							>
-								<div className="mx-auto flex max-w-4xl flex-col gap-4">
-									{progressTab === "statistics" && (
-										<>
-											<GoalsSettings
-												preferences={preferences}
-												setPreferences={setPreferences}
-											/>
-											<StatisticsPanel />
-										</>
-									)}
-									{progressTab === "profile" && <ProfilePanel />}
-									{progressTab === "achievements" && <AchievementsPanel />}
-									{progressTab === "rewards" && <RewardsShopPanel />}
-								</div>
-							</div>
-						</>
+									<StatisticsPanel />
+								</>
+							)}
+							{progressTab === "profile" && <ProfilePanel />}
+							{progressTab === "achievements" && <AchievementsPanel />}
+							{progressTab === "rewards" && <RewardsShopPanel />}
+						</TabbedSection>
+					) : section === "camera" ? (
+						<CameraSection
+							preferences={preferences}
+							setPreferences={setPreferences}
+							camera={camera}
+							tab={cameraTab}
+							onTabChange={setCameraTab}
+						/>
 					) : section === "about" ? (
 						<AboutPanel autoUpdate={autoUpdate} />
 					) : (
-						<div
-							key={section}
-							className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] [scrollbar-gutter:stable] px-4 py-4 sm:px-6 sm:py-5"
-						>
+						<div key={section} className={MAIN_SCROLL_CLASS}>
 							<div className="mx-auto flex max-w-3xl flex-col gap-4">
 								{section === "reminders" && (
 									<>
@@ -330,21 +408,6 @@ function SettingsShell({
 										<QuietHoursFocusSettings
 											preferences={preferences}
 											setPreferences={setPreferences}
-										/>
-									</>
-								)}
-
-								{section === "camera" && (
-									<>
-										<CameraErrorBanner
-											error={camera.error}
-											onDismiss={() => camera.setError(null)}
-										/>
-										<CameraControls
-											preferences={preferences}
-											setPreferences={setPreferences}
-											isWindowOpen={camera.isWindowOpen}
-											setIsWindowOpen={camera.setIsWindowOpen}
 										/>
 									</>
 								)}

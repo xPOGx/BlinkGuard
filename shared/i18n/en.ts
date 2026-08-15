@@ -10,7 +10,10 @@ export const en: MessageCatalog = {
 		"Interval, start/stop, quiet hours, and fullscreen pause for blink reminders.",
 	"app.section.camera": "Camera",
 	"app.section.camera.desc":
-		"Detection, quality, calibration, and MGD mode.",
+		"Connect the camera, then calibrate detection and coaching.",
+	"app.camera.tabsAria": "Camera views",
+	"app.camera.tab.setup": "Setup",
+	"app.camera.tab.tuning": "Tuning",
 	"app.section.exercises": "Eye care",
 	"app.section.exercises.desc":
 		"Exercises and 20-20-20 look-away breaks.",

@@ -10,7 +10,10 @@ export const uk: MessageCatalog = {
 		"Інтервал, запуск/зупинка, тихі години та пауза в повноекранному режимі.",
 	"app.section.camera": "Камера",
 	"app.section.camera.desc":
-		"Виявлення, якість, калібрування та режим MGD.",
+		"Підключіть камеру, потім налаштуйте виявлення та підказки.",
+	"app.camera.tabsAria": "Перегляди камери",
+	"app.camera.tab.setup": "Підключення",
+	"app.camera.tab.tuning": "Точність",
 	"app.section.exercises": "Турбота про очі",
 	"app.section.exercises.desc":
 		"Вправи та перерви 20-20-20 «подивіться вдалину».",
