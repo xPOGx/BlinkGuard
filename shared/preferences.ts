@@ -1,4 +1,5 @@
 import { BLINK_RATE_LOW_MAX } from "./blink-rate";
+import { theme } from "./theme";
 import {
 	type CameraDevicePref,
 	sanitizeCameraDevice,
@@ -538,9 +539,9 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	popupPosition: null,
 	popupSize: { width: 300, height: 120 },
 	popupColors: {
-		background: "#0F172A",
-		text: "#F8FAFC",
-		transparency: 0.15,
+		background: theme.popup.bg,
+		text: theme.popup.text,
+		transparency: theme.popup.transparency,
 	},
 	popupMessage: defaultPopupMessage("en"),
 	blinkPopupClickThrough: true,

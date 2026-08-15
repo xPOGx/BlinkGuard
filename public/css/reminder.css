@@ -88,7 +88,7 @@ body:has(.reminder-card) {
 	border: none;
 	border-radius: var(--popup-radius-sm);
 	background: var(--popup-accent-color, var(--popup-accent));
-	color: #fff;
+	color: var(--popup-on-accent);
 	font-family: inherit;
 	font-size: clamp(0.7rem, 8vmin, 0.85rem);
 	font-weight: 550;
@@ -101,7 +101,7 @@ body:has(.reminder-card) {
 }
 
 .reminder-snooze:hover {
-	background: #0d9488;
+	background: var(--popup-accent-hover);
 }
 
 .reminder-snooze:active {
@@ -109,11 +109,11 @@ body:has(.reminder-card) {
 }
 
 .reminder-card[data-kind="starting"] .reminder-icon {
-	background: rgba(22, 163, 74, 0.14);
+	background: var(--popup-success-soft);
 	color: var(--popup-success);
 }
 
 .reminder-card[data-kind="stopped"] .reminder-icon {
-	background: rgba(220, 38, 38, 0.14);
+	background: var(--popup-danger-soft);
 	color: var(--popup-danger);
 }

@@ -1,3 +1,5 @@
+import { hsl, theme } from "../../../../shared/theme";
+
 export type ProfileShareStat = {
 	label: string;
 	value: string;
@@ -72,6 +74,10 @@ const WIDTH = 1080;
 const OUTER_PAD = 44;
 const CARD_PAD = 52;
 const HEADER_H = 108;
+
+function shareSans(weight: number, sizePx: number): string {
+	return `${weight} ${sizePx}px ${theme.font.sans}`;
+}
 
 function roundRect(
 	ctx: CanvasRenderingContext2D,
@@ -150,7 +156,7 @@ function drawChip(
 	y: number,
 	opts: { fill: string; stroke: string; fg: string },
 ): number {
-	ctx.font = "600 22px system-ui, sans-serif";
+	ctx.font = shareSans(600, 22);
 	const padX = 18;
 	const tw = ctx.measureText(text).width;
 	const w = tw + padX * 2;
@@ -191,10 +197,30 @@ function drawProgressRing(
 	ctx.lineCap = "butt";
 
 	ctx.fillStyle = opts.fg;
-	ctx.font = "700 34px system-ui, sans-serif";
+	ctx.font = shareSans(700, 34);
 	ctx.textAlign = "center";
 	ctx.fillText(opts.label, cx, cy + 12);
 	ctx.textAlign = "start";
+}
+
+function shareCardColors(dark: boolean) {
+	const c = dark ? theme.color.dark : theme.color.light;
+	return {
+		bg0: hsl(c.background),
+		bg1: hsl(c.secondary),
+		card: hsl(c.card),
+		border: hsl(c.border),
+		muted: hsl(c.mutedForeground),
+		fg: hsl(c.foreground),
+		accent: hsl(c.primary),
+		chipFill: hsl(c.primary, 0.1),
+		chipStroke: hsl(c.primary, 0.35),
+		statBg: hsl(c.muted),
+		headerFill: hsl(c.accent),
+		track: hsl(c.border),
+		wash: hsl(c.primary, dark ? 0.07 : 0.08),
+		orb: hsl(c.primary, dark ? 0.2 : 0.16),
+	};
 }
 
 function paintCard(
@@ -203,22 +229,22 @@ function paintCard(
 	dark: boolean,
 	height: number,
 ): number {
-	const bg0 = dark ? "#0f1419" : "#f4f7f5";
-	const bg1 = dark ? "#1a2330" : "#e7efe9";
-	const card = dark ? "#18212c" : "#ffffff";
-	const border = dark ? "#2c3a4a" : "#d5e0d8";
-	const muted = dark ? "#9db0c0" : "#5f7368";
-	const fg = dark ? "#eef3f7" : "#1c2a24";
-	const accent = dark ? "#3dd6c6" : "#0f766e";
-	const chipFill = dark
-		? "rgba(61, 214, 198, 0.12)"
-		: "rgba(15, 118, 110, 0.1)";
-	const chipStroke = dark
-		? "rgba(61, 214, 198, 0.45)"
-		: "rgba(15, 118, 110, 0.35)";
-	const statBg = dark ? "#121a24" : "#f0f5f2";
-	const headerFill = dark ? "#14202b" : "#e8f2ed";
-	const track = dark ? "#243040" : "#d8e5de";
+	const {
+		bg0,
+		bg1,
+		card,
+		border,
+		muted,
+		fg,
+		accent,
+		chipFill,
+		chipStroke,
+		statBg,
+		headerFill,
+		track,
+		wash,
+		orb: orbFill,
+	} = shareCardColors(dark);
 
 	const gradient = ctx.createLinearGradient(0, 0, WIDTH, height);
 	gradient.addColorStop(0, bg0);
@@ -226,9 +252,7 @@ function paintCard(
 	ctx.fillStyle = gradient;
 	ctx.fillRect(0, 0, WIDTH, height);
 
-	ctx.fillStyle = dark
-		? "rgba(61, 214, 198, 0.07)"
-		: "rgba(15, 118, 110, 0.08)";
+	ctx.fillStyle = wash;
 	ctx.beginPath();
 	ctx.moveTo(0, 160);
 	ctx.lineTo(WIDTH, 40);
@@ -245,11 +269,8 @@ function paintCard(
 		180,
 		260,
 	);
-	orb.addColorStop(
-		0,
-		dark ? "rgba(61, 214, 198, 0.2)" : "rgba(15, 118, 110, 0.16)",
-	);
-	orb.addColorStop(1, "rgba(0,0,0,0)");
+	orb.addColorStop(0, orbFill);
+	orb.addColorStop(1, "transparent");
 	ctx.fillStyle = orb;
 	ctx.fillRect(WIDTH - 480, 0, 480, 420);
 
@@ -281,7 +302,7 @@ function paintCard(
 	ctx.fillText(content.brand, innerX, cardY + 68);
 
 	if (content.dateLabel) {
-		ctx.font = "500 22px system-ui, sans-serif";
+		ctx.font = shareSans(500, 22);
 		const dw = ctx.measureText(content.dateLabel).width;
 		const chipW = dw + 28;
 		const chipX = cardX + cardW - CARD_PAD - chipW;
@@ -352,7 +373,7 @@ function paintCard(
 
 	if (content.progressCaption) {
 		ctx.fillStyle = muted;
-		ctx.font = "500 24px system-ui, sans-serif";
+		ctx.font = shareSans(500, 24);
 		ctx.fillText(content.progressCaption, innerX, y);
 		y += 34;
 	}
@@ -368,7 +389,7 @@ function paintCard(
 	if (content.desc) {
 		y += 6;
 		ctx.fillStyle = muted;
-		ctx.font = "400 26px system-ui, sans-serif";
+		ctx.font = shareSans(400, 26);
 		const descH = wrapText(ctx, content.desc, innerX, y, innerW, 36, 3);
 		y += descH;
 	}
@@ -404,7 +425,7 @@ function paintCard(
 			ctx.fill();
 
 			ctx.fillStyle = muted;
-			ctx.font = "600 20px system-ui, sans-serif";
+			ctx.font = shareSans(600, 20);
 			ctx.fillText(stat.label.toUpperCase(), cx + 38, cy + 34);
 
 			ctx.fillStyle = fg;
@@ -429,7 +450,7 @@ function paintCard(
 
 	if (content.tagline) {
 		ctx.fillStyle = muted;
-		ctx.font = "400 22px system-ui, sans-serif";
+		ctx.font = shareSans(400, 22);
 		const tw = ctx.measureText(content.tagline).width;
 		ctx.fillText(content.tagline, innerX + innerW - tw, y);
 	}

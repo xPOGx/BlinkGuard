@@ -300,8 +300,8 @@ export function CameraControls({
 					className={cn(
 						"h-full",
 						cameraOn
-							? "border-teal-600/40 bg-teal-600/5"
-							: "border-amber-500/40 bg-amber-500/10",
+							? "border-primary/40 bg-primary/5"
+							: "border-warning/40 bg-warning/10",
 					)}
 				>
 					<SettingRow
@@ -310,17 +310,13 @@ export function CameraControls({
 								<Camera
 									className={cn(
 										"h-4 w-4",
-										cameraOn
-											? "text-teal-700 dark:text-teal-300"
-											: "text-amber-700 dark:text-amber-200",
+										cameraOn ? "text-primary" : "text-warning",
 									)}
 									aria-hidden
 								/>
 								<span
 									className={cn(
-										cameraOn
-											? "text-teal-900 dark:text-teal-100"
-											: "text-amber-950 dark:text-amber-50",
+										cameraOn ? "text-primary" : "text-warning-foreground",
 									)}
 								>
 									{t("camera.detection")}
@@ -338,9 +334,7 @@ export function CameraControls({
 								<span
 									className={cn(
 										"col-start-1 row-start-1",
-										cameraOn
-											? "text-teal-900/80 dark:text-teal-100/85"
-											: "text-amber-950/85 dark:text-amber-50/90",
+										cameraOn ? "text-primary/80" : "text-warning-foreground/85",
 									)}
 								>
 									{cameraOn

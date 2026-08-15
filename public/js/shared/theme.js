@@ -1,5 +1,11 @@
 // Shared popup theme helpers (CSS variables + reminder text/mode)
 
+const POPUP_THEME_DEFAULTS = {
+	background: "#0f172a",
+	text: "#f8fafc",
+	transparency: 0.15,
+};
+
 function parseHexColor(hex) {
 	if (typeof hex !== "string") return null;
 	const raw = hex.trim().replace(/^#/, "");
@@ -34,7 +40,8 @@ function applyPopupSurfaceAlpha() {
 	);
 	const alpha = clamp01(1 - transparency);
 	const bg =
-		styles.getPropertyValue("--popup-bg-color").trim() || "#0f172a";
+		styles.getPropertyValue("--popup-bg-color").trim() ||
+		POPUP_THEME_DEFAULTS.background;
 	const rgb = parseHexColor(bg);
 	if (rgb) {
 		root.style.setProperty(

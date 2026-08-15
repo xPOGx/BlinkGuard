@@ -30,7 +30,7 @@ export function DarkModeToggle({
 			>
 				<span className="flex items-center gap-2">
 					{darkMode ? (
-						<Sun className="h-4 w-4 text-amber-400" aria-hidden />
+						<Sun className="h-4 w-4 text-warning" aria-hidden />
 					) : (
 						<Moon className="h-4 w-4" aria-hidden />
 					)}
@@ -48,7 +48,7 @@ export function DarkModeToggle({
 			aria-label={t("common.toggleDarkMode")}
 		>
 			{darkMode ? (
-				<Sun className="h-4 w-4 text-amber-400" aria-hidden />
+				<Sun className="h-4 w-4 text-warning" aria-hidden />
 			) : (
 				<Moon className="h-4 w-4" aria-hidden />
 			)}

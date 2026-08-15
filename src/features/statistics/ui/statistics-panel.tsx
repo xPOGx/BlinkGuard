@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { SettingGrid } from "@/components/setting-grid";
 import { SettingPanel } from "@/components/setting-panel";
@@ -77,9 +78,7 @@ export function StatisticsPanel() {
 						<span className="inline-flex items-center gap-2">
 							{t("stats.totals")}
 							{hasStatsFlair ? (
-								<span className="rounded border border-teal-600/40 bg-teal-600/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-teal-700 dark:text-teal-300">
-									{t("stats.flair.badge")}
-								</span>
+								<Badge className="uppercase">{t("stats.flair.badge")}</Badge>
 							) : null}
 						</span>
 					}
@@ -152,7 +151,7 @@ export function StatisticsPanel() {
 								className={cn(
 									"rounded-md border px-2 py-1 text-xs font-medium",
 									streak.shieldCharges > 0
-										? "border-teal-600/40 bg-teal-600/10 text-teal-800 dark:text-teal-200"
+										? "border-primary/40 bg-primary/10 text-primary"
 										: "border-border text-muted-foreground",
 								)}
 							>
@@ -273,7 +272,7 @@ function GoalProgressRow({
 				<div
 					className={cn(
 						"h-full rounded-full transition-[width]",
-						metric.met ? "bg-teal-600" : "bg-primary",
+						metric.met ? "bg-success" : "bg-primary",
 					)}
 					style={{ width: `${ratio * 100}%` }}
 				/>

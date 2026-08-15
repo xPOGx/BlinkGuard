@@ -80,11 +80,7 @@ function initLookAwayPopup() {
 }
 
 function initLookAway() {
-	updateColors({
-		background: "#0F172A",
-		text: "#F8FAFC",
-		transparency: 0.15,
-	});
+	updateColors(POPUP_THEME_DEFAULTS);
 
 	initLookAwayPopup();
 }

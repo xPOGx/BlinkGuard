@@ -1,5 +1,6 @@
 import { Share } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { SettingPanel } from "@/components/setting-panel";
 import { SettingRow } from "@/components/setting-row";
@@ -108,20 +109,16 @@ export function ProfilePanel() {
 								{t("profile.levelLabel", { level: progress.level })}
 							</p>
 							<div className="flex flex-wrap items-center gap-2">
-								<span className="inline-flex items-center rounded border border-teal-600/40 bg-teal-600/10 px-2 py-0.5 text-[11px] font-semibold uppercase leading-none tracking-wide text-teal-700 dark:text-teal-300">
-									{t(tierKey)}
-								</span>
+								<Badge className="uppercase">{t(tierKey)}</Badge>
 								{snapshot.hasStatsFlair ? (
-									<span className="inline-flex items-center rounded border border-teal-600/40 bg-teal-600/10 px-2 py-0.5 text-[11px] font-semibold uppercase leading-none tracking-wide text-teal-700 dark:text-teal-300">
-										{t("stats.flair.badge")}
-									</span>
+									<Badge className="uppercase">{t("stats.flair.badge")}</Badge>
 								) : null}
-								<span className="inline-flex items-center rounded border border-teal-600/40 bg-teal-600/10 px-2 py-0.5 text-[11px] font-semibold uppercase leading-none tracking-wide text-teal-700 dark:text-teal-300">
+								<Badge className="uppercase">
 									{t("achievements.badge", {
 										unlocked: snapshot.achievementsUnlocked,
 										total: snapshot.achievementsTotal,
 									})}
-								</span>
+								</Badge>
 							</div>
 						</div>
 						<div>

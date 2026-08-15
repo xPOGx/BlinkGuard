@@ -341,7 +341,7 @@ export function DebugPanel({ setPreferences }: DebugPanelProps) {
 							</Button>
 						</div>
 						{traceStatus ? (
-							<p className="text-xs text-[var(--muted-foreground)] break-all">
+							<p className="text-xs text-muted-foreground break-all">
 								{traceStatus}
 							</p>
 						) : null}

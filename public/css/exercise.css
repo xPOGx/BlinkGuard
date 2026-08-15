@@ -16,14 +16,14 @@ body:has(.exercise-container) {
 .exercise-title {
 	font-size: 17px;
 	font-weight: 600;
-	color: #f8fafc;
+	color: var(--popup-text-color);
 	margin: 0 0 10px;
 	letter-spacing: -0.01em;
 }
 
 .exercise-text {
 	font-size: 14px;
-	color: #cbd5e1;
+	color: var(--popup-muted);
 	margin: 0 0 16px;
 	line-height: 1.45;
 }
@@ -47,21 +47,21 @@ body:has(.exercise-container) {
 }
 
 .exercise-button.skip {
-	background: #334155;
-	color: #e2e8f0;
+	background: var(--popup-button-muted);
+	color: var(--popup-muted);
 }
 
 .exercise-button.skip:hover {
-	background: #475569;
+	background: var(--popup-button-muted-hover);
 }
 
 .exercise-button.snooze {
 	background: var(--popup-accent);
-	color: #fff;
+	color: var(--popup-on-accent);
 }
 
 .exercise-button.snooze:hover {
-	background: #0d9488;
+	background: var(--popup-accent-hover);
 }
 
 .exercise-button:active {

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../shared/theme.ts";
 
 @plugin "tailwindcss-animate";
 
@@ -49,6 +50,12 @@
 	--color-destructive: hsl(var(--destructive));
 	--color-destructive-foreground: hsl(var(--destructive-foreground));
 
+	--color-warning: hsl(var(--warning));
+	--color-warning-foreground: hsl(var(--warning-foreground));
+
+	--color-success: hsl(var(--success));
+	--color-success-foreground: hsl(var(--success-foreground));
+
 	--color-border: hsl(var(--border));
 	--color-input: hsl(var(--input));
 	--color-ring: hsl(var(--ring));
@@ -58,6 +65,13 @@
 	--color-chart-3: hsl(var(--chart-3));
 	--color-chart-4: hsl(var(--chart-4));
 	--color-chart-5: hsl(var(--chart-5));
+
+	--color-sidebar: hsl(var(--sidebar));
+	--color-sidebar-foreground: hsl(var(--sidebar-foreground));
+	--color-sidebar-active: hsl(var(--sidebar-active));
+
+	--text-2xs: 0.6875rem;
+	--text-2xs--line-height: 1rem;
 }
 
 @layer base {
@@ -72,7 +86,8 @@
 
 @layer base {
 	:root {
-		/* Slate neutrals + teal primary (~173 hue) */
+		/* Slate neutrals + teal primary (~173 hue). Numbers: shared/theme.ts */
+		/* theme:start */
 		--background: 210 25% 97%;
 		--foreground: 222 47% 11%;
 		--card: 0 0% 100%;
@@ -89,6 +104,10 @@
 		--accent-foreground: 173 58% 26%;
 		--destructive: 0 72% 51%;
 		--destructive-foreground: 0 0% 100%;
+		--warning: 38 92% 50%;
+		--warning-foreground: 22 78% 26%;
+		--success: 142 76% 36%;
+		--success-foreground: 0 0% 100%;
 		--border: 214 18% 86%;
 		--input: 214 18% 86%;
 		--ring: 173 58% 36%;
@@ -101,9 +120,11 @@
 		--sidebar: 210 22% 95%;
 		--sidebar-foreground: 222 35% 20%;
 		--sidebar-active: 173 45% 92%;
+		/* theme:end */
 	}
 
 	.dark {
+		/* theme:start */
 		--background: 222 40% 8%;
 		--foreground: 210 20% 98%;
 		--card: 222 35% 11%;
@@ -120,6 +141,10 @@
 		--accent-foreground: 173 50% 72%;
 		--destructive: 0 62% 42%;
 		--destructive-foreground: 210 20% 98%;
+		--warning: 43 96% 56%;
+		--warning-foreground: 48 96% 89%;
+		--success: 142 70% 45%;
+		--success-foreground: 210 20% 98%;
 		--border: 217 22% 18%;
 		--input: 217 22% 18%;
 		--ring: 173 55% 42%;
@@ -128,9 +153,11 @@
 		--chart-3: 30 80% 55%;
 		--chart-4: 280 50% 55%;
 		--chart-5: 340 65% 55%;
+		--radius: 0.5rem;
 		--sidebar: 222 38% 10%;
 		--sidebar-foreground: 210 18% 90%;
 		--sidebar-active: 173 30% 16%;
+		/* theme:end */
 	}
 }
 
@@ -220,19 +247,5 @@
 
 	::-webkit-scrollbar-corner {
 		background: transparent;
-	}
-}
-
-@layer utilities {
-	.bg-sidebar {
-		background-color: hsl(var(--sidebar));
-	}
-
-	.text-sidebar-foreground {
-		color: hsl(var(--sidebar-foreground));
-	}
-
-	.bg-sidebar-active {
-		background-color: hsl(var(--sidebar-active));
 	}
 }

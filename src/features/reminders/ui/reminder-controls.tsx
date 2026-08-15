@@ -183,7 +183,7 @@ export function ReminderControls({
 						{t("reminders.guidance.3.afterMgd")}
 					</li>
 				</ul>
-				<p className="mt-2 text-[0.7rem] opacity-80 sm:text-xs">
+				<p className="mt-2 text-2xs opacity-80 sm:text-xs">
 					{t("reminders.guidance.disclaimer")}
 				</p>
 			</aside>

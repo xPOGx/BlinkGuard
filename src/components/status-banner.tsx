@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { theme } from "../../shared/theme";
 
 type StatusBannerVariant = "destructive" | "warning";
 
@@ -11,9 +12,8 @@ interface StatusBannerProps {
 }
 
 const variantClasses: Record<StatusBannerVariant, string> = {
-	destructive: "border-destructive/40 bg-destructive/10 text-destructive",
-	warning:
-		"border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-100",
+	destructive: theme.recipe.destructiveSurface,
+	warning: theme.recipe.warningSurface,
 };
 
 export function StatusBanner({

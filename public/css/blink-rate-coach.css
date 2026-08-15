@@ -16,7 +16,7 @@ body.blink-rate-coach-body {
 	font-size: 0.8rem;
 	font-weight: 500;
 	letter-spacing: 0.01em;
-	color: #fbbf24;
+	color: var(--popup-warning);
 	border: 1px solid var(--popup-border);
 	border-radius: var(--popup-radius-sm);
 	padding: 8px 14px;

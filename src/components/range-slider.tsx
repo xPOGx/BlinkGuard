@@ -1,5 +1,6 @@
 import type { ChangeEvent } from "react";
 import { cn } from "@/lib/utils";
+import { cssColor } from "../../shared/theme";
 
 interface RangeSliderProps {
 	id?: string;
@@ -26,8 +27,8 @@ export function RangeSlider({
 }: RangeSliderProps) {
 	const span = max - min;
 	const progress = span <= 0 ? 0 : ((value - min) / span) * 100;
-	const fillColor = "hsl(var(--primary))";
-	const trackColor = "hsl(var(--muted))";
+	const fillColor = cssColor("primary");
+	const trackColor = cssColor("muted");
 
 	const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
 		onChange(Number.parseFloat(event.target.value));

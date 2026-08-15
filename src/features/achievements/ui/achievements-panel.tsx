@@ -21,6 +21,7 @@ import {
 	Zap,
 } from "lucide-react";
 import { useState } from "react";
+import { Badge } from "@/components/badge";
 import { SettingGrid } from "@/components/setting-grid";
 import { SettingPanel } from "@/components/setting-panel";
 import { SettingRow } from "@/components/setting-row";
@@ -62,9 +63,6 @@ const ICONS: Record<AchievementIconName, LucideIcon> = {
 	crosshair: Crosshair,
 };
 
-const COUNT_CHIP =
-	"inline-flex items-center rounded border border-teal-600/40 bg-teal-600/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums leading-none tracking-wide text-teal-700 dark:text-teal-300";
-
 type Translate = (key: string, vars?: TranslateVars) => string;
 
 function progressLabel(
@@ -102,7 +100,7 @@ function AchievementCard({
 			className={cn(
 				"rounded-md border px-3 py-3",
 				unlocked
-					? "border-teal-600/40 bg-teal-600/10"
+					? "border-primary/40 bg-primary/10"
 					: "border-border bg-background",
 			)}
 		>
@@ -111,7 +109,7 @@ function AchievementCard({
 					className={cn(
 						"mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border",
 						unlocked
-							? "border-teal-600/40 text-teal-700 dark:text-teal-300"
+							? "border-primary/40 text-primary"
 							: "border-border text-muted-foreground",
 					)}
 				>
@@ -207,12 +205,12 @@ export function AchievementsPanel() {
 							<span className="min-w-0 flex-1 text-sm font-medium text-foreground">
 								{categoryLabel}
 							</span>
-							<span className={COUNT_CHIP}>
+							<Badge className="tabular-nums">
 								{t("achievements.badge", {
 									unlocked: unlockedCount,
 									total: ids.length,
 								})}
-							</span>
+							</Badge>
 							<ChevronDown
 								className={cn(
 									"h-4 w-4 shrink-0 text-muted-foreground transition-transform",

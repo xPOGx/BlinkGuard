@@ -15,7 +15,7 @@ body.no-face-body {
 	font-size: 0.8rem;
 	font-weight: 500;
 	letter-spacing: 0.01em;
-	color: #f87171;
+	color: var(--popup-danger);
 	border: 1px solid var(--popup-border);
 	border-radius: var(--popup-radius-sm);
 	padding: 8px 12px;

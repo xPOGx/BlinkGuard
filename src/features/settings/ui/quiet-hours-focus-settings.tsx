@@ -19,6 +19,7 @@ import {
 	type PauseAppPickerPayload,
 	type PauseAppRule,
 } from "../../../../shared/preferences";
+import { theme } from "../../../../shared/theme";
 import type { SettingsPreferences } from "../model/preferences";
 import type { SetPreferences } from "../model/use-preferences";
 
@@ -387,7 +388,7 @@ export function QuietHoursFocusSettings({
 
 			{statusLabel ? (
 				<p
-					className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100"
+					className={`rounded-md border px-3 py-2 text-sm ${theme.recipe.warningSurface}`}
 					role="status"
 				>
 					{statusLabel}

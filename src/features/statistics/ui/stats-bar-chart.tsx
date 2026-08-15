@@ -35,7 +35,7 @@ export function StatsBarChart({ buckets, ariaLabel }: StatsBarChartProps) {
 								style={{ height: `${heightPct}%` }}
 							/>
 						</div>
-						<span className="truncate text-[10px] text-muted-foreground sm:text-xs">
+						<span className="truncate text-2xs text-muted-foreground sm:text-xs">
 							{bucket.label}
 						</span>
 					</div>

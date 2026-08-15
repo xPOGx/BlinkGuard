@@ -4,7 +4,7 @@
 	height: 100%;
 	margin: 0;
 	padding: 0;
-	background: #000;
+	background: var(--popup-letterbox);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -30,12 +30,12 @@
 	max-width: min(340px, calc(100% - 48px));
 	padding: 16px 20px;
 	text-align: center;
-	background: rgba(15, 23, 42, 0.88);
-	color: #f8fafc;
+	background: color-mix(in srgb, var(--popup-bg-color) 88%, transparent);
+	color: var(--popup-text-color);
 	border: 1px solid var(--popup-border);
 	border-radius: var(--popup-radius-sm);
 	font-family: var(--popup-font);
-	box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+	box-shadow: 0 8px 28px var(--popup-shadow);
 	pointer-events: none;
 }
 
@@ -53,12 +53,12 @@
 .camera-face-missing-hint {
 	font-size: 12px;
 	line-height: 1.4;
-	color: #e2e8f0;
+	color: var(--popup-muted);
 }
 
 .camera-hud {
-	background: rgba(15, 23, 42, 0.82);
-	color: #f8fafc;
+	background: var(--popup-overlay);
+	color: var(--popup-text-color);
 	border: 1px solid var(--popup-border);
 	border-radius: var(--popup-radius-sm);
 	font-family: var(--popup-font);
@@ -69,8 +69,8 @@
 	position: absolute;
 	bottom: 20px;
 	left: 20px;
-	background: rgba(15, 23, 42, 0.82);
-	color: #f8fafc;
+	background: var(--popup-overlay);
+	color: var(--popup-text-color);
 	border: 1px solid var(--popup-border);
 	padding: 8px 14px;
 	border-radius: var(--popup-radius-sm);
@@ -83,8 +83,8 @@
 	position: absolute;
 	top: 20px;
 	left: 20px;
-	background: rgba(15, 23, 42, 0.82);
-	color: #f8fafc;
+	background: var(--popup-overlay);
+	color: var(--popup-text-color);
 	border: 1px solid var(--popup-border);
 	padding: 10px 14px;
 	border-radius: var(--popup-radius-sm);
@@ -99,8 +99,8 @@
 	position: absolute;
 	bottom: 20px;
 	right: 20px;
-	background: rgba(15, 23, 42, 0.82);
-	color: #e2e8f0;
+	background: var(--popup-overlay);
+	color: var(--popup-muted);
 	border: 1px solid var(--popup-border);
 	padding: 8px 12px;
 	border-radius: var(--popup-radius-sm);
@@ -116,8 +116,8 @@
 	position: absolute;
 	top: 20px;
 	right: 20px;
-	background: rgba(15, 23, 42, 0.82);
-	color: #f8fafc;
+	background: var(--popup-overlay);
+	color: var(--popup-text-color);
 	border: 1px solid var(--popup-border);
 	padding: 10px 14px;
 	border-radius: var(--popup-radius-sm);

@@ -24,11 +24,7 @@ function applyBlinkClickThrough(enabled) {
 }
 
 function initReminderPopup() {
-	updateColors({
-		background: "#0F172A",
-		text: "#F8FAFC",
-		transparency: 0.15,
-	});
+	updateColors(POPUP_THEME_DEFAULTS);
 
 	window.popupAPI.onUpdateColors(updateColors);
 	window.popupAPI.onUpdateMessage(updateMessage);
