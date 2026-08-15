@@ -269,7 +269,7 @@ export function ProfileShareDialog({
 				if (event.target === event.currentTarget && !saveBusy) onClose();
 			}}
 		>
-			<SettingPanel className="flex max-h-[min(92vh,900px)] w-full max-w-3xl flex-col gap-4 overflow-y-auto shadow-lg">
+			<SettingPanel className="flex max-h-[min(92vh,900px)] w-full max-w-3xl flex-col gap-4 overflow-y-auto [scrollbar-gutter:stable] shadow-lg">
 				<div className="space-y-1">
 					<h2 id={titleId} className="text-xl font-semibold tracking-tight">
 						{t("profile.share.dialogTitle")}

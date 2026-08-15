@@ -293,7 +293,7 @@ function SettingsShell({
 							</div>
 							<div
 								key={progressTab}
-								className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] px-4 py-4 sm:px-6 sm:py-5"
+								className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] [scrollbar-gutter:stable] px-4 py-4 sm:px-6 sm:py-5"
 							>
 								<div className="mx-auto flex max-w-4xl flex-col gap-4">
 									{progressTab === "statistics" && (
@@ -316,7 +316,7 @@ function SettingsShell({
 					) : (
 						<div
 							key={section}
-							className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] px-4 py-4 sm:px-6 sm:py-5"
+							className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] [scrollbar-gutter:stable] px-4 py-4 sm:px-6 sm:py-5"
 						>
 							<div className="mx-auto flex max-w-3xl flex-col gap-4">
 								{section === "reminders" && (
