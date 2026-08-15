@@ -5,6 +5,7 @@ import {
 	defaultLookAwayTitle,
 	defaultPopupMessage,
 	getCatalog,
+	type Locale,
 	pluralKey,
 	pluralSuffix,
 	resolveCatalog,
@@ -14,7 +15,6 @@ import {
 	resolvePopupMessage,
 	sanitizeLocale,
 	t,
-	type Locale,
 } from "../../../shared/i18n";
 import { en } from "../../../shared/i18n/en";
 import { uk } from "../../../shared/i18n/uk";
@@ -45,6 +45,14 @@ describe("i18n t()", () => {
 		expect(t("uk", "tray.snoozeLookAway", { n: 2 })).toContain("2");
 		expect(t("en", "session.paused")).toBe("Paused: screen off");
 		expect(t("uk", "session.paused")).toBe("Пауза: екран вимкнено");
+		expect(t("en", "session.paused.lock")).toBe("Paused: lock screen");
+		expect(t("uk", "session.paused.lock")).toBe("Пауза: екран заблоковано");
+		expect(t("en", "session.paused.displayOff")).toBe("Paused: screen off");
+		expect(t("uk", "session.paused.suspend")).toBe("Пауза: сон");
+		expect(t("en", "session.paused.lid")).toBe("Camera paused: lid closed");
+		expect(t("uk", "session.paused.lid")).toBe(
+			"Камера на паузі: кришка закрита",
+		);
 	});
 
 	it("interpolates variables", () => {

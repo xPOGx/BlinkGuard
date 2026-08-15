@@ -1,8 +1,10 @@
 import type { AppPreferences } from "../../shared/preferences";
 import {
+	resolveSessionIdleCause,
 	resolveSessionPauseMode,
 	SESSION_RESUME_DELAY_MS,
 	sessionPauseRank,
+	type SessionActivityFlags,
 	type SessionPauseMode,
 } from "../domain/session-activity-policy";
 import type { AppRuntimeState } from "./app-runtime-state";
@@ -66,7 +68,7 @@ export class SessionPauseService {
 		>,
 		private readonly focusPause: Pick<
 			FocusPauseService,
-			"setSessionIdle" | "recompute"
+			"setSessionOverlay" | "recompute"
 		>,
 		options: SessionPauseServiceOptions = {},
 	) {
@@ -99,22 +101,35 @@ export class SessionPauseService {
 	}
 
 	private sync(): void {
-		const next = resolveSessionPauseMode({
-			suspended: this.suspended,
-			locked: this.locked,
-			displaysAsleep: this.environment.displaysAsleep,
-			lidClosed: this.environment.lidClosed,
-		});
+		const flags = this.flags();
+		const next = resolveSessionPauseMode(flags);
 		if (next === this.mode) {
 			this.cancelResume();
+			this.pushOverlay(flags);
 			return;
 		}
 		if (sessionPauseRank(next) > sessionPauseRank(this.mode)) {
 			this.cancelResume();
-			this.applyMode(next);
+			this.applyMode(next, flags);
 			return;
 		}
 		this.scheduleResume(next);
+	}
+
+	private flags(): SessionActivityFlags {
+		return {
+			suspended: this.suspended,
+			locked: this.locked,
+			displaysAsleep: this.environment.displaysAsleep,
+			lidClosed: this.environment.lidClosed,
+		};
+	}
+
+	private pushOverlay(flags: SessionActivityFlags = this.flags()): void {
+		this.focusPause.setSessionOverlay({
+			mode: this.mode,
+			cause: resolveSessionIdleCause(flags),
+		});
 	}
 
 	private scheduleResume(next: SessionPauseMode): void {
@@ -131,9 +146,14 @@ export class SessionPauseService {
 		this.resumeTimer = null;
 	}
 
-	private applyMode(next: SessionPauseMode): void {
+	private applyMode(
+		next: SessionPauseMode,
+		flags: SessionActivityFlags = this.flags(),
+	): void {
 		const prev = this.mode;
 		if (prev === next) return;
+		this.mode = next;
+		this.pushOverlay(flags);
 
 		if (next === "inactive") {
 			this.enterInactive();
@@ -145,8 +165,6 @@ export class SessionPauseService {
 			this.focusPause.recompute();
 			this.reminders.resumeAfterSleep({ restoreStats: false });
 		}
-
-		this.mode = next;
 	}
 
 	private enterInactive(): void {
@@ -162,13 +180,11 @@ export class SessionPauseService {
 		}
 		this.exercises.stop();
 		this.lookAway.stop();
-		this.focusPause.setSessionIdle(true);
 	}
 
 	private leaveInactive(next: SessionPauseMode): void {
 		const snap = this.snapshot;
 		this.snapshot = null;
-		this.focusPause.setSessionIdle(false);
 		if (snap?.exercises && this.preferences.eyeExercisesEnabled) {
 			this.exercises.resetTimer();
 			this.exercises.start();

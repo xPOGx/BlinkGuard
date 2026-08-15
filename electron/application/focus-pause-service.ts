@@ -1,4 +1,9 @@
 import type { AppPreferences, PauseAppRule } from "../../shared/preferences";
+import type {
+	FocusPauseStatePayload,
+	SessionIdleCause,
+	SessionPauseMode,
+} from "../../shared/session-pause-status";
 import {
 	foregroundMatchesAppRules,
 	isInQuietHours,
@@ -13,6 +18,8 @@ import type { FocusForegroundSnapshot } from "./ports/focus-environment-port";
 import { EMPTY_FOREGROUND_SNAPSHOT } from "./ports/focus-environment-port";
 import type { ReminderService } from "./reminder-service";
 
+export type { FocusPauseStatePayload };
+
 export interface FocusPauseWindowsPort {
 	closeReminder(): void;
 	closeExercise(): void;
@@ -23,18 +30,15 @@ export interface FocusPauseWindowsPort {
 	sendToMain(channel: string, ...args: unknown[]): void;
 }
 
-export interface FocusPauseStatePayload {
-	reason: NotificationPauseReason;
-	fullscreenDetectionSupported: boolean;
-}
-
 export class FocusPauseService implements NotificationGate {
 	private reason: FocusPauseReason = null;
-	private sessionIdle = false;
+	private sessionPauseMode: SessionPauseMode = "active";
+	private sessionIdleCause: SessionIdleCause | null = null;
 	private cameraPausedForFocus = false;
 	private foreground: FocusForegroundSnapshot = EMPTY_FOREGROUND_SNAPSHOT;
 	private lastExternal: PauseAppRule | null = null;
 	private quietHoursTimer: ReturnType<typeof setInterval> | null = null;
+	private onState: ((payload: FocusPauseStatePayload) => void) | null = null;
 
 	constructor(
 		private readonly preferences: AppPreferences,
@@ -44,20 +48,39 @@ export class FocusPauseService implements NotificationGate {
 		private readonly fullscreenDetectionSupported: boolean,
 	) {}
 
+	setOnState(listener: (payload: FocusPauseStatePayload) => void): void {
+		this.onState = listener;
+	}
+
 	notificationsAllowed(): boolean {
-		return !this.sessionIdle && this.reason === null;
+		return this.sessionPauseMode !== "inactive" && this.reason === null;
 	}
 
 	pauseReason(): NotificationPauseReason {
-		if (this.sessionIdle) return "session-idle";
+		if (this.sessionPauseMode === "inactive") return "session-idle";
 		return this.reason;
 	}
 
-	/** Full session pause (sleep / lock / display off) overlays other gates. */
-	setSessionIdle(idle: boolean): void {
-		if (this.sessionIdle === idle) return;
-		this.sessionIdle = idle;
-		if (idle) this.closeInterruptiveUi();
+	/**
+	 * Session overlay for Settings/tray. Only `inactive` trips the notification
+	 * gate (`session-idle`); `camera-only` is UI-only (clamshell).
+	 */
+	setSessionOverlay(overlay: {
+		mode: SessionPauseMode;
+		cause: SessionIdleCause | null;
+	}): void {
+		const wasInactive = this.sessionPauseMode === "inactive";
+		if (
+			overlay.mode === this.sessionPauseMode &&
+			overlay.cause === this.sessionIdleCause
+		) {
+			return;
+		}
+		if (overlay.mode === "inactive" && !wasInactive) {
+			this.closeInterruptiveUi();
+		}
+		this.sessionPauseMode = overlay.mode;
+		this.sessionIdleCause = overlay.cause;
 		this.pushState();
 	}
 
@@ -141,8 +164,11 @@ export class FocusPauseService implements NotificationGate {
 		const payload: FocusPauseStatePayload = {
 			reason: this.pauseReason(),
 			fullscreenDetectionSupported: this.fullscreenDetectionSupported,
+			sessionPauseMode: this.sessionPauseMode,
+			sessionIdleCause: this.sessionIdleCause,
 		};
 		this.windows.sendToMain(this.focusPauseChannel, payload);
+		this.onState?.(payload);
 	}
 
 	private closeInterruptiveUi(): void {

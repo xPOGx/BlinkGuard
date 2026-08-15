@@ -407,6 +407,7 @@ function bootstrap(): void {
 		});
 
 		tray.create();
+		focusPause.setOnState((payload) => tray.setPauseState(payload));
 		autoUpdates.start();
 		autoUpdates.checkForUpdates();
 		applyLaunchAtLogin(preferences.launchAtLogin);

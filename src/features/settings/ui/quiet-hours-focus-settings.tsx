@@ -19,6 +19,10 @@ import {
 	type PauseAppPickerPayload,
 	type PauseAppRule,
 } from "../../../../shared/preferences";
+import {
+	type FocusPauseStatePayload,
+	pauseStatusMessageKey,
+} from "../../../../shared/session-pause-status";
 import { theme } from "../../../../shared/theme";
 import type { SettingsPreferences } from "../model/preferences";
 import type { SetPreferences } from "../model/use-preferences";
@@ -57,20 +61,14 @@ export function QuietHoursFocusSettings({
 	setPreferences,
 }: QuietHoursFocusSettingsProps) {
 	const t = useT();
-	const [pauseReason, setPauseReason] = useState<
-		"quiet-hours" | "fullscreen" | "app-rule" | "session-idle" | null
-	>(null);
-	const [fullscreenDetectionSupported, setFullscreenDetectionSupported] =
-		useState<boolean | null>(null);
+	const [pauseState, setPauseState] = useState<FocusPauseStatePayload | null>(
+		null,
+	);
 	const [picker, setPicker] =
 		useState<PauseAppPickerPayload>(emptyPauseAppPicker);
 
 	useEffect(
-		() =>
-			rendererIpc.onFocusPauseState((payload) => {
-				setPauseReason(payload.reason);
-				setFullscreenDetectionSupported(payload.fullscreenDetectionSupported);
-			}),
+		() => rendererIpc.onFocusPauseState((payload) => setPauseState(payload)),
 		[],
 	);
 
@@ -89,18 +87,11 @@ export function QuietHoursFocusSettings({
 		};
 	}, []);
 
-	const statusLabel =
-		pauseReason === "session-idle"
-			? t("session.paused")
-			: pauseReason === "quiet-hours"
-				? t("quietHours.paused")
-				: pauseReason === "fullscreen"
-					? t("fullscreen.paused")
-					: pauseReason === "app-rule"
-						? t("appRules.paused")
-						: null;
+	const statusKey = pauseState ? pauseStatusMessageKey(pauseState) : null;
+	const statusLabel = statusKey ? t(statusKey) : null;
 
-	const fullscreenUnsupported = fullscreenDetectionSupported === false;
+	const fullscreenUnsupported =
+		pauseState?.fullscreenDetectionSupported === false;
 	const rules = preferences.pauseAppRules;
 	const canAddRule =
 		!fullscreenUnsupported && rules.length < PAUSE_APP_RULES_MAX;
@@ -378,7 +369,7 @@ export function QuietHoursFocusSettings({
 					</Button>
 					{!fullscreenUnsupported &&
 					rules.length > 0 &&
-					pauseReason !== "app-rule" ? (
+					pauseState?.reason !== "app-rule" ? (
 						<p className="text-xs text-muted-foreground">
 							{t("appRules.foregroundHint")}
 						</p>

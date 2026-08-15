@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { FocusPauseService } from "../../../electron/application/focus-pause-service";
 import { DEFAULT_PREFERENCES } from "../../../shared/preferences";
+import type { FocusPauseStatePayload } from "../../../shared/session-pause-status";
 
 function hoursWindowContainingNow(): { start: string; end: string } {
 	const now = new Date();
@@ -54,16 +55,28 @@ function makeService(
 	};
 }
 
+function pausePayload(
+	overrides: Partial<FocusPauseStatePayload> = {},
+): FocusPauseStatePayload {
+	return {
+		reason: null,
+		fullscreenDetectionSupported: true,
+		sessionPauseMode: "active",
+		sessionIdleCause: null,
+		...overrides,
+	};
+}
+
 describe("FocusPauseService pushState", () => {
 	it("includes fullscreenDetectionSupported in the payload", () => {
 		const { service, sendToMain } = makeService({}, false);
 
 		service.pushState();
 
-		expect(sendToMain).toHaveBeenCalledWith("focus-pause-state", {
-			reason: null,
-			fullscreenDetectionSupported: false,
-		});
+		expect(sendToMain).toHaveBeenCalledWith(
+			"focus-pause-state",
+			pausePayload({ fullscreenDetectionSupported: false }),
+		);
 	});
 });
 
@@ -84,10 +97,10 @@ describe("FocusPauseService app-rule / fullscreen / quiet hours", () => {
 		expect(service.notificationsAllowed()).toBe(false);
 		expect(closeReminder).toHaveBeenCalled();
 		expect(pauseCameraForFocus).toHaveBeenCalled();
-		expect(sendToMain).toHaveBeenCalledWith("focus-pause-state", {
-			reason: "app-rule",
-			fullscreenDetectionSupported: true,
-		});
+		expect(sendToMain).toHaveBeenCalledWith(
+			"focus-pause-state",
+			pausePayload({ reason: "app-rule" }),
+		);
 	});
 
 	it("does not pause when the foreground misses the blocklist", () => {
@@ -153,21 +166,49 @@ describe("FocusPauseService app-rule / fullscreen / quiet hours", () => {
 	});
 
 	it("overlays session-idle on top of other pause reasons", () => {
-		const { service, sendToMain, closeReminder } = makeService();
+		const { start, end } = hoursWindowContainingNow();
+		const { service, sendToMain, closeReminder } = makeService({
+			quietHoursEnabled: true,
+			quietHoursStart: start,
+			quietHoursEnd: end,
+		});
+		service.recompute();
+		expect(service.pauseReason()).toBe("quiet-hours");
 
-		service.setSessionIdle(true);
+		service.setSessionOverlay({ mode: "inactive", cause: "lock" });
 
 		expect(service.pauseReason()).toBe("session-idle");
 		expect(service.notificationsAllowed()).toBe(false);
 		expect(closeReminder).toHaveBeenCalled();
-		expect(sendToMain).toHaveBeenCalledWith("focus-pause-state", {
-			reason: "session-idle",
-			fullscreenDetectionSupported: true,
-		});
+		expect(sendToMain).toHaveBeenCalledWith(
+			"focus-pause-state",
+			pausePayload({
+				reason: "session-idle",
+				sessionPauseMode: "inactive",
+				sessionIdleCause: "lock",
+			}),
+		);
 
-		service.setSessionIdle(false);
+		service.setSessionOverlay({ mode: "active", cause: null });
+		expect(service.pauseReason()).toBe("quiet-hours");
+		expect(service.notificationsAllowed()).toBe(false);
+	});
+
+	it("surfaces camera-only lid without blocking notifications", () => {
+		const { service, sendToMain, closeReminder } = makeService();
+
+		service.setSessionOverlay({ mode: "camera-only", cause: "lid" });
+
 		expect(service.pauseReason()).toBeNull();
 		expect(service.notificationsAllowed()).toBe(true);
+		expect(closeReminder).not.toHaveBeenCalled();
+		expect(sendToMain).toHaveBeenCalledWith(
+			"focus-pause-state",
+			pausePayload({
+				sessionPauseMode: "camera-only",
+				sessionIdleCause: "lid",
+			}),
+		);
 	});
 });
 

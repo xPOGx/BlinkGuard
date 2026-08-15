@@ -6,8 +6,8 @@ import type {
 } from "../../../shared/backup";
 import type { BlinkStatsSnapshot } from "../../../shared/blink-stats";
 import {
-	sanitizeCalibrationNudgePayload,
 	type CalibrationNudgePayload,
+	sanitizeCalibrationNudgePayload,
 } from "../../../shared/calibration-freshness";
 import {
 	type CameraDeviceNotice,
@@ -36,6 +36,10 @@ import {
 } from "../../../shared/preferences";
 import type { ExportProfileImageResult } from "../../../shared/profile-export";
 import type { GetReleaseNotesResult } from "../../../shared/release-notes";
+import {
+	type FocusPauseStatePayload,
+	sanitizeFocusPauseStatePayload,
+} from "../../../shared/session-pause-status";
 import type { TraceRecordingResult } from "../../../shared/trace-recording";
 
 type Listener = (...args: unknown[]) => void;
@@ -210,12 +214,10 @@ export const rendererIpc = {
 			listener(sanitizeCalibrationNudgePayload(payload));
 		}),
 	updateLocale: (locale: string) => send(IPC_CHANNELS.updateLocale, locale),
-	onFocusPauseState: (
-		listener: (payload: {
-			reason: "quiet-hours" | "fullscreen" | "app-rule" | "session-idle" | null;
-			fullscreenDetectionSupported: boolean;
-		}) => void,
-	) => subscribe(IPC_CHANNELS.focusPauseState, listener),
+	onFocusPauseState: (listener: (payload: FocusPauseStatePayload) => void) =>
+		subscribe(IPC_CHANNELS.focusPauseState, (payload) => {
+			listener(sanitizeFocusPauseStatePayload(payload));
+		}),
 	updateMgdMode: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateMgdMode, enabled),
 	startCameraTracking: () => send(IPC_CHANNELS.startCameraTracking),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+	resolveSessionIdleCause,
 	resolveSessionPauseMode,
 	sessionPauseRank,
 } from "../../../electron/domain/session-activity-policy";
@@ -49,5 +50,54 @@ describe("resolveSessionPauseMode", () => {
 		expect(sessionPauseRank("camera-only")).toBeGreaterThan(
 			sessionPauseRank("active"),
 		);
+	});
+});
+
+describe("resolveSessionIdleCause", () => {
+	it("is null when no idle flags are set", () => {
+		expect(resolveSessionIdleCause(idle)).toBeNull();
+	});
+
+	it("prefers suspend over lock, display-off, and lid", () => {
+		expect(
+			resolveSessionIdleCause({
+				suspended: true,
+				locked: true,
+				displaysAsleep: true,
+				lidClosed: true,
+			}),
+		).toBe("suspend");
+		expect(resolveSessionIdleCause({ ...idle, suspended: true })).toBe(
+			"suspend",
+		);
+	});
+
+	it("prefers lock over display-off and lid", () => {
+		expect(
+			resolveSessionIdleCause({
+				...idle,
+				locked: true,
+				displaysAsleep: true,
+				lidClosed: true,
+			}),
+		).toBe("lock");
+		expect(resolveSessionIdleCause({ ...idle, locked: true })).toBe("lock");
+	});
+
+	it("uses display-off when lid is also closed", () => {
+		expect(
+			resolveSessionIdleCause({
+				...idle,
+				displaysAsleep: true,
+				lidClosed: true,
+			}),
+		).toBe("display-off");
+		expect(resolveSessionIdleCause({ ...idle, displaysAsleep: true })).toBe(
+			"display-off",
+		);
+	});
+
+	it("uses lid when it is the only flag", () => {
+		expect(resolveSessionIdleCause({ ...idle, lidClosed: true })).toBe("lid");
 	});
 });

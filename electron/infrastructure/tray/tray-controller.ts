@@ -1,12 +1,17 @@
 import { Menu, Tray, nativeImage, type MenuItemConstructorOptions } from "electron";
 import path from "node:path";
 import { pluralKey, t, type Locale } from "../../../shared/i18n";
+import {
+	trayTooltipLabel,
+	type FocusPauseStatePayload,
+} from "../../../shared/session-pause-status";
 import type { InteractionLogger } from "../logging/interaction-logger";
 import type { AppPaths } from "../paths/app-paths";
 import type { WindowManager } from "../windows/window-manager";
 
 export class TrayController {
 	private tray: Tray | null = null;
+	private pauseState: FocusPauseStatePayload | null = null;
 
 	constructor(
 		private readonly paths: AppPaths,
@@ -25,7 +30,6 @@ export class TrayController {
 		if (this.tray) return;
 		const icon = this.loadIcon();
 		this.tray = new Tray(icon);
-		this.tray.setToolTip("BlinkGuard");
 		this.rebuildMenu(this.getLocale());
 		this.tray.on("click", () => {
 			this.interactions?.append({ source: "tray", action: "click-show" });
@@ -95,12 +99,22 @@ export class TrayController {
 			},
 		);
 		this.tray.setContextMenu(Menu.buildFromTemplate(items));
+		this.applyTooltip(locale);
+	}
+
+	setPauseState(payload: FocusPauseStatePayload): void {
+		this.pauseState = payload;
+		this.applyTooltip();
 	}
 
 	destroy(): void {
 		if (!this.tray) return;
 		this.tray.destroy();
 		this.tray = null;
+	}
+
+	private applyTooltip(locale: Locale = this.getLocale()): void {
+		this.tray?.setToolTip(trayTooltipLabel(locale, this.pauseState));
 	}
 
 	private pushSnoozeItem(

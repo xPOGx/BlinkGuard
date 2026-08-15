@@ -1,6 +1,11 @@
+import type {
+	SessionIdleCause,
+	SessionPauseMode,
+} from "../../shared/session-pause-status";
+
 export const SESSION_RESUME_DELAY_MS = 1800;
 
-export type SessionPauseMode = "active" | "camera-only" | "inactive";
+export type { SessionIdleCause, SessionPauseMode };
 
 export type SessionActivityFlags = {
 	suspended: boolean;
@@ -27,6 +32,17 @@ export function resolveSessionPauseMode(
 	}
 	if (input.lidClosed) return "camera-only";
 	return "active";
+}
+
+/** Primary UI cause: suspend > lock > display-off > lid. */
+export function resolveSessionIdleCause(
+	input: SessionActivityFlags,
+): SessionIdleCause | null {
+	if (input.suspended) return "suspend";
+	if (input.locked) return "lock";
+	if (input.displaysAsleep) return "display-off";
+	if (input.lidClosed) return "lid";
+	return null;
 }
 
 export function sessionPauseRank(mode: SessionPauseMode): number {

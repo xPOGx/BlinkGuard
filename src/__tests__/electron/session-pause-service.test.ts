@@ -30,7 +30,7 @@ function makeService(prefs: Partial<typeof DEFAULT_PREFERENCES> = {}) {
 		resetTimer: vi.fn(),
 	};
 	const focusPause = {
-		setSessionIdle: vi.fn(),
+		setSessionOverlay: vi.fn(),
 		recompute: vi.fn(),
 	};
 	const service = new SessionPauseService(
@@ -81,7 +81,10 @@ describe("SessionPauseService", () => {
 		expect(ctx.pauseForSession).toHaveBeenCalledTimes(1);
 		expect(ctx.exercises.stop).toHaveBeenCalled();
 		expect(ctx.lookAway.stop).toHaveBeenCalled();
-		expect(ctx.focusPause.setSessionIdle).toHaveBeenCalledWith(true);
+		expect(ctx.focusPause.setSessionOverlay).toHaveBeenCalledWith({
+			mode: "inactive",
+			cause: "lock",
+		});
 		expect(ctx.preferences.isTracking).toBe(true);
 		clearInterval(ctx.state.exerciseInterval);
 		clearInterval(ctx.state.lookAwayInterval);
@@ -97,13 +100,19 @@ describe("SessionPauseService", () => {
 
 		ctx.service.setPowerFlags({ locked: false });
 		expect(ctx.resumeAfterSleep).not.toHaveBeenCalled();
-		expect(ctx.focusPause.setSessionIdle).toHaveBeenLastCalledWith(true);
+		expect(ctx.focusPause.setSessionOverlay).toHaveBeenLastCalledWith({
+			mode: "inactive",
+			cause: "lock",
+		});
 
 		vi.advanceTimersByTime(SESSION_RESUME_DELAY_MS - 1);
 		expect(ctx.resumeAfterSleep).not.toHaveBeenCalled();
 
 		vi.advanceTimersByTime(1);
-		expect(ctx.focusPause.setSessionIdle).toHaveBeenLastCalledWith(false);
+		expect(ctx.focusPause.setSessionOverlay).toHaveBeenLastCalledWith({
+			mode: "active",
+			cause: null,
+		});
 		expect(ctx.focusPause.recompute).toHaveBeenCalled();
 		expect(ctx.exercises.resetTimer).toHaveBeenCalled();
 		expect(ctx.exercises.start).toHaveBeenCalled();
@@ -129,7 +138,15 @@ describe("SessionPauseService", () => {
 		expect(ctx.pauseCameraForClamshell).toHaveBeenCalledTimes(1);
 		expect(ctx.pauseForSession).not.toHaveBeenCalled();
 		expect(ctx.exercises.stop).not.toHaveBeenCalled();
-		expect(ctx.focusPause.setSessionIdle).not.toHaveBeenCalled();
+		expect(ctx.focusPause.setSessionOverlay).toHaveBeenCalledWith({
+			mode: "camera-only",
+			cause: "lid",
+		});
+		expect(
+			ctx.focusPause.setSessionOverlay.mock.calls.every(
+				([overlay]) => overlay.mode !== "inactive",
+			),
+		).toBe(true);
 	});
 
 	it("does not resume tracking if the user stopped during the pause", () => {
@@ -158,5 +175,31 @@ describe("SessionPauseService", () => {
 			lidClosed: true,
 		});
 		expect(clamshell.pauseCameraForClamshell).toHaveBeenCalledTimes(1);
+	});
+
+	it("updates the overlay cause when lock follows display-off without a second pause", () => {
+		const ctx = makeService();
+		ctx.service.setEnvironment({ displaysAsleep: true, lidClosed: false });
+		expect(ctx.pauseForSession).toHaveBeenCalledTimes(1);
+		expect(ctx.focusPause.setSessionOverlay).toHaveBeenCalledWith({
+			mode: "inactive",
+			cause: "display-off",
+		});
+
+		ctx.service.setPowerFlags({ locked: true });
+		expect(ctx.pauseForSession).toHaveBeenCalledTimes(1);
+		expect(ctx.focusPause.setSessionOverlay).toHaveBeenLastCalledWith({
+			mode: "inactive",
+			cause: "lock",
+		});
+	});
+
+	it("overlays suspend as the primary cause", () => {
+		const ctx = makeService();
+		ctx.service.setPowerFlags({ suspended: true });
+		expect(ctx.focusPause.setSessionOverlay).toHaveBeenCalledWith({
+			mode: "inactive",
+			cause: "suspend",
+		});
 	});
 });

@@ -434,6 +434,10 @@ export const uk: MessageCatalog = {
 	"quietHours.toggleAria": "Перемкнути тихі години",
 	"quietHours.paused": "Пауза: тихі години",
 	"session.paused": "Пауза: екран вимкнено",
+	"session.paused.lock": "Пауза: екран заблоковано",
+	"session.paused.displayOff": "Пауза: екран вимкнено",
+	"session.paused.suspend": "Пауза: сон",
+	"session.paused.lid": "Камера на паузі: кришка закрита",
 	"fullscreen.title": "Пауза на повноекранному режимі",
 	"fullscreen.description":
 		"Автопауза спливаючих вікон (і камери), коли інша програма на весь екран. У Windows, якщо вимкнено, для ігор краще Borderless Windowed або віконний режим.",

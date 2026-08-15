@@ -426,6 +426,10 @@ export const en: MessageCatalog = {
 	"quietHours.toggleAria": "Toggle quiet hours",
 	"quietHours.paused": "Paused: quiet hours",
 	"session.paused": "Paused: screen off",
+	"session.paused.lock": "Paused: lock screen",
+	"session.paused.displayOff": "Paused: screen off",
+	"session.paused.suspend": "Paused: sleep",
+	"session.paused.lid": "Camera paused: lid closed",
 	"fullscreen.title": "Pause while fullscreen",
 	"fullscreen.description":
 		"Auto-pause popups (and the camera) when another app is fullscreen. On Windows, prefer Borderless Windowed or Windowed mode if you leave this off while gaming.",
