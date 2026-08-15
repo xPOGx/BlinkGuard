@@ -98,9 +98,17 @@ describe("settings shell", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Settings" }));
 		expect(screen.getByText("Keyboard shortcuts")).toBeDefined();
+		expect(screen.queryByText("Backup")).toBeNull();
 		expect(screen.queryByText("Quiet hours")).toBeNull();
+		fireEvent.click(screen.getByRole("tab", { name: "Data" }));
+		expect(screen.getByText("Backup")).toBeDefined();
+		expect(screen.getByText("Danger Zone")).toBeDefined();
+		expect(screen.queryByText("Keyboard shortcuts")).toBeNull();
 
 		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
+		expect(screen.getByText("Reminder Interval")).toBeDefined();
+		expect(screen.queryByText("Quiet hours")).toBeNull();
+		fireEvent.click(screen.getByRole("tab", { name: "Pause" }));
 		expect(screen.getByText("Quiet hours")).toBeDefined();
 		expect(screen.getByText("Pause while fullscreen")).toBeDefined();
 
@@ -135,14 +143,16 @@ describe("settings shell", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.checkForUpdates);
 
-		fireEvent.click(screen.getByRole("button", { name: "Release notes" }));
-		expect(await screen.findByRole("button", { name: "Back" })).toBeDefined();
+		fireEvent.click(screen.getByRole("tab", { name: "Notes" }));
 		expect(await screen.findByText("BlinkGuard 2.1.0")).toBeDefined();
 		expect(screen.getByText("Goals")).toBeDefined();
 		fireEvent.click(screen.getByRole("button", { name: "View on GitHub" }));
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.openGithubReleases);
-		fireEvent.click(screen.getByRole("button", { name: "Back" }));
+		fireEvent.click(screen.getByRole("tab", { name: "Overview" }));
 		expect(screen.getByText("What it is")).toBeDefined();
+		fireEvent.click(screen.getByRole("tab", { name: "Thanks" }));
+		expect(screen.getByText("Dmytro Gorobets")).toBeDefined();
+		expect(screen.queryByText("What it is")).toBeNull();
 
 		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
 		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.unsubscribeBlinkStats);
@@ -157,6 +167,17 @@ describe("settings shell", () => {
 		expect(remindersScroller).toBeInstanceOf(HTMLElement);
 		remindersScroller.scrollTop = 120;
 		const canObserveScroll = remindersScroller.scrollTop === 120;
+
+		fireEvent.click(screen.getByRole("tab", { name: "Pause" }));
+		expect(screen.getByText("Quiet hours")).toBeDefined();
+		const pauseScroller = document.querySelector(
+			"main .overflow-y-auto",
+		) as HTMLElement;
+		expect(pauseScroller).toBeInstanceOf(HTMLElement);
+		expect(pauseScroller).not.toBe(remindersScroller);
+		if (canObserveScroll) {
+			expect(pauseScroller.scrollTop).toBe(0);
+		}
 
 		fireEvent.click(screen.getByRole("button", { name: "Camera" }));
 		expect(screen.getByRole("tab", { name: "Setup" })).toBeDefined();
@@ -212,6 +233,7 @@ describe("settings shell", () => {
 		render(<App />);
 		hydratePreferences({ hasCompletedOnboarding: true });
 		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
+		fireEvent.click(screen.getByRole("tab", { name: "Pause" }));
 
 		const toggle = screen.getByRole("switch", {
 			name: "Toggle pause while fullscreen",
@@ -422,6 +444,7 @@ describe("settings shell", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
 		send.mockClear();
+		fireEvent.click(screen.getByRole("tab", { name: "Pause" }));
 		fireEvent.click(screen.getByRole("switch", { name: "Toggle quiet hours" }));
 		expect(send).toHaveBeenCalledWith(
 			IPC_CHANNELS.updateQuietHoursEnabled,

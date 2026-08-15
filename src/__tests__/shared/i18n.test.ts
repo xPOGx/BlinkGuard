@@ -48,21 +48,21 @@ describe("i18n t()", () => {
 	});
 
 	it("interpolates variables", () => {
-		expect(t("en", "reminders.desc.timer_plural", { n: 5 })).toBe(
-			"Show reminder every 5 seconds",
+		expect(t("en", "reminders.snoozeDesc_plural", { n: 5 })).toBe(
+			"Hide blink, exercise, and look-away prompts for 5 minutes after Snooze.",
 		);
 		expect(t("uk", "camera.cancelCalibration", { n: 3 })).toContain("3");
 	});
 
 	it("uses correct Ukrainian second/minute forms", () => {
-		expect(t("uk", pluralKey("reminders.desc.timer", "uk", 1), { n: 1 })).toBe(
-			"Показувати нагадування кожну 1 секунду",
+		expect(t("uk", pluralKey("reminders.snoozeDesc", "uk", 1), { n: 1 })).toBe(
+			"Ховати нагадування про моргання, вправи та погляд вдалину на 1 хвилину після «Відкласти».",
 		);
-		expect(t("uk", pluralKey("reminders.desc.timer", "uk", 2), { n: 2 })).toBe(
-			"Показувати нагадування кожні 2 секунди",
+		expect(t("uk", pluralKey("reminders.snoozeDesc", "uk", 2), { n: 2 })).toBe(
+			"Ховати нагадування про моргання, вправи та погляд вдалину на 2 хвилини після «Відкласти».",
 		);
-		expect(t("uk", pluralKey("reminders.desc.timer", "uk", 5), { n: 5 })).toBe(
-			"Показувати нагадування кожні 5 секунд",
+		expect(t("uk", pluralKey("reminders.snoozeDesc", "uk", 5), { n: 5 })).toBe(
+			"Ховати нагадування про моргання, вправи та погляд вдалину на 5 хвилин після «Відкласти».",
 		);
 	});
 });

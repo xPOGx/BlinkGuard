@@ -7,7 +7,10 @@ export const en: MessageCatalog = {
 	"app.navNeedsAttention": "Needs attention",
 	"app.section.reminders": "Reminders",
 	"app.section.reminders.desc":
-		"Interval, start/stop, quiet hours, and fullscreen pause for blink reminders.",
+		"Blink interval, snooze, and when reminders pause.",
+	"app.reminders.tabsAria": "Reminder views",
+	"app.reminders.tab.schedule": "Schedule",
+	"app.reminders.tab.pause": "Pause",
 	"app.section.camera": "Camera",
 	"app.section.camera.desc":
 		"Connect the camera, then calibrate detection and coaching.",
@@ -30,13 +33,23 @@ export const en: MessageCatalog = {
 	"app.progress.tab.rewards": "Rewards",
 	"app.section.settings": "Settings",
 	"app.section.settings.desc":
-		"Shortcut, language, launch at login, backup, and reset.",
+		"Shortcuts, language, launch at login, backup, and reset.",
+	"app.settings.tabsAria": "Settings views",
+	"app.settings.tab.general": "General",
+	"app.settings.tab.data": "Data",
 	"app.section.about": "About",
 	"app.section.about.desc":
-		"What BlinkGuard is, why it exists, privacy, and the open-source repo.",
+		"What BlinkGuard is, release notes, and thanks.",
+	"app.about.tabsAria": "About views",
+	"app.about.tab.overview": "Overview",
+	"app.about.tab.notes": "Notes",
+	"app.about.tab.thanks": "Thanks",
 	"app.section.debug": "Debug",
 	"app.section.debug.desc":
-		"Preview overlays, test notification sounds, and reopen onboarding for local testing.",
+		"Preview overlays and sounds, then shop, profile, and trace tools.",
+	"app.debug.tabsAria": "Debug views",
+	"app.debug.tab.preview": "Preview",
+	"app.debug.tab.tools": "Tools",
 
 	// About
 	"about.what.title": "What it is",
@@ -66,18 +79,13 @@ export const en: MessageCatalog = {
 	"about.meta.version": "Version {version}",
 	"about.meta.author": "Made by {name}",
 	"about.checkForUpdates": "Check for updates",
-	"about.releaseNotes.button": "Release notes",
 	"about.releaseNotes.title": "Release notes",
-	"about.releaseNotes.back": "Back",
 	"about.releaseNotes.viewOnGithub": "View on GitHub",
 	"about.releaseNotes.loading": "Loading release notes…",
 	"about.releaseNotes.error": "Could not load release notes: {message}",
 	"about.releaseNotes.empty": "No releases found.",
 	"about.releaseNotes.emptyBody": "No notes for this release.",
 	"about.releaseNotes.prerelease": "Pre-release",
-	"about.thanks.button": "Thank you",
-	"about.thanks.title": "Thank you",
-	"about.thanks.back": "Back",
 	"about.thanks.intro":
 		"Thanks to the early users and testers who try BlinkGuard and share feedback.",
 
@@ -167,15 +175,8 @@ export const en: MessageCatalog = {
 	// Reminders
 	"reminders.interval": "Reminder Interval",
 	"reminders.intervalAria": "Reminder interval",
-	"reminders.desc.camera":
-		"Show reminder if you haven't blinked for {n} second",
-	"reminders.desc.camera_few":
-		"Show reminder if you haven't blinked for {n} seconds",
-	"reminders.desc.camera_plural":
-		"Show reminder if you haven't blinked for {n} seconds",
-	"reminders.desc.timer": "Show reminder every {n} second",
-	"reminders.desc.timer_few": "Show reminder every {n} seconds",
-	"reminders.desc.timer_plural": "Show reminder every {n} seconds",
+	"reminders.desc.camera": "Show reminder if you haven't blinked.",
+	"reminders.desc.timer": "Show reminder at this interval.",
 	"reminders.snooze": "Snooze duration",
 	"reminders.snoozeDesc":
 		"Hide blink, exercise, and look-away prompts for {n} minute after Snooze.",

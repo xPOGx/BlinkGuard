@@ -8,9 +8,10 @@ import {
 	Settings,
 	Timer,
 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { dismissBootSplash } from "@/boot-splash";
-import { type SectionTabItem, SectionTabs } from "@/components/section-tabs";
+import { SettingGrid } from "@/components/setting-grid";
+import { MAIN_SCROLL_CLASS, TabbedSection } from "@/components/tabbed-section";
 import { useAutoUpdate } from "@/features/about/model/use-auto-update";
 import { AboutPanel } from "@/features/about/ui/about-panel";
 import { UpdateDialog } from "@/features/about/ui/update-dialog";
@@ -60,45 +61,8 @@ type SectionId =
 	| "debug";
 
 type ProgressTabId = "statistics" | "profile" | "achievements" | "rewards";
-
-const MAIN_SCROLL_CLASS =
-	"min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] [scrollbar-gutter:stable] px-4 py-4 sm:px-6 sm:py-5";
-
-function TabbedSection<T extends string>({
-	items,
-	value,
-	onChange,
-	"aria-label": ariaLabel,
-	maxWidthClass,
-	children,
-}: {
-	items: readonly SectionTabItem<T>[];
-	value: T;
-	onChange: (id: T) => void;
-	"aria-label": string;
-	maxWidthClass: string;
-	children: ReactNode;
-}) {
-	return (
-		<>
-			<div className="shrink-0 border-b border-border bg-background px-4 pt-4 pb-3 sm:px-6 sm:pt-5">
-				<div className={cn("mx-auto", maxWidthClass)}>
-					<SectionTabs
-						aria-label={ariaLabel}
-						items={items}
-						value={value}
-						onChange={onChange}
-					/>
-				</div>
-			</div>
-			<div key={value} className={MAIN_SCROLL_CLASS}>
-				<div className={cn("mx-auto flex flex-col gap-4", maxWidthClass)}>
-					{children}
-				</div>
-			</div>
-		</>
-	);
-}
+type RemindersTabId = "schedule" | "pause";
+type SettingsTabId = "general" | "data";
 
 function CameraSection({
 	preferences,
@@ -193,6 +157,8 @@ function SettingsShell({
 	const [section, setSection] = useState<SectionId>("reminders");
 	const [progressTab, setProgressTab] = useState<ProgressTabId>("statistics");
 	const [cameraTab, setCameraTab] = useState<CameraTabId>("setup");
+	const [remindersTab, setRemindersTab] = useState<RemindersTabId>("schedule");
+	const [settingsTab, setSettingsTab] = useState<SettingsTabId>("general");
 	const sections: {
 		id: SectionId;
 		label: string;
@@ -258,6 +224,14 @@ function SettingsShell({
 		{ id: "profile" as const, label: t("app.progress.tab.profile") },
 		{ id: "achievements" as const, label: t("app.progress.tab.achievements") },
 		{ id: "rewards" as const, label: t("app.progress.tab.rewards") },
+	];
+	const remindersTabs = [
+		{ id: "schedule" as const, label: t("app.reminders.tab.schedule") },
+		{ id: "pause" as const, label: t("app.reminders.tab.pause") },
+	];
+	const settingsTabs = [
+		{ id: "general" as const, label: t("app.settings.tab.general") },
+		{ id: "data" as const, label: t("app.settings.tab.data") },
 	];
 	const active = sections.find((item) => item.id === section) ?? sections[0];
 	const showOnboarding = prefsHydrated && !preferences.hasCompletedOnboarding;
@@ -392,26 +366,73 @@ function SettingsShell({
 							tab={cameraTab}
 							onTabChange={setCameraTab}
 						/>
+					) : section === "reminders" ? (
+						<TabbedSection
+							aria-label={t("app.reminders.tabsAria")}
+							items={remindersTabs}
+							value={remindersTab}
+							onChange={setRemindersTab}
+							maxWidthClass="max-w-3xl"
+						>
+							{remindersTab === "schedule" ? (
+								<ReminderControls
+									preferences={preferences}
+									setPreferences={setPreferences}
+									onIntervalChange={changeReminderInterval}
+									onToggleTracking={toggleTracking}
+								/>
+							) : (
+								<QuietHoursFocusSettings
+									preferences={preferences}
+									setPreferences={setPreferences}
+								/>
+							)}
+						</TabbedSection>
+					) : section === "settings" ? (
+						<TabbedSection
+							aria-label={t("app.settings.tabsAria")}
+							items={settingsTabs}
+							value={settingsTab}
+							onChange={setSettingsTab}
+							maxWidthClass="max-w-3xl"
+						>
+							{settingsTab === "general" ? (
+								<>
+									<ShortcutSettings
+										shortcuts={preferences.keyboardShortcuts}
+										activeAction={shortcuts.activeAction}
+										temporaryShortcut={shortcuts.temporaryShortcut}
+										errorMessage={shortcuts.errorMessage}
+										onStartRecording={shortcuts.startRecording}
+										onSave={shortcuts.save}
+										onCancel={shortcuts.cancel}
+										onClear={shortcuts.clear}
+									/>
+									<SettingGrid>
+										<LanguageSettings
+											preferences={preferences}
+											setPreferences={setPreferences}
+										/>
+										<LaunchAtLoginSettings
+											preferences={preferences}
+											setPreferences={setPreferences}
+										/>
+									</SettingGrid>
+								</>
+							) : (
+								<>
+									<BackupSettings />
+									<ResetPreferencesButton />
+								</>
+							)}
+						</TabbedSection>
 					) : section === "about" ? (
 						<AboutPanel autoUpdate={autoUpdate} />
+					) : section === "debug" && import.meta.env.DEV ? (
+						<DebugPanel setPreferences={setPreferences} />
 					) : (
 						<div key={section} className={MAIN_SCROLL_CLASS}>
 							<div className="mx-auto flex max-w-3xl flex-col gap-4">
-								{section === "reminders" && (
-									<>
-										<ReminderControls
-											preferences={preferences}
-											setPreferences={setPreferences}
-											onIntervalChange={changeReminderInterval}
-											onToggleTracking={toggleTracking}
-										/>
-										<QuietHoursFocusSettings
-											preferences={preferences}
-											setPreferences={setPreferences}
-										/>
-									</>
-								)}
-
 								{section === "exercises" && (
 									<>
 										<EyePromptsDisabledNotice
@@ -445,37 +466,6 @@ function SettingsShell({
 										/>
 									</>
 								)}
-
-								{section === "settings" && (
-									<>
-										<ShortcutSettings
-											shortcuts={preferences.keyboardShortcuts}
-											activeAction={shortcuts.activeAction}
-											temporaryShortcut={shortcuts.temporaryShortcut}
-											errorMessage={shortcuts.errorMessage}
-											onStartRecording={shortcuts.startRecording}
-											onSave={shortcuts.save}
-											onCancel={shortcuts.cancel}
-											onClear={shortcuts.clear}
-										/>
-										<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-											<LanguageSettings
-												preferences={preferences}
-												setPreferences={setPreferences}
-											/>
-											<LaunchAtLoginSettings
-												preferences={preferences}
-												setPreferences={setPreferences}
-											/>
-										</div>
-										<BackupSettings />
-										<ResetPreferencesButton />
-									</>
-								)}
-
-								{section === "debug" && import.meta.env.DEV ? (
-									<DebugPanel setPreferences={setPreferences} />
-								) : null}
 							</div>
 						</div>
 					)}

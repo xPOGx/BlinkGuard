@@ -7,7 +7,10 @@ export const uk: MessageCatalog = {
 	"app.navNeedsAttention": "Потрібна увага",
 	"app.section.reminders": "Нагадування",
 	"app.section.reminders.desc":
-		"Інтервал, запуск/зупинка, тихі години та пауза в повноекранному режимі.",
+		"Інтервал моргання, дрімота і коли нагадування ставлять на паузу.",
+	"app.reminders.tabsAria": "Перегляди нагадувань",
+	"app.reminders.tab.schedule": "Розклад",
+	"app.reminders.tab.pause": "Пауза",
 	"app.section.camera": "Камера",
 	"app.section.camera.desc":
 		"Підключіть камеру, потім налаштуйте виявлення та підказки.",
@@ -30,13 +33,23 @@ export const uk: MessageCatalog = {
 	"app.progress.tab.rewards": "Нагороди",
 	"app.section.settings": "Налаштування",
 	"app.section.settings.desc":
-		"Гаряча клавіша, мова, автозапуск, резервна копія і скидання.",
+		"Гарячі клавіші, мова, автозапуск, резервна копія і скидання.",
+	"app.settings.tabsAria": "Перегляди налаштувань",
+	"app.settings.tab.general": "Загальні",
+	"app.settings.tab.data": "Дані",
 	"app.section.about": "Про застосунок",
 	"app.section.about.desc":
-		"Що таке BlinkGuard, навіщо він, приватність і open-source репозиторій.",
+		"Що таке BlinkGuard, нотатки до релізів і подяки.",
+	"app.about.tabsAria": "Перегляди про застосунок",
+	"app.about.tab.overview": "Огляд",
+	"app.about.tab.notes": "Релізи",
+	"app.about.tab.thanks": "Подяки",
 	"app.section.debug": "Debug",
 	"app.section.debug.desc":
-		"Перегляд оверлеїв, тест звуків сповіщень і повторне відкриття онбордингу для локальних тестів.",
+		"Перегляд оверлеїв і звуків, далі магазин, профіль і запис трейсів.",
+	"app.debug.tabsAria": "Перегляди Debug",
+	"app.debug.tab.preview": "Перегляд",
+	"app.debug.tab.tools": "Інструменти",
 
 	// About
 	"about.what.title": "Що це",
@@ -66,18 +79,13 @@ export const uk: MessageCatalog = {
 	"about.meta.version": "Версія {version}",
 	"about.meta.author": "Автор: {name}",
 	"about.checkForUpdates": "Перевірити оновлення",
-	"about.releaseNotes.button": "Що нового",
 	"about.releaseNotes.title": "Що нового",
-	"about.releaseNotes.back": "Назад",
 	"about.releaseNotes.viewOnGithub": "Відкрити на GitHub",
 	"about.releaseNotes.loading": "Завантаження нотаток до релізу…",
 	"about.releaseNotes.error": "Не вдалося завантажити нотатки: {message}",
 	"about.releaseNotes.empty": "Релізів не знайдено.",
 	"about.releaseNotes.emptyBody": "Для цього релізу немає нотаток.",
 	"about.releaseNotes.prerelease": "Попередній реліз",
-	"about.thanks.button": "Подяка",
-	"about.thanks.title": "Подяка",
-	"about.thanks.back": "Назад",
 	"about.thanks.intro":
 		"Дякуємо першим користувачам і тестувальникам, які пробують BlinkGuard і діляться відгуками.",
 
@@ -169,17 +177,8 @@ export const uk: MessageCatalog = {
 	"reminders.interval": "Інтервал нагадувань",
 	"reminders.intervalAria": "Інтервал нагадувань",
 	"reminders.desc.camera":
-		"Показати нагадування, якщо ви не моргали {n} секунду",
-	"reminders.desc.camera_few":
-		"Показати нагадування, якщо ви не моргали {n} секунди",
-	"reminders.desc.camera_plural":
-		"Показати нагадування, якщо ви не моргали {n} секунд",
-	"reminders.desc.timer":
-		"Показувати нагадування кожну {n} секунду",
-	"reminders.desc.timer_few":
-		"Показувати нагадування кожні {n} секунди",
-	"reminders.desc.timer_plural":
-		"Показувати нагадування кожні {n} секунд",
+		"Показати нагадування, якщо ви не моргали.",
+	"reminders.desc.timer": "Показувати нагадування з цим інтервалом.",
 	"reminders.snooze": "Тривалість відкладення",
 	"reminders.snoozeDesc":
 		"Ховати нагадування про моргання, вправи та погляд вдалину на {n} хвилину після «Відкласти».",

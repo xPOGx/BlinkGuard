@@ -2,6 +2,7 @@ import { Activity, Clock, Moon, Play, Square } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { Button } from "@/components/button";
 import { RangeSlider } from "@/components/range-slider";
+import { SettingGrid } from "@/components/setting-grid";
 import { SettingPanel } from "@/components/setting-panel";
 import { SettingRow } from "@/components/setting-row";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
@@ -30,14 +31,6 @@ export function ReminderControls({
 	const blinksPerMinute = 60 / preferences.reminderInterval;
 	const formattedRate = formatBlinksPerMinute(preferences.reminderInterval);
 	const inTypicalRange = blinksPerMinute >= 15 && blinksPerMinute <= 20;
-	const interval = preferences.reminderInterval;
-	const descKey = pluralKey(
-		preferences.cameraEnabled
-			? "reminders.desc.camera"
-			: "reminders.desc.timer",
-		locale,
-		interval,
-	);
 	const snoozeMinutes = preferences.snoozeMinutes;
 	const snoozeDescKey = pluralKey(
 		"reminders.snoozeDesc",
@@ -46,75 +39,78 @@ export function ReminderControls({
 	);
 	return (
 		<>
-			<SettingPanel>
-				<SettingRow
-					title={
-						<>
-							<Clock className="h-4 w-4 text-muted-foreground" aria-hidden />
-							<label htmlFor="reminder-interval">
-								{t("reminders.interval")}
-							</label>
-						</>
-					}
-					description={t(descKey, { n: interval })}
-				>
-					<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-						<RangeSlider
-							id="reminder-interval"
-							aria-label={t("reminders.intervalAria")}
-							min={1}
-							max={10}
-							value={preferences.reminderInterval}
-							onChange={onIntervalChange}
-							className="sm:flex-1"
-						/>
-						<div className="flex shrink-0 items-center justify-center gap-3 sm:justify-end">
-							<div className="min-w-[4.5rem] rounded-md bg-accent px-3 py-1 text-center text-sm font-semibold text-accent-foreground">
+			<SettingGrid>
+				<SettingPanel className="flex h-full flex-col">
+					<SettingRow
+						title={
+							<>
+								<Clock className="h-4 w-4 text-muted-foreground" aria-hidden />
+								<label htmlFor="reminder-interval">
+									{t("reminders.interval")}
+								</label>
+							</>
+						}
+						description={
+							preferences.cameraEnabled
+								? t("reminders.desc.camera")
+								: t("reminders.desc.timer")
+						}
+					/>
+					<div className="mt-auto flex flex-col items-center gap-3 pt-3 sm:flex-row sm:items-end sm:gap-4">
+						<div className="flex min-h-9 min-w-0 w-full flex-1 items-center gap-3">
+							<RangeSlider
+								id="reminder-interval"
+								aria-label={t("reminders.intervalAria")}
+								min={1}
+								max={10}
+								value={preferences.reminderInterval}
+								onChange={onIntervalChange}
+								className="min-w-0 flex-1"
+							/>
+							<div className="min-w-[4.5rem] shrink-0 rounded-md bg-accent px-3 py-1 text-center text-sm font-semibold text-accent-foreground">
 								{preferences.reminderInterval}s
 							</div>
-							<div className="relative">
+						</div>
+						<div className="relative flex w-[5.75rem] shrink-0 flex-col items-center">
+							{preferences.isTracking ? (
+								<div className="absolute bottom-full left-1/2 mb-1 flex -translate-x-1/2 items-center justify-center gap-1 whitespace-nowrap text-xs font-medium text-primary">
+									<Activity className="h-3 w-3" aria-hidden />
+									<span>{t("common.active")}</span>
+								</div>
+							) : null}
+							<Button
+								type="button"
+								variant={preferences.isTracking ? "destructive" : "default"}
+								onClick={onToggleTracking}
+								className="w-full gap-2 whitespace-nowrap"
+							>
 								{preferences.isTracking ? (
-									<div className="absolute bottom-full left-0 right-0 mb-1 flex items-center justify-center gap-1 text-xs font-medium text-primary">
-										<Activity className="h-3 w-3" aria-hidden />
-										<span>{t("common.active")}</span>
-									</div>
-								) : null}
-								<Button
-									type="button"
-									size="default"
-									variant={preferences.isTracking ? "destructive" : "default"}
-									onClick={onToggleTracking}
-									className="w-[5.75rem] gap-2 whitespace-nowrap"
-								>
-									{preferences.isTracking ? (
-										<>
-											<Square className="h-4 w-4" aria-hidden />
-											{t("common.stop")}
-										</>
-									) : (
-										<>
-											<Play className="h-4 w-4" aria-hidden />
-											{t("common.start")}
-										</>
-									)}
-								</Button>
-							</div>
+									<>
+										<Square className="h-4 w-4" aria-hidden />
+										{t("common.stop")}
+									</>
+								) : (
+									<>
+										<Play className="h-4 w-4" aria-hidden />
+										{t("common.start")}
+									</>
+								)}
+							</Button>
 						</div>
 					</div>
-				</SettingRow>
-			</SettingPanel>
+				</SettingPanel>
 
-			<SettingPanel>
-				<SettingRow
-					title={
-						<>
-							<Moon className="h-4 w-4 text-muted-foreground" aria-hidden />
-							<label htmlFor="snooze-minutes">{t("reminders.snooze")}</label>
-						</>
-					}
-					description={t(snoozeDescKey, { n: snoozeMinutes })}
-				>
-					<div className="flex items-center gap-2">
+				<SettingPanel className="flex h-full flex-col">
+					<SettingRow
+						title={
+							<>
+								<Moon className="h-4 w-4 text-muted-foreground" aria-hidden />
+								<label htmlFor="snooze-minutes">{t("reminders.snooze")}</label>
+							</>
+						}
+						description={t(snoozeDescKey, { n: snoozeMinutes })}
+					/>
+					<div className="mt-auto flex min-h-9 items-center gap-2 pt-3">
 						<RangeSlider
 							id="snooze-minutes"
 							aria-label={t("reminders.snoozeAria")}
@@ -127,14 +123,14 @@ export function ReminderControls({
 									snoozeMinutes: next,
 								}))
 							}
-							className="h-1.5 flex-1"
+							className="min-w-0 flex-1"
 						/>
 						<div className="min-w-[2.5rem] text-center text-xs font-medium text-primary">
 							{snoozeMinutes}m
 						</div>
 					</div>
-				</SettingRow>
-			</SettingPanel>
+				</SettingPanel>
+			</SettingGrid>
 
 			<aside
 				role="status"

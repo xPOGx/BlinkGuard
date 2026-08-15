@@ -1,8 +1,9 @@
-import { ExternalLink, Heart, ScrollText, Upload } from "lucide-react";
+import { ExternalLink, Upload } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/button";
 import { SettingPanel } from "@/components/setting-panel";
 import { SettingRow } from "@/components/setting-row";
+import { TabbedSection } from "@/components/tabbed-section";
 import type { useAutoUpdate } from "@/features/about/model/use-auto-update";
 import { ReleaseNotesPanel } from "@/features/about/ui/release-notes-panel";
 import { ThanksPanel } from "@/features/about/ui/thanks-panel";
@@ -12,17 +13,29 @@ import { author, version } from "../../../../package.json";
 
 const AUTHOR_NAME = author.name;
 
+const OVERVIEW_COPY = [
+	{ title: "about.what.title", body: "about.what.body" },
+	{ title: "about.why.title", body: "about.why.body" },
+	{ title: "about.privacy.title", body: "about.privacy.body" },
+	{ title: "about.display.title", body: "about.display.body" },
+] as const;
+
+type AboutTabId = "overview" | "notes" | "thanks";
+
 type AboutPanelProps = {
 	autoUpdate: Pick<ReturnType<typeof useAutoUpdate>, "busy" | "check">;
 };
 
 export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 	const t = useT();
-	const [view, setView] = useState<"about" | "release-notes" | "thanks">(
-		"about",
-	);
+	const [tab, setTab] = useState<AboutTabId>("overview");
 	const [exportBusy, setExportBusy] = useState(false);
 	const [exportStatus, setExportStatus] = useState<string | null>(null);
+	const aboutTabs = [
+		{ id: "overview" as const, label: t("app.about.tab.overview") },
+		{ id: "notes" as const, label: t("app.about.tab.notes") },
+		{ id: "thanks" as const, label: t("app.about.tab.thanks") },
+	];
 
 	const handleExportDiagnostics = async () => {
 		if (exportBusy) return;
@@ -56,111 +69,71 @@ export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 		}
 	};
 
-	if (view === "release-notes") {
-		return <ReleaseNotesPanel onBack={() => setView("about")} />;
-	}
-
-	if (view === "thanks") {
-		return <ThanksPanel onBack={() => setView("about")} />;
-	}
-
 	return (
-		<div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain [overflow-anchor:none] [scrollbar-gutter:stable] px-4 py-4 sm:px-6 sm:py-5">
-			<div className="mx-auto flex max-w-3xl flex-col gap-4">
-				<SettingPanel>
-					<SettingRow
-						title={t("about.what.title")}
-						description={t("about.what.body")}
-					/>
-				</SettingPanel>
+		<TabbedSection
+			aria-label={t("app.about.tabsAria")}
+			items={aboutTabs}
+			value={tab}
+			onChange={setTab}
+			maxWidthClass="max-w-3xl"
+		>
+			{tab === "overview" ? (
+				<>
+					{OVERVIEW_COPY.map((item) => (
+						<SettingPanel key={item.title}>
+							<SettingRow title={t(item.title)} description={t(item.body)} />
+						</SettingPanel>
+					))}
 
-				<SettingPanel>
-					<SettingRow
-						title={t("about.why.title")}
-						description={t("about.why.body")}
-					/>
-				</SettingPanel>
-
-				<SettingPanel>
-					<SettingRow
-						title={t("about.privacy.title")}
-						description={t("about.privacy.body")}
-					/>
-				</SettingPanel>
-
-				<SettingPanel>
-					<SettingRow
-						title={t("about.display.title")}
-						description={t("about.display.body")}
-					/>
-				</SettingPanel>
-
-				<SettingPanel>
-					<SettingRow
-						title={t("about.opensource.title")}
-						description={t("about.opensource.body")}
-						action={
-							<Button
-								type="button"
-								variant="secondary"
-								onClick={() => rendererIpc.openGithubRepo()}
-							>
-								<ExternalLink className="mr-2 h-4 w-4" aria-hidden />
-								{t("about.opensource.github")}
-							</Button>
-						}
-					/>
-				</SettingPanel>
-
-				<SettingPanel>
-					<SettingRow
-						title={t("about.exportDiagnostics.title")}
-						description={t("about.exportDiagnostics.body")}
-						action={
-							<Button
-								type="button"
-								variant="secondary"
-								disabled={exportBusy}
-								onClick={() => {
-									void handleExportDiagnostics();
-								}}
-							>
-								<Upload className="mr-2 h-4 w-4" aria-hidden />
-								{exportBusy
-									? t("about.exportDiagnostics.busy")
-									: t("about.exportDiagnostics.button")}
-							</Button>
-						}
-					>
-						{exportStatus ? (
-							<p className="select-text text-sm text-muted-foreground break-all">
-								{exportStatus}
-							</p>
-						) : null}
-					</SettingRow>
-				</SettingPanel>
-
-				<SettingPanel>
-					<SettingRow
-						title="BlinkGuard"
-						action={
-							<div className="flex flex-wrap items-center justify-end gap-2">
+					<SettingPanel>
+						<SettingRow
+							title={t("about.opensource.title")}
+							description={t("about.opensource.body")}
+							action={
 								<Button
 									type="button"
 									variant="secondary"
-									onClick={() => setView("release-notes")}
+									onClick={() => rendererIpc.openGithubRepo()}
 								>
-									<ScrollText className="mr-2 h-4 w-4" aria-hidden />
-									{t("about.releaseNotes.button")}
+									<ExternalLink className="mr-2 h-4 w-4" aria-hidden />
+									{t("about.opensource.github")}
 								</Button>
+							}
+						/>
+					</SettingPanel>
+
+					<SettingPanel>
+						<SettingRow
+							title={t("about.exportDiagnostics.title")}
+							description={t("about.exportDiagnostics.body")}
+							action={
 								<Button
 									type="button"
 									variant="secondary"
-									onClick={() => setView("thanks")}
+									disabled={exportBusy}
+									onClick={() => {
+										void handleExportDiagnostics();
+									}}
 								>
-									<Heart className="mr-2 h-4 w-4" aria-hidden />
-									{t("about.thanks.button")}
+									<Upload className="mr-2 h-4 w-4" aria-hidden />
+									{exportBusy
+										? t("about.exportDiagnostics.busy")
+										: t("about.exportDiagnostics.button")}
 								</Button>
+							}
+						>
+							{exportStatus ? (
+								<p className="select-text text-sm text-muted-foreground break-all">
+									{exportStatus}
+								</p>
+							) : null}
+						</SettingRow>
+					</SettingPanel>
+
+					<SettingPanel>
+						<SettingRow
+							title="BlinkGuard"
+							action={
 								<Button
 									type="button"
 									variant="secondary"
@@ -169,18 +142,20 @@ export function AboutPanel({ autoUpdate }: AboutPanelProps) {
 								>
 									{t("about.checkForUpdates")}
 								</Button>
-							</div>
-						}
-					>
-						<p className="select-text text-sm text-muted-foreground">
-							{t("about.meta.version", { version })}
-						</p>
-						<p className="mt-1 text-sm text-muted-foreground">
-							{t("about.meta.author", { name: AUTHOR_NAME })}
-						</p>
-					</SettingRow>
-				</SettingPanel>
-			</div>
-		</div>
+							}
+						>
+							<p className="select-text text-sm text-muted-foreground">
+								{t("about.meta.version", { version })}
+							</p>
+							<p className="mt-1 text-sm text-muted-foreground">
+								{t("about.meta.author", { name: AUTHOR_NAME })}
+							</p>
+						</SettingRow>
+					</SettingPanel>
+				</>
+			) : null}
+			{tab === "notes" ? <ReleaseNotesPanel /> : null}
+			{tab === "thanks" ? <ThanksPanel /> : null}
+		</TabbedSection>
 	);
 }

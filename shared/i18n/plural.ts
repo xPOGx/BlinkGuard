@@ -21,7 +21,7 @@ export function pluralSuffix(locale: Locale, n: number): PluralSuffix {
 	return "_plural";
 }
 
-/** Build a key like `reminders.desc.timer` + suffix. */
+/** Build a key like `reminders.snoozeDesc` + suffix. */
 export function pluralKey(base: string, locale: Locale, n: number): string {
 	return `${base}${pluralSuffix(locale, n)}`;
 }
