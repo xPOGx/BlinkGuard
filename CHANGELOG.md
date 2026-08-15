@@ -4,6 +4,18 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-08-15
+
+### Added
+
+- Camera settings split into Setup and Tuning tabs
+- Nudge when EAR calibration is stale or drifted (banner + popup; no auto-start)
+- Styled scrollbars on settings pages
+
+### Changed
+
+- UI: shared theme tokens for colors and type
+
 ## [2.9.0] - 2026-08-14
 
 ### Added

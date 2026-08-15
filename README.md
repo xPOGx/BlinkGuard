@@ -10,7 +10,7 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 - **Timer mode** — show a reminder popup on a fixed interval
 - **Camera blink detection (optional)** — OpenCV YuNet + dlib sidecar; ROI gates, personal blink calibration, pose/per-eye vetoes, OCEC open/closed confirm, and adaptive EAR; reminds you only when you haven’t blinked for the set interval
 - **MGD mode** — when camera detection is on, show timed popups even while blinking; the popup still closes when a blink is detected
-- **Camera visualization** — optional live preview (up to Ultra 30 FPS) with face/eye landmarks and EAR status
+- **Camera visualization** — optional live preview (up to Ultra 30 FPS) with face/eye landmarks and EAR status; Setup vs Tuning tabs; nudge when EAR calibration is stale
 - **Eye exercise reminders** — can run independently of blink reminders; configurable interval (5–60 minutes); Skip / configurable Snooze; auto-close after 30 seconds
 - **20-20-20 look-away breaks** — independent timer alongside exercises; editable title/hint
 - **Customizable reminder popup** — drag to reposition, resize with edge handles, custom message, colors, and transparency
