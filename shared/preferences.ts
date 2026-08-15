@@ -387,6 +387,14 @@ export interface PersistedPreferences {
 	blinkRateThresholdPerMin: number;
 	/** Personal open-eye EAR baseline; null when unset. */
 	earCalibration: number | null;
+	/** Epoch ms of last successful EAR calibration; null if never / unknown. */
+	calibrationAt: number | null;
+	/** Soft toast when EAR baseline is stale or the sidecar reports drift. */
+	calibrationNudgeEnabled: boolean;
+	/** Epoch ms when the user dismissed a stale/drift banner; null if not snoozed. */
+	calibrationNudgeDismissedAt: number | null;
+	/** Epoch ms of last sidecar baseline_drift_nudge; null if none this baseline. */
+	lastBaselineDriftAt: number | null;
 	/** Stage 5 personal classifier logit bias; null when unset. */
 	classifierBias: number | null;
 	/** Stage 5 personal classifier threshold; null = baked 0.25. */
@@ -512,6 +520,10 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	blinkRateCoachingEnabled: true,
 	blinkRateThresholdPerMin: BLINK_RATE_LOW_MAX,
 	earCalibration: null,
+	calibrationAt: null,
+	calibrationNudgeEnabled: true,
+	calibrationNudgeDismissedAt: null,
+	lastBaselineDriftAt: null,
 	classifierBias: null,
 	classifierThreshold: null,
 	eyeExercisesEnabled: true,
@@ -597,6 +609,23 @@ function isCameraQualityValue(value: unknown): value is CameraQuality {
 		value === "high" ||
 		value === "ultra"
 	);
+}
+
+/** Epoch ms from a number or ISO date string; invalid / missing → null. */
+export function sanitizeEpochMs(value: unknown): number | null {
+	if (value === null || value === undefined || value === "") return null;
+	if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+		return Math.round(value);
+	}
+	if (typeof value === "string" && value.trim()) {
+		const asNumber = Number(value);
+		if (Number.isFinite(asNumber) && asNumber > 0) {
+			return Math.round(asNumber);
+		}
+		const parsed = Date.parse(value);
+		if (Number.isFinite(parsed) && parsed > 0) return parsed;
+	}
+	return null;
 }
 
 function asBoolean(value: unknown, fallback: boolean): boolean {
@@ -690,6 +719,11 @@ export function sanitizePersistedPreferences(
 			: isValidEarCalibration(earRaw)
 				? earRaw
 				: defaults.earCalibration;
+	const calibrationAt = sanitizeEpochMs(record.calibrationAt);
+	const calibrationNudgeDismissedAt = sanitizeEpochMs(
+		record.calibrationNudgeDismissedAt,
+	);
+	const lastBaselineDriftAt = sanitizeEpochMs(record.lastBaselineDriftAt);
 	const classifierBias = sanitizeClassifierBias(record.classifierBias);
 	const classifierThreshold = sanitizeClassifierThreshold(
 		record.classifierThreshold,
@@ -746,6 +780,13 @@ export function sanitizePersistedPreferences(
 			record.blinkRateThresholdPerMin,
 		),
 		earCalibration,
+		calibrationAt: earCalibration == null ? null : calibrationAt,
+		calibrationNudgeEnabled: asBoolean(
+			record.calibrationNudgeEnabled,
+			defaults.calibrationNudgeEnabled,
+		),
+		calibrationNudgeDismissedAt,
+		lastBaselineDriftAt,
 		classifierBias,
 		classifierThreshold,
 		eyeExercisesEnabled: asBoolean(

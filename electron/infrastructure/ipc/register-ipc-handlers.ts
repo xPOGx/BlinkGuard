@@ -21,6 +21,7 @@ import {
 } from "../../../shared/preferences";
 import type { AppRuntimeState } from "../../application/app-runtime-state";
 import type { BlinkStatsService } from "../../application/blink-stats-service";
+import type { CalibrationNudgeService } from "../../application/calibration-nudge-service";
 import type { ExerciseService } from "../../application/exercise-service";
 import type { FocusPauseService } from "../../application/focus-pause-service";
 import type { FocusEnvironmentPort } from "../../application/ports/focus-environment-port";
@@ -72,6 +73,7 @@ interface IpcDependencies {
 	focusPause: FocusPauseService;
 	focusEnvironment: FocusEnvironmentPort;
 	sound: NotificationSoundPort;
+	calibrationNudge: CalibrationNudgeService;
 	checkForUpdates: () => void;
 	installUpdate: () => void;
 	interactions: InteractionLogger;
@@ -96,6 +98,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		focusPause,
 		focusEnvironment,
 		sound,
+		calibrationNudge,
 		checkForUpdates,
 		installUpdate,
 		interactions,
@@ -190,7 +193,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	on(IPC_CHANNELS.updateEarCalibration, (_event, baseline: unknown) => {
 		if (baseline === null) {
 			preferences.set("earCalibration", null);
+			preferences.set("calibrationAt", null);
 			sidecar.applyEarCalibration(null);
+			calibrationNudge.onCalibrationUpdated();
 			return;
 		}
 		if (!isValidEarCalibration(baseline)) return;
@@ -387,6 +392,15 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 			preferences.set("blinkRateCoachingEnabled", Boolean(enabled));
 		},
 	);
+	on(
+		IPC_CHANNELS.updateCalibrationNudgeEnabled,
+		(_event, enabled: unknown) => {
+			preferences.set("calibrationNudgeEnabled", Boolean(enabled));
+		},
+	);
+	on(IPC_CHANNELS.dismissCalibrationNudge, () => {
+		calibrationNudge.dismiss();
+	});
 	on(IPC_CHANNELS.updateBlinkRateThreshold, (_event, threshold: unknown) => {
 		preferences.set("blinkRateThresholdPerMin", threshold as number);
 	});

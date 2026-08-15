@@ -41,6 +41,7 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updatePauseOnFullscreen: vi.fn(),
 		updatePauseAppRules: vi.fn(),
 		updateBlinkRateCoachingEnabled: vi.fn(),
+		updateCalibrationNudgeEnabled: vi.fn(),
 		updateBlinkRateThreshold: vi.fn(),
 		updateLocale: vi.fn(),
 		updateHasCompletedOnboarding: vi.fn(),
@@ -134,6 +135,22 @@ describe("sameRendererPrefs", () => {
 					...base.keyboardShortcuts,
 					snoozeAll: "Ctrl+Shift+S",
 				},
+			}),
+		).toBe(false);
+	});
+
+	it("detects calibration nudge preference changes", () => {
+		const base = { ...DEFAULT_RENDERER_PREFERENCES };
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				calibrationNudgeEnabled: false,
+			}),
+		).toBe(false);
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				calibrationAt: 1_700_000_000_000,
 			}),
 		).toBe(false);
 	});
@@ -376,6 +393,35 @@ describe("pushPreferenceDiff", () => {
 			next.cameraDevice,
 		);
 		expect(rendererIpc.updateCameraQuality).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+	});
+
+	it("pushes calibrationNudgeEnabled without locale or calibrationAt", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = { ...previous, calibrationNudgeEnabled: false };
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateCalibrationNudgeEnabled).toHaveBeenCalledWith(
+			false,
+		);
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+		expect(rendererIpc.updateEarCalibration).not.toHaveBeenCalled();
+	});
+
+	it("does not push main-owned calibration timestamps", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = {
+			...previous,
+			calibrationAt: 1_700_000_000_000,
+			calibrationNudgeDismissedAt: 1_700_000_000_100,
+			lastBaselineDriftAt: 1_700_000_000_200,
+		};
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateEarCalibration).not.toHaveBeenCalled();
+		expect(rendererIpc.updateCalibrationNudgeEnabled).not.toHaveBeenCalled();
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 	});
 });

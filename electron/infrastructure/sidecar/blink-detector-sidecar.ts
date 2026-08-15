@@ -41,7 +41,7 @@ import type {
 import type { BlinkDetectorDebugLogger } from "../logging/blink-detector-debug-logger";
 import type { AppPaths } from "../paths/app-paths";
 import type { ChildProcessRegistry } from "../process/child-process-registry";
-import { NdjsonBuffer, SIDECAR_STATUS, encodeSidecarMessage, isBenignSidecarStderr } from "./protocol";
+import { NdjsonBuffer, SIDECAR_STATUS, encodeSidecarMessage, isBenignSidecarStderr, parseBaselineDriftNudge, type BaselineDriftNudgePayload } from "./protocol";
 
 interface SidecarCallbacks {
 	onBlink: (data: { ear?: number; time?: number }) => void;
@@ -61,6 +61,8 @@ interface SidecarCallbacks {
 		name: string;
 		id: string;
 	}) => void;
+	/** Sidecar session baseline drifted; do not persist the nudged EAR. */
+	onBaselineDriftNudge?: (payload: BaselineDriftNudgePayload) => void;
 }
 
 interface FaceDataSample {
@@ -626,6 +628,8 @@ export class BlinkDetectorSidecar {
 			this.sampleBlinkDebugForCalibration(
 				message.blinkDebug as Record<string, unknown>,
 			);
+			const drift = parseBaselineDriftNudge(message.blinkDebug);
+			if (drift) this.callbacks.onBaselineDriftNudge?.(drift);
 		}
 		if (message.blink) {
 			this.callbacks.onBlink(message);

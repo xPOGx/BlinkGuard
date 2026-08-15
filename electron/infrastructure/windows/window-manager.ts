@@ -49,8 +49,11 @@ export class WindowManager {
 	editor: BrowserWindow | null = null;
 	noFace: BrowserWindow | null = null;
 	blinkRateCoach: BrowserWindow | null = null;
+	calibrationNudge: BrowserWindow | null = null;
 	cheerToast: BrowserWindow | null = null;
 	private blinkRateCoachDismissTimer: ReturnType<typeof setTimeout> | null =
+		null;
+	private calibrationNudgeDismissTimer: ReturnType<typeof setTimeout> | null =
 		null;
 	private cheerToastDismissTimer: ReturnType<typeof setTimeout> | null = null;
 	private onMainLoaded: (() => void) | null = null;
@@ -343,6 +346,71 @@ export class WindowManager {
 
 	hasBlinkRateCoach(): boolean {
 		return !!this.blinkRateCoach && !this.blinkRateCoach.isDestroyed();
+	}
+
+	showCalibrationNudge(
+		reason: "stale" | "drift",
+		options: ForceShowOptions = {},
+	): void {
+		if (
+			!options.force &&
+			(!this.preferences.isTracking ||
+				!this.preferences.cameraEnabled ||
+				(this.calibrationNudge && !this.calibrationNudge.isDestroyed()))
+		) {
+			return;
+		}
+		if (this.calibrationNudge && !this.calibrationNudge.isDestroyed()) {
+			this.hideCalibrationNudge();
+		}
+		const width = 320;
+		const { x, y } = getTopCenterPopupPosition(width);
+		const popup = createPanelWindow(
+			{
+				width,
+				height: 48,
+				x,
+				y,
+				focusable: false,
+			},
+			this.paths.preload,
+		);
+		this.calibrationNudge = popup;
+		void popup.loadFile(
+			path.join(this.paths.publicDir, "calibration-nudge.html"),
+			{ query: { reason } },
+		);
+		popup.webContents.on("did-finish-load", () => {
+			this.sendI18n(popup);
+			popup.setIgnoreMouseEvents(true);
+		});
+		popup.once("ready-to-show", () => popup.showInactive());
+		popup.on("closed", () => {
+			if (this.calibrationNudge === popup) this.calibrationNudge = null;
+			if (this.calibrationNudgeDismissTimer) {
+				clearTimeout(this.calibrationNudgeDismissTimer);
+				this.calibrationNudgeDismissTimer = null;
+			}
+		});
+		if (this.calibrationNudgeDismissTimer) {
+			clearTimeout(this.calibrationNudgeDismissTimer);
+		}
+		this.calibrationNudgeDismissTimer = setTimeout(() => {
+			this.calibrationNudgeDismissTimer = null;
+			if (this.calibrationNudge === popup) this.hideCalibrationNudge();
+		}, BLINK_RATE_COACH_DISMISS_MS);
+	}
+
+	hideCalibrationNudge(): void {
+		if (this.calibrationNudgeDismissTimer) {
+			clearTimeout(this.calibrationNudgeDismissTimer);
+			this.calibrationNudgeDismissTimer = null;
+		}
+		this.closeWindow("calibrationNudge");
+	}
+
+	hasCalibrationNudge(): boolean {
+		return !!this.calibrationNudge && !this.calibrationNudge.isDestroyed();
 	}
 
 	/** Short celebration toast after Cheer / level-up / achievement. */
@@ -769,6 +837,7 @@ export class WindowManager {
 		this.editor = null;
 		this.noFace = null;
 		this.blinkRateCoach = null;
+		this.calibrationNudge = null;
 		this.cheerToast = null;
 	}
 
@@ -832,6 +901,7 @@ export class WindowManager {
 			| "editor"
 			| "noFace"
 			| "blinkRateCoach"
+			| "calibrationNudge"
 			| "cheerToast",
 	): void {
 		const window = this[key];

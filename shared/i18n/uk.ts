@@ -265,6 +265,18 @@ export const uk: MessageCatalog = {
 		"Замало зразків з відкритими очима ({n}/{min}). Тримайте обличчя по центру з відкритими очима.",
 	"camera.calibrationCancelled": "Калібрування скасовано",
 	"camera.calibrationCleared": "Калібрування скинуто",
+	"camera.lastCalibrated": "Останнє калібрування: {date}",
+	"camera.lastCalibratedUnknown": "Останнє калібрування: невідомо",
+	"camera.calibrationStaleHint":
+		"Калібрування старше за 30 днів. Повторне калібрування допомагає точніше відстежувати моргання.",
+	"camera.calibrationDriftHint":
+		"Освітлення або відстань могли змінитися. Повторне калібрування може допомогти.",
+	"camera.calibrationNudgeDismiss": "Закрити",
+	"camera.calibrationNudge": "Нагадування про калібрування",
+	"camera.calibrationNudgeDesc":
+		"М’яка підказка під час спостереження, коли калібрування застаріло або змінилося освітлення.",
+	"camera.calibrationNudgeToggleAria":
+		"Перемкнути нагадування про калібрування",
 	"camera.coaching": "Підказки за частотою моргання",
 	"camera.coachingDesc":
 		"М’яка підказка, коли нещодавня частота з камери низька. Жива частота — у Статистиці.",
@@ -707,6 +719,10 @@ export const uk: MessageCatalog = {
 	"popup.lookAway.snooze_plural": "Відкласти ({n} хв)",
 	"popup.noFace.message": "Обличчя не виявлено",
 	"popup.coach.message": "Моргайте трохи частіше — частота низька",
+	"popup.calibrationNudge.stale":
+		"Калібрування варто оновити — відкрийте розділ «Камера»",
+	"popup.calibrationNudge.drift":
+		"Калібрування змістилось — відкрийте «Камера», щоб повторити",
 	"popup.cheer.message": "Класні моргання — так тримати!",
 	"popup.levelUp.message": "Рівень {level}!",
 	"popup.levelUp.subtitle": "Новий кліп-ранг",

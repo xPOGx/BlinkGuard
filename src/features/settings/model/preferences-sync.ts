@@ -53,6 +53,10 @@ export function sameRendererPrefs(
 		a.blinkRateCoachingEnabled === b.blinkRateCoachingEnabled &&
 		a.blinkRateThresholdPerMin === b.blinkRateThresholdPerMin &&
 		a.earCalibration === b.earCalibration &&
+		a.calibrationAt === b.calibrationAt &&
+		a.calibrationNudgeEnabled === b.calibrationNudgeEnabled &&
+		a.calibrationNudgeDismissedAt === b.calibrationNudgeDismissedAt &&
+		a.lastBaselineDriftAt === b.lastBaselineDriftAt &&
 		a.classifierBias === b.classifierBias &&
 		a.classifierThreshold === b.classifierThreshold &&
 		a.eyeExercisesEnabled === b.eyeExercisesEnabled &&
@@ -227,6 +231,12 @@ export function pushPreferenceDiff(
 		previous.blinkRateCoachingEnabled !== next.blinkRateCoachingEnabled
 	) {
 		rendererIpc.updateBlinkRateCoachingEnabled(next.blinkRateCoachingEnabled);
+	}
+	if (
+		!previous ||
+		previous.calibrationNudgeEnabled !== next.calibrationNudgeEnabled
+	) {
+		rendererIpc.updateCalibrationNudgeEnabled(next.calibrationNudgeEnabled);
 	}
 	if (
 		!previous ||

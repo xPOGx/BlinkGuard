@@ -23,6 +23,7 @@ function createWindows(): BlinkRateCoachWindowPort {
 		showBlinkRateCoach: vi.fn(),
 		hideBlinkRateCoach: vi.fn(),
 		hasBlinkRateCoach: vi.fn(() => false),
+		hasCalibrationNudge: vi.fn(() => false),
 		hasReminder: vi.fn(() => false),
 		hasNoFace: vi.fn(() => false),
 	};

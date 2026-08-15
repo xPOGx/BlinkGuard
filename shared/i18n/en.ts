@@ -259,6 +259,17 @@ export const en: MessageCatalog = {
 		"Not enough open-eye samples ({n}/{min}). Keep your face centered with eyes open.",
 	"camera.calibrationCancelled": "Calibration cancelled",
 	"camera.calibrationCleared": "Calibration cleared",
+	"camera.lastCalibrated": "Last calibrated {date}",
+	"camera.lastCalibratedUnknown": "Last calibrated: unknown",
+	"camera.calibrationStaleHint":
+		"Your baseline is over 30 days old. Recalibrating helps tracking stay accurate.",
+	"camera.calibrationDriftHint":
+		"Lighting or distance may have shifted. Recalibrating can help.",
+	"camera.calibrationNudgeDismiss": "Dismiss",
+	"camera.calibrationNudge": "Calibration reminders",
+	"camera.calibrationNudgeDesc":
+		"Soft tip while tracking when your blink calibration looks stale or lighting has drifted.",
+	"camera.calibrationNudgeToggleAria": "Toggle calibration reminders",
 	"camera.coaching": "Blink rate coaching",
 	"camera.coachingDesc":
 		"Soft tip when your recent camera blink rate is low. Live rate stays in Statistics.",
@@ -697,6 +708,10 @@ export const en: MessageCatalog = {
 	"popup.lookAway.snooze_plural": "Snooze ({n} min)",
 	"popup.noFace.message": "No face detected",
 	"popup.coach.message": "Blink a bit more — rate is low",
+	"popup.calibrationNudge.stale":
+		"Calibration may need a refresh — open Camera settings",
+	"popup.calibrationNudge.drift":
+		"Blink calibration drifted — open Camera to recalibrate",
 	"popup.cheer.message": "Nice blinks — keep it up!",
 	"popup.levelUp.message": "Level {level}!",
 	"popup.levelUp.subtitle": "New blink rank unlocked",

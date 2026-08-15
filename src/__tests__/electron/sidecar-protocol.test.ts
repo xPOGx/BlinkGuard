@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	NdjsonBuffer,
 	encodeSidecarMessage,
+	parseBaselineDriftNudge,
 } from "../../../electron/infrastructure/sidecar/protocol";
 
 describe("NdjsonBuffer", () => {
@@ -29,6 +30,27 @@ describe("NdjsonBuffer", () => {
 	it("accepts Buffer chunks", () => {
 		const buffer = new NdjsonBuffer();
 		expect(buffer.push(Buffer.from('{"ok":true}\n'))).toEqual(['{"ok":true}']);
+	});
+});
+
+describe("parseBaselineDriftNudge", () => {
+	it("promotes baseline_drift_nudge blinkDebug and ignores other phases", () => {
+		expect(
+			parseBaselineDriftNudge({
+				phase: "baseline_drift_nudge",
+				baseline_before: 0.3,
+				baseline: 0.31,
+				live_open_ear: 0.34,
+				drift_ratio: 0.13,
+			}),
+		).toEqual({
+			baseline_before: 0.3,
+			baseline: 0.31,
+			live_open_ear: 0.34,
+			drift_ratio: 0.13,
+		});
+		expect(parseBaselineDriftNudge({ phase: "complete" })).toBeNull();
+		expect(parseBaselineDriftNudge(null)).toBeNull();
 	});
 });
 

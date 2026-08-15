@@ -442,6 +442,18 @@ describe("settings shell", () => {
 			false,
 		);
 		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
+
+		send.mockClear();
+		fireEvent.click(
+			screen.getByRole("switch", {
+				name: "Toggle calibration reminders",
+			}),
+		);
+		expect(send).toHaveBeenCalledWith(
+			IPC_CHANNELS.updateCalibrationNudgeEnabled,
+			false,
+		);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
 	});
 
 	it("ignores identical preference echoes after interactive changes", () => {

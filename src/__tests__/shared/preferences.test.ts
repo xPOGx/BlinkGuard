@@ -26,6 +26,7 @@ import {
 	sanitizePersistedPreferences,
 	sanitizeSnoozeMinutes,
 	sanitizeSoundVolume,
+	sanitizeEpochMs,
 	toRendererPreferences,
 } from "../../../shared/preferences";
 
@@ -44,6 +45,8 @@ describe("toRendererPreferences", () => {
 		expect(renderer.popupMessage).toBe(DEFAULT_PREFERENCES.popupMessage);
 		expect(renderer.cameraQuality).toBe("medium");
 		expect(renderer.earCalibration).toBeNull();
+		expect(renderer.calibrationAt).toBeNull();
+		expect(renderer.calibrationNudgeEnabled).toBe(true);
 		expect(renderer.classifierBias).toBeNull();
 		expect(renderer.classifierThreshold).toBeNull();
 	});
@@ -197,6 +200,40 @@ describe("blink-rate coaching preference defaults", () => {
 		expect(sanitizeBlinkRateThresholdPerMin(0)).toBe(1);
 		expect(sanitizeBlinkRateThresholdPerMin(99)).toBe(60);
 		expect(sanitizeBlinkRateThresholdPerMin(7.6)).toBe(8);
+	});
+});
+
+describe("calibration freshness preference defaults", () => {
+	it("defaults timestamps to null and the toast opt-in on", () => {
+		expect(DEFAULT_PREFERENCES.calibrationAt).toBeNull();
+		expect(DEFAULT_PREFERENCES.calibrationNudgeEnabled).toBe(true);
+		expect(DEFAULT_PREFERENCES.calibrationNudgeDismissedAt).toBeNull();
+		expect(DEFAULT_PREFERENCES.lastBaselineDriftAt).toBeNull();
+	});
+
+	it("parses epoch ms and ISO strings, drops invalid stamps", () => {
+		expect(sanitizeEpochMs(1_700_000_000_000)).toBe(1_700_000_000_000);
+		expect(sanitizeEpochMs("2024-01-15T12:00:00.000Z")).toBe(
+			Date.parse("2024-01-15T12:00:00.000Z"),
+		);
+		expect(sanitizeEpochMs("nope")).toBeNull();
+		expect(sanitizeEpochMs(-1)).toBeNull();
+	});
+
+	it("clears calibrationAt when earCalibration is missing", () => {
+		const prefs = sanitizePersistedPreferences({
+			earCalibration: null,
+			calibrationAt: 1_700_000_000_000,
+		});
+		expect(prefs.calibrationAt).toBeNull();
+	});
+
+	it("keeps a valid calibrationAt with a saved EAR", () => {
+		const prefs = sanitizePersistedPreferences({
+			earCalibration: 0.28,
+			calibrationAt: 1_700_000_000_000,
+		});
+		expect(prefs.calibrationAt).toBe(1_700_000_000_000);
 	});
 });
 

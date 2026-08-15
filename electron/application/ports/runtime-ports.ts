@@ -9,6 +9,9 @@ export interface ReminderWindowPort {
 	showBlinkRateCoach(): void;
 	hideBlinkRateCoach(): void;
 	hasBlinkRateCoach(): boolean;
+	showCalibrationNudge(reason: "stale" | "drift"): void;
+	hideCalibrationNudge(): void;
+	hasCalibrationNudge(): boolean;
 	closeCamera(): void;
 	sendToMain(channel: string, ...args: unknown[]): void;
 	sendPreferences(): void;
@@ -19,8 +22,19 @@ export interface BlinkRateCoachWindowPort {
 	showBlinkRateCoach(): void;
 	hideBlinkRateCoach(): void;
 	hasBlinkRateCoach(): boolean;
+	hasCalibrationNudge(): boolean;
 	hasReminder(): boolean;
 	hasNoFace(): boolean;
+}
+
+export interface CalibrationNudgeWindowPort {
+	showCalibrationNudge(reason: "stale" | "drift"): void;
+	hideCalibrationNudge(): void;
+	hasCalibrationNudge(): boolean;
+	hasBlinkRateCoach(): boolean;
+	hasReminder(): boolean;
+	hasNoFace(): boolean;
+	sendToMain(channel: string, ...args: unknown[]): void;
 }
 
 export interface BlinkDetectorPort {

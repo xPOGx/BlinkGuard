@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { AppRuntimeState } from "./application/app-runtime-state";
 import { BlinkRateCoachingService } from "./application/blink-rate-coaching-service";
 import { BlinkStatsService } from "./application/blink-stats-service";
+import { CalibrationNudgeService } from "./application/calibration-nudge-service";
 import { ExerciseService } from "./application/exercise-service";
 import { FocusPauseService } from "./application/focus-pause-service";
 import { LookAwayService } from "./application/look-away-service";
@@ -121,6 +122,7 @@ function bootstrap(): void {
 	};
 
 	let reminders: ReminderService;
+	let calibrationNudge: CalibrationNudgeService;
 	const blinkDebugLogger = new BlinkDetectorDebugLogger();
 	const interactionLogger = new InteractionLogger();
 	const sidecar = new BlinkDetectorSidecar(
@@ -175,7 +177,9 @@ function bootstrap(): void {
 			onCalibrationComplete: (payload) => {
 				if (payload.baseline !== null) {
 					preferencesService.set("earCalibration", payload.baseline);
+					preferencesService.set("calibrationAt", Date.now());
 					sidecar.applyEarCalibration(payload.baseline);
+					calibrationNudge.onCalibrationUpdated();
 				}
 				if (typeof payload.classifierBias === "number") {
 					preferencesService.set("classifierBias", payload.classifierBias);
@@ -199,12 +203,20 @@ function bootstrap(): void {
 				}
 				windows.sendToMain(IPC_CHANNELS.earCalibrationComplete, payload);
 			},
+			onBaselineDriftNudge: () => {
+				calibrationNudge.onDriftNudge();
+			},
 		},
 		blinkDebugLogger,
 	);
 	const blinkRateCoaching = new BlinkRateCoachingService(
 		preferences,
 		blinkStats,
+		windows,
+		notificationGate,
+	);
+	calibrationNudge = new CalibrationNudgeService(
+		preferencesService,
 		windows,
 		notificationGate,
 	);
@@ -218,6 +230,7 @@ function bootstrap(): void {
 		blinkStats,
 		notificationGate,
 		blinkRateCoaching,
+		calibrationNudge,
 	);
 	const focusEnvironment = createFocusEnvironment();
 	const focusPause = new FocusPauseService(
@@ -303,6 +316,7 @@ function bootstrap(): void {
 			sessionActivity.dispose();
 			sessionPause.dispose();
 			blinkRateCoaching.dispose();
+			calibrationNudge.dispose();
 			autoUpdates.dispose();
 		},
 	);
@@ -364,6 +378,7 @@ function bootstrap(): void {
 		focusPause,
 		focusEnvironment,
 		sound,
+		calibrationNudge,
 		checkForUpdates: () => autoUpdates.checkForUpdates({ interactive: true }),
 		installUpdate: () => autoUpdates.installUpdate(),
 		interactions: interactionLogger,

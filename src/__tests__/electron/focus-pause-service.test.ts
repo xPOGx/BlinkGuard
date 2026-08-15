@@ -20,6 +20,7 @@ function makeService(
 	const closeLookAway = vi.fn();
 	const hideNoFace = vi.fn();
 	const hideBlinkRateCoach = vi.fn();
+	const hideCalibrationNudge = vi.fn();
 	const pauseCameraForFocus = vi.fn();
 	const resumeCameraIfNeeded = vi.fn();
 	const service = new FocusPauseService(
@@ -36,6 +37,7 @@ function makeService(
 			closeLookAway,
 			hideNoFace,
 			hideBlinkRateCoach,
+			hideCalibrationNudge,
 			sendToMain,
 		},
 		{ pauseCameraForFocus, resumeCameraIfNeeded } as never,

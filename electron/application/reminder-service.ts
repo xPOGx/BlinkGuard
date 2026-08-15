@@ -14,7 +14,7 @@ import {
 	shouldShowCameraReminder,
 } from "../domain/reminder-policy";
 import type { AppRuntimeState } from "./app-runtime-state";
-import type { BlinkRateCoachingPort, BlinkStatsPort } from "./ports/blink-stats-port";
+import type { BlinkRateCoachingPort, BlinkStatsPort, CalibrationNudgePort } from "./ports/blink-stats-port";
 import type { PreferenceStore } from "./ports/preference-store";
 import type { NotificationGate } from "./ports/notification-gate";
 import type {
@@ -45,6 +45,7 @@ export class ReminderService {
 		private readonly stats: BlinkStatsPort | null = null,
 		private readonly notificationGate: NotificationGate = ALLOW_ALL_GATE,
 		private readonly coaching: BlinkRateCoachingPort | null = null,
+		private readonly calibrationNudge: CalibrationNudgePort | null = null,
 	) {}
 
 	/**
@@ -81,6 +82,7 @@ export class ReminderService {
 		this.state.isAutoResuming = false;
 		this.cameraPauseReasons.clear();
 		this.coaching?.stop();
+		this.calibrationNudge?.stop();
 		this.setTracking(false);
 		this.sidecar.stopCamera();
 		this.resetFaceTracking();
@@ -184,6 +186,7 @@ export class ReminderService {
 			this.state.isFaceDetected = false;
 			this.windows.closeReminder();
 			this.windows.hideBlinkRateCoach();
+			this.windows.hideCalibrationNudge();
 			this.armNoFaceAutoStop();
 			if (!this.notificationGate.notificationsAllowed()) return;
 			this.windows.showNoFace();
@@ -280,6 +283,7 @@ export class ReminderService {
 			// Re-arm timer cadence without an immediate popup (slider tweak).
 			this.stats?.setFaceCoverageMode(false);
 			this.coaching?.stop();
+			this.calibrationNudge?.stop();
 			this.state.blinkReminderActive = true;
 			this.state.blinkInterval = setInterval(() => {
 				if (this.state.blinkReminderActive && this.preferences.isTracking) {
@@ -327,6 +331,7 @@ export class ReminderService {
 		this.cameraPauseReasons.add(reason);
 		if (alreadyPaused) return;
 		this.coaching?.stop();
+		this.calibrationNudge?.stop();
 		this.sidecar.stopCamera();
 		this.resetFaceTracking();
 		this.stats?.onFaceVisibility(false);
@@ -342,6 +347,7 @@ export class ReminderService {
 		}
 		if (this.sidecar.isCameraReady) {
 			this.coaching?.start();
+			this.calibrationNudge?.start();
 			return;
 		}
 		this.startCameraMonitoring(false);
@@ -354,6 +360,7 @@ export class ReminderService {
 	private startTimerLoop(showImmediately = true): void {
 		this.stats?.setFaceCoverageMode(false);
 		this.coaching?.stop();
+		this.calibrationNudge?.stop();
 		this.state.blinkReminderActive = true;
 		if (showImmediately) this.showBlinkReminder();
 		this.state.blinkInterval = setInterval(() => {
@@ -381,6 +388,7 @@ export class ReminderService {
 				}, REMINDER_POPUP_VISIBLE_MS);
 			}
 			this.coaching?.start();
+			this.calibrationNudge?.start();
 			this.sidecar.requestVideo();
 			this.creditBlink("camera-ready");
 			this.windows.sendToMain(IPC_CHANNELS.cameraReady);
@@ -404,6 +412,7 @@ export class ReminderService {
 		if (!this.sidecar.isRunning) this.sidecar.start();
 		if (!this.sidecar.startCamera()) return;
 		this.coaching?.start();
+		this.calibrationNudge?.start();
 
 		const waitForCamera = setInterval(() => {
 			if (!this.preferences.isTracking) {
@@ -479,6 +488,7 @@ export class ReminderService {
 		if (Date.now() < this.state.blinkSnoozeUntil) return null;
 		if (!this.notificationGate.notificationsAllowed()) return null;
 		this.windows.hideBlinkRateCoach();
+		this.windows.hideCalibrationNudge();
 		this.sound.play("blink");
 		return this.windows.showReminder("blink");
 	}
@@ -490,6 +500,7 @@ export class ReminderService {
 		this.cancelFaceReturnDebounce();
 		this.windows.hideNoFace();
 		this.windows.hideBlinkRateCoach();
+		this.windows.hideCalibrationNudge();
 	}
 
 	private cancelNoFaceDebounce(): void {

@@ -74,7 +74,8 @@ export class BlinkRateCoachingService {
 			hasBlockingToast:
 				this.windows.hasReminder() ||
 				this.windows.hasNoFace() ||
-				this.windows.hasBlinkRateCoach(),
+				this.windows.hasBlinkRateCoach() ||
+				this.windows.hasCalibrationNudge(),
 		});
 		if (!show) return;
 		this.windows.showBlinkRateCoach();

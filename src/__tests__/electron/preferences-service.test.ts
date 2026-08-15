@@ -107,6 +107,7 @@ describe("PreferencesService", () => {
 		expect(service.current.darkMode).toBe(false);
 		expect(service.current.cameraQuality).toBe("high");
 		expect(service.current.earCalibration).toBe(0.31);
+		expect(service.current.calibrationAt).toBeNull();
 		expect(service.current.classifierBias).toBeNull();
 		expect(service.current.launchAtLogin).toBe(true);
 		expect(service.current.isTracking).toBe(true);
@@ -211,6 +212,18 @@ describe("PreferencesService", () => {
 		const service = new PreferencesService(store);
 
 		expect(service.current.earCalibration).toBeNull();
+	});
+
+	it("sanitizes calibration timestamps and persists a valid stamp", () => {
+		const store = new FakePreferenceStore();
+		store.set("earCalibration", 0.28);
+		store.set("calibrationAt", "not-a-date");
+		const service = new PreferencesService(store);
+		expect(service.current.calibrationAt).toBeNull();
+
+		service.set("calibrationAt", 1_700_000_000_000);
+		expect(service.current.calibrationAt).toBe(1_700_000_000_000);
+		expect(store.get("calibrationAt")).toBe(1_700_000_000_000);
 	});
 
 	it("clears invalid classifier overlay from the store", () => {
@@ -371,6 +384,7 @@ describe("PreferencesService", () => {
 			DEFAULT_PREFERENCES.cameraQuality,
 		);
 		expect(service.current.earCalibration).toBeNull();
+		expect(service.current.calibrationAt).toBeNull();
 		expect(service.current.classifierBias).toBeNull();
 		expect(service.current.classifierThreshold).toBeNull();
 	});

@@ -10,7 +10,8 @@ body.blink-rate-coach-body {
 	padding: 0;
 }
 
-#blink-rate-coach {
+#blink-rate-coach,
+#calibration-nudge {
 	font-family: var(--popup-font);
 	font-size: 0.8rem;
 	font-weight: 500;

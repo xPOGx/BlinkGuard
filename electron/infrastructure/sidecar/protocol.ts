@@ -29,3 +29,33 @@ export class NdjsonBuffer {
 		return messages;
 	}
 }
+
+export const BASELINE_DRIFT_NUDGE_PHASE = "baseline_drift_nudge";
+
+export type BaselineDriftNudgePayload = {
+	baseline_before?: number;
+	baseline?: number;
+	live_open_ear?: number;
+	drift_ratio?: number;
+};
+
+function optionalFiniteNumber(value: unknown): number | undefined {
+	return typeof value === "number" && Number.isFinite(value)
+		? value
+		: undefined;
+}
+
+/** Promote sidecar blinkDebug.phase === baseline_drift_nudge into a typed payload. */
+export function parseBaselineDriftNudge(
+	debug: unknown,
+): BaselineDriftNudgePayload | null {
+	if (!debug || typeof debug !== "object") return null;
+	const record = debug as Record<string, unknown>;
+	if (record.phase !== BASELINE_DRIFT_NUDGE_PHASE) return null;
+	return {
+		baseline_before: optionalFiniteNumber(record.baseline_before),
+		baseline: optionalFiniteNumber(record.baseline),
+		live_open_ear: optionalFiniteNumber(record.live_open_ear),
+		drift_ratio: optionalFiniteNumber(record.drift_ratio),
+	};
+}

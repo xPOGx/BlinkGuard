@@ -15,3 +15,9 @@ export interface BlinkRateCoachingPort {
 	start(): void;
 	stop(): void;
 }
+
+export interface CalibrationNudgePort {
+	start(): void;
+	stop(): void;
+	onDriftNudge(nowMs?: number): void;
+}

@@ -6,6 +6,10 @@ import type {
 } from "../../../shared/backup";
 import type { BlinkStatsSnapshot } from "../../../shared/blink-stats";
 import {
+	sanitizeCalibrationNudgePayload,
+	type CalibrationNudgePayload,
+} from "../../../shared/calibration-freshness";
+import {
 	type CameraDeviceNotice,
 	type CameraDevicePref,
 	type CameraDevicesPayload,
@@ -198,6 +202,13 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateBlinkRateCoachingEnabled, enabled),
 	updateBlinkRateThreshold: (threshold: number) =>
 		send(IPC_CHANNELS.updateBlinkRateThreshold, threshold),
+	updateCalibrationNudgeEnabled: (enabled: boolean) =>
+		send(IPC_CHANNELS.updateCalibrationNudgeEnabled, enabled),
+	dismissCalibrationNudge: () => send(IPC_CHANNELS.dismissCalibrationNudge),
+	onCalibrationNudge: (listener: (payload: CalibrationNudgePayload) => void) =>
+		subscribe(IPC_CHANNELS.calibrationNudge, (payload) => {
+			listener(sanitizeCalibrationNudgePayload(payload));
+		}),
 	updateLocale: (locale: string) => send(IPC_CHANNELS.updateLocale, locale),
 	onFocusPauseState: (
 		listener: (payload: {

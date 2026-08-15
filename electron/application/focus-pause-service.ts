@@ -19,6 +19,7 @@ export interface FocusPauseWindowsPort {
 	closeLookAway(): void;
 	hideNoFace(): void;
 	hideBlinkRateCoach(): void;
+	hideCalibrationNudge(): void;
 	sendToMain(channel: string, ...args: unknown[]): void;
 }
 
@@ -150,6 +151,7 @@ export class FocusPauseService implements NotificationGate {
 		this.windows.closeLookAway();
 		this.windows.hideNoFace();
 		this.windows.hideBlinkRateCoach();
+		this.windows.hideCalibrationNudge();
 	}
 
 	private pauseCameraForFocus(): void {

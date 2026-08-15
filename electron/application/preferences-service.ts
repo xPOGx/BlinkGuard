@@ -9,6 +9,7 @@ import {
 	samePauseAppRules,
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
+	sanitizeEpochMs,
 	sanitizeExercisePrompts,
 	sanitizeKeyboardShortcuts,
 	sanitizeLookAwayHint,
@@ -187,6 +188,12 @@ export class PreferencesService {
 			next = sanitizePauseAppRules(value) as PersistedPreferences[K];
 		} else if (key === "cameraDevice") {
 			next = sanitizeCameraDevice(value) as PersistedPreferences[K];
+		} else if (
+			key === "calibrationAt" ||
+			key === "calibrationNudgeDismissedAt" ||
+			key === "lastBaselineDriftAt"
+		) {
+			next = sanitizeEpochMs(value) as PersistedPreferences[K];
 		}
 		// No-op equal writes: settings sync and dual IPC callers re-send often.
 		if (samePreferenceValue(key, this.current[key], next)) {
