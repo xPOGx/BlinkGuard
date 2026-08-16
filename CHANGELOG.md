@@ -4,6 +4,13 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.12.1] - 2026-08-16
+
+### Fixed
+
+- Sound: recover chimes after the default audio device changes
+- Camera: keep blink tracking responsive when the app is in the tray
+
 ## [2.12.0] - 2026-08-16
 
 ### Added
