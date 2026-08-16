@@ -335,9 +335,13 @@ export class ReminderService {
 		this.sidecar.startCamera();
 	}
 
-	/** Release capture when preview closes and tracking is not using the camera. */
+	/** Release capture when preview closes and tracking is not using the camera.
+	 * While tracking, only stop JPEG preview encode. */
 	stopCameraIfIdle(): void {
-		if (this.preferences.isTracking) return;
+		if (this.preferences.isTracking) {
+			this.sidecar.stopVideo();
+			return;
+		}
 		this.sidecar.stopCamera();
 	}
 

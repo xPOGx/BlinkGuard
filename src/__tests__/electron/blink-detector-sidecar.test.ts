@@ -141,6 +141,13 @@ describe("BlinkDetectorSidecar preview restore", () => {
 		expect(sidecar.isCameraReady).toBe(true);
 		expect(parseWrites(stdinChunks)).toEqual([]);
 	});
+
+	it("stopVideo writes stop_video without stop_camera", () => {
+		const { sidecar, stdinChunks } = createSidecar(() => false);
+		stdinChunks.length = 0;
+		sidecar.stopVideo();
+		expect(parseWrites(stdinChunks)).toEqual([{ stop_video: true }]);
+	});
 });
 
 describe("BlinkDetectorSidecar EAR calibration samples", () => {

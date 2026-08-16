@@ -50,6 +50,11 @@ from blink_detector_package.infrastructure.vision import (
 	stabilize_face_rect,
 )
 from blink_detector_package.infrastructure.ocec import load_ocec, score_eye_open
+from blink_detector_package.infrastructure.process_qos import (
+	boost_capture,
+	is_boosted,
+	release_capture,
+)
 
 NO_FACE_DATA = json.dumps(
 	{
@@ -419,6 +424,7 @@ class BlinkDetectorApplication:
 		want_stop = False
 		want_start = False
 		want_video = False
+		want_stop_video = False
 		want_list = False
 		record_trace_path = None
 		want_stop_trace = False
@@ -439,8 +445,16 @@ class BlinkDetectorApplication:
 				want_start = False
 			if "start_camera" in data:
 				want_start = True
+			if "stop_video" in data:
+				want_stop_video = True
+				want_video = False
 			if "request_video" in data:
-				want_video = True
+				if data.get("request_video"):
+					want_video = True
+					want_stop_video = False
+				else:
+					want_stop_video = True
+					want_video = False
 			if data.get("list_cameras"):
 				want_list = True
 			if "record_trace" in data:
@@ -532,6 +546,7 @@ class BlinkDetectorApplication:
 				# scenario → camera off → stop recording. stop_camera must not
 				# close an empty/partial trace mid-session.
 				self.camera.stop(reason="stop_camera")
+				self._set_capture_qos(False)
 				self.send_video = False
 				self._cached_face = None
 				self._clear_landmark_track()
@@ -554,6 +569,7 @@ class BlinkDetectorApplication:
 
 			if want_start:
 				if self.camera.start(self.detection.reset):
+					self._set_capture_qos(True)
 					self._cached_face = None
 					self._clear_landmark_track()
 					self._face_miss_streak = 0
@@ -565,6 +581,10 @@ class BlinkDetectorApplication:
 				else:
 					self.transport.send({"error": "Failed to start camera"})
 
+			if want_stop_video:
+				self.send_video = False
+				self.transport.send({"status": "Video streaming disabled"})
+
 			if want_video:
 				self.send_video = True
 				self._sync_video_emit_interval()
@@ -573,6 +593,14 @@ class BlinkDetectorApplication:
 			self.transport.send(
 				{"debug": f"Command processing error: {str(error)}"}
 			)
+
+	def _set_capture_qos(self, hold):
+		"""Best-effort OS boost while capture is live — never a camera-error."""
+		try:
+			result = boost_capture() if hold else release_capture()
+		except Exception as error:
+			result = f"failed:{error}"
+		self.transport.send({"debug": f"process_qos {result}"})
 
 	def _trace_header(self):
 		return {
@@ -1577,6 +1605,8 @@ class BlinkDetectorApplication:
 					not self.camera.active
 					or self.camera.capture is None
 				):
+					if is_boosted():
+						self._set_capture_qos(False)
 					time.sleep(0.1)
 					continue
 
@@ -1866,6 +1896,7 @@ class BlinkDetectorApplication:
 					}
 				)
 			self.camera.stop(reason="detector_exit")
+			self._set_capture_qos(False)
 			self.transport.send({"status": "Blink detector stopped"})
 			self.transport.stop()
 

@@ -103,6 +103,7 @@ function createSidecar(
 		startCamera: vi.fn(() => true),
 		stopCamera: vi.fn(),
 		requestVideo: vi.fn(),
+		stopVideo: vi.fn(),
 		markCameraUnavailable: vi.fn(),
 		...overrides,
 	};
@@ -887,6 +888,7 @@ describe("ReminderService preview camera", () => {
 		service.stopCameraIfIdle();
 
 		expect(sidecar.stopCamera).toHaveBeenCalledOnce();
+		expect(sidecar.stopVideo).not.toHaveBeenCalled();
 	});
 
 	it("stopCameraIfIdle keeps capture while tracking", () => {
@@ -907,6 +909,7 @@ describe("ReminderService preview camera", () => {
 		service.stopCameraIfIdle();
 
 		expect(sidecar.stopCamera).not.toHaveBeenCalled();
+		expect(sidecar.stopVideo).toHaveBeenCalledOnce();
 	});
 
 	it("pauseForSession keeps isTracking and stops stats without a stopped popup", () => {

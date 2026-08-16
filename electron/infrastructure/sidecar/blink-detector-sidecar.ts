@@ -241,6 +241,11 @@ export class BlinkDetectorSidecar {
 		this.write({ request_video: true });
 	}
 
+	/** Stop JPEG preview encode without releasing capture (tracking stays on). */
+	stopVideo(): void {
+		this.write({ stop_video: true });
+	}
+
 	/** Push the given (or current) quality preset to a live sidecar. */
 	applyCameraQuality(quality?: CameraQuality): void {
 		const resolved = quality ?? this.preferences.cameraQuality;

@@ -361,6 +361,21 @@ class CameraHelperTests(unittest.TestCase):
 
 
 class CommandBatchTests(unittest.TestCase):
+	def setUp(self):
+		from unittest import mock
+
+		self._qos = mock.patch.multiple(
+			"blink_detector_package.application.detector",
+			boost_capture=mock.DEFAULT,
+			release_capture=mock.DEFAULT,
+		)
+		patched = self._qos.start()
+		self.addCleanup(self._qos.stop)
+		self._boost = patched["boost_capture"]
+		self._release = patched["release_capture"]
+		self._boost.return_value = "boosted"
+		self._release.return_value = "released"
+
 	def test_config_applied_before_start_in_batch(self):
 		from blink_detector_package.application.detector import (
 			BlinkDetectorApplication,
@@ -525,6 +540,108 @@ class CommandBatchTests(unittest.TestCase):
 		app.process_commands()
 		self.assertTrue(app._should_exit)
 		self.assertEqual(camera_stopped, [])
+
+	def test_stop_video_clears_preview_without_stopping_capture(self):
+		from blink_detector_package.application.detector import (
+			BlinkDetectorApplication,
+		)
+
+		events = []
+
+		class _Transport:
+			def __init__(self):
+				import queue
+
+				self.command_queue = queue.Queue()
+
+			def send(self, payload):
+				events.append(payload)
+
+			def start_input_thread(self):
+				return None
+
+			def stop(self):
+				return None
+
+			def send_serialized(self, _line):
+				return None
+
+		transport = _Transport()
+		app = BlinkDetectorApplication(transport=transport)
+		app.send_video = True
+		stopped = []
+		app.camera.stop = lambda reason="stop_camera": stopped.append(reason)
+		transport.command_queue.put('{"stop_video": true}')
+		app.process_commands()
+		self.assertFalse(app.send_video)
+		self.assertEqual(stopped, [])
+		self.assertTrue(
+			any(e.get("status") == "Video streaming disabled" for e in events)
+		)
+
+	def test_request_video_false_clears_preview(self):
+		from blink_detector_package.application.detector import (
+			BlinkDetectorApplication,
+		)
+
+		class _Transport:
+			def __init__(self):
+				import queue
+
+				self.command_queue = queue.Queue()
+
+			def send(self, _payload):
+				return None
+
+			def start_input_thread(self):
+				return None
+
+			def stop(self):
+				return None
+
+			def send_serialized(self, _line):
+				return None
+
+		transport = _Transport()
+		app = BlinkDetectorApplication(transport=transport)
+		app.send_video = True
+		transport.command_queue.put('{"request_video": false}')
+		app.process_commands()
+		self.assertFalse(app.send_video)
+
+	def test_start_and_stop_camera_toggle_qos(self):
+		from blink_detector_package.application.detector import (
+			BlinkDetectorApplication,
+		)
+
+		class _Transport:
+			def __init__(self):
+				import queue
+
+				self.command_queue = queue.Queue()
+
+			def send(self, _payload):
+				return None
+
+			def start_input_thread(self):
+				return None
+
+			def stop(self):
+				return None
+
+			def send_serialized(self, _line):
+				return None
+
+		transport = _Transport()
+		app = BlinkDetectorApplication(transport=transport)
+		app.camera.start = lambda reset: True
+		app.camera.stop = lambda reason="stop_camera": None
+		transport.command_queue.put('{"start_camera": true}')
+		app.process_commands()
+		self._boost.assert_called_once()
+		transport.command_queue.put('{"stop_camera": true}')
+		app.process_commands()
+		self._release.assert_called_once()
 
 
 if __name__ == "__main__":
