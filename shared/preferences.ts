@@ -425,7 +425,11 @@ export interface PersistedPreferences {
 	/** Look-away popup hint (user-editable; built-ins localize). */
 	lookAwayHint: string;
 	popupPosition: Point | null;
+	/** Blink/editor top-left per Electron `display.id` (string). */
+	popupPositionsByDisplayId: Record<string, Point>;
 	popupSize: Size;
+	/** Blink/editor size per Electron `display.id` (string). */
+	popupSizesByDisplayId: Record<string, Size>;
 	popupColors: PopupColors;
 	popupMessage: string;
 	/** When true, blink / exercise / look-away popups ignore mouse (watermark); snooze via tray. */
@@ -544,7 +548,9 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	lookAwayTitle: defaultLookAwayTitle("en"),
 	lookAwayHint: defaultLookAwayHint("en"),
 	popupPosition: null,
+	popupPositionsByDisplayId: {},
 	popupSize: { width: 300, height: 120 },
+	popupSizesByDisplayId: {},
 	popupColors: {
 		background: theme.popup.bg,
 		text: theme.popup.text,
@@ -671,6 +677,69 @@ function sanitizePopupPosition(value: unknown): Point | null {
 	return { x: Math.round(x), y: Math.round(y) };
 }
 
+const POPUP_POSITIONS_BY_DISPLAY_MAX = 16;
+
+/** Coerce stored/IPC per-display popup points; drop junk keys. */
+export function sanitizePopupPositionsByDisplayId(
+	value: unknown,
+): Record<string, Point> {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+	const out: Record<string, Point> = {};
+	for (const [rawKey, rawPoint] of Object.entries(
+		value as Record<string, unknown>,
+	)) {
+		const id = rawKey.trim();
+		if (!id) continue;
+		const point = sanitizePopupPosition(rawPoint);
+		if (!point) continue;
+		out[id] = point;
+		if (Object.keys(out).length >= POPUP_POSITIONS_BY_DISPLAY_MAX) break;
+	}
+	return out;
+}
+
+export function samePopupPositionsByDisplayId(
+	a: Record<string, Point>,
+	b: Record<string, Point>,
+): boolean {
+	const keysA = Object.keys(a);
+	const keysB = Object.keys(b);
+	if (keysA.length !== keysB.length) return false;
+	return keysA.every((key) => {
+		const other = b[key];
+		return !!other && a[key].x === other.x && a[key].y === other.y;
+	});
+}
+
+/**
+ * If the map is empty and a legacy single point exists, seed it under
+ * `seedDisplayId`. Existing map entries win (do not overwrite).
+ */
+export function seedPopupPositionsFromLegacy(
+	map: Record<string, Point>,
+	legacyPoint: Point | null,
+	seedDisplayId: string,
+): Record<string, Point> {
+	if (Object.keys(map).length > 0) return { ...map };
+	const id = seedDisplayId.trim();
+	if (!legacyPoint || !id) return {};
+	return { [id]: { x: legacyPoint.x, y: legacyPoint.y } };
+}
+
+/** Drop map keys that are not in the live display-id list. */
+export function prunePopupPositionsByDisplayId(
+	map: Record<string, Point>,
+	liveDisplayIds: readonly string[],
+): Record<string, Point> {
+	const live = new Set(liveDisplayIds);
+	const next: Record<string, Point> = {};
+	for (const [id, point] of Object.entries(map)) {
+		if (!live.has(id)) continue;
+		next[id] = point;
+	}
+	return next;
+}
+
 function sanitizePopupSize(value: unknown, fallback: Size): Size {
 	if (!value || typeof value !== "object") return { ...fallback };
 	const record = value as Record<string, unknown>;
@@ -680,6 +749,82 @@ function sanitizePopupSize(value: unknown, fallback: Size): Size {
 		width: Math.max(1, Math.round(width)),
 		height: Math.max(1, Math.round(height)),
 	};
+}
+
+function parsePopupSize(value: unknown): Size | null {
+	if (!value || typeof value !== "object") return null;
+	const record = value as Record<string, unknown>;
+	const width = asFiniteNumber(record.width, Number.NaN);
+	const height = asFiniteNumber(record.height, Number.NaN);
+	if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+	if (width < 1 || height < 1) return null;
+	return { width: Math.round(width), height: Math.round(height) };
+}
+
+/** Coerce stored/IPC per-display popup sizes; drop junk keys. */
+export function sanitizePopupSizesByDisplayId(
+	value: unknown,
+): Record<string, Size> {
+	if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+	const out: Record<string, Size> = {};
+	for (const [rawKey, rawSize] of Object.entries(
+		value as Record<string, unknown>,
+	)) {
+		const id = rawKey.trim();
+		if (!id) continue;
+		const size = parsePopupSize(rawSize);
+		if (!size) continue;
+		out[id] = size;
+		if (Object.keys(out).length >= POPUP_POSITIONS_BY_DISPLAY_MAX) break;
+	}
+	return out;
+}
+
+export function samePopupSizesByDisplayId(
+	a: Record<string, Size>,
+	b: Record<string, Size>,
+): boolean {
+	const keysA = Object.keys(a);
+	const keysB = Object.keys(b);
+	if (keysA.length !== keysB.length) return false;
+	return keysA.every((key) => {
+		const other = b[key];
+		return (
+			!!other && a[key].width === other.width && a[key].height === other.height
+		);
+	});
+}
+
+/**
+ * If the size map is empty, copy the mirror size onto each position-map id.
+ * Existing size entries win.
+ */
+export function seedPopupSizesFromPositionIds(
+	sizes: Record<string, Size>,
+	positionIds: readonly string[],
+	mirror: Size,
+): Record<string, Size> {
+	if (Object.keys(sizes).length > 0) return { ...sizes };
+	if (positionIds.length === 0) return {};
+	const out: Record<string, Size> = {};
+	for (const id of positionIds) {
+		if (!id) continue;
+		out[id] = { width: mirror.width, height: mirror.height };
+	}
+	return out;
+}
+
+export function prunePopupSizesByDisplayId(
+	map: Record<string, Size>,
+	liveDisplayIds: readonly string[],
+): Record<string, Size> {
+	const live = new Set(liveDisplayIds);
+	const next: Record<string, Size> = {};
+	for (const [id, size] of Object.entries(map)) {
+		if (!live.has(id)) continue;
+		next[id] = size;
+	}
+	return next;
 }
 
 function sanitizePopupColors(value: unknown, fallback: PopupColors): PopupColors {
@@ -823,7 +968,13 @@ export function sanitizePersistedPreferences(
 		lookAwayTitle: sanitizeLookAwayTitle(record.lookAwayTitle, locale),
 		lookAwayHint: sanitizeLookAwayHint(record.lookAwayHint, locale),
 		popupPosition: sanitizePopupPosition(record.popupPosition),
+		popupPositionsByDisplayId: sanitizePopupPositionsByDisplayId(
+			record.popupPositionsByDisplayId,
+		),
 		popupSize: sanitizePopupSize(record.popupSize, defaults.popupSize),
+		popupSizesByDisplayId: sanitizePopupSizesByDisplayId(
+			record.popupSizesByDisplayId,
+		),
 		popupColors: sanitizePopupColors(record.popupColors, defaults.popupColors),
 		popupMessage:
 			typeof record.popupMessage === "string" && record.popupMessage.trim()

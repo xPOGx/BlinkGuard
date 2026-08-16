@@ -119,10 +119,18 @@ function sanitizeIpcDetail(
 	}
 
 	if (channel === IPC_CHANNELS.popupEditorSaved) {
-		const value = args[0] as { size?: unknown; position?: unknown } | undefined;
+		const value = args[0] as
+			| { size?: unknown; position?: unknown; scope?: unknown }
+			| undefined;
 		return {
 			size: value?.size ?? null,
 			position: value?.position ?? null,
+			scope:
+				value?.scope === "all"
+					? "all"
+					: value?.scope === "next"
+						? "next"
+						: "current",
 		};
 	}
 

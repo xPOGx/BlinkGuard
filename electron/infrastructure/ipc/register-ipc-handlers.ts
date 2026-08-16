@@ -481,15 +481,33 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		installUpdate();
 	});
 	on(IPC_CHANNELS.popupEditorSaved, (_event, value: unknown) => {
-		const payload = value as { size: Size; position: Point };
-		const position = windows.clampPopupPosition(
-			payload.position,
+		if (!value || typeof value !== "object") return;
+		const payload = value as {
+			size?: Size;
+			position?: Point;
+			scope?: unknown;
+		};
+		if (payload.scope === "next") {
+			windows.moveEditorToNextUnsaved();
+			return;
+		}
+		if (!payload.size || !payload.position) return;
+		if (payload.scope === "all") {
+			windows.saveEditorGeometryAll(payload.size, payload.position);
+			windows.sendPreferences();
+			windows.closeEditor();
+			return;
+		}
+		const displayId = windows.saveEditorGeometry(
 			payload.size,
+			payload.position,
 		);
-		preferences.set("popupSize", payload.size);
-		preferences.set("popupPosition", position);
-		windows.applyPopupGeometry(payload.size, position);
 		windows.sendPreferences();
+		if (windows.hasNextUnsavedDisplay(displayId)) {
+			windows.sendEditorSetupNextState(true);
+			return;
+		}
+		windows.closeEditor();
 	});
 	on(IPC_CHANNELS.resetPreferences, (_event, replayOnboarding?: unknown) => {
 		preferenceActions.resetPreferences(replayOnboarding as boolean | undefined);

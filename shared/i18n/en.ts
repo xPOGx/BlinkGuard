@@ -746,6 +746,8 @@ export const en: MessageCatalog = {
 		"Click & drag to move • Drag edges to resize",
 	"popup.editor.size": "Width: {width}px, Height: {height}px",
 	"popup.editor.save": "Save",
+	"popup.editor.saveAll": "Save all",
+	"popup.editor.setupNext": "Set up next display",
 	"popup.editor.cancel": "Cancel",
 	"popup.editor.windowTitle": "Popup Editor",
 

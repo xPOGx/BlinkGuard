@@ -338,6 +338,20 @@ describe("PreferencesService", () => {
 		expect(store.setCounts.get("cameraDevice")).toBe(1);
 		service.set("cameraDevice", { id: "pnp-1", index: 1, name: "USB" });
 		expect(store.setCounts.get("cameraDevice")).toBe(1);
+
+		service.set("popupPositionsByDisplayId", {});
+		expect(store.setCounts.get("popupPositionsByDisplayId") ?? 0).toBe(0);
+		service.set("popupPositionsByDisplayId", { "1": { x: 10, y: 20 } });
+		expect(store.setCounts.get("popupPositionsByDisplayId")).toBe(1);
+		service.set("popupPositionsByDisplayId", { "1": { x: 10, y: 20 } });
+		expect(store.setCounts.get("popupPositionsByDisplayId")).toBe(1);
+
+		service.set("popupSizesByDisplayId", {});
+		expect(store.setCounts.get("popupSizesByDisplayId") ?? 0).toBe(0);
+		service.set("popupSizesByDisplayId", { "1": { width: 320, height: 140 } });
+		expect(store.setCounts.get("popupSizesByDisplayId")).toBe(1);
+		service.set("popupSizesByDisplayId", { "1": { width: 320, height: 140 } });
+		expect(store.setCounts.get("popupSizesByDisplayId")).toBe(1);
 	});
 
 	it("sanitizes invalid autoStopNoFaceMinutes on hydrate", () => {
@@ -396,6 +410,9 @@ describe("PreferencesService", () => {
 			DEFAULT_PREFERENCES.reminderInterval,
 		);
 		expect(service.current.popupPosition).toEqual(popupPosition);
+		expect(service.current.popupPositionsByDisplayId).toEqual({});
+		expect(service.current.popupSizesByDisplayId).toEqual({});
+		expect(service.current.popupSize).toEqual(DEFAULT_PREFERENCES.popupSize);
 		expect(service.current.isTracking).toBe(false);
 		expect(service.current.launchAtLogin).toBe(false);
 		expect(service.current.hasCompletedOnboarding).toBe(true);
@@ -419,6 +436,35 @@ describe("PreferencesService", () => {
 		service.reset(null);
 
 		expect(service.current.popupPosition).toBeNull();
+		expect(service.current.popupPositionsByDisplayId).toEqual({});
+		expect(service.current.popupSizesByDisplayId).toEqual({});
+		expect(service.current.popupSize).toEqual(DEFAULT_PREFERENCES.popupSize);
+	});
+
+	it("seedPopupPositionsFromLegacy writes the map once from popupPosition", () => {
+		const store = new FakePreferenceStore();
+		store.set("popupPosition", { x: 40, y: 80 });
+		const service = new PreferencesService(store);
+
+		expect(service.seedPopupPositionsFromLegacy("1")).toBe(true);
+		expect(service.current.popupPositionsByDisplayId).toEqual({
+			"1": { x: 40, y: 80 },
+		});
+		expect(service.seedPopupPositionsFromLegacy("1")).toBe(false);
+		expect(service.seedPopupPositionsFromLegacy("99")).toBe(false);
+	});
+
+	it("seedPopupSizesFromPositionIds writes sizes once from popupSize", () => {
+		const store = new FakePreferenceStore();
+		store.set("popupSize", { width: 320, height: 140 });
+		store.set("popupPositionsByDisplayId", { "1": { x: 40, y: 80 } });
+		const service = new PreferencesService(store);
+
+		expect(service.seedPopupSizesFromPositionIds()).toBe(true);
+		expect(service.current.popupSizesByDisplayId).toEqual({
+			"1": { width: 320, height: 140 },
+		});
+		expect(service.seedPopupSizesFromPositionIds()).toBe(false);
 	});
 
 	it("reset with replayOnboarding leaves first-run incomplete", () => {

@@ -13,17 +13,33 @@ function updateSizeDisplay() {
 	}
 }
 
-function savePopupEditor() {
-	const size = {
-		width: Math.round(window.innerWidth),
-		height: Math.round(window.innerHeight),
+function editorGeometry() {
+	return {
+		size: {
+			width: Math.round(window.innerWidth),
+			height: Math.round(window.innerHeight),
+		},
+		position: {
+			x: Math.round(window.screenX),
+			y: Math.round(window.screenY),
+		},
 	};
-	const position = {
-		x: Math.round(window.screenX),
-		y: Math.round(window.screenY),
-	};
-	window.popupAPI.savePopupEditor({ size, position });
-	window.close();
+}
+
+function savePopupEditor(scope) {
+	window.popupAPI.savePopupEditor({ ...editorGeometry(), scope: scope || "current" });
+}
+
+function setSaveAllVisible(multiDisplay) {
+	const saveAllBtn = document.getElementById("saveAllBtn");
+	if (!saveAllBtn) return;
+	saveAllBtn.hidden = !multiDisplay;
+}
+
+function setSetupNextVisible(hasNextUnsaved) {
+	const setupNextBtn = document.getElementById("setupNextBtn");
+	if (!setupNextBtn) return;
+	setupNextBtn.hidden = !hasNextUnsaved;
 }
 
 function cancelPopupEditor() {
@@ -37,10 +53,20 @@ function initPopupEditor() {
 	}
 
 	const saveBtn = document.getElementById("saveBtn");
+	const saveAllBtn = document.getElementById("saveAllBtn");
+	const setupNextBtn = document.getElementById("setupNextBtn");
 	const cancelBtn = document.getElementById("cancelBtn");
 
 	if (saveBtn) {
-		saveBtn.addEventListener("click", savePopupEditor);
+		saveBtn.addEventListener("click", () => savePopupEditor("current"));
+	}
+
+	if (saveAllBtn) {
+		saveAllBtn.addEventListener("click", () => savePopupEditor("all"));
+	}
+
+	if (setupNextBtn) {
+		setupNextBtn.addEventListener("click", () => savePopupEditor("next"));
 	}
 
 	if (cancelBtn) {
@@ -53,7 +79,7 @@ function initPopupEditor() {
 			cancelPopupEditor();
 		} else if (event.key === "Enter") {
 			event.preventDefault();
-			savePopupEditor();
+			savePopupEditor("current");
 		}
 	});
 
@@ -85,7 +111,6 @@ function initPopupEditor() {
 		handle.addEventListener("mouseenter", () => {
 			isOverResizeHandle = true;
 		});
-
 		handle.addEventListener("mouseleave", () => {
 			isOverResizeHandle = false;
 		});
@@ -108,6 +133,8 @@ function initEditor() {
 			updateColors(data.data);
 		} else if (data.type === "state") {
 			updateSizeDisplay();
+			setSaveAllVisible(Boolean(data.data && data.data.multiDisplay));
+			setSetupNextVisible(Boolean(data.data && data.data.hasNextUnsaved));
 		}
 	});
 }

@@ -8,6 +8,8 @@ import {
 	DEFAULT_PREFERENCES,
 	sameKeyboardShortcuts,
 	samePauseAppRules,
+	samePopupPositionsByDisplayId,
+	samePopupSizesByDisplayId,
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeEpochMs,
@@ -17,11 +19,17 @@ import {
 	sanitizeLookAwayTitle,
 	sanitizePauseAppRules,
 	sanitizePersistedPreferences,
+	sanitizePopupPositionsByDisplayId,
+	sanitizePopupSizesByDisplayId,
 	sanitizeSnoozeMinutes,
 	sanitizeSoundVolume,
+	seedPopupPositionsFromLegacy,
+	seedPopupSizesFromPositionIds,
 	type AppPreferences,
 	type KeyboardShortcuts,
 	type PersistedPreferences,
+	type Point,
+	type Size,
 } from "../../shared/preferences";
 import { sanitizeLocale } from "../../shared/i18n";
 import type { PreferenceStore } from "./ports/preference-store";
@@ -63,6 +71,18 @@ function samePreferenceValue(
 		if (a === b) return true;
 		if (!a || !b) return false;
 		return a.x === b.x && a.y === b.y;
+	}
+	if (key === "popupPositionsByDisplayId") {
+		return samePopupPositionsByDisplayId(
+			previous as Record<string, Point>,
+			next as Record<string, Point>,
+		);
+	}
+	if (key === "popupSizesByDisplayId") {
+		return samePopupSizesByDisplayId(
+			previous as Record<string, Size>,
+			next as Record<string, Size>,
+		);
 	}
 	if (key === "popupSize") {
 		const a = previous as PersistedPreferences["popupSize"];
@@ -191,6 +211,12 @@ export class PreferencesService {
 			next = sanitizePauseAppRules(value) as PersistedPreferences[K];
 		} else if (key === "cameraDevice") {
 			next = sanitizeCameraDevice(value) as PersistedPreferences[K];
+		} else if (key === "popupPositionsByDisplayId") {
+			next = sanitizePopupPositionsByDisplayId(
+				value,
+			) as PersistedPreferences[K];
+		} else if (key === "popupSizesByDisplayId") {
+			next = sanitizePopupSizesByDisplayId(value) as PersistedPreferences[K];
 		} else if (
 			key === "calibrationAt" ||
 			key === "calibrationNudgeDismissedAt" ||
@@ -204,6 +230,47 @@ export class PreferencesService {
 		}
 		this.current[key] = next as never;
 		this.store.set(key, next);
+	}
+
+	/**
+	 * Seed `popupPositionsByDisplayId` from legacy `popupPosition` when the map
+	 * is empty. Returns true when the map was written.
+	 */
+	seedPopupPositionsFromLegacy(seedDisplayId: string): boolean {
+		const next = seedPopupPositionsFromLegacy(
+			this.current.popupPositionsByDisplayId,
+			this.current.popupPosition,
+			seedDisplayId,
+		);
+		if (
+			samePopupPositionsByDisplayId(
+				next,
+				this.current.popupPositionsByDisplayId,
+			)
+		) {
+			return false;
+		}
+		this.set("popupPositionsByDisplayId", next);
+		return true;
+	}
+
+	/**
+	 * Seed `popupSizesByDisplayId` from the size mirror when the map is empty.
+	 * Uses ids already in the position map. Returns true when the map was written.
+	 */
+	seedPopupSizesFromPositionIds(): boolean {
+		const next = seedPopupSizesFromPositionIds(
+			this.current.popupSizesByDisplayId,
+			Object.keys(this.current.popupPositionsByDisplayId),
+			this.current.popupSize,
+		);
+		if (
+			samePopupSizesByDisplayId(next, this.current.popupSizesByDisplayId)
+		) {
+			return false;
+		}
+		this.set("popupSizesByDisplayId", next);
+		return true;
 	}
 
 	/**

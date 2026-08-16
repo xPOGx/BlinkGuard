@@ -54,6 +54,7 @@ function createActions(
 			sendPreferences: vi.fn(),
 			sendToMain: vi.fn(),
 			showCamera: vi.fn(),
+			getPopupPositionSeedDisplayId: () => "1",
 		}) as never,
 		(overrides.sidecar ?? {
 			startEarCalibration: vi.fn(),
@@ -210,6 +211,7 @@ describe("PreferenceActions", () => {
 			sendPreferences: vi.fn(),
 			sendToMain: vi.fn(),
 			showCamera: vi.fn(),
+			getPopupPositionSeedDisplayId: () => "1",
 		};
 		const sidecar = {
 			startEarCalibration: vi.fn(),
@@ -328,6 +330,60 @@ describe("PreferenceActions", () => {
 		});
 	});
 
+	it("applyBackup seeds per-display positions from a legacy popupPosition", () => {
+		const preferences = new PreferencesService(createStore());
+		const windows = {
+			sendPreferences: vi.fn(),
+			sendToMain: vi.fn(),
+			showCamera: vi.fn(),
+			getPopupPositionSeedDisplayId: () => "2528",
+		};
+		const actions = createActions(preferences, { windows });
+
+		actions.applyBackup("preferences", {
+			preferences: {
+				...preferences.current,
+				popupPosition: { x: 40, y: 80 },
+				popupPositionsByDisplayId: {},
+				hasCompletedOnboarding: true,
+			},
+		});
+
+		expect(preferences.current.popupPositionsByDisplayId).toEqual({
+			"2528": { x: 40, y: 80 },
+		});
+		expect(preferences.current.popupPosition).toEqual({ x: 40, y: 80 });
+		expect(preferences.current.popupSizesByDisplayId).toEqual({
+			"2528": preferences.current.popupSize,
+		});
+	});
+
+	it("applyBackup keeps an existing per-display map instead of reseeding", () => {
+		const preferences = new PreferencesService(createStore());
+		const windows = {
+			sendPreferences: vi.fn(),
+			sendToMain: vi.fn(),
+			showCamera: vi.fn(),
+			getPopupPositionSeedDisplayId: () => "2528",
+		};
+		const actions = createActions(preferences, { windows });
+		const existing = { "9": { x: 1, y: 2 } };
+		const existingSizes = { "9": { width: 400, height: 180 } };
+
+		actions.applyBackup("preferences", {
+			preferences: {
+				...preferences.current,
+				popupPosition: { x: 40, y: 80 },
+				popupPositionsByDisplayId: existing,
+				popupSizesByDisplayId: existingSizes,
+				hasCompletedOnboarding: true,
+			},
+		});
+
+		expect(preferences.current.popupPositionsByDisplayId).toEqual(existing);
+		expect(preferences.current.popupSizesByDisplayId).toEqual(existingSizes);
+	});
+
 	it("resetPreferences stops tracking and restores defaults without replaying onboarding", () => {
 		const preferences = new PreferencesService(createStore());
 		preferences.set("isTracking", true);
@@ -337,6 +393,12 @@ describe("PreferenceActions", () => {
 		preferences.set("classifierBias", 0.4);
 		preferences.set("hasCompletedOnboarding", true);
 		preferences.set("launchAtLogin", true);
+		preferences.set("popupPosition", { x: 40, y: 80 });
+		preferences.set("popupPositionsByDisplayId", { "1": { x: 40, y: 80 } });
+		preferences.set("popupSizesByDisplayId", {
+			"1": { width: 400, height: 180 },
+		});
+		preferences.set("popupSize", { width: 400, height: 180 });
 		const reminders = { stop: vi.fn() };
 		const exercises = { stop: vi.fn() };
 		const lookAway = { stop: vi.fn() };
@@ -384,6 +446,10 @@ describe("PreferenceActions", () => {
 		expect(preferences.current.classifierBias).toBeNull();
 		expect(preferences.current.isTracking).toBe(false);
 		expect(preferences.current.hasCompletedOnboarding).toBe(true);
+		expect(preferences.current.popupPosition).toBeNull();
+		expect(preferences.current.popupPositionsByDisplayId).toEqual({});
+		expect(preferences.current.popupSizesByDisplayId).toEqual({});
+		expect(preferences.current.popupSize).toEqual({ width: 300, height: 120 });
 		expect(applyLaunchAtLogin).toHaveBeenCalledWith(false);
 		expect(shortcuts.registerAll).toHaveBeenCalledWith(
 			preferences.current.keyboardShortcuts,

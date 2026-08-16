@@ -6,8 +6,7 @@ const getAllDisplays = vi.fn();
 
 vi.mock("electron", () => ({
 	screen: {
-		getCursorScreenPoint: (...args: unknown[]) =>
-			getCursorScreenPoint(...args),
+		getCursorScreenPoint: (...args: unknown[]) => getCursorScreenPoint(...args),
 		getDisplayNearestPoint: (...args: unknown[]) =>
 			getDisplayNearestPoint(...args),
 		getAllDisplays: (...args: unknown[]) => getAllDisplays(...args),
@@ -15,13 +14,21 @@ vi.mock("electron", () => ({
 }));
 
 import {
+	clampPopupSizeToWorkArea,
 	getActiveDisplay,
 	getCenteredPopupPosition,
+	getDisplayIdContainingPoint,
 	getLeftBiasedPopupPosition,
 	getRightBiasedPopupPosition,
 	getTopCenterPopupPosition,
 	isPointInAnyWorkArea,
+	isPointInWorkArea,
+	layoutForDisplays,
+	nextUnsavedDisplayId,
+	resolveOpenWindowPosition,
 	resolvePopupPosition,
+	resolvePopupPositionForDisplay,
+	resolvePopupSizeForDisplay,
 	resolveVisiblePopupPosition,
 } from "../../../electron/infrastructure/windows/window-position";
 
@@ -101,7 +108,12 @@ describe("window-position", () => {
 			const saved = { x: 100, y: 200 };
 			expect(isPointInAnyWorkArea(saved, [primaryWorkArea])).toBe(true);
 			expect(
-				resolvePopupPosition(saved, { width: 300, height: 120 }, [primaryWorkArea], fallback),
+				resolvePopupPosition(
+					saved,
+					{ width: 300, height: 120 },
+					[primaryWorkArea],
+					fallback,
+				),
 			).toEqual({ position: saved, recovered: false });
 		});
 
@@ -124,32 +136,42 @@ describe("window-position", () => {
 			const saved = { x: 2500, y: 400 };
 			expect(isPointInAnyWorkArea(saved, [primaryWorkArea])).toBe(false);
 			expect(
-				resolvePopupPosition(saved, { width: 300, height: 120 }, [primaryWorkArea], fallback),
+				resolvePopupPosition(
+					saved,
+					{ width: 300, height: 120 },
+					[primaryWorkArea],
+					fallback,
+				),
 			).toEqual({ position: fallback, recovered: true });
 		});
 
 		it("uses fallback for null saved without marking recovered", () => {
 			expect(
-				resolvePopupPosition(null, { width: 300, height: 120 }, [primaryWorkArea], fallback),
+				resolvePopupPosition(
+					null,
+					{ width: 300, height: 120 },
+					[primaryWorkArea],
+					fallback,
+				),
 			).toEqual({ position: fallback, recovered: false });
 		});
 
 		it("treats the inclusive top-left workArea corner as valid", () => {
-			expect(
-				isPointInAnyWorkArea({ x: 0, y: 0 }, [primaryWorkArea]),
-			).toBe(true);
+			expect(isPointInAnyWorkArea({ x: 0, y: 0 }, [primaryWorkArea])).toBe(
+				true,
+			);
 			expect(
 				isPointInAnyWorkArea({ x: 1920, y: 100 }, [secondaryWorkArea]),
 			).toBe(true);
 		});
 
 		it("treats the exclusive bottom-right edge as off-screen", () => {
-			expect(
-				isPointInAnyWorkArea({ x: 1920, y: 0 }, [primaryWorkArea]),
-			).toBe(false);
-			expect(
-				isPointInAnyWorkArea({ x: 0, y: 1080 }, [primaryWorkArea]),
-			).toBe(false);
+			expect(isPointInAnyWorkArea({ x: 1920, y: 0 }, [primaryWorkArea])).toBe(
+				false,
+			);
+			expect(isPointInAnyWorkArea({ x: 0, y: 1080 }, [primaryWorkArea])).toBe(
+				false,
+			);
 		});
 
 		it("resolveVisiblePopupPosition recovers via active-display center", () => {
@@ -162,6 +184,180 @@ describe("window-position", () => {
 				position: getCenteredPopupPosition(300, 120),
 				recovered: true,
 			});
+		});
+	});
+
+	describe("resolvePopupPositionForDisplay / resolveOpenWindowPosition", () => {
+		const popupSize = { width: 300, height: 120 };
+		const primaryCenter = {
+			x: Math.floor((1920 - 300) / 2),
+			y: Math.floor((1080 - 120) / 2),
+		};
+
+		it("keeps a saved point on the target workArea", () => {
+			expect(
+				resolvePopupPositionForDisplay(
+					{ x: 100, y: 200 },
+					popupSize,
+					primaryWorkArea,
+				),
+			).toEqual({ position: { x: 100, y: 200 }, recovered: false });
+		});
+
+		it("does not reuse another display's coordinates on this display", () => {
+			expect(
+				resolvePopupPositionForDisplay(
+					{ x: 2500, y: 400 },
+					popupSize,
+					primaryWorkArea,
+				),
+			).toEqual({ position: primaryCenter, recovered: true });
+		});
+
+		it("centers on miss without marking recovered", () => {
+			expect(
+				resolvePopupPositionForDisplay(null, popupSize, primaryWorkArea),
+			).toEqual({ position: primaryCenter, recovered: false });
+		});
+
+		it("leaves an open window on the matched display", () => {
+			expect(
+				resolveOpenWindowPosition(
+					{ x: 100, y: 200 },
+					{ x: 10, y: 10 },
+					primaryWorkArea,
+					popupSize,
+				),
+			).toEqual({ position: { x: 100, y: 200 }, recovered: false });
+		});
+
+		it("recovers an off-screen window via the matched display saved point", () => {
+			expect(
+				resolveOpenWindowPosition(
+					{ x: 2500, y: 400 },
+					{ x: 80, y: 90 },
+					primaryWorkArea,
+					popupSize,
+				),
+			).toEqual({ position: { x: 80, y: 90 }, recovered: true });
+		});
+
+		it("centers when the off-screen window has no saved point on the matched display", () => {
+			expect(
+				resolveOpenWindowPosition(
+					{ x: 2500, y: 400 },
+					null,
+					primaryWorkArea,
+					popupSize,
+				),
+			).toEqual({ position: primaryCenter, recovered: true });
+		});
+
+		it("treats workArea hit-tests as inclusive top-left", () => {
+			expect(isPointInWorkArea({ x: 0, y: 0 }, primaryWorkArea)).toBe(true);
+			expect(isPointInWorkArea({ x: 1920, y: 0 }, primaryWorkArea)).toBe(false);
+		});
+
+		it("seeds a legacy point under the display that contains it", () => {
+			const displays = [
+				{ id: 1, workArea: primaryWorkArea },
+				{ id: 2, workArea: secondaryWorkArea },
+			];
+			expect(
+				getDisplayIdContainingPoint({ x: 2500, y: 400 }, displays, "1"),
+			).toBe("2");
+			expect(
+				getDisplayIdContainingPoint({ x: 100, y: 100 }, displays, "1"),
+			).toBe("1");
+			expect(
+				getDisplayIdContainingPoint({ x: -50, y: -50 }, displays, "1"),
+			).toBe("1");
+		});
+	});
+
+	describe("layoutForDisplays / resolvePopupSizeForDisplay", () => {
+		const sourceSize = { width: 300, height: 120 };
+
+		it("uses the mirror size when this display has no saved size", () => {
+			expect(
+				resolvePopupSizeForDisplay(null, sourceSize, primaryWorkArea),
+			).toEqual(sourceSize);
+		});
+
+		it("prefers this display's saved size over the mirror", () => {
+			expect(
+				resolvePopupSizeForDisplay(
+					{ width: 400, height: 180 },
+					sourceSize,
+					primaryWorkArea,
+				),
+			).toEqual({ width: 400, height: 180 });
+		});
+
+		it("clamps a saved size that is larger than the workArea", () => {
+			expect(
+				clampPopupSizeToWorkArea(
+					{ width: 3000, height: 2000 },
+					primaryWorkArea,
+				),
+			).toEqual({ width: 1920, height: 1080 });
+		});
+
+		it("copies size and relative offset onto every display", () => {
+			const current = { x: 192, y: 108 };
+			const layouts = layoutForDisplays(current, sourceSize, primaryWorkArea, [
+				{ id: "1", workArea: primaryWorkArea },
+				{ id: "2", workArea: secondaryWorkArea },
+			]);
+			expect(layouts["1"]).toEqual({
+				size: sourceSize,
+				position: current,
+			});
+			expect(layouts["2"]?.size).toEqual(sourceSize);
+			expect(layouts["2"]?.position.x).toBe(
+				secondaryWorkArea.x +
+					Math.floor((192 / 1920) * secondaryWorkArea.width),
+			);
+			expect(layouts["2"]?.position.y).toBe(
+				secondaryWorkArea.y +
+					Math.floor((108 / 1080) * secondaryWorkArea.height),
+			);
+		});
+
+		it("shrinks size on a smaller display so the window stays on-screen", () => {
+			const tiny = { x: 0, y: 0, width: 200, height: 90 };
+			const layouts = layoutForDisplays(
+				{ x: 100, y: 40 },
+				{ width: 300, height: 120 },
+				primaryWorkArea,
+				[{ id: "tiny", workArea: tiny }],
+			);
+			expect(layouts.tiny?.size).toEqual({ width: 200, height: 90 });
+			expect(layouts.tiny?.position).toEqual({ x: 0, y: 0 });
+		});
+	});
+
+	describe("nextUnsavedDisplayId", () => {
+		const live = ["1", "2", "3"];
+
+		it("picks the next live id after current that is not saved", () => {
+			expect(nextUnsavedDisplayId(live, ["1"], "1")).toBe("2");
+			expect(nextUnsavedDisplayId(live, ["1", "2"], "2")).toBe("3");
+		});
+
+		it("wraps to the first unsaved display", () => {
+			expect(nextUnsavedDisplayId(live, ["3"], "3")).toBe("1");
+			expect(nextUnsavedDisplayId(live, ["2", "3"], "3")).toBe("1");
+		});
+
+		it("returns null when every other live display is saved", () => {
+			expect(nextUnsavedDisplayId(live, ["1", "2", "3"], "1")).toBeNull();
+			expect(nextUnsavedDisplayId(["1"], [], "1")).toBeNull();
+			expect(nextUnsavedDisplayId([], [], "1")).toBeNull();
+		});
+
+		it("skips saved ids between current and the next unset display", () => {
+			expect(nextUnsavedDisplayId(live, ["2"], "1")).toBe("3");
 		});
 	});
 });

@@ -756,6 +756,8 @@ export const uk: MessageCatalog = {
 		"Клацніть і тягніть, щоб перемістити • Тягніть краї, щоб змінити розмір",
 	"popup.editor.size": "Ширина: {width}px, Висота: {height}px",
 	"popup.editor.save": "Зберегти",
+	"popup.editor.saveAll": "Зберегти всі",
+	"popup.editor.setupNext": "Наступний екран",
 	"popup.editor.cancel": "Скасувати",
 	"popup.editor.windowTitle": "Редактор спливаючого вікна",
 

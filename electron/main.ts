@@ -95,8 +95,17 @@ function bootstrap(): void {
 		paths,
 		preferences,
 		VITE_DEV_SERVER_URL,
-		(position) => {
-			preferencesService.set("popupPosition", position);
+		(update) => {
+			preferencesService.set("popupPositionsByDisplayId", update.map);
+			if (update.sizes) {
+				preferencesService.set("popupSizesByDisplayId", update.sizes);
+			}
+			if (update.position) {
+				preferencesService.set("popupPosition", update.position);
+			}
+			if (update.size) {
+				preferencesService.set("popupSize", update.size);
+			}
 		},
 	);
 	const sound = new NotificationSoundPlayer(paths, preferences, app.isPackaged);
@@ -418,6 +427,10 @@ function bootstrap(): void {
 	void app.whenReady().then(async () => {
 		lifecycle.register();
 		windows.registerDisplayListeners();
+		preferencesService.seedPopupPositionsFromLegacy(
+			windows.getPopupPositionSeedDisplayId(preferences.popupPosition),
+		);
+		windows.migrateLegacyPopupPositions();
 
 		const startHidden =
 			process.argv.includes("--hidden") ||
@@ -432,10 +445,6 @@ function bootstrap(): void {
 		autoUpdates.checkForUpdates();
 		applyLaunchAtLogin(preferences.launchAtLogin);
 		shortcuts.registerAll(preferences.keyboardShortcuts);
-
-		preferences.popupPosition = store.has("popupPosition")
-			? store.get("popupPosition")
-			: null;
 
 		exercises.resetTimer();
 		lookAway.resetTimer();

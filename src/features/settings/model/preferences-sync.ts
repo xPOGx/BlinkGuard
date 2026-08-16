@@ -5,6 +5,8 @@ import {
 	type Size,
 	sameKeyboardShortcuts,
 	samePauseAppRules,
+	samePopupPositionsByDisplayId,
+	samePopupSizesByDisplayId,
 } from "../../../../shared/preferences";
 import type { SettingsPreferences } from "./preferences";
 
@@ -73,7 +75,15 @@ export function sameRendererPrefs(
 		a.notificationStyle === b.notificationStyle &&
 		samePopupColors(a.popupColors, b.popupColors) &&
 		samePoint(a.popupPosition, b.popupPosition) &&
+		samePopupPositionsByDisplayId(
+			a.popupPositionsByDisplayId,
+			b.popupPositionsByDisplayId,
+		) &&
 		sameSize(a.popupSize, b.popupSize) &&
+		samePopupSizesByDisplayId(
+			a.popupSizesByDisplayId,
+			b.popupSizesByDisplayId,
+		) &&
 		sameKeyboardShortcuts(a.keyboardShortcuts, b.keyboardShortcuts) &&
 		a.mgdMode === b.mgdMode &&
 		a.soundEnabled === b.soundEnabled &&

@@ -14,8 +14,13 @@ import {
 	DEFAULT_KEYBOARD_SHORTCUTS,
 	DEFAULT_PREFERENCES,
 	findDuplicateShortcutActions,
+	prunePopupPositionsByDisplayId,
+	prunePopupSizesByDisplayId,
+	samePopupPositionsByDisplayId,
+	samePopupSizesByDisplayId,
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
+	sanitizeEpochMs,
 	sanitizeExercisePrompts,
 	sanitizeKeyboardShortcuts,
 	sanitizeLookAwayHint,
@@ -24,9 +29,12 @@ import {
 	sanitizePauseAppPickerPayload,
 	sanitizePauseAppRules,
 	sanitizePersistedPreferences,
+	sanitizePopupPositionsByDisplayId,
+	sanitizePopupSizesByDisplayId,
 	sanitizeSnoozeMinutes,
 	sanitizeSoundVolume,
-	sanitizeEpochMs,
+	seedPopupPositionsFromLegacy,
+	seedPopupSizesFromPositionIds,
 	toRendererPreferences,
 } from "../../../shared/preferences";
 
@@ -513,5 +521,106 @@ describe("sanitizePauseAppPickerPayload", () => {
 			},
 			running: [{ processName: "chrome.exe", windowTitle: "Docs" }],
 		});
+	});
+});
+
+describe("popupPositionsByDisplayId", () => {
+	it("sanitizes junk keys and non-finite points", () => {
+		expect(sanitizePopupPositionsByDisplayId(null)).toEqual({});
+		expect(sanitizePopupPositionsByDisplayId("nope")).toEqual({});
+		expect(sanitizePopupPositionsByDisplayId([])).toEqual({});
+		expect(
+			sanitizePopupPositionsByDisplayId({
+				" 12 ": { x: 10.6, y: 20.2 },
+				"": { x: 1, y: 2 },
+				bad: { x: "n", y: 2 },
+				nested: 4,
+			}),
+		).toEqual({
+			"12": { x: 11, y: 20 },
+		});
+	});
+
+	it("hydrates a missing map to {}", () => {
+		expect(sanitizePersistedPreferences({}).popupPositionsByDisplayId).toEqual(
+			{},
+		);
+	});
+
+	it("seeds from legacy popupPosition only when the map is empty", () => {
+		const legacy = { x: 40, y: 80 };
+		expect(seedPopupPositionsFromLegacy({}, legacy, "1")).toEqual({
+			"1": legacy,
+		});
+		expect(
+			seedPopupPositionsFromLegacy({ "2": { x: 1, y: 2 } }, legacy, "1"),
+		).toEqual({ "2": { x: 1, y: 2 } });
+		expect(seedPopupPositionsFromLegacy({}, null, "1")).toEqual({});
+		expect(seedPopupPositionsFromLegacy({}, legacy, "  ")).toEqual({});
+	});
+
+	it("prunes ids that are not live and compares maps", () => {
+		const map = {
+			"1": { x: 10, y: 20 },
+			"2": { x: 30, y: 40 },
+		};
+		expect(prunePopupPositionsByDisplayId(map, ["1"])).toEqual({
+			"1": { x: 10, y: 20 },
+		});
+		expect(samePopupPositionsByDisplayId(map, { ...map })).toBe(true);
+		expect(samePopupPositionsByDisplayId(map, { "1": { x: 10, y: 20 } })).toBe(
+			false,
+		);
+	});
+});
+
+describe("popupSizesByDisplayId", () => {
+	it("sanitizes junk keys and invalid sizes", () => {
+		expect(sanitizePopupSizesByDisplayId(null)).toEqual({});
+		expect(sanitizePopupSizesByDisplayId([])).toEqual({});
+		expect(
+			sanitizePopupSizesByDisplayId({
+				" 3 ": { width: 320.6, height: 140.2 },
+				"": { width: 10, height: 10 },
+				bad: { width: 0, height: 80 },
+				nested: true,
+			}),
+		).toEqual({
+			"3": { width: 321, height: 140 },
+		});
+	});
+
+	it("hydrates a missing map to {}", () => {
+		expect(sanitizePersistedPreferences({}).popupSizesByDisplayId).toEqual({});
+	});
+
+	it("seeds from the size mirror onto position-map ids when empty", () => {
+		const mirror = { width: 300, height: 120 };
+		expect(seedPopupSizesFromPositionIds({}, ["1", "2"], mirror)).toEqual({
+			"1": mirror,
+			"2": mirror,
+		});
+		expect(
+			seedPopupSizesFromPositionIds(
+				{ "9": { width: 200, height: 80 } },
+				["1"],
+				mirror,
+			),
+		).toEqual({ "9": { width: 200, height: 80 } });
+		expect(seedPopupSizesFromPositionIds({}, [], mirror)).toEqual({});
+	});
+
+	it("prunes ids that are not live", () => {
+		const map = {
+			"1": { width: 300, height: 120 },
+			"2": { width: 400, height: 180 },
+		};
+		expect(prunePopupSizesByDisplayId(map, ["2"])).toEqual({
+			"2": { width: 400, height: 180 },
+		});
+		expect(samePopupSizesByDisplayId(map, { ...map })).toBe(true);
+		expect(
+			samePopupSizesByDisplayId(map, { "1": { width: 300, height: 120 } }),
+		).toBe(false);
 	});
 });

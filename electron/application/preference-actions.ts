@@ -11,6 +11,7 @@ import type { CameraDevicePref } from "../../shared/camera-devices";
 import type {
 	CameraQuality,
 	KeyboardShortcuts,
+	Point,
 } from "../../shared/preferences";
 import type { BlinkStatsService } from "./blink-stats-service";
 import type { ExerciseService } from "./exercise-service";
@@ -35,6 +36,7 @@ export interface PreferenceActionWindows {
 	sendPreferences(): void;
 	sendToMain(channel: string, ...args: unknown[]): void;
 	showCamera(onClosed: () => void): void;
+	getPopupPositionSeedDisplayId(legacyPoint: Point | null): string;
 }
 
 export interface PreferenceActionShortcuts {
@@ -144,6 +146,12 @@ export class PreferenceActions {
 			this.lookAway.stop();
 			this.sidecar.cancelEarCalibration("Preferences imported from backup");
 			this.preferences.replaceFromBackup(parsed.preferences);
+			this.preferences.seedPopupPositionsFromLegacy(
+				this.windows.getPopupPositionSeedDisplayId(
+					this.preferences.current.popupPosition,
+				),
+			);
+			this.preferences.seedPopupSizesFromPositionIds();
 			const next = this.preferences.current;
 			this.applyLaunchAtLogin(next.launchAtLogin);
 			this.shortcuts.registerAll(next.keyboardShortcuts);

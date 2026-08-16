@@ -89,6 +89,18 @@ describe("sameRendererPrefs", () => {
 				popupPosition: { x: 1, y: 2 },
 			}),
 		).toBe(false);
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				popupPositionsByDisplayId: { "1": { x: 1, y: 2 } },
+			}),
+		).toBe(false);
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				popupSizesByDisplayId: { "1": { width: 320, height: 140 } },
+			}),
+		).toBe(false);
 	});
 
 	it("detects auto-stop no-face preference changes", () => {
@@ -202,6 +214,34 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateKeyboardShortcuts).not.toHaveBeenCalled();
 		expect(rendererIpc.updateAutoStopNoFaceEnabled).not.toHaveBeenCalled();
 		expect(rendererIpc.updateCameraDevice).not.toHaveBeenCalled();
+	});
+
+	it("does not push IPC when only popupPositionsByDisplayId changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = {
+			...previous,
+			popupPositionsByDisplayId: { "1": { x: 40, y: 80 } },
+		};
+
+		pushPreferenceDiff(previous, next);
+
+		for (const fn of Object.values(rendererIpc)) {
+			expect(fn).not.toHaveBeenCalled();
+		}
+	});
+
+	it("does not push IPC when only popupSizesByDisplayId changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = {
+			...previous,
+			popupSizesByDisplayId: { "1": { width: 320, height: 140 } },
+		};
+
+		pushPreferenceDiff(previous, next);
+
+		for (const fn of Object.values(rendererIpc)) {
+			expect(fn).not.toHaveBeenCalled();
+		}
 	});
 
 	it("does not touch locale when only unrelated prefs change", () => {
