@@ -1,7 +1,7 @@
 {
 	"name": "blinkguard",
 	"private": true,
-	"version": "2.11.0",
+	"version": "2.12.0",
 	"type": "module",
 	"description": "A desktop application to help prevent dry eyes by reminding you to blink regularly",
 	"license": "MIT",

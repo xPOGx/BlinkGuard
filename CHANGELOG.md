@@ -4,6 +4,13 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-08-16
+
+### Added
+
+- Optional native OS toasts for blink, exercise, and look-away (overlay, banners, or both)
+- Remember blink editor layout per display; Save all / Set up next for remaining monitors
+
 ## [2.11.0] - 2026-08-16
 
 ### Added

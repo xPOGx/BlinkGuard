@@ -13,9 +13,9 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 - **Camera visualization** — optional live preview (up to Ultra 30 FPS) with face/eye landmarks and EAR status; Setup vs Tuning tabs; nudge when EAR calibration is stale
 - **Eye exercise reminders** — can run independently of blink reminders; configurable interval (5–60 minutes); Skip / configurable Snooze; auto-close after 30 seconds
 - **20-20-20 look-away breaks** — independent timer alongside exercises; editable title/hint
-- **Customizable reminder popup** — drag to reposition, resize with edge handles, custom message, colors, and transparency
+- **Customizable reminder popup** — drag to reposition, resize with edge handles, custom message, colors, and transparency; layout remembered per display
 - **Global keyboard shortcuts** — multi-action bindings (default includes `Ctrl+I`; rebindable)
-- **Sounds** — optional notification sounds for blink and exercise popups (per-kind volume)
+- **Sounds & OS toasts** — optional notification sounds (per-kind volume); blink / exercise / look-away can use overlay, native OS banners, or both
 - **Quiet hours, fullscreen, and per-app pause** — hide popups during quiet time, fullscreen, or listed foreground apps
 - **Progress** — stats, goals/streaks, blink levels, achievements, rewards shop, and share-card preview in one nav section
 - **Backup** — export/import local prefs and stats as JSON
