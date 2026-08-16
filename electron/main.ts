@@ -36,6 +36,7 @@ import { createSessionActivity } from "./infrastructure/session-activity/create-
 import { BlinkDetectorSidecar } from "./infrastructure/sidecar/blink-detector-sidecar";
 import { ShortcutController } from "./infrastructure/shortcuts/shortcut-controller";
 import { NotificationSoundPlayer } from "./infrastructure/sound/notification-sound-player";
+import { OsNotificationPlayer } from "./infrastructure/notifications/os-notification-player";
 import { ElectronPreferenceStore } from "./infrastructure/store/electron-preference-store";
 import { TrayController } from "./infrastructure/tray/tray-controller";
 import { AutoUpdateService } from "./infrastructure/updates/auto-update-service";
@@ -99,6 +100,7 @@ function bootstrap(): void {
 		},
 	);
 	const sound = new NotificationSoundPlayer(paths, preferences, app.isPackaged);
+	const osNotifications = new OsNotificationPlayer();
 
 	blinkStats.setPushHandler((snapshot) => {
 		windows.sendToMain(IPC_CHANNELS.loadBlinkStats, snapshot);
@@ -231,6 +233,7 @@ function bootstrap(): void {
 		notificationGate,
 		blinkRateCoaching,
 		calibrationNudge,
+		osNotifications,
 	);
 	const focusEnvironment = createFocusEnvironment();
 	const focusPause = new FocusPauseService(
@@ -239,6 +242,7 @@ function bootstrap(): void {
 		reminders,
 		IPC_CHANNELS.focusPauseState,
 		focusEnvironment.supportsFullscreenDetection(),
+		osNotifications,
 	);
 	gateHolder.current = focusPause;
 	const focusMonitor = new FocusEnvironmentMonitor(
@@ -255,6 +259,7 @@ function bootstrap(): void {
 		windows,
 		sound,
 		notificationGate,
+		osNotifications,
 	);
 	const lookAway = new LookAwayService(
 		preferences,
@@ -263,7 +268,21 @@ function bootstrap(): void {
 		windows,
 		sound,
 		notificationGate,
+		osNotifications,
 	);
+	osNotifications.setActivationHandlers({
+		onClick: () => windows.showMain(),
+		onSnooze: (kind) => {
+			if (kind === "blink") reminders.snooze();
+			else if (kind === "exercise") exercises.snooze();
+			else lookAway.snooze();
+		},
+	});
+	focusPause.bindPromptDismissers({
+		blink: () => reminders.dismissVisibleBlink(),
+		exercise: () => exercises.dismissVisible(),
+		lookAway: () => lookAway.dismissVisible(),
+	});
 	reminders.bindTrackingSessionStop((showStatus) =>
 		stopTrackingSession(
 			{ reminders, exercises, lookAway, preferences },
@@ -309,6 +328,7 @@ function bootstrap(): void {
 		processCleanup,
 		blinkStats,
 		() => {
+			osNotifications.dismissAll();
 			shortcuts.unregisterAll();
 			focusMonitor.stop();
 			focusPause.stopQuietHoursWatch();

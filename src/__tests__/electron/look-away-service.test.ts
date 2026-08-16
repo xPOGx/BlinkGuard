@@ -6,9 +6,10 @@ import type {
 	LookAwayWindowPort,
 	NotificationSoundPort,
 } from "../../../electron/application/ports/runtime-ports";
+import { snoozeAllPrompts } from "../../../electron/application/snooze-all";
 import {
-	DEFAULT_PREFERENCES,
 	type AppPreferences,
+	DEFAULT_PREFERENCES,
 } from "../../../shared/preferences";
 
 function createStore(): PreferenceStore {
@@ -70,6 +71,16 @@ function createWindows(): LookAwayWindowPort & {
 
 function createSound(): NotificationSoundPort {
 	return { play: vi.fn() };
+}
+
+function createOs(shown = true) {
+	return {
+		isSupported: vi.fn(() => true),
+		show: vi.fn(() => ({ shown })),
+		dismiss: vi.fn(),
+		dismissAll: vi.fn(),
+		setActivationHandlers: vi.fn(),
+	};
 }
 
 describe("LookAwayService", () => {
@@ -304,6 +315,162 @@ describe("LookAwayService", () => {
 		service.resetTimer();
 
 		expect(store.get("lastLookAwayTime", 0)).toBeGreaterThan(dueAt);
+		expect(windows.showLookAway).not.toHaveBeenCalled();
+	});
+
+	it("shows a native toast instead of an overlay when style is native", () => {
+		const preferences = createPreferences({
+			lookAwayInterval: 1,
+			notificationStyle: "native",
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const os = createOs();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			createSound(),
+			undefined,
+			os,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(os.show).toHaveBeenCalledOnce();
+		expect(windows.showLookAway).not.toHaveBeenCalled();
+		expect(state.isLookAwayShowing).toBe(true);
+	});
+
+	it("dismissVisible clears native-only showing state", () => {
+		const preferences = createPreferences({
+			lookAwayInterval: 1,
+			notificationStyle: "native",
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const os = createOs();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			createSound(),
+			undefined,
+			os,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+		expect(state.isLookAwayShowing).toBe(true);
+
+		service.dismissVisible();
+
+		expect(state.isLookAwayShowing).toBe(false);
+		expect(os.dismiss).toHaveBeenCalledWith("lookAway");
+	});
+
+	it("shows overlay and native toast when style is both", () => {
+		const preferences = createPreferences({
+			lookAwayInterval: 1,
+			notificationStyle: "both",
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const sound = createSound();
+		const os = createOs();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			sound,
+			undefined,
+			os,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(sound.play).toHaveBeenCalledOnce();
+		expect(windows.showLookAway).toHaveBeenCalledOnce();
+		expect(os.show).toHaveBeenCalledOnce();
+		expect(state.isLookAwayShowing).toBe(true);
+	});
+
+	it("does not call os.show when the gate is closed", () => {
+		const preferences = createPreferences({
+			lookAwayInterval: 1,
+			notificationStyle: "both",
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const sound = createSound();
+		const os = createOs();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			sound,
+			{
+				notificationsAllowed: () => false,
+				pauseReason: () => "quiet-hours",
+			},
+			os,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(os.show).not.toHaveBeenCalled();
+		expect(windows.showLookAway).not.toHaveBeenCalled();
+		expect(sound.play).not.toHaveBeenCalled();
+	});
+
+	it("snoozeAll still snoozes a native-only look-away", () => {
+		const preferences = createPreferences({
+			lookAwayInterval: 1,
+			notificationStyle: "native",
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastLookAwayTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const os = createOs();
+		const service = new LookAwayService(
+			preferences,
+			state,
+			store,
+			windows,
+			createSound(),
+			undefined,
+			os,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+		expect(state.isLookAwayShowing).toBe(true);
+
+		snoozeAllPrompts({
+			reminders: { snooze: vi.fn() },
+			exercises: { snooze: vi.fn() },
+			lookAway: service,
+			state,
+		});
+
+		expect(os.dismiss).toHaveBeenCalledWith("lookAway");
+		expect(state.isLookAwayShowing).toBe(false);
 		expect(windows.showLookAway).not.toHaveBeenCalled();
 	});
 });

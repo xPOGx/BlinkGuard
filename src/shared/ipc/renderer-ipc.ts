@@ -23,6 +23,7 @@ import type {
 } from "../../../shared/debug-preview";
 import type { ExportDiagnosticsResult } from "../../../shared/diagnostics";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
+import type { NotificationStyle } from "../../../shared/notification-style";
 import {
 	type CameraQuality,
 	emptyPauseAppPicker,
@@ -178,6 +179,8 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateSoundEnabled, enabled),
 	updateSoundVolume: (volume: number) =>
 		send(IPC_CHANNELS.updateSoundVolume, volume),
+	updateNotificationStyle: (style: NotificationStyle) =>
+		send(IPC_CHANNELS.updateNotificationStyle, style),
 	updateLaunchAtLogin: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateLaunchAtLogin, enabled),
 	updateHasCompletedOnboarding: (completed: boolean) =>

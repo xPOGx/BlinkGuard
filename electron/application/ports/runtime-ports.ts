@@ -65,3 +65,37 @@ export interface NotificationSoundPort {
 		options?: { force?: boolean; volume?: number },
 	): void;
 }
+
+export type OsToastKind = "blink" | "exercise" | "lookAway";
+
+export type OsToastShowResult = { shown: boolean };
+
+export type OsToastPayload = {
+	title: string;
+	body: string;
+	snoozeLabel: string;
+};
+
+export interface OsNotificationPort {
+	isSupported(): boolean;
+	show(
+		kind: OsToastKind,
+		payload: OsToastPayload,
+		hooks?: { onFailed?: () => void },
+	): OsToastShowResult;
+	dismiss(kind: OsToastKind): void;
+	dismissAll(): void;
+	setActivationHandlers(handlers: {
+		onClick: (kind: OsToastKind) => void;
+		onSnooze: (kind: OsToastKind) => void;
+	}): void;
+}
+
+/** Default when tests / callers omit the port — native is treated as unsupported (overlay fallback). */
+export const NO_OP_OS_NOTIFICATIONS: OsNotificationPort = {
+	isSupported: () => false,
+	show: () => ({ shown: false }),
+	dismiss: () => {},
+	dismissAll: () => {},
+	setActivationHandlers: () => {},
+};

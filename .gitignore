@@ -20,6 +20,7 @@ coverage/
 !.vscode/extensions.json
 .idea
 .cursor/
+specs/
 .DS_Store
 *.suo
 *.ntvs*

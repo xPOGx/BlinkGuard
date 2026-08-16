@@ -30,6 +30,7 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updatePopupTransparency: vi.fn(),
 		updatePopupMessage: vi.fn(),
 		updateBlinkPopupClickThrough: vi.fn(),
+		updateNotificationStyle: vi.fn(),
 		updateKeyboardShortcuts: vi.fn(),
 		updateMgdMode: vi.fn(),
 		updateSoundEnabled: vi.fn(),
@@ -122,6 +123,16 @@ describe("sameRendererPrefs", () => {
 			sameRendererPrefs(base, {
 				...base,
 				snoozeMinutes: 10,
+			}),
+		).toBe(false);
+	});
+
+	it("detects notificationStyle preference changes", () => {
+		const base = { ...DEFAULT_RENDERER_PREFERENCES };
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				notificationStyle: "native",
 			}),
 		).toBe(false);
 	});
@@ -272,6 +283,18 @@ describe("pushPreferenceDiff", () => {
 		);
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 		expect(rendererIpc.updatePopupMessage).not.toHaveBeenCalled();
+	});
+
+	it("pushes only notification style when it changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = { ...previous, notificationStyle: "both" as const };
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateNotificationStyle).toHaveBeenCalledWith("both");
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+		expect(rendererIpc.updateSoundEnabled).not.toHaveBeenCalled();
+		expect(rendererIpc.updateBlinkPopupClickThrough).not.toHaveBeenCalled();
 	});
 
 	it("pushes only eye-care independence when it changes", () => {

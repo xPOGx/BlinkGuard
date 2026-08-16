@@ -3,6 +3,7 @@ import {
 	sanitizeClassifierBias,
 	sanitizeClassifierThreshold,
 } from "../../shared/classifier-calibration";
+import { sanitizeNotificationStyle } from "../../shared/notification-style";
 import {
 	DEFAULT_PREFERENCES,
 	sameKeyboardShortcuts,
@@ -151,6 +152,8 @@ export class PreferencesService {
 		let next = value;
 		if (key === "locale") {
 			next = sanitizeLocale(value) as PersistedPreferences[K];
+		} else if (key === "notificationStyle") {
+			next = sanitizeNotificationStyle(value) as PersistedPreferences[K];
 		} else if (key === "exercisePrompts") {
 			next = sanitizeExercisePrompts(
 				value,

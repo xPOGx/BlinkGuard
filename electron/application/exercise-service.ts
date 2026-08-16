@@ -1,4 +1,8 @@
-import { resolveExercisePrompts } from "../../shared/i18n";
+import { resolveExercisePrompts, t } from "../../shared/i18n";
+import {
+	resolvePromptSurfaces,
+	withNativeFallback,
+} from "../../shared/notification-style";
 import {
 	sanitizeExercisePrompts,
 	type AppPreferences,
@@ -10,9 +14,11 @@ import {
 import type { AppRuntimeState } from "./app-runtime-state";
 import type { PreferenceStore } from "./ports/preference-store";
 import type { NotificationGate } from "./ports/notification-gate";
-import type {
-	ExerciseWindowPort,
-	NotificationSoundPort,
+import {
+	NO_OP_OS_NOTIFICATIONS,
+	type ExerciseWindowPort,
+	type NotificationSoundPort,
+	type OsNotificationPort,
 } from "./ports/runtime-ports";
 
 const ALLOW_ALL_GATE: NotificationGate = {
@@ -20,7 +26,11 @@ const ALLOW_ALL_GATE: NotificationGate = {
 	pauseReason: () => null,
 };
 
+type PromptSession = { overlay: unknown | null };
+
 export class ExerciseService {
+	private session: PromptSession | null = null;
+
 	constructor(
 		private readonly preferences: AppPreferences,
 		private readonly state: AppRuntimeState,
@@ -28,6 +38,7 @@ export class ExerciseService {
 		private readonly windows: ExerciseWindowPort,
 		private readonly sound: NotificationSoundPort,
 		private readonly notificationGate: NotificationGate = ALLOW_ALL_GATE,
+		private readonly osNotifications: OsNotificationPort = NO_OP_OS_NOTIFICATIONS,
 	) {}
 
 	start(): void {
@@ -47,16 +58,16 @@ export class ExerciseService {
 
 	stop(): void {
 		this.state.clearExerciseTimers();
-		this.windows.closeExercise();
+		this.dismissVisible();
 	}
 
 	skip(): void {
-		this.closePopup();
+		this.dismissVisible();
 		this.store.set("lastExerciseTime", Date.now());
 	}
 
 	snooze(): void {
-		this.closePopup();
+		this.dismissVisible();
 		if (this.state.exerciseSnoozeTimeout) {
 			clearTimeout(this.state.exerciseSnoozeTimeout);
 		}
@@ -92,18 +103,64 @@ export class ExerciseService {
 		const prompt = prompts[index];
 		this.store.set("exercisePromptIndex", (index + 1) % prompts.length);
 
-		const popup = this.windows.showExercise(prompt, () => {
-			this.state.isExerciseShowing = false;
-		});
-		if (!popup) {
+		const surfaces = resolvePromptSurfaces(
+			this.preferences.notificationStyle,
+			this.osNotifications.isSupported(),
+		);
+		let nativeShown = false;
+		if (surfaces.native) {
+			nativeShown = this.osNotifications.show(
+				"exercise",
+				{
+					title: t(locale, "popup.exercise.title"),
+					body: prompt,
+					snoozeLabel: t(locale, "osToast.snooze"),
+				},
+				{ onFailed: () => this.fallbackOverlay(prompt) },
+			).shown;
+		}
+		const planned = withNativeFallback(surfaces, nativeShown);
+		let overlay: unknown | null = null;
+		if (planned.overlay) {
+			overlay = this.windows.showExercise(prompt, () => {
+				this.state.isExerciseShowing = false;
+				this.osNotifications.dismiss("exercise");
+				this.session = null;
+			});
+		}
+		if (planned.overlay && !overlay && !planned.nativeShown) {
 			this.state.isExerciseShowing = false;
 			return;
 		}
+		const session: PromptSession = { overlay };
+		this.session = session;
 		setTimeout(() => {
-			if (this.windows.closeExerciseIfCurrent(popup)) {
+			this.endSessionIfCurrent(session);
+		}, EXERCISE_POPUP_VISIBLE_MS);
+	}
+
+	private fallbackOverlay(prompt: string): void {
+		if (!this.state.isExerciseShowing) return;
+		if (this.session?.overlay) return;
+		const overlay = this.windows.showExercise(prompt, () => {
+			this.state.isExerciseShowing = false;
+			this.osNotifications.dismiss("exercise");
+			this.session = null;
+		});
+		if (this.session) this.session.overlay = overlay;
+	}
+
+	private endSessionIfCurrent(session: PromptSession): void {
+		if (this.session !== session) return;
+		if (session.overlay) {
+			if (this.windows.closeExerciseIfCurrent(session.overlay)) {
 				this.state.isExerciseShowing = false;
 			}
-		}, EXERCISE_POPUP_VISIBLE_MS);
+		} else {
+			this.state.isExerciseShowing = false;
+		}
+		this.osNotifications.dismiss("exercise");
+		this.session = null;
 	}
 
 	/** Prefer 20-20-20 when both eye-care prompts are due in the same tick. */
@@ -114,8 +171,10 @@ export class ExerciseService {
 		return elapsed >= this.preferences.lookAwayInterval * 60 * 1000;
 	}
 
-	private closePopup(): void {
+	dismissVisible(): void {
 		this.windows.closeExercise();
+		this.osNotifications.dismiss("exercise");
 		this.state.isExerciseShowing = false;
+		this.session = null;
 	}
 }

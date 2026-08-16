@@ -6,6 +6,7 @@ import type {
 	ExerciseWindowPort,
 	NotificationSoundPort,
 } from "../../../electron/application/ports/runtime-ports";
+import { snoozeAllPrompts } from "../../../electron/application/snooze-all";
 import {
 	type AppPreferences,
 	DEFAULT_PREFERENCES,
@@ -62,6 +63,16 @@ function createWindows(): ExerciseWindowPort & {
 
 function createSound(): NotificationSoundPort {
 	return { play: vi.fn() };
+}
+
+function createOs(shown = true) {
+	return {
+		isSupported: vi.fn(() => true),
+		show: vi.fn(() => ({ shown })),
+		dismiss: vi.fn(),
+		dismissAll: vi.fn(),
+		setActivationHandlers: vi.fn(),
+	};
 }
 
 describe("ExerciseService", () => {
@@ -279,5 +290,216 @@ describe("ExerciseService", () => {
 		expect(sound.play).toHaveBeenCalledWith("exercise");
 		expect(windows.showExercise).toHaveBeenCalledOnce();
 		expect(state.isExerciseShowing).toBe(false);
+	});
+
+	it("shows a native toast instead of an overlay when style is native", () => {
+		const preferences = createPreferences({
+			lookAwayEnabled: false,
+			notificationStyle: "native",
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastExerciseTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const sound = createSound();
+		const os = createOs();
+		const service = new ExerciseService(
+			preferences,
+			state,
+			store,
+			windows,
+			sound,
+			undefined,
+			os,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(sound.play).toHaveBeenCalledWith("exercise");
+		expect(os.show).toHaveBeenCalledOnce();
+		expect(windows.showExercise).not.toHaveBeenCalled();
+		expect(state.isExerciseShowing).toBe(true);
+	});
+
+	it("dismissVisible clears native-only showing state", () => {
+		const preferences = createPreferences({
+			lookAwayEnabled: false,
+			notificationStyle: "native",
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastExerciseTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const os = createOs();
+		const service = new ExerciseService(
+			preferences,
+			state,
+			store,
+			windows,
+			createSound(),
+			undefined,
+			os,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+		expect(state.isExerciseShowing).toBe(true);
+
+		service.dismissVisible();
+
+		expect(state.isExerciseShowing).toBe(false);
+		expect(os.dismiss).toHaveBeenCalledWith("exercise");
+	});
+
+	it("shows overlay and native toast when style is both", () => {
+		const preferences = createPreferences({
+			lookAwayEnabled: false,
+			notificationStyle: "both",
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastExerciseTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const sound = createSound();
+		const os = createOs();
+		const service = new ExerciseService(
+			preferences,
+			state,
+			store,
+			windows,
+			sound,
+			undefined,
+			os,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(sound.play).toHaveBeenCalledOnce();
+		expect(windows.showExercise).toHaveBeenCalledOnce();
+		expect(os.show).toHaveBeenCalledOnce();
+	});
+
+	it("falls back to overlay when native show fails", () => {
+		const preferences = createPreferences({
+			lookAwayEnabled: false,
+			notificationStyle: "native",
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastExerciseTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const os = createOs(false);
+		const service = new ExerciseService(
+			preferences,
+			state,
+			store,
+			windows,
+			createSound(),
+			undefined,
+			os,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(windows.showExercise).toHaveBeenCalledOnce();
+		expect(state.isExerciseShowing).toBe(true);
+	});
+
+	it("does not call os.show when the gate is closed", () => {
+		const preferences = createPreferences({
+			lookAwayEnabled: false,
+			notificationStyle: "both",
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastExerciseTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const sound = createSound();
+		const os = createOs();
+		const service = new ExerciseService(
+			preferences,
+			state,
+			store,
+			windows,
+			sound,
+			{
+				notificationsAllowed: () => false,
+				pauseReason: () => "quiet-hours",
+			},
+			os,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(os.show).not.toHaveBeenCalled();
+		expect(windows.showExercise).not.toHaveBeenCalled();
+		expect(sound.play).not.toHaveBeenCalled();
+	});
+
+	it("does not show a native toast while look-away is due", () => {
+		const preferences = createPreferences({ notificationStyle: "native" });
+		const state = new AppRuntimeState();
+		const store = createStore();
+		const dueAt = Date.now() - 61_000;
+		store.set("lastExerciseTime", dueAt);
+		store.set("lastLookAwayTime", dueAt);
+		const windows = createWindows();
+		const os = createOs();
+		const service = new ExerciseService(
+			preferences,
+			state,
+			store,
+			windows,
+			createSound(),
+			undefined,
+			os,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+
+		expect(os.show).not.toHaveBeenCalled();
+		expect(windows.showExercise).not.toHaveBeenCalled();
+		expect(state.isExerciseShowing).toBe(false);
+	});
+
+	it("snoozeAll still snoozes a native-only exercise", () => {
+		const preferences = createPreferences({
+			lookAwayEnabled: false,
+			notificationStyle: "native",
+		});
+		const state = new AppRuntimeState();
+		const store = createStore();
+		store.set("lastExerciseTime", Date.now() - 61_000);
+		const windows = createWindows();
+		const os = createOs();
+		const service = new ExerciseService(
+			preferences,
+			state,
+			store,
+			windows,
+			createSound(),
+			undefined,
+			os,
+		);
+
+		service.start();
+		vi.advanceTimersByTime(60_000);
+		expect(state.isExerciseShowing).toBe(true);
+
+		snoozeAllPrompts({
+			reminders: { snooze: vi.fn() },
+			exercises: service,
+			lookAway: { snooze: vi.fn() },
+			state,
+		});
+
+		expect(os.dismiss).toHaveBeenCalledWith("exercise");
+		expect(state.isExerciseShowing).toBe(false);
+		expect(windows.showExercise).not.toHaveBeenCalled();
 	});
 });

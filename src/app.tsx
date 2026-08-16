@@ -39,6 +39,7 @@ import { DarkModeToggle } from "@/features/settings/ui/dark-mode-toggle";
 import { GoalsSettings } from "@/features/settings/ui/goals-settings";
 import { LanguageSettings } from "@/features/settings/ui/language-settings";
 import { LaunchAtLoginSettings } from "@/features/settings/ui/launch-at-login-settings";
+import { NotificationStyleSettings } from "@/features/settings/ui/notification-style-settings";
 import { QuietHoursFocusSettings } from "@/features/settings/ui/quiet-hours-focus-settings";
 import { ResetPreferencesButton } from "@/features/settings/ui/reset-preferences-button";
 import { SoundSettings } from "@/features/settings/ui/sound-settings";
@@ -457,6 +458,10 @@ function SettingsShell({
 								{section === "appearance" && (
 									<>
 										<PopupSettings
+											preferences={preferences}
+											setPreferences={setPreferences}
+										/>
+										<NotificationStyleSettings
 											preferences={preferences}
 											setPreferences={setPreferences}
 										/>

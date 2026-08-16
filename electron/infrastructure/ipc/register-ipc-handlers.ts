@@ -10,6 +10,7 @@ import {
 import { isBlinkRewardId } from "../../../shared/blink-rewards";
 import { isDebugOverlayKind, isDebugSoundKind } from "../../../shared/debug-preview";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
+import { sanitizeNotificationStyle } from "../../../shared/notification-style";
 import type { PauseAppRule, Point, PopupColors, Size } from "../../../shared/preferences";
 import {
 	sameKeyboardShortcuts,
@@ -351,6 +352,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	});
 	on(IPC_CHANNELS.updateSoundVolume, (_event, volume: unknown) => {
 		preferences.set("soundVolume", volume as number);
+	});
+	on(IPC_CHANNELS.updateNotificationStyle, (_event, style: unknown) => {
+		preferences.set("notificationStyle", sanitizeNotificationStyle(style));
 	});
 	on(IPC_CHANNELS.updateLaunchAtLogin, (_event, enabled: unknown) => {
 		preferences.set("launchAtLogin", enabled as boolean);

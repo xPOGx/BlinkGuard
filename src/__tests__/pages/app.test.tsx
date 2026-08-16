@@ -518,4 +518,35 @@ describe("settings shell", () => {
 
 		expect(send).not.toHaveBeenCalled();
 	});
+
+	it("pushes notificationStyle from Appearance without hiding click-through", () => {
+		render(<App />);
+		hydratePreferences({ hasCompletedOnboarding: true });
+
+		fireEvent.click(screen.getByRole("button", { name: "Appearance" }));
+		expect(
+			screen.getByRole("switch", {
+				name: "Pass clicks through reminder popups",
+			}),
+		).toBeTruthy();
+
+		send.mockClear();
+		fireEvent.change(
+			screen.getByRole("combobox", {
+				name: "How blink, exercise, and look-away prompts appear",
+			}),
+			{ target: { value: "native" } },
+		);
+
+		expect(send).toHaveBeenCalledWith(
+			IPC_CHANNELS.updateNotificationStyle,
+			"native",
+		);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
+		expect(
+			screen.getByRole("switch", {
+				name: "Pass clicks through reminder popups",
+			}),
+		).toBeTruthy();
+	});
 });

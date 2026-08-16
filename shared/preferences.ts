@@ -17,6 +17,11 @@ import {
 	sanitizeLocale,
 	type Locale,
 } from "./i18n";
+import {
+	DEFAULT_NOTIFICATION_STYLE,
+	sanitizeNotificationStyle,
+	type NotificationStyle,
+} from "./notification-style";
 
 export type { Locale };
 
@@ -425,6 +430,8 @@ export interface PersistedPreferences {
 	popupMessage: string;
 	/** When true, blink / exercise / look-away popups ignore mouse (watermark); snooze via tray. */
 	blinkPopupClickThrough: boolean;
+	/** How blink / exercise / look-away prompts appear. Default overlay (current). */
+	notificationStyle: NotificationStyle;
 	/** Minutes to suppress/re-show prompts after Snooze (1…30). */
 	snoozeMinutes: number;
 	/** Per-action global accelerators; empty string = unbound. */
@@ -545,6 +552,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	},
 	popupMessage: defaultPopupMessage("en"),
 	blinkPopupClickThrough: true,
+	notificationStyle: DEFAULT_NOTIFICATION_STYLE,
 	snoozeMinutes: SNOOZE_MINUTES_DEFAULT,
 	keyboardShortcuts: { ...DEFAULT_KEYBOARD_SHORTCUTS },
 	mgdMode: false,
@@ -825,6 +833,7 @@ export function sanitizePersistedPreferences(
 			record.blinkPopupClickThrough,
 			defaults.blinkPopupClickThrough,
 		),
+		notificationStyle: sanitizeNotificationStyle(record.notificationStyle),
 		snoozeMinutes: sanitizeSnoozeMinutes(record.snoozeMinutes),
 		keyboardShortcuts: sanitizeKeyboardShortcuts(
 			record.keyboardShortcuts,

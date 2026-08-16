@@ -1,4 +1,9 @@
 import { IPC_CHANNELS } from "../../shared/ipc-channels";
+import { t } from "../../shared/i18n";
+import {
+	resolvePromptSurfaces,
+	withNativeFallback,
+} from "../../shared/notification-style";
 import type { AppPreferences } from "../../shared/preferences";
 import {
 	BLINK_CREDIT_DEBOUNCE_MS,
@@ -17,10 +22,12 @@ import type { AppRuntimeState } from "./app-runtime-state";
 import type { BlinkRateCoachingPort, BlinkStatsPort, CalibrationNudgePort } from "./ports/blink-stats-port";
 import type { PreferenceStore } from "./ports/preference-store";
 import type { NotificationGate } from "./ports/notification-gate";
-import type {
-	BlinkDetectorPort,
-	NotificationSoundPort,
-	ReminderWindowPort,
+import {
+	NO_OP_OS_NOTIFICATIONS,
+	type BlinkDetectorPort,
+	type NotificationSoundPort,
+	type OsNotificationPort,
+	type ReminderWindowPort,
 } from "./ports/runtime-ports";
 
 const ALLOW_ALL_GATE: NotificationGate = {
@@ -34,6 +41,7 @@ export class ReminderService {
 	private lastDetectedBlinkAt = 0;
 	private readonly cameraPauseReasons = new Set<CameraPauseReason>();
 	private trackingSessionStop: ((showStatus: boolean) => void) | null = null;
+	private blinkSession: { overlay: unknown | null } | null = null;
 
 	constructor(
 		private readonly preferences: AppPreferences,
@@ -46,6 +54,7 @@ export class ReminderService {
 		private readonly notificationGate: NotificationGate = ALLOW_ALL_GATE,
 		private readonly coaching: BlinkRateCoachingPort | null = null,
 		private readonly calibrationNudge: CalibrationNudgePort | null = null,
+		private readonly osNotifications: OsNotificationPort = NO_OP_OS_NOTIFICATIONS,
 	) {}
 
 	/**
@@ -86,7 +95,7 @@ export class ReminderService {
 		this.setTracking(false);
 		this.sidecar.stopCamera();
 		this.resetFaceTracking();
-		this.windows.closeReminder();
+		this.dismissVisibleBlink();
 	}
 
 	private setTracking(value: boolean): void {
@@ -105,7 +114,7 @@ export class ReminderService {
 		if (!this.preferences.isTracking) return false;
 		if (!this.creditBlink("detected")) return false;
 		this.stats?.recordBlink();
-		this.windows.closeReminder();
+		this.dismissVisibleBlink();
 		return true;
 	}
 
@@ -125,6 +134,13 @@ export class ReminderService {
 		return true;
 	}
 
+	/** Close overlay + native blink toast without snoozing or stopping tracking. */
+	dismissVisibleBlink(): void {
+		this.windows.closeReminder();
+		this.osNotifications.dismiss("blink");
+		this.blinkSession = null;
+	}
+
 	/** Auto-dismiss / show cooldown — does not forge blink credit. */
 	markReminderShown(): void {
 		this.state.lastReminderShownAt = Date.now();
@@ -137,7 +153,7 @@ export class ReminderService {
 	 */
 	snooze(): void {
 		const ms = promptSnoozeMs(this.preferences.snoozeMinutes);
-		this.windows.closeReminder();
+		this.dismissVisibleBlink();
 		if (this.state.blinkSnoozeTimeout) {
 			clearTimeout(this.state.blinkSnoozeTimeout);
 		}
@@ -184,7 +200,7 @@ export class ReminderService {
 				return;
 			}
 			this.state.isFaceDetected = false;
-			this.windows.closeReminder();
+			this.dismissVisibleBlink();
 			this.windows.hideBlinkRateCoach();
 			this.windows.hideCalibrationNudge();
 			this.armNoFaceAutoStop();
@@ -261,7 +277,7 @@ export class ReminderService {
 			return;
 		}
 		this.state.clearReminderTimers();
-		this.windows.closeReminder();
+		this.dismissVisibleBlink();
 		if (this.preferences.mgdMode) {
 			this.startMgdLoop();
 		} else {
@@ -277,7 +293,7 @@ export class ReminderService {
 		if (!this.preferences.isTracking) return;
 
 		this.state.clearReminderTimers();
-		this.windows.closeReminder();
+		this.dismissVisibleBlink();
 
 		if (!this.preferences.cameraEnabled) {
 			// Re-arm timer cadence without an immediate popup (slider tweak).
@@ -287,7 +303,7 @@ export class ReminderService {
 			this.state.blinkReminderActive = true;
 			this.state.blinkInterval = setInterval(() => {
 				if (this.state.blinkReminderActive && this.preferences.isTracking) {
-					this.showBlinkReminder();
+					this.scheduleBlinkReminder();
 				} else {
 					this.state.clearReminderTimers();
 				}
@@ -335,7 +351,7 @@ export class ReminderService {
 		this.sidecar.stopCamera();
 		this.resetFaceTracking();
 		this.stats?.onFaceVisibility(false);
-		this.windows.closeReminder();
+		this.dismissVisibleBlink();
 	}
 
 	/** Resume camera after fullscreen / session if tracking still wants capture. */
@@ -362,10 +378,10 @@ export class ReminderService {
 		this.coaching?.stop();
 		this.calibrationNudge?.stop();
 		this.state.blinkReminderActive = true;
-		if (showImmediately) this.showBlinkReminder();
+		if (showImmediately) this.scheduleBlinkReminder();
 		this.state.blinkInterval = setInterval(() => {
 			if (this.state.blinkReminderActive && this.preferences.isTracking) {
-				this.showBlinkReminder();
+				this.scheduleBlinkReminder();
 			} else {
 				this.state.clearReminderTimers();
 			}
@@ -463,26 +479,28 @@ export class ReminderService {
 					isTracking: this.preferences.isTracking,
 					isDetectorRunning: this.sidecar.isRunning,
 					isFaceDetected: this.state.isFaceDetected,
-					hasPopup: this.windows.hasReminder(),
+					hasPopup: this.windows.hasReminder() || this.blinkSession !== null,
 					timeSinceLastBlinkMs: Date.now() - this.state.lastBlinkTime,
 					timeSinceLastReminderMs:
 						Date.now() - this.state.lastReminderShownAt,
 					reminderIntervalMs: this.preferences.reminderInterval,
 				})
 			) {
-				const popup = this.showBlinkReminder();
-				if (!popup) return;
-				setTimeout(() => {
-					if (this.windows.closeReminderIfCurrent(popup)) {
-						this.markReminderShown();
-					}
-				}, REMINDER_POPUP_VISIBLE_MS);
+				this.scheduleBlinkReminder();
 			}
 		}, CAMERA_POLL_INTERVAL_MS);
 	}
 
+	private scheduleBlinkReminder(): void {
+		const session = this.showBlinkReminder();
+		if (!session) return;
+		setTimeout(() => {
+			this.endBlinkSessionIfCurrent(session);
+		}, REMINDER_POPUP_VISIBLE_MS);
+	}
+
 	/** Soft-suppress blink popups while eye-care / quiet hours / fullscreen / snooze. */
-	private showBlinkReminder(): unknown | null {
+	private showBlinkReminder(): { overlay: unknown | null } | null {
 		if (this.state.isLookAwayShowing) return null;
 		if (this.state.isExerciseShowing) return null;
 		if (Date.now() < this.state.blinkSnoozeUntil) return null;
@@ -490,7 +508,52 @@ export class ReminderService {
 		this.windows.hideBlinkRateCoach();
 		this.windows.hideCalibrationNudge();
 		this.sound.play("blink");
-		return this.windows.showReminder("blink");
+
+		const locale = this.preferences.locale === "uk" ? "uk" : "en";
+		const surfaces = resolvePromptSurfaces(
+			this.preferences.notificationStyle,
+			this.osNotifications.isSupported(),
+		);
+		let nativeShown = false;
+		if (surfaces.native) {
+			nativeShown = this.osNotifications.show(
+				"blink",
+				{
+					title: t(locale, "popup.blink.title"),
+					body: this.preferences.popupMessage,
+					snoozeLabel: t(locale, "osToast.snooze"),
+				},
+				{ onFailed: () => this.fallbackBlinkOverlay() },
+			).shown;
+		}
+		const planned = withNativeFallback(surfaces, nativeShown);
+		let overlay: unknown | null = null;
+		if (planned.overlay) {
+			overlay = this.windows.showReminder("blink");
+		}
+		if (planned.overlay && !overlay && !planned.nativeShown) {
+			return null;
+		}
+		const session = { overlay };
+		this.blinkSession = session;
+		return session;
+	}
+
+	private fallbackBlinkOverlay(): void {
+		if (this.blinkSession?.overlay) return;
+		if (this.state.isLookAwayShowing || this.state.isExerciseShowing) return;
+		const overlay = this.windows.showReminder("blink");
+		if (this.blinkSession) this.blinkSession.overlay = overlay;
+	}
+
+	private endBlinkSessionIfCurrent(session: { overlay: unknown | null }): void {
+		if (this.blinkSession !== session) return;
+		if (session.overlay) {
+			this.windows.closeReminderIfCurrent(session.overlay);
+		}
+		this.osNotifications.dismiss("blink");
+		this.blinkSession = null;
+		this.markReminderShown();
 	}
 
 	private resetFaceTracking(): void {

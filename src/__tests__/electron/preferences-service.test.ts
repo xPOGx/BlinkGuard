@@ -123,6 +123,28 @@ describe("PreferencesService", () => {
 		expect(service.current.cameraQuality).toBe("medium");
 	});
 
+	it("falls back to overlay when notificationStyle in the store is invalid", () => {
+		const store = new FakePreferenceStore();
+		store.set("notificationStyle", "toast");
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.notificationStyle).toBe("overlay");
+	});
+
+	it("sanitizes invalid notificationStyle on set()", () => {
+		const store = new FakePreferenceStore();
+		const service = new PreferencesService(store);
+
+		service.set("notificationStyle", "native");
+		expect(service.current.notificationStyle).toBe("native");
+
+		service.set("notificationStyle", "toast" as never);
+
+		expect(service.current.notificationStyle).toBe("overlay");
+		expect(store.get("notificationStyle")).toBe("overlay");
+	});
+
 	it("sanitizes invalid locale to en", () => {
 		const store = new FakePreferenceStore();
 		store.set("locale", "de");

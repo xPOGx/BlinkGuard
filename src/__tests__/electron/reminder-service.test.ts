@@ -112,6 +112,16 @@ function createSound(): NotificationSoundPort {
 	return { play: vi.fn() };
 }
 
+function createOs(shown = true) {
+	return {
+		isSupported: vi.fn(() => true),
+		show: vi.fn(() => ({ shown })),
+		dismiss: vi.fn(),
+		dismissAll: vi.fn(),
+		setActivationHandlers: vi.fn(),
+	};
+}
+
 describe("ReminderService credit semantics", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
@@ -801,6 +811,14 @@ describe("ReminderService no-face toast hysteresis", () => {
 });
 
 describe("ReminderService preview camera", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
 	it("ensureCameraActive starts capture without starting tracking", () => {
 		const preferences = createPreferences({
 			isTracking: false,
@@ -1021,6 +1039,178 @@ describe("ReminderService preview camera", () => {
 		expect(sidecar.stopCamera).toHaveBeenCalled();
 		expect(state.blinkReminderActive).toBe(true);
 		expect(state.blinkInterval).not.toBeNull();
+		service.ensureStopped();
+	});
+
+	it("does not show a blink overlay or toast when the gate is closed", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: false,
+			reminderInterval: 3000,
+			notificationStyle: "both",
+		});
+		const windows = createWindows();
+		const sound = createSound();
+		const os = createOs();
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			windows,
+			createSidecar({ isRunning: false, isCameraReady: false }),
+			sound,
+			createStore(),
+			null,
+			{
+				notificationsAllowed: () => false,
+				pauseReason: () => "quiet-hours",
+			},
+			null,
+			null,
+			os,
+		);
+
+		service.start(3000);
+
+		expect(windows.showReminder).not.toHaveBeenCalled();
+		expect(os.show).not.toHaveBeenCalled();
+		expect(sound.play).not.toHaveBeenCalled();
+		service.ensureStopped();
+	});
+
+	it("shows a native blink toast without an overlay", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: false,
+			reminderInterval: 3000,
+			notificationStyle: "native",
+		});
+		const windows = createWindows();
+		const sound = createSound();
+		const os = createOs();
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			windows,
+			createSidecar({ isRunning: false, isCameraReady: false }),
+			sound,
+			createStore(),
+			null,
+			undefined,
+			null,
+			null,
+			os,
+		);
+
+		service.start(3000);
+
+		expect(os.show).toHaveBeenCalledOnce();
+		expect(os.show).toHaveBeenCalledWith(
+			"blink",
+			expect.objectContaining({ body: preferences.popupMessage }),
+			expect.any(Object),
+		);
+		expect(windows.showReminder).not.toHaveBeenCalled();
+		expect(sound.play).toHaveBeenCalledWith("blink");
+		service.ensureStopped();
+	});
+
+	it("shows overlay and native blink toast when style is both", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: false,
+			reminderInterval: 3000,
+			notificationStyle: "both",
+		});
+		const windows = createWindows();
+		const sound = createSound();
+		const os = createOs();
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			windows,
+			createSidecar({ isRunning: false, isCameraReady: false }),
+			sound,
+			createStore(),
+			null,
+			undefined,
+			null,
+			null,
+			os,
+		);
+
+		service.start(3000);
+
+		expect(windows.showReminder).toHaveBeenCalledWith("blink");
+		expect(os.show).toHaveBeenCalledOnce();
+		expect(sound.play).toHaveBeenCalledOnce();
+		expect(sound.play).toHaveBeenCalledWith("blink");
+		service.ensureStopped();
+	});
+
+	it("native blink auto-dismiss marks reminder shown without an overlay", () => {
+		const preferences = createPreferences({
+			reminderInterval: 1000,
+			notificationStyle: "native",
+		});
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		state.lastBlinkTime = Date.now() - 5000;
+		state.lastReminderShownAt = Date.now() - 5000;
+		const windows = createWindows();
+		const os = createOs();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			createStore(),
+			null,
+			undefined,
+			null,
+			null,
+			os,
+		);
+
+		service.syncCameraLoopForMgdMode();
+		vi.advanceTimersByTime(100);
+		expect(os.show).toHaveBeenCalledOnce();
+		expect(windows.showReminder).not.toHaveBeenCalled();
+		const reminderAtShow = state.lastReminderShownAt;
+
+		vi.advanceTimersByTime(REMINDER_POPUP_VISIBLE_MS);
+		expect(os.dismiss).toHaveBeenCalledWith("blink");
+		expect(state.lastReminderShownAt).toBeGreaterThan(reminderAtShow);
+		service.ensureStopped();
+	});
+
+	it("starting overlay does not show a native toast", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			notificationStyle: "native",
+		});
+		const windows = createWindows();
+		const sound = createSound();
+		const os = createOs();
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			windows,
+			createSidecar(),
+			sound,
+			createStore(),
+			null,
+			undefined,
+			null,
+			null,
+			os,
+		);
+
+		service.start(3000);
+
+		expect(windows.showReminder).toHaveBeenCalledWith("starting");
+		expect(os.show).not.toHaveBeenCalled();
+		expect(sound.play).toHaveBeenCalledWith("starting");
 		service.ensureStopped();
 	});
 });

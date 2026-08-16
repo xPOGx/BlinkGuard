@@ -70,6 +70,7 @@ export function sameRendererPrefs(
 		a.lookAwayHint === b.lookAwayHint &&
 		a.popupMessage === b.popupMessage &&
 		a.blinkPopupClickThrough === b.blinkPopupClickThrough &&
+		a.notificationStyle === b.notificationStyle &&
 		samePopupColors(a.popupColors, b.popupColors) &&
 		samePoint(a.popupPosition, b.popupPosition) &&
 		sameSize(a.popupSize, b.popupSize) &&
@@ -189,6 +190,9 @@ export function pushPreferenceDiff(
 		previous.blinkPopupClickThrough !== next.blinkPopupClickThrough
 	) {
 		rendererIpc.updateBlinkPopupClickThrough(next.blinkPopupClickThrough);
+	}
+	if (!previous || previous.notificationStyle !== next.notificationStyle) {
+		rendererIpc.updateNotificationStyle(next.notificationStyle);
 	}
 	if (
 		!previous ||

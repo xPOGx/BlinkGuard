@@ -167,6 +167,7 @@ describe("look-away / 20-20-20 preference defaults", () => {
 		expect(DEFAULT_PREFERENCES.lookAwayInterval).toBe(20);
 		expect(DEFAULT_PREFERENCES.exerciseInterval).toBe(40);
 		expect(DEFAULT_PREFERENCES.blinkPopupClickThrough).toBe(true);
+		expect(DEFAULT_PREFERENCES.notificationStyle).toBe("overlay");
 		expect(DEFAULT_PREFERENCES.lookAwayDuration).toBe(20);
 		expect(DEFAULT_PREFERENCES.lookAwayTitle).toBe("Look away");
 		expect(DEFAULT_PREFERENCES.lookAwayHint).toContain("20 feet");
@@ -234,6 +235,28 @@ describe("calibration freshness preference defaults", () => {
 			calibrationAt: 1_700_000_000_000,
 		});
 		expect(prefs.calibrationAt).toBe(1_700_000_000_000);
+	});
+});
+
+describe("notificationStyle preference", () => {
+	it("defaults to overlay and keeps native / both", () => {
+		expect(DEFAULT_PREFERENCES.notificationStyle).toBe("overlay");
+		expect(sanitizePersistedPreferences({}).notificationStyle).toBe("overlay");
+		expect(
+			sanitizePersistedPreferences({ notificationStyle: "both" })
+				.notificationStyle,
+		).toBe("both");
+		expect(
+			sanitizePersistedPreferences({ notificationStyle: "native" })
+				.notificationStyle,
+		).toBe("native");
+	});
+
+	it("falls back to overlay when the stored value is invalid", () => {
+		expect(
+			sanitizePersistedPreferences({ notificationStyle: "toast" })
+				.notificationStyle,
+		).toBe("overlay");
 	});
 });
 

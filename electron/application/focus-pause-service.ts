@@ -17,6 +17,10 @@ import type {
 import type { FocusForegroundSnapshot } from "./ports/focus-environment-port";
 import { EMPTY_FOREGROUND_SNAPSHOT } from "./ports/focus-environment-port";
 import type { ReminderService } from "./reminder-service";
+import {
+	NO_OP_OS_NOTIFICATIONS,
+	type OsNotificationPort,
+} from "./ports/runtime-ports";
 
 export type { FocusPauseStatePayload };
 
@@ -40,16 +44,35 @@ export class FocusPauseService implements NotificationGate {
 	private quietHoursTimer: ReturnType<typeof setInterval> | null = null;
 	private onState: ((payload: FocusPauseStatePayload) => void) | null = null;
 
+	private promptDismissers: {
+		blink: () => void;
+		exercise: () => void;
+		lookAway: () => void;
+	} | null = null;
+
 	constructor(
 		private readonly preferences: AppPreferences,
 		private readonly windows: FocusPauseWindowsPort,
 		private readonly reminders: ReminderService,
 		private readonly focusPauseChannel: string,
 		private readonly fullscreenDetectionSupported: boolean,
+		private readonly osNotifications: OsNotificationPort = NO_OP_OS_NOTIFICATIONS,
 	) {}
 
 	setOnState(listener: (payload: FocusPauseStatePayload) => void): void {
 		this.onState = listener;
+	}
+
+	/**
+	 * Late-bind prompt teardown so pause can clear native-only showing flags.
+	 * Exercise / look-away are constructed after this service in main.
+	 */
+	bindPromptDismissers(dismissers: {
+		blink: () => void;
+		exercise: () => void;
+		lookAway: () => void;
+	}): void {
+		this.promptDismissers = dismissers;
 	}
 
 	notificationsAllowed(): boolean {
@@ -178,6 +201,10 @@ export class FocusPauseService implements NotificationGate {
 		this.windows.hideNoFace();
 		this.windows.hideBlinkRateCoach();
 		this.windows.hideCalibrationNudge();
+		this.promptDismissers?.blink();
+		this.promptDismissers?.exercise();
+		this.promptDismissers?.lookAway();
+		this.osNotifications.dismissAll();
 	}
 
 	private pauseCameraForFocus(): void {

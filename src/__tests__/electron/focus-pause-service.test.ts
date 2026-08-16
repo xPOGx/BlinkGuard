@@ -24,6 +24,7 @@ function makeService(
 	const hideCalibrationNudge = vi.fn();
 	const pauseCameraForFocus = vi.fn();
 	const resumeCameraIfNeeded = vi.fn();
+	const dismissAll = vi.fn();
 	const service = new FocusPauseService(
 		{
 			...DEFAULT_PREFERENCES,
@@ -44,6 +45,13 @@ function makeService(
 		{ pauseCameraForFocus, resumeCameraIfNeeded } as never,
 		"focus-pause-state",
 		supported,
+		{
+			isSupported: () => false,
+			show: () => ({ shown: false }),
+			dismiss: () => {},
+			dismissAll,
+			setActivationHandlers: () => {},
+		},
 	);
 	return {
 		service,
@@ -52,6 +60,7 @@ function makeService(
 		closeExercise,
 		pauseCameraForFocus,
 		resumeCameraIfNeeded,
+		dismissAll,
 	};
 }
 
@@ -143,17 +152,39 @@ describe("FocusPauseService app-rule / fullscreen / quiet hours", () => {
 
 	it("keeps the camera running during quiet hours", () => {
 		const { start, end } = hoursWindowContainingNow();
-		const { service, pauseCameraForFocus, closeReminder } = makeService({
-			quietHoursEnabled: true,
-			quietHoursStart: start,
-			quietHoursEnd: end,
-		});
+		const { service, pauseCameraForFocus, closeReminder, dismissAll } =
+			makeService({
+				quietHoursEnabled: true,
+				quietHoursStart: start,
+				quietHoursEnd: end,
+			});
 
 		service.recompute();
 
 		expect(service.pauseReason()).toBe("quiet-hours");
 		expect(closeReminder).toHaveBeenCalled();
+		expect(dismissAll).toHaveBeenCalled();
 		expect(pauseCameraForFocus).not.toHaveBeenCalled();
+	});
+
+	it("runs prompt dismissers so native-only showing flags can clear", () => {
+		const { start, end } = hoursWindowContainingNow();
+		const { service, dismissAll } = makeService({
+			quietHoursEnabled: true,
+			quietHoursStart: start,
+			quietHoursEnd: end,
+		});
+		const blink = vi.fn();
+		const exercise = vi.fn();
+		const lookAway = vi.fn();
+		service.bindPromptDismissers({ blink, exercise, lookAway });
+
+		service.recompute();
+
+		expect(blink).toHaveBeenCalledOnce();
+		expect(exercise).toHaveBeenCalledOnce();
+		expect(lookAway).toHaveBeenCalledOnce();
+		expect(dismissAll).toHaveBeenCalled();
 	});
 
 	it("soft-pauses the camera on fullscreen", () => {
@@ -195,13 +226,21 @@ describe("FocusPauseService app-rule / fullscreen / quiet hours", () => {
 	});
 
 	it("surfaces camera-only lid without blocking notifications", () => {
-		const { service, sendToMain, closeReminder } = makeService();
+		const { service, sendToMain, closeReminder, dismissAll } = makeService();
+		const exercise = vi.fn();
+		service.bindPromptDismissers({
+			blink: vi.fn(),
+			exercise,
+			lookAway: vi.fn(),
+		});
 
 		service.setSessionOverlay({ mode: "camera-only", cause: "lid" });
 
 		expect(service.pauseReason()).toBeNull();
 		expect(service.notificationsAllowed()).toBe(true);
 		expect(closeReminder).not.toHaveBeenCalled();
+		expect(dismissAll).not.toHaveBeenCalled();
+		expect(exercise).not.toHaveBeenCalled();
 		expect(sendToMain).toHaveBeenCalledWith(
 			"focus-pause-state",
 			pausePayload({

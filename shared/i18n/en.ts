@@ -22,7 +22,7 @@ export const en: MessageCatalog = {
 		"Exercises and 20-20-20 look-away breaks.",
 	"app.section.appearance": "Appearance",
 	"app.section.appearance.desc":
-		"Popup message, colors, size, and notification sound.",
+		"Popup message, colors, size, notification sound, and how prompts appear.",
 	"app.section.progress": "Progress",
 	"app.section.progress.desc":
 		"Statistics, goals, profile, achievements, and the rewards shop.",
@@ -369,6 +369,18 @@ export const en: MessageCatalog = {
 		"Blink, exercise, and look-away popups stay visible but do not steal clicks (like a watermark). Snooze from the tray menu.",
 	"popup.clickThroughAria": "Pass clicks through reminder popups",
 	"popup.colorPickerAria": "{label} picker",
+
+	"notifications.style.title": "Prompt style",
+	"notifications.style.description":
+		"Overlay uses BlinkGuard’s custom popups. Native uses Windows or macOS system banners (not custom colors or the look-away countdown). Quiet hours, fullscreen, and app pause still apply. Both shows the overlay and a silent system banner so prompts are harder to miss on another display.",
+	"notifications.style.aria": "How blink, exercise, and look-away prompts appear",
+	"notifications.style.overlay": "Overlay",
+	"notifications.style.native": "System banner",
+	"notifications.style.both": "Overlay and system banner",
+	"osToast.snooze": "Snooze",
+	"osToast.lookAway.body": "{n} second",
+	"osToast.lookAway.body_few": "{n} seconds",
+	"osToast.lookAway.body_plural": "{n} seconds",
 
 	// Sound / launch / reset / quiet hours
 	"sound.title": "Notification Sound",

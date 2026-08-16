@@ -22,7 +22,7 @@ export const uk: MessageCatalog = {
 		"Вправи та перерви 20-20-20 «подивіться вдалину».",
 	"app.section.appearance": "Вигляд",
 	"app.section.appearance.desc":
-		"Текст спливаючого вікна, кольори, розмір і звук сповіщень.",
+		"Текст попапу, кольори, розмір, звук і як показувати підказки.",
 	"app.section.progress": "Прогрес",
 	"app.section.progress.desc":
 		"Статистика, цілі, профіль, ачівки і магазин нагород.",
@@ -376,6 +376,19 @@ export const uk: MessageCatalog = {
 		"Попапи моргання, вправи та «подивіться вдалину» лишаються видимими, але не перехоплюють кліки (як водяний знак). Відкласти можна з меню в треї.",
 	"popup.clickThroughAria": "Пропускати кліки крізь попапи нагадувань",
 	"popup.colorPickerAria": "Вибір кольору: {label}",
+
+	"notifications.style.title": "Стиль підказок",
+	"notifications.style.description":
+		"Накладка — власні попапи BlinkGuard. Системний банер — сповіщення Windows або macOS (без ваших кольорів і без зворотного відліку «подивіться вдалину»). Тиха година, повний екран і пауза за програмами лишаються чинними. Обидва варіанти показують накладку й тихий системний банер, щоб підказка не загубилась на іншому моніторі.",
+	"notifications.style.aria":
+		"Як показувати підказки моргання, вправ і «подивіться вдалину»",
+	"notifications.style.overlay": "Накладка",
+	"notifications.style.native": "Системний банер",
+	"notifications.style.both": "Накладка і системний банер",
+	"osToast.snooze": "Відкласти",
+	"osToast.lookAway.body": "{n} секунда",
+	"osToast.lookAway.body_few": "{n} секунди",
+	"osToast.lookAway.body_plural": "{n} секунд",
 
 	// Sound / launch / reset / quiet hours
 	"sound.title": "Звук сповіщень",
