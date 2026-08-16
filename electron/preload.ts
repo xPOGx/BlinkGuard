@@ -63,11 +63,27 @@ contextBridge.exposeInMainWorld('popupAPI', {
   },
   
   // For sound player (file MP3 or procedural cheer)
-  onPlaySound: (callback: (payload: { volume: number; path?: string; mode?: "file" | "cheer" }) => void) => {
+  onPlaySound: (callback: (payload: {
+    kind: string;
+    volume: number;
+    path?: string;
+    mode?: "file" | "cheer";
+  }) => void) => {
     ipcRenderer.on(IPC_CHANNELS.playSound, (_event, payload) => callback(payload));
   },
   notifyAudioFinished: () => {
     ipcRenderer.send(IPC_CHANNELS.audioFinished);
+  },
+  notifyAudioError: (payload: {
+    kind?: string;
+    reason: string;
+    message?: string;
+    contextState?: string;
+  }) => {
+    ipcRenderer.send(IPC_CHANNELS.audioError, payload);
+  },
+  notifyAudioOutputInvalidated: () => {
+    ipcRenderer.send(IPC_CHANNELS.audioOutputInvalidated);
   },
   
   // For camera window
@@ -135,8 +151,20 @@ declare global {
       onUpdateMessage: (callback: (message: string) => void) => void;
       onCameraMode: (callback: (isEnabled: boolean) => void) => void;
       onBlinkClickThrough: (callback: (enabled: boolean) => void) => void;
-      onPlaySound: (callback: (payload: { volume: number; path?: string; mode?: "file" | "cheer" }) => void) => void;
+      onPlaySound: (callback: (payload: {
+        kind: string;
+        volume: number;
+        path?: string;
+        mode?: "file" | "cheer";
+      }) => void) => void;
       notifyAudioFinished: () => void;
+      notifyAudioError: (payload: {
+        kind?: string;
+        reason: string;
+        message?: string;
+        contextState?: string;
+      }) => void;
+      notifyAudioOutputInvalidated: () => void;
       onFaceTrackingData: (callback: (data: any) => void) => void;
       onBlinkDetected: (callback: (blinkData: any) => void) => void;
       onVideoStream: (callback: (streamData: string | Record<string, unknown>) => void) => void;

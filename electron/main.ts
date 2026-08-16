@@ -337,6 +337,7 @@ function bootstrap(): void {
 		processCleanup,
 		blinkStats,
 		() => {
+			sound.dispose();
 			osNotifications.dismissAll();
 			shortcuts.unregisterAll();
 			focusMonitor.stop();

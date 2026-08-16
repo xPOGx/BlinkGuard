@@ -75,6 +75,8 @@ export const IPC_CHANNELS = {
 	updateLaunchAtLogin: "update-launch-at-login",
 	updateHasCompletedOnboarding: "update-has-completed-onboarding",
 	audioFinished: "audio-finished",
+	audioError: "audio-error",
+	audioOutputInvalidated: "audio-output-invalidated",
 	requestVideoStream: "request-video-stream",
 	loadBlinkStats: "load-blink-stats",
 	requestBlinkStats: "request-blink-stats",

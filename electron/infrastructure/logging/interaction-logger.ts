@@ -21,6 +21,8 @@ const SKIP_IPC_CHANNELS = new Set<string>([
 	IPC_CHANNELS.subscribeBlinkStats,
 	IPC_CHANNELS.unsubscribeBlinkStats,
 	IPC_CHANNELS.audioFinished,
+	IPC_CHANNELS.audioError,
+	IPC_CHANNELS.audioOutputInvalidated,
 	IPC_CHANNELS.requestBlinkStats,
 ]);
 

@@ -1,14 +1,136 @@
 // Hidden sound player window — file MP3s or procedural cheer fanfare
 
-/** @param {number} volume 0..1 */
-function playCheerFanfare(volume) {
+/** @type {number} */
+let playId = 0;
+/** @type {number} */
+let finishedForPlayId = -1;
+/** @type {AudioContext | null} */
+let cheerCtx = null;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let deviceChangeTimer = null;
+
+/**
+ * @param {number} id
+ */
+function notifyFinished(id) {
+	if (id !== playId || finishedForPlayId === id) return;
+	finishedForPlayId = id;
+	window.popupAPI.notifyAudioFinished();
+}
+
+/**
+ * @param {{ kind?: string, reason: string, message?: string, contextState?: string }} payload
+ */
+function notifyError(payload) {
+	window.popupAPI.notifyAudioError(payload);
+}
+
+function stopInFlight() {
+	const audio = document.getElementById("audio");
+	if (audio) {
+		audio.pause();
+		audio.removeAttribute("src");
+		try {
+			audio.load();
+		} catch {
+			// ignore
+		}
+	}
+	if (cheerCtx) {
+		const ctx = cheerCtx;
+		cheerCtx = null;
+		void ctx.close().catch(() => {});
+	}
+}
+
+/**
+ * @param {HTMLAudioElement} audio
+ * @param {string | undefined} kind
+ */
+async function rebindSink(audio, kind) {
+	if (typeof audio.setSinkId !== "function") return;
+
+	try {
+		await audio.setSinkId("default");
+	} catch (error) {
+		notifyError({
+			kind,
+			reason: "sink-failed",
+			message: error instanceof Error ? error.message : String(error),
+		});
+	}
+
+	if (!navigator.mediaDevices?.enumerateDevices) return;
+
+	try {
+		const devices = await navigator.mediaDevices.enumerateDevices();
+		const outputs = devices.filter((device) => device.kind === "audiooutput");
+		const defaultDev = outputs.find((device) => device.deviceId === "default");
+		if (!defaultDev) return;
+		const hardware = outputs.find(
+			(device) =>
+				device.groupId === defaultDev.groupId &&
+				device.deviceId !== "default" &&
+				device.deviceId !== "communications",
+		);
+		if (hardware) await audio.setSinkId(hardware.deviceId);
+	} catch (error) {
+		notifyError({
+			kind,
+			reason: "sink-failed",
+			message: error instanceof Error ? error.message : String(error),
+		});
+	}
+}
+
+/**
+ * @param {number} volume 0..1
+ * @param {string | undefined} kind
+ * @param {number} id
+ */
+async function playCheerFanfare(volume, kind, id) {
 	const AudioCtx = window.AudioContext || window.webkitAudioContext;
 	if (!AudioCtx) {
-		window.popupAPI.notifyAudioFinished();
+		notifyError({ kind, reason: "cheer-no-context" });
+		notifyFinished(id);
 		return;
 	}
 
 	const ctx = new AudioCtx();
+	cheerCtx = ctx;
+	try {
+		await ctx.resume();
+	} catch (error) {
+		notifyError({
+			kind,
+			reason: "cheer-not-running",
+			message: error instanceof Error ? error.message : String(error),
+			contextState: ctx.state,
+		});
+		if (cheerCtx === ctx) cheerCtx = null;
+		void ctx.close().catch(() => {});
+		notifyFinished(id);
+		return;
+	}
+
+	if (id !== playId) {
+		if (cheerCtx === ctx) cheerCtx = null;
+		void ctx.close().catch(() => {});
+		return;
+	}
+
+	if (ctx.state !== "running") {
+		notifyError({
+			kind,
+			reason: "cheer-not-running",
+			contextState: ctx.state,
+		});
+		if (cheerCtx === ctx) cheerCtx = null;
+		void ctx.close().catch(() => {});
+		notifyFinished(id);
+		return;
+	}
+
 	const master = ctx.createGain();
 	master.gain.value = Math.min(1, Math.max(0, volume)) * 0.35;
 	master.connect(ctx.destination);
@@ -31,10 +153,7 @@ function playCheerFanfare(volume) {
 		osc.frequency.value = freq;
 		gain.gain.setValueAtTime(0.0001, startTime);
 		gain.gain.exponentialRampToValueAtTime(peak, startTime + 0.02);
-		gain.gain.exponentialRampToValueAtTime(
-			0.0001,
-			startTime + duration,
-		);
+		gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
 		osc.connect(gain);
 		gain.connect(master);
 		osc.start(startTime);
@@ -47,30 +166,34 @@ function playCheerFanfare(volume) {
 		const freq = midiOffset(deg);
 		const start = t0 + (i * stepMs) / 1000;
 		playTone(freq, start, noteDur, 0.7 + Math.random() * 0.25);
-		// Soft octave sparkle on last note sometimes
 		if (i === noteCount - 1 && Math.random() < 0.7) {
 			playTone(freq * 2, start + 0.04, noteDur * 0.7, 0.35);
 		}
 	}
 
-	// Tiny high "ding" after the arpeggio
 	if (Math.random() < 0.85) {
 		const dingStart = t0 + (noteCount * stepMs) / 1000 + 0.05;
 		playTone(midiOffset(12 + Math.floor(Math.random() * 5)), dingStart, 0.22, 0.45);
 	}
 
-	const totalMs =
-		noteCount * stepMs + noteDur * 1000 + 350;
+	const totalMs = noteCount * stepMs + noteDur * 1000 + 350;
 	setTimeout(() => {
+		if (cheerCtx === ctx) cheerCtx = null;
 		void ctx.close().catch(() => {});
-		window.popupAPI.notifyAudioFinished();
+		notifyFinished(id);
 	}, totalMs);
 }
 
-function playFileSound(payload) {
+/**
+ * @param {{ path?: string, volume?: number }} payload
+ * @param {string | undefined} kind
+ * @param {number} id
+ */
+async function playFileSound(payload, kind, id) {
 	const audio = document.getElementById("audio");
 	if (!audio || !payload?.path) {
-		window.popupAPI.notifyAudioFinished();
+		notifyError({ kind, reason: "no-audio-element" });
+		notifyFinished(id);
 		return;
 	}
 
@@ -79,37 +202,68 @@ function playFileSound(payload) {
 			? Math.min(1, Math.max(0, payload.volume))
 			: 1;
 
+	await rebindSink(audio, kind);
+	if (id !== playId) return;
+
 	audio.src = payload.path;
 	audio.volume = volume;
 
 	audio.addEventListener(
 		"ended",
 		() => {
-			window.popupAPI.notifyAudioFinished();
+			notifyFinished(id);
 		},
 		{ once: true },
 	);
 
-	audio.play().catch((error) => {
-		console.error("Error playing sound:", error);
-		window.popupAPI.notifyAudioFinished();
-	});
+	try {
+		await audio.play();
+	} catch (error) {
+		notifyError({
+			kind,
+			reason: "play-rejected",
+			message: error instanceof Error ? error.message : String(error),
+		});
+		notifyFinished(id);
+	}
+}
+
+function onDeviceChange() {
+	if (deviceChangeTimer) clearTimeout(deviceChangeTimer);
+	deviceChangeTimer = setTimeout(() => {
+		deviceChangeTimer = null;
+		const id = playId;
+		const inFlight = playId > 0 && finishedForPlayId !== playId;
+		stopInFlight();
+		window.popupAPI.notifyAudioOutputInvalidated();
+		if (inFlight) notifyFinished(id);
+	}, 200);
 }
 
 function initSoundPlayer() {
 	window.popupAPI.onPlaySound((payload) => {
+		playId += 1;
+		const id = playId;
+		finishedForPlayId = -1;
+		stopInFlight();
+
+		const kind = typeof payload?.kind === "string" ? payload.kind : undefined;
 		const volume =
 			typeof payload?.volume === "number" && Number.isFinite(payload.volume)
 				? Math.min(1, Math.max(0, payload.volume))
 				: 1;
 
 		if (payload?.mode === "cheer") {
-			playCheerFanfare(volume);
+			void playCheerFanfare(volume, kind, id);
 			return;
 		}
 
-		playFileSound(payload);
+		void playFileSound(payload, kind, id);
 	});
+
+	if (navigator.mediaDevices?.addEventListener) {
+		navigator.mediaDevices.addEventListener("devicechange", onDeviceChange);
+	}
 }
 
 if (document.readyState === "loading") {
