@@ -4,6 +4,21 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-08-16
+
+### Added
+
+- Section tabs on Reminders, Settings, About, and Debug (same chrome as Camera / Progress)
+- Distinct lock, display-off, lid, and sleep pause reasons in settings and tray
+
+### Fixed
+
+- Camera: recover/persist desk rest; credit OCEC look-down and threshold misses
+
+### Changed
+
+- Reminders schedule: keep interval duration on the seconds chip instead of repeating it in copy
+
 ## [2.10.0] - 2026-08-15
 
 ### Added
