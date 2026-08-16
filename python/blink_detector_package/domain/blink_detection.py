@@ -6,6 +6,7 @@ from blink_detector_package.domain.classifier import (
 	score as classifier_score,
 )
 from blink_detector_package.domain.pose import (
+	PITCH_WEIGHT_SPAN,
 	evaluate_pose_gate,
 	get_pose_profile,
 	lerp,
@@ -73,6 +74,11 @@ BILATERAL_MAX_SPREAD = 0.95
 # Stage 7: OCEC prob_open confirm (1=open, 0=closed). Relative drop vs live
 # open; missing samples skip (legacy NDJSON). Do not retune with LOOK_DOWN_*.
 OCEC_CONFIRM_MIN_DROP = 0.35
+# Slow look-down EAR + real OCEC close (POG 2026-08-16: 101 LD
+# reject_velocity, peak p50≈0.36 vs short_ld 0.55, ocec_drop p50≈0.53,
+# duration p50≈0.08). Do not waive sub-60ms jitter (1 Hz storm path).
+# Do not retune short_look_down_velocity / LOOK_DOWN_* in this pass.
+OCEC_VELOCITY_MIN_DURATION = 0.06
 # Short+shallow opening kill / no peak-waive. The 2026-08-12 down-left 1 Hz
 # storm was yaw≈1.1; CLASSIFIER_SIDE_YAW_WAIVE (0.35) is the crop/veto band
 # and was too broad — chat-bottom often lands |yaw| 0.35–0.80
@@ -99,6 +105,10 @@ RESTING_PITCH_RISE_SAMPLES = 240
 # blinks ran frontal gates and died).
 RESTING_PITCH_FLOOR_S = 30.0
 RESTING_PITCH_FLOOR_Q = 0.20
+# Keep laptop desk below the look-down deadzone by half the weight span so
+# pose_w stays ~0.5 (not ~0.24 → frontal aperture FN). Preview/MSMF reopen
+# must not wipe rest (POG 2026-08-15: reset re-seeded rest≈0.009).
+RESTING_PITCH_DESK_MARGIN = PITCH_WEIGHT_SPAN * 0.5
 
 # Live open-eye EAR tracks *current* lid height (frontal or look-down).
 # Gates use this ref so look-down open (~0.73 of frontal) is "open", not
@@ -1108,8 +1118,9 @@ class BlinkDetectionState:
 		Do not raise resting into a look-down — chasing pitch_delta→0
 		disables look_down gates (brief glance *or* a 6s chat-bottom hold).
 		A too-low camera-look seed may slowly rise toward the *desk* floor
-		(20th percentile of ~30s) minus the look-down deadzone, not toward
-		the current look-down band.
+		(20th percentile of ~30s) minus the look-down deadzone and half the
+		weight span, not toward the current look-down band. Camera reset
+		keeps rest (session posture), not a first-frame re-seed.
 		"""
 		now = float(current_time)
 		if not pose or not pose.get("valid", False):
@@ -1172,7 +1183,7 @@ class BlinkDetectionState:
 		d0 = float(
 			get_pose_profile(self.pose_strictness)["pitch_look_down_delta"]
 		)
-		target = min(band_median, floor_q) - d0
+		target = min(band_median, floor_q) - d0 - RESTING_PITCH_DESK_MARGIN
 		if target <= float(self.resting_pitch):
 			return
 		gap = target - float(self.resting_pitch)
@@ -2110,15 +2121,35 @@ class BlinkDetectionState:
 					ocec_ok,
 					strong_ocec_drop,
 				)
-				if not opening_ok and ocec_ear_waive:
-					opening_ok = True
-					waives.append("ocec_opening")
-				# Same 1-frame LD shape: relative EAR drop 0.14–0.18 vs
-				# adaptive 0.17–0.19 while OCEC drop p50≈0.93 (POG 2026-08-15
-				# reject_threshold). Do not retune LOOK_DOWN_* / threshold_mult.
-				if not threshold_ok and ocec_ear_waive:
-					threshold_ok = True
-					waives.append("ocec_threshold")
+				if ocec_ear_waive:
+					if not opening_ok:
+						opening_ok = True
+						waives.append("ocec_opening")
+					if not threshold_ok:
+						threshold_ok = True
+						waives.append("ocec_threshold")
+					if (
+						not velocity_ok
+						and blink_duration >= OCEC_VELOCITY_MIN_DURATION
+					):
+						velocity_ok = True
+						waives.append("ocec_velocity")
+				# Laptop look-down: OCEC crop stays open (drop≈0) on real
+				# multi-frame EAR blinks (POG 2026-08-15 soak: 60 LD
+				# closed≥2 reject_ocec, ocec_drop p50=0). Keep 1-frame
+				# confirm — those are jitter. Do not lower OCEC_CONFIRM_MIN_DROP.
+				if (
+					not ocec_ok
+					and treat_as_look_down
+					and (
+						self.closed_frames >= 2
+						or blink_duration >= SHORT_BLINK_DURATION
+					)
+				):
+					ocec_ok = True
+					self._confirm_ocec_ok = True
+					info_pose["ocec_ok"] = True
+					waives.append("ocec_look_down")
 				gates_ok = (
 					duration_ok
 					and threshold_ok
@@ -2330,10 +2361,11 @@ class BlinkDetectionState:
 		self.left_track = EyeTrack()
 		self.right_track = EyeTrack()
 		self._merge_label = None
-		self.resting_pitch = None
+		# Keep resting_pitch + 30s hist across camera reopen (preview / MSMF
+		# / no-face recover). Reset only the rise clock so a long pause is
+		# not one 6s hold. Same idea as ear_calibration below.
 		self._reset_resting_rise_band()
 		self._resting_rise_last_t = None
-		self._resting_pitch_hist.clear()
 		self.awaiting_reopen = False
 		self.awaiting_reopen_since = None
 		self.eyes_closed = False

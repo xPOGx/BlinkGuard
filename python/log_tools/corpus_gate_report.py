@@ -38,6 +38,8 @@ KNOWN_WAIVES = (
 	"stronger_eye",
 	"ocec_opening",
 	"ocec_threshold",
+	"ocec_look_down",
+	"ocec_velocity",
 	"ocec_clf",
 )
 KNOWN_REJECTS = (
