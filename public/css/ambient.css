@@ -1,4 +1,4 @@
-/* Full-workArea peripheral glow — not a centered card; window opacity stays 1. */
+/* Full-display peripheral glow (bounds, not workArea) — covers taskbar/dock; window opacity stays 1. */
 html.ambient-root,
 body.ambient-body {
 	background: transparent !important;

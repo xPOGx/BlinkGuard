@@ -281,7 +281,8 @@ export class WindowManager {
 			this.repositionAmbient();
 			return;
 		}
-		const { x, y, width, height } = getActiveDisplay().workArea;
+		// Full display bounds so the glow covers the taskbar / dock, not only workArea.
+		const { x, y, width, height } = getActiveDisplay().bounds;
 		const popup = createPanelWindow(
 			{
 				width,
@@ -1002,7 +1003,8 @@ export class WindowManager {
 
 	private repositionAmbient(): void {
 		if (!this.ambient || this.ambient.isDestroyed()) return;
-		const { x, y, width, height } = getActiveDisplay().workArea;
+		// Match showAmbient: full bounds so glow stays over the taskbar / dock.
+		const { x, y, width, height } = getActiveDisplay().bounds;
 		this.ambient.setBounds({ x, y, width, height });
 	}
 
