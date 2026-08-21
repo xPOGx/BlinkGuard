@@ -747,7 +747,7 @@ export class ReminderService {
 			this.resolveBlinkOverlayBody(locale);
 
 		if (step === "overlay") {
-			this.windows.hideAmbient();
+			// Keep Gentle soft glow under the blink popup (dismiss only on blink/snooze/stop).
 			this.showOverlaySurfaces(locale, body, {
 				shouldAdvancePool,
 				index,
@@ -755,10 +755,7 @@ export class ReminderService {
 			return;
 		}
 
-		// escalate — ensure overlay/native up, chime once
-		if (this.blinkSession?.ambient || this.windows.hasAmbient()) {
-			this.windows.hideAmbient();
-		}
+		// escalate — ensure overlay/native up, chime once (glow stays if already on)
 		const alreadyShowingOverlayStep =
 			!!this.blinkSession && !this.blinkSession.ambient;
 		if (!alreadyShowingOverlayStep) {

@@ -1363,14 +1363,19 @@ describe("ReminderService prompt ladder", () => {
 		expect(windows.showAmbient).toHaveBeenCalled();
 		expectBlinkOverlayNotShown(windows);
 		expect(sound.play).not.toHaveBeenCalledWith("blink");
+		expect(windows.hasAmbient()).toBe(true);
+		windows.hideAmbient.mockClear();
 
 		vi.advanceTimersByTime(1100);
 		expectBlinkOverlayShown(windows);
-		expect(windows.hideAmbient).toHaveBeenCalled();
+		expect(windows.hasAmbient()).toBe(true);
+		expect(windows.hideAmbient).not.toHaveBeenCalled();
 		expect(sound.play).not.toHaveBeenCalledWith("blink");
 
 		vi.advanceTimersByTime(1100);
 		expect(sound.play).toHaveBeenCalledWith("blink");
+		expect(windows.hasAmbient()).toBe(true);
+		expect(windows.hideAmbient).not.toHaveBeenCalled();
 		service.ensureStopped();
 	});
 
