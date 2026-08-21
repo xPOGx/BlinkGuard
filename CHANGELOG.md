@@ -4,6 +4,18 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-08-21
+
+### Added
+
+- Reminders: Standard / Gentle prompt profile with ambient glow → overlay → escalate ladder and ICMU backoff
+- Reminders: separate camera miss-gap and timer micro-break intervals in settings
+- Camera: live capture status in the tray tooltip/menu and Settings Setup chip
+
+### Changed
+
+- Reminders: ladder and streak cheer owned by ReminderService; standalone blink-rate coach toast removed
+
 ## [2.12.1] - 2026-08-16
 
 ### Fixed
