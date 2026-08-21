@@ -36,7 +36,7 @@ import {
 	REMINDER_POPUP_VISIBLE_MS,
 } from "../../domain/reminder-policy";
 import type { AppPaths } from "../paths/app-paths";
-import { createPanelWindow } from "./panel-window";
+import { createPanelWindow, pinPanelAboveSystemChrome } from "./panel-window";
 import {
 	getActiveDisplay,
 	getDisplayForPopupRect,
@@ -282,7 +282,8 @@ export class WindowManager {
 			return;
 		}
 		// Full display bounds so the glow covers the taskbar / dock, not only workArea.
-		const { x, y, width, height } = getActiveDisplay().bounds;
+		const bounds = getActiveDisplay().bounds;
+		const { x, y, width, height } = bounds;
 		const popup = createPanelWindow(
 			{
 				width,
@@ -290,6 +291,7 @@ export class WindowManager {
 				x,
 				y,
 				focusable: false,
+				coverSystemChrome: true,
 			},
 			this.paths.preload,
 		);
@@ -302,9 +304,18 @@ export class WindowManager {
 				this.preferences.popupColors,
 			);
 			popup.setIgnoreMouseEvents(true);
+			pinPanelAboveSystemChrome(popup, getActiveDisplay().bounds);
 		});
 		popup.once("ready-to-show", () => {
-			if (!popup.isDestroyed()) popup.showInactive();
+			if (popup.isDestroyed()) return;
+			pinPanelAboveSystemChrome(popup, getActiveDisplay().bounds);
+			popup.showInactive();
+			// Windows may re-stack under the taskbar on first show — pin again.
+			pinPanelAboveSystemChrome(popup, getActiveDisplay().bounds);
+			// Keep blink overlay above the glow when both are up.
+			if (this.reminder && !this.reminder.isDestroyed()) {
+				this.reminder.moveTop();
+			}
 		});
 		popup.on("closed", () => {
 			if (this.ambient === popup) this.ambient = null;
@@ -1003,9 +1014,10 @@ export class WindowManager {
 
 	private repositionAmbient(): void {
 		if (!this.ambient || this.ambient.isDestroyed()) return;
-		// Match showAmbient: full bounds so glow stays over the taskbar / dock.
-		const { x, y, width, height } = getActiveDisplay().bounds;
-		this.ambient.setBounds({ x, y, width, height });
+		pinPanelAboveSystemChrome(this.ambient, getActiveDisplay().bounds);
+		if (this.reminder && !this.reminder.isDestroyed()) {
+			this.reminder.moveTop();
+		}
 	}
 
 	private setWindowPositionIfOpen(
@@ -1034,6 +1046,8 @@ export class WindowManager {
 			} else {
 				popup.showInactive();
 			}
+			// Stay above ambient glow when both are visible.
+			popup.moveTop();
 		});
 	}
 
