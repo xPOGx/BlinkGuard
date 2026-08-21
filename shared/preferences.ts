@@ -439,9 +439,9 @@ export interface PersistedPreferences {
 	autoStopNoFaceEnabled: boolean;
 	/** Minutes without a face before auto-stop (1…30). */
 	autoStopNoFaceMinutes: number;
-	/** Soft toast when live camera blink rate is below threshold. */
+	/** Low-BPM ladder boost when live camera blink rate is below threshold (not a soft toast). */
 	blinkRateCoachingEnabled: boolean;
-	/** Soft-coach when blinks/min is strictly below this value (default = Low band). */
+	/** Ladder / ICMU threshold: boost when blinks/min is strictly below this value (default = Low band). */
 	blinkRateThresholdPerMin: number;
 	/** Personal open-eye EAR baseline; null when unset. */
 	earCalibration: number | null;
