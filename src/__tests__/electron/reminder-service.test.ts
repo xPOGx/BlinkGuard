@@ -1894,3 +1894,147 @@ describe("ReminderService FR-7 streak cheer", () => {
 		service.ensureStopped();
 	});
 });
+
+describe("ReminderService setOnTrackingChange", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it("start tracking notifies true once", () => {
+		const preferences = createPreferences({ isTracking: false });
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			createWindows(),
+			createSidecar(),
+			createSound(),
+			createStore(),
+		);
+		const onTrackingChange = vi.fn();
+		service.setOnTrackingChange(onTrackingChange);
+
+		service.start();
+
+		expect(onTrackingChange).toHaveBeenCalledTimes(1);
+		expect(onTrackingChange).toHaveBeenCalledWith(true);
+		expect(preferences.isTracking).toBe(true);
+		service.ensureStopped();
+	});
+
+	it("ensureStopped notifies false when tracking", () => {
+		const preferences = createPreferences({ isTracking: true });
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			createWindows(),
+			createSidecar(),
+			createSound(),
+			createStore(),
+		);
+		const onTrackingChange = vi.fn();
+		service.setOnTrackingChange(onTrackingChange);
+
+		service.ensureStopped();
+
+		expect(onTrackingChange).toHaveBeenCalledTimes(1);
+		expect(onTrackingChange).toHaveBeenCalledWith(false);
+		expect(preferences.isTracking).toBe(false);
+	});
+
+	it("no-face auto-stop notifies false", () => {
+		const preferences = createPreferences({
+			autoStopNoFaceEnabled: true,
+			autoStopNoFaceMinutes: 2,
+		});
+		const state = new AppRuntimeState();
+		const service = new ReminderService(
+			preferences,
+			state,
+			createWindows(),
+			createSidecar(),
+			createSound(),
+			createStore(),
+		);
+		const onTrackingChange = vi.fn();
+		service.setOnTrackingChange(onTrackingChange);
+
+		service.onFaceDetection(false);
+		vi.advanceTimersByTime(NO_FACE_DEBOUNCE_MS);
+		expect(onTrackingChange).not.toHaveBeenCalled();
+
+		vi.advanceTimersByTime(2 * 60 * 1000);
+		expect(preferences.isTracking).toBe(false);
+		expect(onTrackingChange).toHaveBeenCalledTimes(1);
+		expect(onTrackingChange).toHaveBeenCalledWith(false);
+	});
+
+	it("pauseCameraForFocus soft pause does not notify tracking false", () => {
+		const preferences = createPreferences({ isTracking: true });
+		const sidecar = createSidecar();
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			createWindows(),
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+		const onTrackingChange = vi.fn();
+		service.setOnTrackingChange(onTrackingChange);
+
+		service.pauseCameraForFocus();
+
+		expect(service.isCameraSoftPaused).toBe(true);
+		expect(preferences.isTracking).toBe(true);
+		expect(onTrackingChange).not.toHaveBeenCalled();
+		expect(sidecar.stopCamera).toHaveBeenCalled();
+	});
+
+	it("unchanged setTracking does not notify", () => {
+		const preferences = createPreferences({ isTracking: false });
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			createWindows(),
+			createSidecar(),
+			createSound(),
+			createStore(),
+		);
+		const onTrackingChange = vi.fn();
+		service.setOnTrackingChange(onTrackingChange);
+
+		service.ensureStopped();
+
+		expect(preferences.isTracking).toBe(false);
+		expect(onTrackingChange).not.toHaveBeenCalled();
+	});
+
+	it("ensureStopped releases capture before clearing tracking", () => {
+		const callOrder: string[] = [];
+		const sidecar = createSidecar();
+		vi.mocked(sidecar.stopCamera).mockImplementation(() => {
+			callOrder.push("stopCamera");
+		});
+		const preferences = createPreferences({ isTracking: true });
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			createWindows(),
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+		service.setOnTrackingChange((isTracking) => {
+			callOrder.push(`tracking:${isTracking}`);
+		});
+
+		service.ensureStopped();
+
+		expect(callOrder).toEqual(["stopCamera", "tracking:false"]);
+		expect(preferences.isTracking).toBe(false);
+	});
+});

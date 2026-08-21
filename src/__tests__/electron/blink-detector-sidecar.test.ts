@@ -49,10 +49,33 @@ function attachRunningProcess(
 		process: FakeChild | null;
 		running: boolean;
 		readStdout: (process: FakeChild) => void;
+		setCameraReady: (next: boolean) => void;
+		clearCameraFlush: () => void;
+		cancelEarCalibration: (reason?: string) => void;
+		failListWaiters: () => void;
+		callbacks: { onError: (message: string) => void };
 	};
 	internal.process = fakeChild;
 	internal.running = true;
 	internal.readStdout(fakeChild);
+	// Mirror start() exit/error so capture-status tests can emit without spawning.
+	fakeChild.on("exit", () => {
+		if (internal.process === fakeChild) internal.process = null;
+		internal.running = false;
+		internal.setCameraReady(false);
+		internal.clearCameraFlush();
+		internal.cancelEarCalibration("Blink detector stopped");
+		internal.failListWaiters();
+	});
+	fakeChild.on("error", (error: Error) => {
+		internal.callbacks.onError(`Process error: ${error.message}`);
+		if (internal.process === fakeChild) internal.process = null;
+		internal.running = false;
+		internal.setCameraReady(false);
+		internal.clearCameraFlush();
+		internal.cancelEarCalibration("Blink detector error");
+		internal.failListWaiters();
+	});
 }
 
 describe("BlinkDetectorSidecar preview restore", () => {
@@ -235,6 +258,7 @@ describe("BlinkDetectorSidecar NDJSON routing", () => {
 			onVideoStream: vi.fn(),
 			onError: vi.fn(),
 			onCameraReady: vi.fn(),
+			onCameraCaptureChange: vi.fn(),
 			shouldRetryCamera: () => false,
 		};
 		const sidecar = new BlinkDetectorSidecar(
@@ -278,10 +302,89 @@ describe("BlinkDetectorSidecar NDJSON routing", () => {
 		emitJson(child, { status: SIDECAR_STATUS.cameraReady });
 		expect(sidecar.isCameraReady).toBe(true);
 		expect(callbacks.onCameraReady).toHaveBeenCalledOnce();
+		expect(callbacks.onCameraCaptureChange).toHaveBeenCalledWith(true);
 
 		const frame = { jpeg: "abc" };
 		emitJson(child, { videoStream: frame });
 		expect(callbacks.onVideoStream).toHaveBeenCalledWith(frame);
+	});
+
+	it("ACK emits onCameraCaptureChange(true) once and still fires onCameraReady", () => {
+		const { sidecar, child, callbacks } = createSidecar();
+		expect(sidecar.isCameraReady).toBe(false);
+
+		emitJson(child, { status: SIDECAR_STATUS.cameraReady });
+		expect(sidecar.isCameraReady).toBe(true);
+		expect(callbacks.onCameraCaptureChange).toHaveBeenCalledTimes(1);
+		expect(callbacks.onCameraCaptureChange).toHaveBeenCalledWith(true);
+		expect(callbacks.onCameraReady).toHaveBeenCalledOnce();
+
+		emitJson(child, { status: SIDECAR_STATUS.cameraStarted });
+		expect(callbacks.onCameraCaptureChange).toHaveBeenCalledTimes(1);
+		expect(callbacks.onCameraReady).toHaveBeenCalledOnce();
+	});
+
+	it("notifies capture change false on stop, error, exit, and mark unavailable", () => {
+		const { sidecar, child, callbacks } = createSidecar();
+		emitJson(child, { status: SIDECAR_STATUS.cameraStarted });
+		expect(callbacks.onCameraCaptureChange).toHaveBeenLastCalledWith(true);
+		callbacks.onCameraCaptureChange.mockClear();
+		callbacks.onCameraReady.mockClear();
+
+		sidecar.stopCamera();
+		expect(sidecar.isCameraReady).toBe(false);
+		expect(callbacks.onCameraCaptureChange).toHaveBeenCalledWith(false);
+		expect(callbacks.onCameraReady).not.toHaveBeenCalled();
+
+		callbacks.onCameraCaptureChange.mockClear();
+		sidecar.stopCamera();
+		expect(callbacks.onCameraCaptureChange).not.toHaveBeenCalled();
+
+		emitJson(child, { status: SIDECAR_STATUS.cameraReady });
+		callbacks.onCameraCaptureChange.mockClear();
+		emitJson(child, { error: "camera permission denied" });
+		expect(callbacks.onCameraCaptureChange).toHaveBeenCalledWith(false);
+
+		emitJson(child, { status: SIDECAR_STATUS.cameraReady });
+		callbacks.onCameraCaptureChange.mockClear();
+		sidecar.markCameraUnavailable();
+		expect(callbacks.onCameraCaptureChange).toHaveBeenCalledWith(false);
+
+		emitJson(child, { status: SIDECAR_STATUS.cameraReady });
+		callbacks.onCameraCaptureChange.mockClear();
+		child.emit("exit", 0);
+		expect(callbacks.onCameraCaptureChange).toHaveBeenCalledWith(false);
+		expect(sidecar.isCameraReady).toBe(false);
+
+		const { child: errorChild } = createFakeChild();
+		attachRunningProcess(sidecar, errorChild);
+		emitJson(errorChild, { status: SIDECAR_STATUS.cameraReady });
+		callbacks.onCameraCaptureChange.mockClear();
+		callbacks.onError.mockClear();
+		errorChild.emit("error", new Error("spawn failed"));
+		expect(callbacks.onCameraCaptureChange).toHaveBeenCalledWith(false);
+		expect(callbacks.onError).toHaveBeenCalledWith("Process error: spawn failed");
+		expect(sidecar.isCameraReady).toBe(false);
+	});
+
+	it("restartCamera notifies false before reopen ACK; no duplicate when already false", () => {
+		const { sidecar, child, callbacks } = createSidecar();
+		emitJson(child, { status: SIDECAR_STATUS.cameraStarted });
+		callbacks.onCameraCaptureChange.mockClear();
+		expect(sidecar.restartCamera()).toBe(true);
+		expect(sidecar.isCameraReady).toBe(false);
+		expect(callbacks.onCameraCaptureChange).toHaveBeenCalledTimes(1);
+		expect(callbacks.onCameraCaptureChange).toHaveBeenCalledWith(false);
+
+		callbacks.onCameraCaptureChange.mockClear();
+		expect(sidecar.restartCamera()).toBe(true);
+		expect(callbacks.onCameraCaptureChange).not.toHaveBeenCalled();
+
+		callbacks.onCameraCaptureChange.mockClear();
+		emitJson(child, { status: SIDECAR_STATUS.cameraStarted });
+		expect(callbacks.onCameraCaptureChange).toHaveBeenCalledWith(true);
+		expect(callbacks.onCameraReady).toHaveBeenCalled();
+		expect(sidecar.isCameraReady).toBe(true);
 	});
 
 	it("ignores cameraState without treating it as a user-facing error", () => {

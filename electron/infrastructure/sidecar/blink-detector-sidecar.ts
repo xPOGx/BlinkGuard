@@ -49,6 +49,8 @@ interface SidecarCallbacks {
 	onVideoStream: (data: unknown) => void;
 	onError: (message: string) => void;
 	onCameraReady: () => void;
+	/** Fired when capture open/closed flips (ACK true / local false). */
+	onCameraCaptureChange?: (capturing: boolean) => void;
 	shouldRetryCamera: () => boolean;
 	/** True while the camera preview BrowserWindow is open. */
 	isCameraWindowOpen?: () => boolean;
@@ -171,7 +173,7 @@ export class BlinkDetectorSidecar {
 			this.processes.delete(child);
 			if (this.process === child) this.process = null;
 			this.running = false;
-			this.cameraReady = false;
+			this.setCameraReady(false);
 			this.clearCameraFlush();
 			this.cancelEarCalibration("Blink detector stopped");
 			this.failListWaiters();
@@ -182,7 +184,7 @@ export class BlinkDetectorSidecar {
 			this.processes.delete(child);
 			if (this.process === child) this.process = null;
 			this.running = false;
-			this.cameraReady = false;
+			this.setCameraReady(false);
 			this.clearCameraFlush();
 			this.cancelEarCalibration("Blink detector error");
 			this.failListWaiters();
@@ -221,19 +223,19 @@ export class BlinkDetectorSidecar {
 		}
 		this.pendingCameraStop = true;
 		this.pendingCameraStart = true;
-		this.cameraReady = false;
+		this.setCameraReady(false);
 		this.scheduleCameraFlush();
 		return true;
 	}
 
 	stopCamera(): void {
 		if (!this.running || !this.process?.stdin) {
-			this.cameraReady = false;
+			this.setCameraReady(false);
 			return;
 		}
 		this.pendingCameraStart = false;
 		this.pendingCameraStop = true;
-		this.cameraReady = false;
+		this.setCameraReady(false);
 		this.scheduleCameraFlush();
 	}
 
@@ -425,7 +427,15 @@ export class BlinkDetectorSidecar {
 	}
 
 	markCameraUnavailable(): void {
-		this.cameraReady = false;
+		this.setCameraReady(false);
+	}
+
+	/** Single seam for capture flag — notify only on change. */
+	private setCameraReady(next: boolean): void {
+		if (this.cameraReady === next) return;
+		this.cameraReady = next;
+		this.callbacks.onCameraCaptureChange?.(next);
+		if (next) this.callbacks.onCameraReady();
 	}
 
 	private beginCalibrationPhase(
@@ -651,11 +661,10 @@ export class BlinkDetectorSidecar {
 				message.status === SIDECAR_STATUS.cameraReady ||
 				message.status === SIDECAR_STATUS.cameraStarted
 			) {
-				this.cameraReady = true;
 				this.retryCount = 0;
 				// Cover races where stop cleared send_video after an earlier request_video.
 				this.requestVideoIfPreviewOpen();
-				this.callbacks.onCameraReady();
+				this.setCameraReady(true);
 			}
 			return;
 		}
@@ -673,7 +682,7 @@ export class BlinkDetectorSidecar {
 		console.error("Blink detector error:", message);
 		this.callbacks.onError(message);
 		const lower = message.toLowerCase();
-		this.cameraReady = false;
+		this.setCameraReady(false);
 		const isCameraError = ["camera", "permission", "access"].some((term) =>
 			lower.includes(term),
 		);

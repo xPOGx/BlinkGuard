@@ -66,6 +66,7 @@ export class ReminderService {
 	private lastDetectedBlinkAt = 0;
 	private readonly cameraPauseReasons = new Set<CameraPauseReason>();
 	private trackingSessionStop: ((showStatus: boolean) => void) | null = null;
+	private onTrackingChange: ((isTracking: boolean) => void) | null = null;
 	private blinkSession: BlinkPromptSession | null = null;
 	private backoff: BlinkBackoffState;
 	/** Continuous healthy ready-BPM ms (FR-7); resets when unhealthy / not tracking. */
@@ -101,6 +102,16 @@ export class ReminderService {
 		this.trackingSessionStop = handler;
 	}
 
+	/**
+	 * Late-bind capture-status / tray listeners when persisted tracking flips.
+	 * Soft pause does not clear isTracking and must not fire this.
+	 */
+	setOnTrackingChange(
+		listener: ((isTracking: boolean) => void) | null,
+	): void {
+		this.onTrackingChange = listener;
+	}
+
 	start(interval = this.preferences.reminderInterval): void {
 		this.ensureStopped();
 		this.setTracking(true);
@@ -128,8 +139,10 @@ export class ReminderService {
 		this.cameraPauseReasons.clear();
 		this.coaching?.stop();
 		this.calibrationNudge?.stop();
-		this.setTracking(false);
+		// Release capture before clearing isTracking so capture-status never
+		// briefly derives "preview" (capturing + !tracking) during Stop.
 		this.sidecar.stopCamera();
+		this.setTracking(false);
 		this.resetFaceTracking();
 		this.dismissVisibleBlink();
 	}
@@ -143,6 +156,9 @@ export class ReminderService {
 			this.stats?.setFaceCoverageMode(false);
 			this.stats?.onTrackingStop();
 			this.resetStreakCheerAccumulator();
+		}
+		if (value !== wasTracking) {
+			this.onTrackingChange?.(value);
 		}
 	}
 
