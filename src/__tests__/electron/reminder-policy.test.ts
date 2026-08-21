@@ -14,8 +14,9 @@ import {
 } from "../../../electron/domain/reminder-policy";
 
 describe("reminder-policy", () => {
-	it("adds popup visible duration to the timer reminder delay", () => {
-		expect(nextTimerReminderDelay(3000)).toBe(3000 + REMINDER_POPUP_VISIBLE_MS);
+	it("returns the interval as the timer reminder delay (no 2.5s add-on)", () => {
+		expect(nextTimerReminderDelay(3000)).toBe(3000);
+		expect(nextTimerReminderDelay(30_000)).toBe(30_000);
 		expect(REMINDER_POPUP_VISIBLE_MS).toBe(2500);
 		expect(CAMERA_POLL_INTERVAL_MS).toBe(100);
 		expect(BLINK_CREDIT_DEBOUNCE_MS).toBe(150);

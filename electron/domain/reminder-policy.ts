@@ -1,5 +1,9 @@
 export const REMINDER_POPUP_VISIBLE_MS = 2500;
 export const CAMERA_POLL_INTERVAL_MS = 100;
+/** Continuous healthy ready-BPM before FR-7 streak cheer. */
+export const STREAK_CHEER_HEALTHY_MS = 10 * 60 * 1000;
+/** In-memory cooldown after a streak cheer (resets on process restart). */
+export const STREAK_CHEER_COOLDOWN_MS = 30 * 60 * 1000;
 /** Main-process debounce for sidecar blink credits (pairs with Python ~300ms cooldown). */
 export const BLINK_CREDIT_DEBOUNCE_MS = 150;
 /** Default snooze duration (matches DEFAULT_PREFERENCES.snoozeMinutes). */
@@ -23,8 +27,13 @@ export type BlinkCreditSource =
 	| "camera-ready"
 	| "sleep";
 
-export function nextTimerReminderDelay(reminderIntervalMs: number): number {
-	return reminderIntervalMs + REMINDER_POPUP_VISIBLE_MS;
+/**
+ * Cadence for timer / MGD setInterval ticks.
+ * No longer adds {@link REMINDER_POPUP_VISIBLE_MS} — blink cues stay until
+ * blink/snooze/replace rather than auto-dismissing at 2.5s.
+ */
+export function nextTimerReminderDelay(intervalMs: number): number {
+	return Math.max(0, intervalMs);
 }
 
 export function autoStopNoFaceDelayMs(minutes: number): number {
