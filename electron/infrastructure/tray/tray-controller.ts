@@ -1,10 +1,12 @@
 import { Menu, Tray, nativeImage, type MenuItemConstructorOptions } from "electron";
 import path from "node:path";
-import { pluralKey, t, type Locale } from "../../../shared/i18n";
 import {
-	trayTooltipLabel,
-	type FocusPauseStatePayload,
-} from "../../../shared/session-pause-status";
+	cameraCaptureStatusMessageKey,
+	composeTrayTooltip,
+	type CameraCaptureStatusPayload,
+} from "../../../shared/camera-capture-status";
+import { pluralKey, t, type Locale } from "../../../shared/i18n";
+import type { FocusPauseStatePayload } from "../../../shared/session-pause-status";
 import type { InteractionLogger } from "../logging/interaction-logger";
 import type { AppPaths } from "../paths/app-paths";
 import type { WindowManager } from "../windows/window-manager";
@@ -12,6 +14,7 @@ import type { WindowManager } from "../windows/window-manager";
 export class TrayController {
 	private tray: Tray | null = null;
 	private pauseState: FocusPauseStatePayload | null = null;
+	private captureState: CameraCaptureStatusPayload | null = null;
 
 	constructor(
 		private readonly paths: AppPaths,
@@ -53,6 +56,10 @@ export class TrayController {
 					this.interactions?.append({ source: "tray", action: "menu-show" });
 					this.windows.showMain();
 				},
+			},
+			{
+				label: t(locale, cameraCaptureStatusMessageKey(this.captureState)),
+				enabled: false,
 			},
 		];
 		this.pushSnoozeItem(
@@ -107,6 +114,18 @@ export class TrayController {
 		this.applyTooltip();
 	}
 
+	setCaptureState(payload: CameraCaptureStatusPayload): void {
+		if (
+			this.captureState &&
+			this.captureState.capturing === payload.capturing &&
+			this.captureState.surface === payload.surface
+		) {
+			return;
+		}
+		this.captureState = payload;
+		this.rebuildMenu();
+	}
+
 	destroy(): void {
 		if (!this.tray) return;
 		this.tray.destroy();
@@ -114,7 +133,9 @@ export class TrayController {
 	}
 
 	private applyTooltip(locale: Locale = this.getLocale()): void {
-		this.tray?.setToolTip(trayTooltipLabel(locale, this.pauseState));
+		this.tray?.setToolTip(
+			composeTrayTooltip(locale, this.pauseState, this.captureState),
+		);
 	}
 
 	private pushSnoozeItem(

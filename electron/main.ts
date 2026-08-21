@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { AppRuntimeState } from "./application/app-runtime-state";
 import { BlinkStatsService } from "./application/blink-stats-service";
 import { CalibrationNudgeService } from "./application/calibration-nudge-service";
+import { CameraCaptureStatusService } from "./application/camera-capture-status-service";
 import { ExerciseService } from "./application/exercise-service";
 import { FocusPauseService } from "./application/focus-pause-service";
 import { LookAwayService } from "./application/look-away-service";
@@ -135,6 +136,10 @@ function bootstrap(): void {
 	let calibrationNudge: CalibrationNudgeService;
 	const blinkDebugLogger = new BlinkDetectorDebugLogger();
 	const interactionLogger = new InteractionLogger();
+	const captureStatus = new CameraCaptureStatusService(
+		windows,
+		IPC_CHANNELS.cameraCaptureStatus,
+	);
 	const sidecar = new BlinkDetectorSidecar(
 		paths,
 		app.isPackaged,
@@ -158,6 +163,9 @@ function bootstrap(): void {
 			},
 			onCameraReady: () => {
 				windows.sendToMain(IPC_CHANNELS.cameraReady);
+			},
+			onCameraCaptureChange: (capturing) => {
+				captureStatus.notifyCapture(capturing);
 			},
 			onCameraDevices: (payload) => {
 				windows.sendToMain(IPC_CHANNELS.cameraDevices, payload);
@@ -237,6 +245,9 @@ function bootstrap(): void {
 		calibrationNudge,
 		osNotifications,
 	);
+	reminders.setOnTrackingChange((isTracking) => {
+		captureStatus.notifyTracking(isTracking);
+	});
 	const focusEnvironment = createFocusEnvironment();
 	const focusPause = new FocusPauseService(
 		preferences,
@@ -434,6 +445,7 @@ function bootstrap(): void {
 
 		tray.create();
 		focusPause.setOnState((payload) => tray.setPauseState(payload));
+		captureStatus.setOnState((payload) => tray.setCaptureState(payload));
 		autoUpdates.start();
 		autoUpdates.checkForUpdates();
 		applyLaunchAtLogin(preferences.launchAtLogin);
@@ -455,6 +467,7 @@ function bootstrap(): void {
 		sessionActivity.start();
 		windows.setOnMainLoaded(() => {
 			focusPause.pushState();
+			captureStatus.hydrate(sidecar.isCameraReady, preferences.isTracking);
 		});
 
 		blinkDebugLogger.announce();

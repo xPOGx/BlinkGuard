@@ -1,4 +1,5 @@
 import { Camera, UserRoundX } from "lucide-react";
+import { Badge } from "@/components/badge";
 import { Button } from "@/components/button";
 import { RangeSlider } from "@/components/range-slider";
 import { SettingGrid } from "@/components/setting-grid";
@@ -10,6 +11,10 @@ import type { SetPreferences } from "@/features/settings/model/use-preferences";
 import { useI18n, useT } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { rendererIpc } from "@/shared/ipc/renderer-ipc";
+import {
+	type CameraCaptureSurface,
+	cameraCaptureChipMessageKey,
+} from "../../../../shared/camera-capture-status";
 import {
 	CAMERA_QUALITY_OPTIONS,
 	CAMERA_QUALITY_PRESETS,
@@ -23,6 +28,8 @@ interface CameraSetupPanelProps {
 	setPreferences: SetPreferences;
 	isWindowOpen: boolean;
 	setIsWindowOpen: (open: boolean) => void;
+	captureSurface: CameraCaptureSurface;
+	error: string | null;
 }
 
 export function CameraSetupPanel({
@@ -30,6 +37,8 @@ export function CameraSetupPanel({
 	setPreferences,
 	isWindowOpen,
 	setIsWindowOpen,
+	captureSurface,
+	error,
 }: CameraSetupPanelProps) {
 	const t = useT();
 	const { locale } = useI18n();
@@ -47,6 +56,16 @@ export function CameraSetupPanel({
 		ultra: t("camera.quality.ultra"),
 	};
 	const activePreset = CAMERA_QUALITY_PRESETS[preferences.cameraQuality];
+	const chipKey = error
+		? "camera.status.error"
+		: cameraCaptureChipMessageKey(captureSurface);
+	const chipClassName = error
+		? "border-destructive/40 bg-destructive/10 text-destructive"
+		: captureSurface === "idle"
+			? "border-muted-foreground/30 bg-muted text-muted-foreground"
+			: captureSurface === "preview"
+				? "border-warning/40 bg-warning/10 text-warning-foreground"
+				: undefined;
 
 	const toggleCamera = () => {
 		const enabled = !preferences.cameraEnabled;
@@ -102,6 +121,9 @@ export function CameraSetupPanel({
 								>
 									{t("camera.detection")}
 								</span>
+								<Badge role="status" className={chipClassName}>
+									{t(chipKey)}
+								</Badge>
 							</>
 						}
 						description={

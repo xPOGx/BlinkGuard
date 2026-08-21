@@ -159,6 +159,7 @@ describe("PreferenceActions", () => {
 		actions.showCameraWindow();
 
 		expect(preferences.current.cameraEnabled).toBe(true);
+		expect(preferences.current.isTracking).toBe(false);
 		expect(reminders.ensureCameraActive).toHaveBeenCalledOnce();
 		expect(windows.sendPreferences).toHaveBeenCalledOnce();
 		expect(windows.showCamera).toHaveBeenCalledOnce();

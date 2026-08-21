@@ -101,6 +101,7 @@ function CameraSection({
 				calibration={calibration}
 				error={camera.error}
 				onDismissError={() => camera.setError(null)}
+				captureSurface={camera.captureSurface}
 			/>
 		</TabbedSection>
 	);

@@ -1,6 +1,7 @@
 import type { CameraCalibration } from "@/features/camera/model/use-camera-calibration";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import type { SetPreferences } from "@/features/settings/model/use-preferences";
+import type { CameraCaptureSurface } from "../../../../shared/camera-capture-status";
 import { CameraCalibrationBanner } from "./camera-calibration-banner";
 import { CameraErrorBanner } from "./camera-error-banner";
 import { CameraSetupPanel } from "./camera-setup-panel";
@@ -17,6 +18,7 @@ interface CameraControlsProps {
 	calibration: CameraCalibration;
 	error: string | null;
 	onDismissError: () => void;
+	captureSurface: CameraCaptureSurface;
 }
 
 export function CameraControls({
@@ -28,6 +30,7 @@ export function CameraControls({
 	calibration,
 	error,
 	onDismissError,
+	captureSurface,
 }: CameraControlsProps) {
 	return (
 		<>
@@ -44,6 +47,8 @@ export function CameraControls({
 					setPreferences={setPreferences}
 					isWindowOpen={isWindowOpen}
 					setIsWindowOpen={setIsWindowOpen}
+					captureSurface={captureSurface}
+					error={error}
 				/>
 			) : (
 				<CameraTuningPanel
