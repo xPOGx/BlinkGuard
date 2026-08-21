@@ -1,5 +1,5 @@
 import { IPC_CHANNELS } from "../../shared/ipc-channels";
-import { t } from "../../shared/i18n";
+import { defaultPopupMessage, t } from "../../shared/i18n";
 import {
 	resolvePromptSurfaces,
 	withNativeFallback,
@@ -11,6 +11,8 @@ import {
 	FACE_RETURN_DEBOUNCE_MS,
 	NO_FACE_DEBOUNCE_MS,
 	REMINDER_POPUP_VISIBLE_MS,
+	STREAK_CHEER_COOLDOWN_MS,
+	STREAK_CHEER_HEALTHY_MS,
 	autoStopNoFaceDelayMs,
 	type BlinkCreditSource,
 	nextTimerReminderDelay,
@@ -18,8 +20,23 @@ import {
 	shouldArmAutoStopOnNoFace,
 	shouldShowCameraReminder,
 } from "../domain/reminder-policy";
+import {
+	BLINK_CAMERA_MESSAGE_POOL_KEYS,
+	BLINK_TIMER_MESSAGE_POOL_KEYS,
+	type BlinkBackoffState,
+	type BlinkPromptStep,
+	createBackoffState,
+	nextBackoffIntervalMs,
+	nextBlinkPromptStep,
+	pickBlinkOverlayMessage,
+	resetBackoff,
+} from "../domain/reminder-prompt-policy";
 import type { AppRuntimeState } from "./app-runtime-state";
-import type { BlinkRateCoachingPort, BlinkStatsPort, CalibrationNudgePort } from "./ports/blink-stats-port";
+import type {
+	BlinkRateCoachingPort,
+	BlinkStatsPort,
+	CalibrationNudgePort,
+} from "./ports/blink-stats-port";
 import type { PreferenceStore } from "./ports/preference-store";
 import type { NotificationGate } from "./ports/notification-gate";
 import {
@@ -37,11 +54,25 @@ const ALLOW_ALL_GATE: NotificationGate = {
 
 export type CameraPauseReason = "focus" | "session";
 
+type BlinkPromptSession = {
+	overlay: unknown | null;
+	ambient: boolean;
+	escalateChimePlayed: boolean;
+	/** Overlay / native body for this visible session (fallback toast). */
+	message: string | null;
+};
+
 export class ReminderService {
 	private lastDetectedBlinkAt = 0;
 	private readonly cameraPauseReasons = new Set<CameraPauseReason>();
 	private trackingSessionStop: ((showStatus: boolean) => void) | null = null;
-	private blinkSession: { overlay: unknown | null } | null = null;
+	private blinkSession: BlinkPromptSession | null = null;
+	private backoff: BlinkBackoffState;
+	/** Continuous healthy ready-BPM ms (FR-7); resets when unhealthy / not tracking. */
+	private streakHealthyAccumulatedMs = 0;
+	private streakLastTickAt: number | null = null;
+	/** Last streak cheer wall time; 0 = never. In-memory only. */
+	private streakLastCheerAt = 0;
 
 	constructor(
 		private readonly preferences: AppPreferences,
@@ -55,7 +86,11 @@ export class ReminderService {
 		private readonly coaching: BlinkRateCoachingPort | null = null,
 		private readonly calibrationNudge: CalibrationNudgePort | null = null,
 		private readonly osNotifications: OsNotificationPort = NO_OP_OS_NOTIFICATIONS,
-	) {}
+		/** Injectable clock for streak cheer tests (defaults to wall clock). */
+		private readonly now: () => number = () => Date.now(),
+	) {
+		this.backoff = createBackoffState(this.preferences.reminderInterval);
+	}
 
 	/**
 	 * Late-bind session teardown so no-face auto-stop can pause eye-care
@@ -70,6 +105,7 @@ export class ReminderService {
 		this.ensureStopped();
 		this.setTracking(true);
 		this.preferences.reminderInterval = interval;
+		this.backoff = createBackoffState(interval);
 		if (this.preferences.cameraEnabled) {
 			this.startCameraMonitoring();
 		} else {
@@ -106,6 +142,7 @@ export class ReminderService {
 		if (!value && wasTracking) {
 			this.stats?.setFaceCoverageMode(false);
 			this.stats?.onTrackingStop();
+			this.resetStreakCheerAccumulator();
 		}
 	}
 
@@ -134,8 +171,9 @@ export class ReminderService {
 		return true;
 	}
 
-	/** Close overlay + native blink toast without snoozing or stopping tracking. */
+	/** Close overlay + ambient + native blink toast without snoozing or stopping tracking. */
 	dismissVisibleBlink(): void {
+		this.windows.hideAmbient();
 		this.windows.closeReminder();
 		this.osNotifications.dismiss("blink");
 		this.blinkSession = null;
@@ -201,7 +239,6 @@ export class ReminderService {
 			}
 			this.state.isFaceDetected = false;
 			this.dismissVisibleBlink();
-			this.windows.hideBlinkRateCoach();
 			this.windows.hideCalibrationNudge();
 			this.armNoFaceAutoStop();
 			if (!this.notificationGate.notificationsAllowed()) return;
@@ -215,6 +252,7 @@ export class ReminderService {
 	 */
 	pauseForSession(): void {
 		this.state.clearReminderTimers();
+		this.freezeStreakCheerClock();
 		this.pauseCameraForFocus("session");
 		if (this.preferences.isTracking) this.stats?.onTrackingStop();
 	}
@@ -227,6 +265,7 @@ export class ReminderService {
 		this.pauseCameraForFocus("session");
 		if (!this.preferences.isTracking) return;
 		this.state.clearReminderTimers();
+		this.freezeStreakCheerClock();
 		this.startTimerLoop(false);
 	}
 
@@ -278,6 +317,7 @@ export class ReminderService {
 		}
 		this.state.clearReminderTimers();
 		this.dismissVisibleBlink();
+		this.backoff = createBackoffState(this.preferences.reminderInterval);
 		if (this.preferences.mgdMode) {
 			this.startMgdLoop();
 		} else {
@@ -286,14 +326,15 @@ export class ReminderService {
 	}
 
 	/**
-	 * Mid-session reminder-interval change: reschedule loops without stopping
-	 * the camera sidecar. Pref `reminderInterval` must already be updated.
+	 * Mid-session reminder-interval / micro-break change: reschedule loops
+	 * without stopping the camera sidecar. Prefs must already be updated.
 	 */
 	applyReminderInterval(): void {
 		if (!this.preferences.isTracking) return;
 
 		this.state.clearReminderTimers();
 		this.dismissVisibleBlink();
+		this.backoff = createBackoffState(this.preferences.reminderInterval);
 
 		if (!this.preferences.cameraEnabled) {
 			// Re-arm timer cadence without an immediate popup (slider tweak).
@@ -303,11 +344,11 @@ export class ReminderService {
 			this.state.blinkReminderActive = true;
 			this.state.blinkInterval = setInterval(() => {
 				if (this.state.blinkReminderActive && this.preferences.isTracking) {
-					this.scheduleBlinkReminder();
+					this.onTimerTick();
 				} else {
 					this.state.clearReminderTimers();
 				}
-			}, nextTimerReminderDelay(this.preferences.reminderInterval));
+			}, nextTimerReminderDelay(this.preferences.microBreakInterval));
 			return;
 		}
 
@@ -356,6 +397,7 @@ export class ReminderService {
 		this.resetFaceTracking();
 		this.stats?.onFaceVisibility(false);
 		this.dismissVisibleBlink();
+		this.freezeStreakCheerClock();
 	}
 
 	/** Resume camera after fullscreen / session if tracking still wants capture. */
@@ -381,21 +423,37 @@ export class ReminderService {
 		this.stats?.setFaceCoverageMode(false);
 		this.coaching?.stop();
 		this.calibrationNudge?.stop();
+		this.resetStreakCheerAccumulator();
 		this.state.blinkReminderActive = true;
-		if (showImmediately) this.scheduleBlinkReminder();
+		if (showImmediately) this.onTimerTick();
 		this.state.blinkInterval = setInterval(() => {
 			if (this.state.blinkReminderActive && this.preferences.isTracking) {
-				this.scheduleBlinkReminder();
+				this.onTimerTick();
 			} else {
 				this.state.clearReminderTimers();
 			}
-		}, nextTimerReminderDelay(this.preferences.reminderInterval));
+		}, nextTimerReminderDelay(this.preferences.microBreakInterval));
+	}
+
+	/**
+	 * Timer micro-break tick: advance ladder / escalate if cue still up;
+	 * replace with a fresh first step after escalate; otherwise show first step.
+	 */
+	private onTimerTick(): void {
+		if (this.blinkSession?.escalateChimePlayed) {
+			this.dismissVisibleBlink();
+			this.showBlinkReminder();
+			return;
+		}
+		this.showBlinkReminder();
 	}
 
 	private startCameraMonitoring(showStarting = true): void {
 		if (this.state.cameraMonitoringInterval) {
 			clearInterval(this.state.cameraMonitoringInterval);
 		}
+
+		this.backoff = createBackoffState(this.preferences.reminderInterval);
 
 		// Already capturing — arm reminder loops without DSHOW reopen thrash.
 		if (this.sidecar.isRunning && this.sidecar.isCameraReady) {
@@ -453,6 +511,9 @@ export class ReminderService {
 
 	private startMgdLoop(): void {
 		this.stats?.setFaceCoverageMode(false);
+		this.backoff = resetBackoff(
+			createBackoffState(this.preferences.reminderInterval),
+		);
 		this.state.mgdReminderLoopActive = true;
 		if (this.state.blinkInterval) clearInterval(this.state.blinkInterval);
 		this.state.blinkInterval = setInterval(() => {
@@ -462,6 +523,7 @@ export class ReminderService {
 				this.preferences.mgdMode &&
 				this.sidecar.isRunning
 			) {
+				this.tickStreakCheer();
 				if (this.state.isFaceDetected) {
 					this.showBlinkReminder();
 				}
@@ -478,42 +540,268 @@ export class ReminderService {
 				this.state.clearReminderTimers();
 				return;
 			}
-			if (
-				shouldShowCameraReminder({
-					isTracking: this.preferences.isTracking,
-					isDetectorRunning: this.sidecar.isRunning,
-					isFaceDetected: this.state.isFaceDetected,
-					hasPopup: this.windows.hasReminder() || this.blinkSession !== null,
-					timeSinceLastBlinkMs: Date.now() - this.state.lastBlinkTime,
-					timeSinceLastReminderMs:
-						Date.now() - this.state.lastReminderShownAt,
-					reminderIntervalMs: this.preferences.reminderInterval,
-				})
-			) {
-				this.scheduleBlinkReminder();
-			}
+			this.tickFaceAwarePrompt();
 		}, CAMERA_POLL_INTERVAL_MS);
 	}
 
-	private scheduleBlinkReminder(): void {
-		const session = this.showBlinkReminder();
-		if (!session) return;
-		setTimeout(() => {
-			this.endBlinkSessionIfCurrent(session);
-		}, REMINDER_POPUP_VISIBLE_MS);
+	private tickFaceAwarePrompt(): void {
+		this.tickStreakCheer();
+		const now = this.now();
+		const hasSurface = this.hasBlinkPromptSurface();
+		const i0 = this.preferences.reminderInterval;
+		const timeSinceLastReminderMs = now - this.state.lastReminderShownAt;
+
+		if (hasSurface) {
+			// Advance ambient → overlay → escalate after one more miss gap.
+			if (timeSinceLastReminderMs >= i0) {
+				this.showBlinkReminder();
+			}
+			return;
+		}
+
+		const rate = this.readLiveBlinkRate();
+		if (
+			rate.ready &&
+			Number.isFinite(rate.bpm) &&
+			rate.bpm < this.preferences.blinkRateThresholdPerMin
+		) {
+			this.backoff = resetBackoff(this.backoff);
+		}
+
+		const spacingMs = this.preferences.mgdMode
+			? i0
+			: this.backoff.intervalMs;
+
+		if (
+			!shouldShowCameraReminder({
+				isTracking: this.preferences.isTracking,
+				isDetectorRunning: this.sidecar.isRunning,
+				isFaceDetected: this.state.isFaceDetected,
+				hasPopup: false,
+				timeSinceLastBlinkMs: now - this.state.lastBlinkTime,
+				timeSinceLastReminderMs,
+				reminderIntervalMs: i0,
+			})
+		) {
+			return;
+		}
+		if (timeSinceLastReminderMs < spacingMs) return;
+
+		this.showBlinkReminder();
 	}
 
-	/** Soft-suppress blink popups while eye-care / quiet hours / fullscreen / snooze. */
-	private showBlinkReminder(): { overlay: unknown | null } | null {
+	/**
+	 * FR-7: after 10 continuous minutes of camera + tracking + ready BPM ≥ T,
+	 * show built-in cheer toast + force cheer sound (30 min in-memory cooldown).
+	 * Pauses while blink overlay / ambient / no-face are up; timer-only never cheers.
+	 */
+	private tickStreakCheer(): void {
+		const now = this.now();
+
+		if (!this.preferences.cameraEnabled || !this.preferences.isTracking) {
+			this.resetStreakCheerAccumulator();
+			return;
+		}
+
+		const rate = this.readLiveBlinkRate();
+		const healthy =
+			rate.ready &&
+			Number.isFinite(rate.bpm) &&
+			rate.bpm >= this.preferences.blinkRateThresholdPerMin;
+
+		if (!healthy) {
+			this.resetStreakCheerAccumulator();
+			return;
+		}
+
+		const surfacesBlocking =
+			this.hasBlinkPromptSurface() || this.windows.hasNoFace();
+
+		if (this.streakLastTickAt !== null && !surfacesBlocking) {
+			this.streakHealthyAccumulatedMs += Math.max(
+				0,
+				now - this.streakLastTickAt,
+			);
+		}
+		this.streakLastTickAt = now;
+
+		if (surfacesBlocking) return;
+		if (!this.notificationGate.notificationsAllowed()) return;
+		if (
+			this.streakLastCheerAt > 0 &&
+			now - this.streakLastCheerAt < STREAK_CHEER_COOLDOWN_MS
+		) {
+			return;
+		}
+		if (this.streakHealthyAccumulatedMs < STREAK_CHEER_HEALTHY_MS) return;
+
+		this.fireStreakCheer(now);
+	}
+
+	private fireStreakCheer(now: number): void {
+		this.streakHealthyAccumulatedMs = 0;
+		this.streakLastTickAt = now;
+		this.streakLastCheerAt = now;
+		this.sound.play("cheer", { force: true });
+		this.windows.showCheerToast({ kind: "cheer" });
+	}
+
+	private resetStreakCheerAccumulator(): void {
+		this.streakHealthyAccumulatedMs = 0;
+		this.streakLastTickAt = null;
+	}
+
+	/** Keep accumulated healthy ms but do not credit a pause/sleep gap. */
+	private freezeStreakCheerClock(): void {
+		this.streakLastTickAt = null;
+	}
+
+	private hasBlinkPromptSurface(): boolean {
+		return (
+			this.blinkSession !== null ||
+			this.windows.hasReminder() ||
+			this.windows.hasAmbient()
+		);
+	}
+
+	private readLiveBlinkRate(): { bpm: number; ready: boolean } {
+		const snapshot = this.stats?.getSnapshot?.();
+		if (!snapshot) return { bpm: 0, ready: false };
+		return {
+			bpm: snapshot.blinksPerMinute,
+			ready: snapshot.blinkRateReady,
+		};
+	}
+
+	/**
+	 * Soft-suppress blink popups while eye-care / quiet hours / fullscreen / snooze.
+	 * Camera: stays until blink/snooze/no-face (no 2.5s auto-dismiss).
+	 */
+	private showBlinkReminder(): BlinkPromptSession | null {
 		if (this.state.isLookAwayShowing) return null;
 		if (this.state.isExerciseShowing) return null;
 		if (Date.now() < this.state.blinkSnoozeUntil) return null;
 		if (!this.notificationGate.notificationsAllowed()) return null;
-		this.windows.hideBlinkRateCoach();
-		this.windows.hideCalibrationNudge();
-		this.sound.play("blink");
 
+		this.windows.hideCalibrationNudge();
+
+		const rate = this.readLiveBlinkRate();
+		const session = this.blinkSession;
+		const step = nextBlinkPromptStep({
+			profile: this.preferences.blinkPromptProfile,
+			mgdMode: this.preferences.mgdMode && this.preferences.cameraEnabled,
+			soundEnabled: this.preferences.soundEnabled,
+			overlayShowing: !!(session && !session.ambient),
+			ambientShowing: !!(session?.ambient || this.windows.hasAmbient()),
+			escalateChimePlayed: session?.escalateChimePlayed ?? false,
+			cameraEnabled: this.preferences.cameraEnabled,
+			isTracking: this.preferences.isTracking,
+			blinkRateCoachingEnabled: this.preferences.blinkRateCoachingEnabled,
+			blinkRateReady: rate.ready,
+			blinksPerMinute: rate.bpm,
+			thresholdPerMin: this.preferences.blinkRateThresholdPerMin,
+		});
+
+		if (!step) return session;
+
+		this.presentBlinkPrompt(step);
+		return this.blinkSession;
+	}
+
+	private presentBlinkPrompt(step: BlinkPromptStep): void {
 		const locale = this.preferences.locale === "uk" ? "uk" : "en";
+
+		if (step === "ambient") {
+			this.windows.hideAmbient();
+			this.windows.closeReminder();
+			this.osNotifications.dismiss("blink");
+			this.windows.showAmbient();
+			this.blinkSession = {
+				overlay: null,
+				ambient: true,
+				escalateChimePlayed: false,
+				message: null,
+			};
+			this.markReminderShown();
+			this.updateBackoffAfterShow();
+			return;
+		}
+
+		const { body, shouldAdvancePool, index } =
+			this.resolveBlinkOverlayBody(locale);
+
+		if (step === "overlay") {
+			this.windows.hideAmbient();
+			this.showOverlaySurfaces(locale, body, {
+				shouldAdvancePool,
+				index,
+			});
+			return;
+		}
+
+		// escalate — ensure overlay/native up, chime once
+		if (this.blinkSession?.ambient || this.windows.hasAmbient()) {
+			this.windows.hideAmbient();
+		}
+		const alreadyShowingOverlayStep =
+			!!this.blinkSession && !this.blinkSession.ambient;
+		if (!alreadyShowingOverlayStep) {
+			this.showOverlaySurfaces(locale, body, {
+				shouldAdvancePool,
+				index,
+			});
+		}
+
+		if (this.blinkSession && !this.blinkSession.escalateChimePlayed) {
+			this.sound.play("blink");
+			this.blinkSession.escalateChimePlayed = true;
+			this.markReminderShown();
+		}
+	}
+
+	/**
+	 * Resolve blink overlay/native copy. Custom non-default `popupMessage`
+	 * wins and does not advance `blinkPromptIndex`.
+	 */
+	private resolveBlinkOverlayBody(locale: "en" | "uk"): {
+		body: string;
+		shouldAdvancePool: boolean;
+		index: number;
+	} {
+		const defaultMessage = defaultPopupMessage(locale);
+		const custom = this.preferences.popupMessage;
+		const trimmed = custom.trim();
+		const shouldAdvancePool = !trimmed || trimmed === defaultMessage;
+		const index = this.readBlinkPromptIndex();
+		const body = pickBlinkOverlayMessage({
+			locale,
+			customPopupMessage: custom,
+			cameraEnabled: this.preferences.cameraEnabled,
+			index,
+			defaultPopupMessage: defaultMessage,
+		});
+		return { body, shouldAdvancePool, index };
+	}
+
+	private readBlinkPromptIndex(): number {
+		const rawIndex = this.store.get("blinkPromptIndex", 0);
+		return typeof rawIndex === "number" && Number.isFinite(rawIndex)
+			? Math.floor(rawIndex)
+			: 0;
+	}
+
+	private advanceBlinkPromptIndex(index: number): void {
+		const poolLen = this.preferences.cameraEnabled
+			? BLINK_CAMERA_MESSAGE_POOL_KEYS.length
+			: BLINK_TIMER_MESSAGE_POOL_KEYS.length;
+		this.store.set("blinkPromptIndex", (index + 1) % poolLen);
+	}
+
+	private showOverlaySurfaces(
+		locale: "en" | "uk",
+		body: string,
+		rotation: { shouldAdvancePool: boolean; index: number },
+	): void {
 		const surfaces = resolvePromptSurfaces(
 			this.preferences.notificationStyle,
 			this.osNotifications.isSupported(),
@@ -524,7 +812,7 @@ export class ReminderService {
 				"blink",
 				{
 					title: t(locale, "popup.blink.title"),
-					body: this.preferences.popupMessage,
+					body,
 					snoozeLabel: t(locale, "osToast.snooze"),
 				},
 				{ onFailed: () => this.fallbackBlinkOverlay() },
@@ -533,31 +821,46 @@ export class ReminderService {
 		const planned = withNativeFallback(surfaces, nativeShown);
 		let overlay: unknown | null = null;
 		if (planned.overlay) {
-			overlay = this.windows.showReminder("blink");
+			overlay = this.windows.showReminder("blink", { message: body });
 		}
 		if (planned.overlay && !overlay && !planned.nativeShown) {
-			return null;
+			this.blinkSession = null;
+			return;
 		}
-		const session = { overlay };
-		this.blinkSession = session;
-		return session;
+
+		this.blinkSession = {
+			overlay,
+			ambient: false,
+			escalateChimePlayed: false,
+			message: body,
+		};
+		this.markReminderShown();
+		this.updateBackoffAfterShow();
+		if (rotation.shouldAdvancePool) {
+			this.advanceBlinkPromptIndex(rotation.index);
+		}
+	}
+
+	private updateBackoffAfterShow(): void {
+		const rate = this.readLiveBlinkRate();
+		this.backoff = nextBackoffIntervalMs(this.backoff, {
+			bpmReady: rate.ready,
+			bpm: rate.bpm,
+			threshold: this.preferences.blinkRateThresholdPerMin,
+			mgdMode: this.preferences.mgdMode,
+			cameraEnabled: this.preferences.cameraEnabled,
+		});
 	}
 
 	private fallbackBlinkOverlay(): void {
 		if (this.blinkSession?.overlay) return;
 		if (this.state.isLookAwayShowing || this.state.isExerciseShowing) return;
-		const overlay = this.windows.showReminder("blink");
+		const message = this.blinkSession?.message ?? undefined;
+		const overlay = this.windows.showReminder(
+			"blink",
+			message ? { message } : undefined,
+		);
 		if (this.blinkSession) this.blinkSession.overlay = overlay;
-	}
-
-	private endBlinkSessionIfCurrent(session: { overlay: unknown | null }): void {
-		if (this.blinkSession !== session) return;
-		if (session.overlay) {
-			this.windows.closeReminderIfCurrent(session.overlay);
-		}
-		this.osNotifications.dismiss("blink");
-		this.blinkSession = null;
-		this.markReminderShown();
 	}
 
 	private resetFaceTracking(): void {
@@ -566,8 +869,8 @@ export class ReminderService {
 		this.cancelNoFaceAutoStop();
 		this.cancelFaceReturnDebounce();
 		this.windows.hideNoFace();
-		this.windows.hideBlinkRateCoach();
 		this.windows.hideCalibrationNudge();
+		this.windows.hideAmbient();
 	}
 
 	private cancelNoFaceDebounce(): void {

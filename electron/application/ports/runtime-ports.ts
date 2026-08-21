@@ -1,37 +1,35 @@
+import type { CheerCelebration } from "../../../shared/achievements";
+
 export interface ReminderWindowPort {
-	showReminder(kind: "starting" | "blink" | "stopped"): unknown | null;
+	showReminder(
+		kind: "starting" | "blink" | "stopped",
+		options?: { force?: boolean; message?: string },
+	): unknown | null;
 	closeReminder(): void;
 	closeReminderIfCurrent(token: unknown): boolean;
 	hasReminder(): boolean;
+	/** Gentle peripheral glow (Task 3.1 implements the window). */
+	showAmbient(): void;
+	hideAmbient(): void;
+	hasAmbient(): boolean;
 	showNoFace(): void;
 	hideNoFace(): void;
 	hasNoFace(): boolean;
-	showBlinkRateCoach(): void;
-	hideBlinkRateCoach(): void;
-	hasBlinkRateCoach(): boolean;
 	showCalibrationNudge(reason: "stale" | "drift"): void;
 	hideCalibrationNudge(): void;
 	hasCalibrationNudge(): boolean;
+	/** Same API as blinkStats.setCheerEffects → windows.showCheerToast. */
+	showCheerToast(celebration?: CheerCelebration): void;
 	closeCamera(): void;
 	sendToMain(channel: string, ...args: unknown[]): void;
 	sendPreferences(): void;
-}
-
-/** Soft blink-rate coach toast surface (subset used by FocusPause + coaching). */
-export interface BlinkRateCoachWindowPort {
-	showBlinkRateCoach(): void;
-	hideBlinkRateCoach(): void;
-	hasBlinkRateCoach(): boolean;
-	hasCalibrationNudge(): boolean;
-	hasReminder(): boolean;
-	hasNoFace(): boolean;
 }
 
 export interface CalibrationNudgeWindowPort {
 	showCalibrationNudge(reason: "stale" | "drift"): void;
 	hideCalibrationNudge(): void;
 	hasCalibrationNudge(): boolean;
-	hasBlinkRateCoach(): boolean;
+	hasAmbient(): boolean;
 	hasReminder(): boolean;
 	hasNoFace(): boolean;
 	sendToMain(channel: string, ...args: unknown[]): void;

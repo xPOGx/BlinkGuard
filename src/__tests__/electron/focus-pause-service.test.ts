@@ -20,7 +20,7 @@ function makeService(
 	const closeExercise = vi.fn();
 	const closeLookAway = vi.fn();
 	const hideNoFace = vi.fn();
-	const hideBlinkRateCoach = vi.fn();
+	const hideAmbient = vi.fn();
 	const hideCalibrationNudge = vi.fn();
 	const pauseCameraForFocus = vi.fn();
 	const resumeCameraIfNeeded = vi.fn();
@@ -38,7 +38,7 @@ function makeService(
 			closeExercise,
 			closeLookAway,
 			hideNoFace,
-			hideBlinkRateCoach,
+			hideAmbient,
 			hideCalibrationNudge,
 			sendToMain,
 		},
@@ -58,6 +58,7 @@ function makeService(
 		sendToMain,
 		closeReminder,
 		closeExercise,
+		hideAmbient,
 		pauseCameraForFocus,
 		resumeCameraIfNeeded,
 		dismissAll,
@@ -91,7 +92,7 @@ describe("FocusPauseService pushState", () => {
 
 describe("FocusPauseService app-rule / fullscreen / quiet hours", () => {
 	it("pauses popups and camera on an app-rule match", () => {
-		const { service, closeReminder, pauseCameraForFocus, sendToMain } =
+		const { service, closeReminder, hideAmbient, pauseCameraForFocus, sendToMain } =
 			makeService({
 				pauseAppRules: [{ processName: "Zoom.exe", windowTitle: "" }],
 			});
@@ -105,6 +106,7 @@ describe("FocusPauseService app-rule / fullscreen / quiet hours", () => {
 		expect(service.pauseReason()).toBe("app-rule");
 		expect(service.notificationsAllowed()).toBe(false);
 		expect(closeReminder).toHaveBeenCalled();
+		expect(hideAmbient).toHaveBeenCalled();
 		expect(pauseCameraForFocus).toHaveBeenCalled();
 		expect(sendToMain).toHaveBeenCalledWith(
 			"focus-pause-state",

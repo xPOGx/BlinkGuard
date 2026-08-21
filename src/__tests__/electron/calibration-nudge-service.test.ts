@@ -32,7 +32,7 @@ function createWindows(): CalibrationNudgeWindowPort {
 		showCalibrationNudge: vi.fn(),
 		hideCalibrationNudge: vi.fn(),
 		hasCalibrationNudge: vi.fn(() => false),
-		hasBlinkRateCoach: vi.fn(() => false),
+		hasAmbient: vi.fn(() => false),
 		hasReminder: vi.fn(() => false),
 		hasNoFace: vi.fn(() => false),
 		sendToMain: vi.fn(),
@@ -72,6 +72,21 @@ describe("CalibrationNudgeService", () => {
 		vi.setSystemTime(1_700_000_000_000 + CALIBRATION_NUDGE_COOLDOWN_MS);
 		service.evaluate();
 		expect(windows.showCalibrationNudge).toHaveBeenCalledWith("stale");
+		service.dispose();
+	});
+
+	it("does not show a toast when ambient is already visible", () => {
+		const store = new FakeStore();
+		store.set("earCalibration", 0.28);
+		store.set("cameraEnabled", true);
+		store.set("isTracking", true);
+		const preferences = new PreferencesService(store);
+		const windows = createWindows();
+		(windows.hasAmbient as ReturnType<typeof vi.fn>).mockReturnValue(true);
+		const service = new CalibrationNudgeService(preferences, windows);
+
+		service.start();
+		expect(windows.showCalibrationNudge).not.toHaveBeenCalled();
 		service.dispose();
 	});
 

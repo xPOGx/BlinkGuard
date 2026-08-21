@@ -2,7 +2,6 @@ import { app } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AppRuntimeState } from "./application/app-runtime-state";
-import { BlinkRateCoachingService } from "./application/blink-rate-coaching-service";
 import { BlinkStatsService } from "./application/blink-stats-service";
 import { CalibrationNudgeService } from "./application/calibration-nudge-service";
 import { ExerciseService } from "./application/exercise-service";
@@ -220,12 +219,6 @@ function bootstrap(): void {
 		},
 		blinkDebugLogger,
 	);
-	const blinkRateCoaching = new BlinkRateCoachingService(
-		preferences,
-		blinkStats,
-		windows,
-		notificationGate,
-	);
 	calibrationNudge = new CalibrationNudgeService(
 		preferencesService,
 		windows,
@@ -240,7 +233,7 @@ function bootstrap(): void {
 		store,
 		blinkStats,
 		notificationGate,
-		blinkRateCoaching,
+		null,
 		calibrationNudge,
 		osNotifications,
 	);
@@ -345,7 +338,6 @@ function bootstrap(): void {
 			focusEnvironment.dispose?.();
 			sessionActivity.dispose();
 			sessionPause.dispose();
-			blinkRateCoaching.dispose();
 			calibrationNudge.dispose();
 			autoUpdates.dispose();
 		},

@@ -9,6 +9,11 @@ export interface BlinkStatsPort {
 	 * Controls whether BPM and trackingMs use face-visible time.
 	 */
 	setFaceCoverageMode(enabled: boolean): void;
+	/** Live BPM snapshot for prompt ladder / backoff (optional in older mocks). */
+	getSnapshot?(now?: Date): {
+		blinksPerMinute: number;
+		blinkRateReady: boolean;
+	};
 }
 
 export interface BlinkRateCoachingPort {

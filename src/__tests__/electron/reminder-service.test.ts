@@ -14,11 +14,18 @@ import {
 	NO_FACE_DEBOUNCE_MS,
 	nextTimerReminderDelay,
 	REMINDER_POPUP_VISIBLE_MS,
+	STREAK_CHEER_COOLDOWN_MS,
+	STREAK_CHEER_HEALTHY_MS,
 } from "../../../electron/domain/reminder-policy";
 import {
 	type AppPreferences,
 	DEFAULT_PREFERENCES,
 } from "../../../shared/preferences";
+import { defaultPopupMessage, t } from "../../../shared/i18n";
+import {
+	BLINK_CAMERA_MESSAGE_POOL_KEYS,
+	BLINK_TIMER_MESSAGE_POOL_KEYS,
+} from "../../../electron/domain/reminder-prompt-policy";
 
 function createStore(): PreferenceStore {
 	const data = new Map<string, unknown>();
@@ -55,13 +62,19 @@ function createPreferences(
 function createWindows() {
 	const api = {
 		reminderOpen: false,
+		ambientOpen: false,
 		hasNoFaceWindow: false,
 		lastPopup: null as unknown,
-		showReminder: vi.fn((_kind: "starting" | "blink" | "stopped") => {
-			api.reminderOpen = true;
-			api.lastPopup = { id: Math.random() };
-			return api.lastPopup;
-		}),
+		showReminder: vi.fn(
+			(
+				_kind: "starting" | "blink" | "stopped",
+				_options?: { force?: boolean; message?: string },
+			) => {
+				api.reminderOpen = true;
+				api.lastPopup = { id: Math.random() };
+				return api.lastPopup;
+			},
+		),
 		closeReminder: vi.fn(() => {
 			api.reminderOpen = false;
 		}),
@@ -73,6 +86,13 @@ function createWindows() {
 			return false;
 		}),
 		hasReminder: vi.fn(() => api.reminderOpen),
+		showAmbient: vi.fn(() => {
+			api.ambientOpen = true;
+		}),
+		hideAmbient: vi.fn(() => {
+			api.ambientOpen = false;
+		}),
+		hasAmbient: vi.fn(() => api.ambientOpen),
 		showNoFace: vi.fn(() => {
 			api.hasNoFaceWindow = true;
 		}),
@@ -80,17 +100,34 @@ function createWindows() {
 			api.hasNoFaceWindow = false;
 		}),
 		hasNoFace: vi.fn(() => api.hasNoFaceWindow),
-		showBlinkRateCoach: vi.fn(),
-		hideBlinkRateCoach: vi.fn(),
-		hasBlinkRateCoach: vi.fn(() => false),
 		showCalibrationNudge: vi.fn(),
 		hideCalibrationNudge: vi.fn(),
 		hasCalibrationNudge: vi.fn(() => false),
+		showCheerToast: vi.fn(),
 		closeCamera: vi.fn(),
 		sendToMain: vi.fn(),
 		sendPreferences: vi.fn(),
 	};
 	return api;
+}
+
+function createStats(
+	overrides: {
+		blinksPerMinute?: number;
+		blinkRateReady?: boolean;
+	} = {},
+) {
+	return {
+		recordBlink: vi.fn(),
+		onTrackingStart: vi.fn(),
+		onTrackingStop: vi.fn(),
+		onFaceVisibility: vi.fn(),
+		setFaceCoverageMode: vi.fn(),
+		getSnapshot: vi.fn(() => ({
+			blinksPerMinute: overrides.blinksPerMinute ?? 0,
+			blinkRateReady: overrides.blinkRateReady ?? false,
+		})),
+	};
 }
 
 function createSidecar(
@@ -121,6 +158,22 @@ function createOs(shown = true) {
 		dismissAll: vi.fn(),
 		setActivationHandlers: vi.fn(),
 	};
+}
+
+function expectBlinkOverlayShown(
+	windows: ReturnType<typeof createWindows>,
+): void {
+	expect(
+		windows.showReminder.mock.calls.some((call) => call[0] === "blink"),
+	).toBe(true);
+}
+
+function expectBlinkOverlayNotShown(
+	windows: ReturnType<typeof createWindows>,
+): void {
+	expect(
+		windows.showReminder.mock.calls.some((call) => call[0] === "blink"),
+	).toBe(false);
 }
 
 describe("ReminderService credit semantics", () => {
@@ -267,8 +320,11 @@ describe("ReminderService credit semantics", () => {
 		expect(preferences.isTracking).toBe(false);
 	});
 
-	it("auto-dismiss updates lastReminderShownAt only", () => {
-		const preferences = createPreferences({ reminderInterval: 1000 });
+	it("marks lastReminderShownAt on show and keeps overlay past 2.5s until blink", () => {
+		const preferences = createPreferences({
+			reminderInterval: 1000,
+			soundEnabled: true,
+		});
 		const state = new AppRuntimeState();
 		state.isFaceDetected = true;
 		state.lastBlinkTime = Date.now() - 5000;
@@ -290,13 +346,20 @@ describe("ReminderService credit semantics", () => {
 		expect(state.cameraMonitoringInterval).not.toBeNull();
 
 		vi.advanceTimersByTime(100);
-		expect(windows.showReminder).toHaveBeenCalledWith("blink");
+		expectBlinkOverlayShown(windows);
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
 		const blinkAtShow = state.lastBlinkTime;
 		const reminderAtShow = state.lastReminderShownAt;
+		expect(reminderAtShow).toBeGreaterThan(0);
 
 		vi.advanceTimersByTime(REMINDER_POPUP_VISIBLE_MS);
+		expect(windows.closeReminderIfCurrent).not.toHaveBeenCalled();
+		expect(windows.hasReminder()).toBe(true);
 		expect(state.lastBlinkTime).toBe(blinkAtShow);
-		expect(state.lastReminderShownAt).toBeGreaterThan(reminderAtShow);
+
+		service.onBlink();
+		expect(windows.closeReminder).toHaveBeenCalled();
+		expect(windows.hideAmbient).toHaveBeenCalled();
 	});
 
 	it("syncCameraLoopForMgdMode restarts the MGD loop mid-session", () => {
@@ -434,23 +497,25 @@ describe("ReminderService credit semantics", () => {
 		const preferences = createPreferences({
 			isTracking: false,
 			cameraEnabled: false,
-			reminderInterval: 3000,
+			microBreakInterval: 3000,
 			snoozeMinutes: 5,
 		});
 		const state = new AppRuntimeState();
 		const windows = createWindows();
+		const sound = createSound();
 		const service = new ReminderService(
 			preferences,
 			state,
 			windows,
 			createSidecar({ isRunning: false, isCameraReady: false }),
-			createSound(),
+			sound,
 			createStore(),
 		);
 
 		service.start(3000);
-		expect(windows.showReminder).toHaveBeenCalledWith("blink");
+		expectBlinkOverlayShown(windows);
 		expect(windows.showReminder).toHaveBeenCalledTimes(1);
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
 
 		service.snooze();
 		expect(windows.closeReminder).toHaveBeenCalled();
@@ -461,7 +526,7 @@ describe("ReminderService credit semantics", () => {
 		expect(windows.showReminder).not.toHaveBeenCalled();
 
 		vi.advanceTimersByTime(1 + nextTimerReminderDelay(3000));
-		expect(windows.showReminder).toHaveBeenCalledWith("blink");
+		expectBlinkOverlayShown(windows);
 		expect(state.blinkSnoozeUntil).toBe(0);
 	});
 
@@ -469,7 +534,7 @@ describe("ReminderService credit semantics", () => {
 		const preferences = createPreferences({
 			isTracking: false,
 			cameraEnabled: false,
-			reminderInterval: 3000,
+			microBreakInterval: 3000,
 			snoozeMinutes: 1,
 		});
 		const state = new AppRuntimeState();
@@ -491,7 +556,7 @@ describe("ReminderService credit semantics", () => {
 		expect(windows.showReminder).not.toHaveBeenCalled();
 
 		vi.advanceTimersByTime(1 + nextTimerReminderDelay(3000));
-		expect(windows.showReminder).toHaveBeenCalledWith("blink");
+		expectBlinkOverlayShown(windows);
 	});
 
 	it("snooze does not forge blink credit; onBlink still works", () => {
@@ -1084,7 +1149,7 @@ describe("ReminderService preview camera", () => {
 		const preferences = createPreferences({
 			isTracking: false,
 			cameraEnabled: false,
-			reminderInterval: 3000,
+			microBreakInterval: 3000,
 			notificationStyle: "native",
 		});
 		const windows = createWindows();
@@ -1109,11 +1174,14 @@ describe("ReminderService preview camera", () => {
 		expect(os.show).toHaveBeenCalledOnce();
 		expect(os.show).toHaveBeenCalledWith(
 			"blink",
-			expect.objectContaining({ body: preferences.popupMessage }),
+			expect.objectContaining({
+				title: expect.any(String),
+				body: expect.any(String),
+			}),
 			expect.any(Object),
 		);
 		expect(windows.showReminder).not.toHaveBeenCalled();
-		expect(sound.play).toHaveBeenCalledWith("blink");
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
 		service.ensureStopped();
 	});
 
@@ -1121,7 +1189,7 @@ describe("ReminderService preview camera", () => {
 		const preferences = createPreferences({
 			isTracking: false,
 			cameraEnabled: false,
-			reminderInterval: 3000,
+			microBreakInterval: 3000,
 			notificationStyle: "both",
 		});
 		const windows = createWindows();
@@ -1143,30 +1211,31 @@ describe("ReminderService preview camera", () => {
 
 		service.start(3000);
 
-		expect(windows.showReminder).toHaveBeenCalledWith("blink");
+		expectBlinkOverlayShown(windows);
 		expect(os.show).toHaveBeenCalledOnce();
-		expect(sound.play).toHaveBeenCalledOnce();
-		expect(sound.play).toHaveBeenCalledWith("blink");
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
 		service.ensureStopped();
 	});
 
-	it("native blink auto-dismiss marks reminder shown without an overlay", () => {
+	it("native blink stays until blink; escalate chimes after another interval", () => {
 		const preferences = createPreferences({
 			reminderInterval: 1000,
 			notificationStyle: "native",
+			soundEnabled: true,
 		});
 		const state = new AppRuntimeState();
 		state.isFaceDetected = true;
 		state.lastBlinkTime = Date.now() - 5000;
 		state.lastReminderShownAt = Date.now() - 5000;
 		const windows = createWindows();
+		const sound = createSound();
 		const os = createOs();
 		const service = new ReminderService(
 			preferences,
 			state,
 			windows,
 			createSidecar(),
-			createSound(),
+			sound,
 			createStore(),
 			null,
 			undefined,
@@ -1179,11 +1248,14 @@ describe("ReminderService preview camera", () => {
 		vi.advanceTimersByTime(100);
 		expect(os.show).toHaveBeenCalledOnce();
 		expect(windows.showReminder).not.toHaveBeenCalled();
-		const reminderAtShow = state.lastReminderShownAt;
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
+		const shownAt = state.lastReminderShownAt;
 
-		vi.advanceTimersByTime(REMINDER_POPUP_VISIBLE_MS);
-		expect(os.dismiss).toHaveBeenCalledWith("blink");
-		expect(state.lastReminderShownAt).toBeGreaterThan(reminderAtShow);
+		vi.advanceTimersByTime(2000);
+		expect(sound.play).toHaveBeenCalledWith("blink");
+		// Stay-until-blink: native toast was not torn down by a 2.5s auto-dismiss.
+		expect(os.show).toHaveBeenCalledOnce();
+		expect(state.lastReminderShownAt).toBeGreaterThanOrEqual(shownAt);
 		service.ensureStopped();
 	});
 
@@ -1214,6 +1286,611 @@ describe("ReminderService preview camera", () => {
 		expect(windows.showReminder).toHaveBeenCalledWith("starting");
 		expect(os.show).not.toHaveBeenCalled();
 		expect(sound.play).toHaveBeenCalledWith("starting");
+		service.ensureStopped();
+	});
+});
+
+describe("ReminderService prompt ladder", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it("Standard first overlay is silent; escalates once after another reminderInterval", () => {
+		const preferences = createPreferences({
+			reminderInterval: 1000,
+			blinkPromptProfile: "standard",
+			soundEnabled: true,
+		});
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		state.lastBlinkTime = Date.now() - 5000;
+		state.lastReminderShownAt = Date.now() - 5000;
+		const windows = createWindows();
+		const sound = createSound();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			sound,
+			createStore(),
+		);
+
+		service.syncCameraLoopForMgdMode();
+		vi.advanceTimersByTime(100);
+		expectBlinkOverlayShown(windows);
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
+		expect(windows.showAmbient).not.toHaveBeenCalled();
+
+		vi.advanceTimersByTime(1100);
+		expect(sound.play).toHaveBeenCalledWith("blink");
+		expect(sound.play).toHaveBeenCalledTimes(1);
+
+		vi.advanceTimersByTime(2000);
+		expect(sound.play).toHaveBeenCalledTimes(1);
+		service.ensureStopped();
+	});
+
+	it("Gentle first step is ambient-only; overlay on next miss; sound waits for escalate", () => {
+		const preferences = createPreferences({
+			reminderInterval: 1000,
+			blinkPromptProfile: "gentle",
+			soundEnabled: true,
+			blinkRateCoachingEnabled: false,
+		});
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		state.lastBlinkTime = Date.now() - 5000;
+		state.lastReminderShownAt = Date.now() - 5000;
+		const windows = createWindows();
+		const sound = createSound();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			sound,
+			createStore(),
+			createStats({ blinkRateReady: false }),
+		);
+
+		service.syncCameraLoopForMgdMode();
+		vi.advanceTimersByTime(100);
+		expect(windows.showAmbient).toHaveBeenCalled();
+		expectBlinkOverlayNotShown(windows);
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
+
+		vi.advanceTimersByTime(1100);
+		expectBlinkOverlayShown(windows);
+		expect(windows.hideAmbient).toHaveBeenCalled();
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
+
+		vi.advanceTimersByTime(1100);
+		expect(sound.play).toHaveBeenCalledWith("blink");
+		service.ensureStopped();
+	});
+
+	it("FR-6 low ready BPM with coaching + sound escalates on first Standard overlay", () => {
+		const preferences = createPreferences({
+			reminderInterval: 1000,
+			blinkPromptProfile: "standard",
+			soundEnabled: true,
+			blinkRateCoachingEnabled: true,
+			blinkRateThresholdPerMin: 4,
+		});
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		state.lastBlinkTime = Date.now() - 5000;
+		state.lastReminderShownAt = Date.now() - 5000;
+		const windows = createWindows();
+		const sound = createSound();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			sound,
+			createStore(),
+			createStats({ blinksPerMinute: 2, blinkRateReady: true }),
+		);
+
+		service.syncCameraLoopForMgdMode();
+		vi.advanceTimersByTime(100);
+		expectBlinkOverlayShown(windows);
+		expect(sound.play).toHaveBeenCalledWith("blink");
+		service.ensureStopped();
+	});
+
+	it("FR-6 coaching off ignores low BPM for instant escalate", () => {
+		const preferences = createPreferences({
+			reminderInterval: 1000,
+			blinkPromptProfile: "standard",
+			soundEnabled: true,
+			blinkRateCoachingEnabled: false,
+			blinkRateThresholdPerMin: 4,
+		});
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		state.lastBlinkTime = Date.now() - 5000;
+		state.lastReminderShownAt = Date.now() - 5000;
+		const windows = createWindows();
+		const sound = createSound();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			sound,
+			createStore(),
+			createStats({ blinksPerMinute: 2, blinkRateReady: true }),
+		);
+
+		service.syncCameraLoopForMgdMode();
+		vi.advanceTimersByTime(100);
+		expectBlinkOverlayShown(windows);
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
+		service.ensureStopped();
+	});
+
+	it("MGD shows overlay immediately with no ambient; sound waits for escalate", () => {
+		const preferences = createPreferences({
+			reminderInterval: 1000,
+			mgdMode: true,
+			blinkPromptProfile: "gentle",
+			soundEnabled: true,
+		});
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		const windows = createWindows();
+		const sound = createSound();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			sound,
+			createStore(),
+		);
+
+		service.syncCameraLoopForMgdMode();
+		expect(state.mgdReminderLoopActive).toBe(true);
+
+		vi.advanceTimersByTime(1000);
+		expectBlinkOverlayShown(windows);
+		expect(windows.showAmbient).not.toHaveBeenCalled();
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
+
+		vi.advanceTimersByTime(1000);
+		expect(sound.play).toHaveBeenCalledWith("blink");
+		service.ensureStopped();
+	});
+
+	it("timer uses microBreakInterval, escalates when cue stays, then replaces", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: false,
+			microBreakInterval: 5000,
+			blinkPromptProfile: "standard",
+			soundEnabled: true,
+		});
+		const windows = createWindows();
+		const sound = createSound();
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			windows,
+			createSidecar({ isRunning: false, isCameraReady: false }),
+			sound,
+			createStore(),
+		);
+
+		service.start(3000);
+		expectBlinkOverlayShown(windows);
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
+		const showsAfterStart = windows.showReminder.mock.calls.length;
+
+		vi.advanceTimersByTime(5000);
+		expect(sound.play).toHaveBeenCalledWith("blink");
+
+		windows.showReminder.mockClear();
+		vi.advanceTimersByTime(5000);
+		// Replace after escalate: dismiss + new first overlay
+		expectBlinkOverlayShown(windows);
+		expect(windows.showReminder.mock.calls.length).toBeGreaterThanOrEqual(1);
+		expect(showsAfterStart).toBeGreaterThan(0);
+		service.ensureStopped();
+	});
+
+	it("dismissVisibleBlink hides ambient and clears escalate state", () => {
+		const preferences = createPreferences({
+			reminderInterval: 1000,
+			blinkPromptProfile: "gentle",
+			blinkRateCoachingEnabled: false,
+		});
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		state.lastBlinkTime = Date.now() - 5000;
+		state.lastReminderShownAt = Date.now() - 5000;
+		const windows = createWindows();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			createStore(),
+			createStats({ blinkRateReady: false }),
+		);
+
+		service.syncCameraLoopForMgdMode();
+		vi.advanceTimersByTime(100);
+		expect(windows.showAmbient).toHaveBeenCalled();
+
+		service.dismissVisibleBlink();
+		expect(windows.hideAmbient).toHaveBeenCalled();
+		expect(windows.closeReminder).toHaveBeenCalled();
+		service.ensureStopped();
+	});
+
+	it("rotates camera pool via blinkPromptIndex after successful overlay show", () => {
+		const preferences = createPreferences({
+			reminderInterval: 1000,
+			popupMessage: defaultPopupMessage("en"),
+			notificationStyle: "overlay",
+			blinkPromptProfile: "standard",
+		});
+		const store = createStore();
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		state.lastBlinkTime = Date.now() - 5000;
+		state.lastReminderShownAt = Date.now() - 5000;
+		const windows = createWindows();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			store,
+		);
+
+		service.syncCameraLoopForMgdMode();
+		vi.advanceTimersByTime(100);
+
+		expect(windows.showReminder).toHaveBeenCalledWith(
+			"blink",
+			expect.objectContaining({
+				message: t("en", BLINK_CAMERA_MESSAGE_POOL_KEYS[0]),
+			}),
+		);
+		expect(store.get("blinkPromptIndex", 0)).toBe(1);
+
+		service.dismissVisibleBlink();
+		windows.showReminder.mockClear();
+		state.lastBlinkTime = Date.now() - 5000;
+		state.lastReminderShownAt = Date.now() - 5000;
+		vi.advanceTimersByTime(100);
+
+		expect(windows.showReminder).toHaveBeenCalledWith(
+			"blink",
+			expect.objectContaining({
+				message: t("en", BLINK_CAMERA_MESSAGE_POOL_KEYS[1]),
+			}),
+		);
+		expect(store.get("blinkPromptIndex", 0)).toBe(2);
+		service.ensureStopped();
+	});
+
+	it("uses custom popupMessage and does not advance blinkPromptIndex", () => {
+		const preferences = createPreferences({
+			isTracking: true,
+			cameraEnabled: true,
+			popupMessage: "Soft blink please",
+			notificationStyle: "overlay",
+			blinkPromptProfile: "standard",
+		});
+		const store = createStore();
+		store.set("blinkPromptIndex", 3);
+		const windows = createWindows();
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		state.lastBlinkTime = Date.now() - 5000;
+		state.lastReminderShownAt = Date.now() - 5000;
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			store,
+		);
+
+		service.syncCameraLoopForMgdMode();
+		vi.advanceTimersByTime(100);
+
+		expect(windows.showReminder).toHaveBeenCalledWith(
+			"blink",
+			expect.objectContaining({ message: "Soft blink please" }),
+		);
+		expect(store.get("blinkPromptIndex", 0)).toBe(3);
+		service.ensureStopped();
+	});
+
+	it("uses timer pool when camera is off", () => {
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: false,
+			microBreakInterval: 3000,
+			popupMessage: defaultPopupMessage("en"),
+			notificationStyle: "both",
+		});
+		const store = createStore();
+		store.set("blinkPromptIndex", 2);
+		const windows = createWindows();
+		const os = createOs();
+		const service = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			windows,
+			createSidecar({ isRunning: false, isCameraReady: false }),
+			createSound(),
+			store,
+			null,
+			undefined,
+			null,
+			null,
+			os,
+		);
+
+		service.start(3000);
+
+		const expected = t("en", BLINK_TIMER_MESSAGE_POOL_KEYS[2]);
+		expect(windows.showReminder).toHaveBeenCalledWith(
+			"blink",
+			expect.objectContaining({ message: expected }),
+		);
+		expect(os.show).toHaveBeenCalledWith(
+			"blink",
+			expect.objectContaining({ body: expected }),
+			expect.any(Object),
+		);
+		expect(store.get("blinkPromptIndex", 0)).toBe(3);
+		service.ensureStopped();
+	});
+
+	it("does not advance blinkPromptIndex on ambient-only Gentle step", () => {
+		const preferences = createPreferences({
+			reminderInterval: 1000,
+			blinkPromptProfile: "gentle",
+			blinkRateCoachingEnabled: false,
+			popupMessage: defaultPopupMessage("en"),
+		});
+		const store = createStore();
+		store.set("blinkPromptIndex", 1);
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		state.lastBlinkTime = Date.now() - 5000;
+		state.lastReminderShownAt = Date.now() - 5000;
+		const windows = createWindows();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			createSound(),
+			store,
+			createStats({ blinkRateReady: false }),
+		);
+
+		service.syncCameraLoopForMgdMode();
+		vi.advanceTimersByTime(100);
+		expect(windows.showAmbient).toHaveBeenCalled();
+		expectBlinkOverlayNotShown(windows);
+		expect(store.get("blinkPromptIndex", 0)).toBe(1);
+
+		vi.advanceTimersByTime(1100);
+		expect(windows.showReminder).toHaveBeenCalledWith(
+			"blink",
+			expect.objectContaining({
+				message: t("en", BLINK_CAMERA_MESSAGE_POOL_KEYS[1]),
+			}),
+		);
+		expect(store.get("blinkPromptIndex", 0)).toBe(2);
+		service.ensureStopped();
+	});
+});
+
+describe("ReminderService FR-7 streak cheer", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	/** Advance fake time while keeping miss-gap timers from firing blink overlays. */
+	function advanceHealthyStreak(state: AppRuntimeState, ms: number): void {
+		const chunk = 1_000;
+		let left = ms;
+		while (left > 0) {
+			const step = Math.min(chunk, left);
+			state.lastBlinkTime = Date.now();
+			state.lastReminderShownAt = Date.now();
+			vi.advanceTimersByTime(step);
+			left -= step;
+		}
+	}
+
+	function startHealthyFaceAware(options?: {
+		gate?: { notificationsAllowed: () => boolean; pauseReason: () => null };
+		bpm?: number;
+		ready?: boolean;
+		mgdMode?: boolean;
+		cameraEnabled?: boolean;
+	}) {
+		const preferences = createPreferences({
+			reminderInterval: 3000,
+			blinkRateThresholdPerMin: 4,
+			blinkRateCoachingEnabled: false,
+			mgdMode: options?.mgdMode ?? false,
+			cameraEnabled: options?.cameraEnabled ?? true,
+		});
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		state.lastBlinkTime = Date.now();
+		state.lastReminderShownAt = Date.now();
+		const windows = createWindows();
+		const sound = createSound();
+		const stats = createStats({
+			blinksPerMinute: options?.bpm ?? 8,
+			blinkRateReady: options?.ready ?? true,
+		});
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			sound,
+			createStore(),
+			stats,
+			options?.gate,
+		);
+		service.syncCameraLoopForMgdMode();
+		return { preferences, state, windows, sound, stats, service };
+	}
+
+	it("cheers after 10 continuous minutes of healthy ready BPM", () => {
+		const { state, windows, sound, service } = startHealthyFaceAware();
+
+		advanceHealthyStreak(state, STREAK_CHEER_HEALTHY_MS - 1_000);
+		expect(windows.showCheerToast).not.toHaveBeenCalled();
+		expect(sound.play).not.toHaveBeenCalledWith("cheer", { force: true });
+
+		advanceHealthyStreak(state, 2_000);
+		expect(windows.showCheerToast).toHaveBeenCalledWith({ kind: "cheer" });
+		expect(sound.play).toHaveBeenCalledWith("cheer", { force: true });
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
+		service.ensureStopped();
+	});
+
+	it("does not cheer again inside the 30 minute cooldown", () => {
+		const { state, windows, sound, service } = startHealthyFaceAware();
+
+		advanceHealthyStreak(state, STREAK_CHEER_HEALTHY_MS + 500);
+		expect(windows.showCheerToast).toHaveBeenCalledTimes(1);
+
+		advanceHealthyStreak(state, STREAK_CHEER_HEALTHY_MS + 500);
+		expect(windows.showCheerToast).toHaveBeenCalledTimes(1);
+
+		// Cooldown ends while accumulator already ≥ 10 min → second cheer.
+		advanceHealthyStreak(
+			state,
+			STREAK_CHEER_COOLDOWN_MS - STREAK_CHEER_HEALTHY_MS,
+		);
+		expect(windows.showCheerToast).toHaveBeenCalledTimes(2);
+		expect(sound.play).toHaveBeenCalledWith("cheer", { force: true });
+		service.ensureStopped();
+	});
+
+	it("resets accumulator when BPM drops below threshold or is not ready", () => {
+		const { state, windows, stats, service } = startHealthyFaceAware();
+
+		advanceHealthyStreak(state, STREAK_CHEER_HEALTHY_MS - 2_000);
+		stats.getSnapshot!.mockReturnValue({
+			blinksPerMinute: 2,
+			blinkRateReady: true,
+		});
+		advanceHealthyStreak(state, 3_000);
+		expect(windows.showCheerToast).not.toHaveBeenCalled();
+
+		stats.getSnapshot!.mockReturnValue({
+			blinksPerMinute: 8,
+			blinkRateReady: true,
+		});
+		advanceHealthyStreak(state, STREAK_CHEER_HEALTHY_MS - 2_000);
+		expect(windows.showCheerToast).not.toHaveBeenCalled();
+
+		advanceHealthyStreak(state, 3_000);
+		expect(windows.showCheerToast).toHaveBeenCalledTimes(1);
+		service.ensureStopped();
+	});
+
+	it("skips cheer while blink overlay is up and fires after clear", () => {
+		const { state, windows, sound, service } = startHealthyFaceAware();
+
+		advanceHealthyStreak(state, STREAK_CHEER_HEALTHY_MS - 1_000);
+		windows.reminderOpen = true;
+		advanceHealthyStreak(state, 5_000);
+		expect(windows.showCheerToast).not.toHaveBeenCalled();
+
+		windows.reminderOpen = false;
+		advanceHealthyStreak(state, 2_000);
+		expect(windows.showCheerToast).toHaveBeenCalledWith({ kind: "cheer" });
+		expect(sound.play).toHaveBeenCalledWith("cheer", { force: true });
+		service.ensureStopped();
+	});
+
+	it("respects NotificationGate and does not cheer in timer-only mode", () => {
+		let allowed = false;
+		const gate = {
+			notificationsAllowed: () => allowed,
+			pauseReason: () => null,
+		};
+		const gated = startHealthyFaceAware({ gate });
+		advanceHealthyStreak(gated.state, STREAK_CHEER_HEALTHY_MS + 500);
+		expect(gated.windows.showCheerToast).not.toHaveBeenCalled();
+
+		allowed = true;
+		advanceHealthyStreak(gated.state, 500);
+		expect(gated.windows.showCheerToast).toHaveBeenCalledTimes(1);
+		gated.service.ensureStopped();
+
+		const preferences = createPreferences({
+			isTracking: false,
+			cameraEnabled: false,
+			microBreakInterval: 5_000,
+		});
+		const windows = createWindows();
+		const sound = createSound();
+		const timerService = new ReminderService(
+			preferences,
+			new AppRuntimeState(),
+			windows,
+			createSidecar({ isRunning: false, isCameraReady: false }),
+			sound,
+			createStore(),
+			createStats({ blinksPerMinute: 8, blinkRateReady: true }),
+		);
+		timerService.start(3_000);
+		vi.advanceTimersByTime(STREAK_CHEER_HEALTHY_MS + 5_000);
+		expect(windows.showCheerToast).not.toHaveBeenCalled();
+		expect(sound.play).not.toHaveBeenCalledWith("cheer", { force: true });
+		timerService.ensureStopped();
+	});
+
+	it("includes MGD when BPM is ready unless blink overlay is up", () => {
+		const { state, windows, sound, service } = startHealthyFaceAware({
+			mgdMode: true,
+		});
+		// MGD still ticks cheer without a face; avoid overlay spam blocking the streak.
+		state.isFaceDetected = false;
+
+		// MGD polls at reminderInterval (3s), so allow one extra tick past 10 min.
+		advanceHealthyStreak(state, STREAK_CHEER_HEALTHY_MS + 4_000);
+		expect(windows.showCheerToast).toHaveBeenCalledWith({ kind: "cheer" });
+		expect(sound.play).toHaveBeenCalledWith("cheer", { force: true });
+
+		windows.showCheerToast.mockClear();
+		vi.mocked(sound.play).mockClear();
+		state.isFaceDetected = true;
+		vi.advanceTimersByTime(3_000);
+		expectBlinkOverlayShown(windows);
+		expect(windows.showCheerToast).not.toHaveBeenCalled();
 		service.ensureStopped();
 	});
 });

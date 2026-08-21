@@ -84,7 +84,7 @@ export class CalibrationNudgeService {
 			hasBlockingToast:
 				this.windows.hasReminder() ||
 				this.windows.hasNoFace() ||
-				this.windows.hasBlinkRateCoach() ||
+				this.windows.hasAmbient() ||
 				this.windows.hasCalibrationNudge(),
 		});
 		if (!show || !reason) return;
