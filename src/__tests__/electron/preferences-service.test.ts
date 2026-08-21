@@ -36,6 +36,8 @@ describe("PreferencesService", () => {
 		expect(service.current.reminderInterval).toBe(
 			DEFAULT_PREFERENCES.reminderInterval,
 		);
+		expect(service.current.blinkPromptProfile).toBe("standard");
+		expect(service.current.microBreakInterval).toBe(30_000);
 		expect(service.current.isTracking).toBe(false);
 		expect(service.current.launchAtLogin).toBe(false);
 		expect(service.current.hasCompletedOnboarding).toBe(false);
@@ -95,6 +97,8 @@ describe("PreferencesService", () => {
 	it("hydrates persisted values from the store", () => {
 		const store = new FakePreferenceStore();
 		store.set("reminderInterval", 5000);
+		store.set("blinkPromptProfile", "gentle");
+		store.set("microBreakInterval", 60_000);
 		store.set("darkMode", false);
 		store.set("cameraQuality", "high");
 		store.set("earCalibration", 0.31);
@@ -104,6 +108,8 @@ describe("PreferencesService", () => {
 		const service = new PreferencesService(store);
 
 		expect(service.current.reminderInterval).toBe(5000);
+		expect(service.current.blinkPromptProfile).toBe("gentle");
+		expect(service.current.microBreakInterval).toBe(60_000);
 		expect(service.current.darkMode).toBe(false);
 		expect(service.current.cameraQuality).toBe("high");
 		expect(service.current.earCalibration).toBe(0.31);
@@ -112,6 +118,30 @@ describe("PreferencesService", () => {
 		expect(service.current.launchAtLogin).toBe(true);
 		expect(service.current.isTracking).toBe(true);
 		expect(service.current.popupMessage).toBe(DEFAULT_PREFERENCES.popupMessage);
+	});
+
+	it("defaults missing microBreakInterval to 30s without copying reminderInterval", () => {
+		const store = new FakePreferenceStore();
+		store.set("reminderInterval", 5_000);
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.reminderInterval).toBe(5_000);
+		expect(service.current.microBreakInterval).toBe(30_000);
+		expect(service.current.blinkPromptProfile).toBe("standard");
+	});
+
+	it("sanitizes invalid blinkPromptProfile and clamps microBreakInterval on hydrate", () => {
+		const store = new FakePreferenceStore();
+		store.set("blinkPromptProfile", "loud");
+		store.set("microBreakInterval", 5_000);
+		store.set("reminderInterval", 500);
+
+		const service = new PreferencesService(store);
+
+		expect(service.current.blinkPromptProfile).toBe("standard");
+		expect(service.current.microBreakInterval).toBe(15_000);
+		expect(service.current.reminderInterval).toBe(1_000);
 	});
 
 	it("falls back to medium when cameraQuality in the store is invalid", () => {

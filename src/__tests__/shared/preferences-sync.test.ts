@@ -9,6 +9,8 @@ import { rendererIpc } from "@/shared/ipc/renderer-ipc";
 vi.mock("@/shared/ipc/renderer-ipc", () => ({
 	rendererIpc: {
 		updateDarkMode: vi.fn(),
+		updateMicroBreakInterval: vi.fn(),
+		updateBlinkPromptProfile: vi.fn(),
 		updateCameraEnabled: vi.fn(),
 		updateCameraQuality: vi.fn(),
 		updateCameraDevice: vi.fn(),
@@ -135,6 +137,22 @@ describe("sameRendererPrefs", () => {
 			sameRendererPrefs(base, {
 				...base,
 				snoozeMinutes: 10,
+			}),
+		).toBe(false);
+	});
+
+	it("detects microBreakInterval and blinkPromptProfile changes", () => {
+		const base = { ...DEFAULT_RENDERER_PREFERENCES };
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				microBreakInterval: 60,
+			}),
+		).toBe(false);
+		expect(
+			sameRendererPrefs(base, {
+				...base,
+				blinkPromptProfile: "gentle",
 			}),
 		).toBe(false);
 	});
@@ -299,6 +317,31 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateSnoozeMinutes).toHaveBeenCalledWith(12);
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 		expect(rendererIpc.updateAutoStopNoFaceMinutes).not.toHaveBeenCalled();
+	});
+
+	it("pushes only microBreakInterval when it changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = { ...previous, microBreakInterval: 45 };
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateMicroBreakInterval).toHaveBeenCalledWith(45);
+		expect(rendererIpc.updateBlinkPromptProfile).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+		expect(rendererIpc.updateDarkMode).not.toHaveBeenCalled();
+	});
+
+	it("pushes only blinkPromptProfile when it changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = { ...previous, blinkPromptProfile: "gentle" as const };
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateBlinkPromptProfile).toHaveBeenCalledWith(
+			"gentle",
+		);
+		expect(rendererIpc.updateMicroBreakInterval).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 	});
 
 	it("pushes only sound volume when it changes", () => {

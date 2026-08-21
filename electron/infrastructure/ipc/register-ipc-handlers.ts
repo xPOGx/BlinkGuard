@@ -15,8 +15,10 @@ import type { PauseAppRule, Point, PopupColors, Size } from "../../../shared/pre
 import {
 	sameKeyboardShortcuts,
 	findDuplicateShortcutActions,
+	sanitizeBlinkPromptProfile,
 	sanitizeGoalsConfig,
 	sanitizeKeyboardShortcuts,
+	sanitizeMicroBreakIntervalMs,
 	sanitizePauseAppPickerPayload,
 	emptyPauseAppPicker,
 } from "../../../shared/preferences";
@@ -136,6 +138,19 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	on(IPC_CHANNELS.updateInterval, (_event, interval: unknown) => {
 		preferences.set("reminderInterval", interval as number);
 		reminders.applyReminderInterval();
+	});
+	on(IPC_CHANNELS.updateMicroBreakInterval, (_event, interval: unknown) => {
+		preferences.set(
+			"microBreakInterval",
+			sanitizeMicroBreakIntervalMs(interval),
+		);
+		reminders.applyReminderInterval();
+	});
+	on(IPC_CHANNELS.updateBlinkPromptProfile, (_event, profile: unknown) => {
+		preferences.set(
+			"blinkPromptProfile",
+			sanitizeBlinkPromptProfile(profile),
+		);
 	});
 	on(IPC_CHANNELS.updatePopupColors, (_event, colors: unknown) => {
 		preferences.set("popupColors", colors as PopupColors);

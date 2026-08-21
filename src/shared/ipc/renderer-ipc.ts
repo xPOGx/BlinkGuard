@@ -25,6 +25,7 @@ import type { ExportDiagnosticsResult } from "../../../shared/diagnostics";
 import { IPC_CHANNELS } from "../../../shared/ipc-channels";
 import type { NotificationStyle } from "../../../shared/notification-style";
 import {
+	type BlinkPromptProfile,
 	type CameraQuality,
 	emptyPauseAppPicker,
 	type KeyboardShortcuts,
@@ -96,6 +97,10 @@ export const rendererIpc = {
 	notifyShellReady: () => send(IPC_CHANNELS.shellReady),
 	updateReminderInterval: (intervalSeconds: number) =>
 		send(IPC_CHANNELS.updateInterval, intervalSeconds * 1000),
+	updateMicroBreakInterval: (intervalSeconds: number) =>
+		send(IPC_CHANNELS.updateMicroBreakInterval, intervalSeconds * 1000),
+	updateBlinkPromptProfile: (profile: BlinkPromptProfile) =>
+		send(IPC_CHANNELS.updateBlinkPromptProfile, profile),
 	updateDarkMode: (enabled: boolean) =>
 		send(IPC_CHANNELS.updateDarkMode, enabled),
 	updateCameraEnabled: (enabled: boolean) =>

@@ -96,7 +96,7 @@ export const en: MessageCatalog = {
 	"debug.preview.blink": "Blink",
 	"debug.preview.starting": "Starting",
 	"debug.preview.stopped": "Stopped",
-	"debug.preview.coach": "Blink-rate coach",
+	"debug.preview.ambient": "Ambient glow",
 	"debug.preview.noFace": "No face",
 	"debug.preview.lookAway": "Look away (20-20-20)",
 	"debug.preview.exercise": "Exercise",
@@ -176,7 +176,7 @@ export const en: MessageCatalog = {
 	"reminders.interval": "Reminder Interval",
 	"reminders.intervalAria": "Reminder interval",
 	"reminders.desc.camera": "Show reminder if you haven't blinked.",
-	"reminders.desc.timer": "Show reminder at this interval.",
+	"reminders.desc.timer": "Cue a blink micro-break at this interval.",
 	"reminders.snooze": "Snooze duration",
 	"reminders.snoozeDesc":
 		"Hide blink, exercise, and look-away prompts for {n} minute after Snooze.",
@@ -189,7 +189,17 @@ export const en: MessageCatalog = {
 	"reminders.rateHint.camera":
 		"upper bound if you blink once whenever a reminder would fire (reminders only appear after you have not blinked for the interval).",
 	"reminders.rateHint.timer":
-		"target cadence if you blink once per reminder interval.",
+		"cue cadence for micro-break blink reminders — not a detected miss.",
+	"reminders.profile.title": "Blink cue intensity",
+	"reminders.profile.description":
+		"How strong the first blink nudge feels before any sound.",
+	"reminders.profile.aria": "Blink cue intensity profile",
+	"reminders.profile.standard": "Standard",
+	"reminders.profile.gentle": "Gentle",
+	"reminders.profile.standardDesc":
+		"Overlay first. Sound only if you keep ignoring the visual cue.",
+	"reminders.profile.gentleDesc":
+		"Soft screen-edge glow first, then the overlay. Sound still waits until you ignore a visual cue.",
 	"reminders.inTypicalRange":
 		"Within the typical resting blink range (about 15–20/min).",
 	"reminders.guidanceTitle": "Blink rate guidance",
@@ -274,10 +284,10 @@ export const en: MessageCatalog = {
 	"camera.calibrationNudgeDesc":
 		"Soft tip while tracking when your blink calibration looks stale or lighting has drifted.",
 	"camera.calibrationNudgeToggleAria": "Toggle calibration reminders",
-	"camera.coaching": "Blink rate coaching",
+	"camera.coaching": "Low-rate prompt boost",
 	"camera.coachingDesc":
-		"Soft tip when your recent camera blink rate is low. Live rate stays in Statistics.",
-	"camera.coachingToggleAria": "Toggle blink rate coaching",
+		"When live camera blink rate is below the threshold, skip Gentle ambient and may play the blink chime on the first overlay. Not a separate coach toast — live rate stays in Statistics.",
+	"camera.coachingToggleAria": "Toggle low-rate prompt boost",
 	"camera.minBlinks": "Min blinks / min",
 	"camera.autoStopNoFace": "Auto-stop when away",
 	"camera.autoStopNoFaceDesc":
@@ -385,7 +395,7 @@ export const en: MessageCatalog = {
 	// Sound / launch / reset / quiet hours
 	"sound.title": "Notification Sound",
 	"sound.description":
-		"Play sounds for blink reminders, exercises, look-away breaks, and start/stop status",
+		"Play sounds for exercises, look-away breaks, and start/stop. The blink chime plays only after you ignore a visual cue (escalate).",
 	"sound.toggleAria": "Toggle notification sound",
 	"sound.volume": "Volume",
 	"sound.volumeAria": "Notification sound volume",
@@ -708,6 +718,16 @@ export const en: MessageCatalog = {
 
 	// Popup chrome
 	"popup.blink.title": "Blink Reminder",
+	"popup.blink.pool.0": "Blink!",
+	"popup.blink.pool.1": "Soft blink",
+	"popup.blink.pool.2": "One full blink",
+	"popup.blink.pool.3": "Give your eyes a blink",
+	"popup.blink.pool.4": "Close, then open — blink",
+	"popup.blink.timerPool.0": "Time for a blink",
+	"popup.blink.timerPool.1": "Blink break",
+	"popup.blink.timerPool.2": "Pause for a blink",
+	"popup.blink.timerPool.3": "A blink would help",
+	"popup.blink.timerPool.4": "Soft blink cue",
 	"popup.blink.snooze": "Snooze ({n} min)",
 	"popup.blink.snooze_few": "Snooze ({n} min)",
 	"popup.blink.snooze_plural": "Snooze ({n} min)",
@@ -728,6 +748,7 @@ export const en: MessageCatalog = {
 	"popup.lookAway.snooze_plural": "Snooze ({n} min)",
 	"popup.noFace.message": "No face detected",
 	"popup.coach.message": "Blink a bit more — rate is low",
+	"popup.ambient.message": "Blink gently — soft reminder",
 	"popup.calibrationNudge.stale":
 		"Calibration may need a refresh — open Camera settings",
 	"popup.calibrationNudge.drift":

@@ -46,6 +46,8 @@ export function sameRendererPrefs(
 	return (
 		a.darkMode === b.darkMode &&
 		a.reminderInterval === b.reminderInterval &&
+		a.microBreakInterval === b.microBreakInterval &&
+		a.blinkPromptProfile === b.blinkPromptProfile &&
 		a.cameraEnabled === b.cameraEnabled &&
 		a.cameraQuality === b.cameraQuality &&
 		sameCameraDevice(a.cameraDevice, b.cameraDevice) &&
@@ -112,6 +114,12 @@ export function pushPreferenceDiff(
 ): void {
 	if (!previous || previous.darkMode !== next.darkMode) {
 		rendererIpc.updateDarkMode(next.darkMode);
+	}
+	if (!previous || previous.microBreakInterval !== next.microBreakInterval) {
+		rendererIpc.updateMicroBreakInterval(next.microBreakInterval);
+	}
+	if (!previous || previous.blinkPromptProfile !== next.blinkPromptProfile) {
+		rendererIpc.updateBlinkPromptProfile(next.blinkPromptProfile);
 	}
 	if (!previous || previous.cameraEnabled !== next.cameraEnabled) {
 		rendererIpc.updateCameraEnabled(next.cameraEnabled);

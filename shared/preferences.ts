@@ -150,6 +150,19 @@ const SOUND_VOLUME_MIN = 0;
 const SOUND_VOLUME_MAX = 100;
 const SOUND_VOLUME_DEFAULT = 100;
 
+/** Camera miss-gap / timer base interval (ms). */
+const REMINDER_INTERVAL_MS_MIN = 1_000;
+const REMINDER_INTERVAL_MS_MAX = 10_000;
+const REMINDER_INTERVAL_MS_DEFAULT = 3_000;
+
+/** No-camera micro-break cue cadence (ms). */
+const MICRO_BREAK_INTERVAL_MS_MIN = 15_000;
+const MICRO_BREAK_INTERVAL_MS_MAX = 120_000;
+const MICRO_BREAK_INTERVAL_MS_DEFAULT = 30_000;
+
+/** Blink prompt intensity ladder profile. */
+export type BlinkPromptProfile = "standard" | "gentle";
+
 /** Global shortcut actions bound via Electron `globalShortcut`. */
 export const SHORTCUT_ACTIONS = [
 	"trackingToggle",
@@ -376,9 +389,48 @@ export function sanitizeSoundVolume(input: unknown): number {
 	);
 }
 
+/** Coerce stored/IPC blink prompt profile; unknown → standard. */
+export function sanitizeBlinkPromptProfile(input: unknown): BlinkPromptProfile {
+	return input === "standard" || input === "gentle" ? input : "standard";
+}
+
+/** Coerce stored/IPC camera miss-gap interval to 1_000…10_000 ms. */
+export function sanitizeReminderIntervalMs(input: unknown): number {
+	if (input === null || input === undefined || input === "") {
+		return REMINDER_INTERVAL_MS_DEFAULT;
+	}
+	const n = typeof input === "number" ? input : Number(input);
+	if (!Number.isFinite(n) || n <= 0) return REMINDER_INTERVAL_MS_DEFAULT;
+	return Math.min(
+		REMINDER_INTERVAL_MS_MAX,
+		Math.max(REMINDER_INTERVAL_MS_MIN, Math.round(n)),
+	);
+}
+
+/**
+ * Coerce stored/IPC micro-break interval to 15_000…120_000 ms.
+ * Missing/invalid → 30s; never copies reminderInterval.
+ */
+export function sanitizeMicroBreakIntervalMs(input: unknown): number {
+	if (input === null || input === undefined || input === "") {
+		return MICRO_BREAK_INTERVAL_MS_DEFAULT;
+	}
+	const n = typeof input === "number" ? input : Number(input);
+	if (!Number.isFinite(n) || n <= 0) return MICRO_BREAK_INTERVAL_MS_DEFAULT;
+	return Math.min(
+		MICRO_BREAK_INTERVAL_MS_MAX,
+		Math.max(MICRO_BREAK_INTERVAL_MS_MIN, Math.round(n)),
+	);
+}
+
 export interface PersistedPreferences {
 	darkMode: boolean;
+	/** Camera miss-gap in ms; 1_000…10_000. */
 	reminderInterval: number;
+	/** Blink prompt intensity profile. */
+	blinkPromptProfile: BlinkPromptProfile;
+	/** No-camera micro-break cue cadence in ms; 15_000…120_000. */
+	microBreakInterval: number;
 	cameraEnabled: boolean;
 	cameraQuality: CameraQuality;
 	/** Preferred capture device; null = Automatic OpenCV index scan. */
@@ -476,8 +528,13 @@ export interface PersistedPreferences {
 
 export type AppPreferences = PersistedPreferences;
 
-export type RendererPreferences = Omit<AppPreferences, "reminderInterval"> & {
+/** Settings UI: interval fields are seconds (ms / 1000). */
+export type RendererPreferences = Omit<
+	AppPreferences,
+	"reminderInterval" | "microBreakInterval"
+> & {
 	reminderInterval: number;
+	microBreakInterval: number;
 };
 
 export const DEFAULT_EXERCISE_PROMPTS: readonly string[] =
@@ -523,7 +580,9 @@ export function sanitizeLookAwayHint(
 
 export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	darkMode: true,
-	reminderInterval: 3000,
+	reminderInterval: REMINDER_INTERVAL_MS_DEFAULT,
+	blinkPromptProfile: "standard",
+	microBreakInterval: MICRO_BREAK_INTERVAL_MS_DEFAULT,
 	cameraEnabled: false,
 	cameraQuality: "medium",
 	cameraDevice: null,
@@ -586,6 +645,7 @@ export function toRendererPreferences(
 	return {
 		...preferences,
 		reminderInterval: preferences.reminderInterval / 1000,
+		microBreakInterval: preferences.microBreakInterval / 1000,
 	};
 }
 
@@ -650,11 +710,6 @@ function asBoolean(value: unknown, fallback: boolean): boolean {
 function asFiniteNumber(value: unknown, fallback: number): number {
 	const n = typeof value === "number" ? value : Number(value);
 	return Number.isFinite(n) ? n : fallback;
-}
-
-function asPositiveMs(value: unknown, fallback: number): number {
-	const n = asFiniteNumber(value, fallback);
-	return n > 0 ? Math.round(n) : fallback;
 }
 
 function asPositiveMinutes(value: unknown, fallback: number): number {
@@ -910,10 +965,9 @@ export function sanitizePersistedPreferences(
 
 	return {
 		darkMode: asBoolean(record.darkMode, defaults.darkMode),
-		reminderInterval: asPositiveMs(
-			record.reminderInterval,
-			defaults.reminderInterval,
-		),
+		reminderInterval: sanitizeReminderIntervalMs(record.reminderInterval),
+		blinkPromptProfile: sanitizeBlinkPromptProfile(record.blinkPromptProfile),
+		microBreakInterval: sanitizeMicroBreakIntervalMs(record.microBreakInterval),
 		cameraEnabled: asBoolean(record.cameraEnabled, defaults.cameraEnabled),
 		cameraQuality: isCameraQualityValue(record.cameraQuality)
 			? record.cameraQuality

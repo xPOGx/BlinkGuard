@@ -31,6 +31,9 @@ import {
 	sanitizePersistedPreferences,
 	sanitizePopupPositionsByDisplayId,
 	sanitizePopupSizesByDisplayId,
+	sanitizeBlinkPromptProfile,
+	sanitizeMicroBreakIntervalMs,
+	sanitizeReminderIntervalMs,
 	sanitizeSnoozeMinutes,
 	sanitizeSoundVolume,
 	seedPopupPositionsFromLegacy,
@@ -57,6 +60,62 @@ describe("toRendererPreferences", () => {
 		expect(renderer.calibrationNudgeEnabled).toBe(true);
 		expect(renderer.classifierBias).toBeNull();
 		expect(renderer.classifierThreshold).toBeNull();
+	});
+
+	it("converts microBreakInterval from ms to seconds for the settings UI", () => {
+		const preferences: AppPreferences = {
+			...DEFAULT_PREFERENCES,
+			microBreakInterval: 45_000,
+		};
+
+		const renderer = toRendererPreferences(preferences);
+
+		expect(renderer.microBreakInterval).toBe(45);
+		expect(renderer.reminderInterval).toBe(3);
+		expect(renderer.blinkPromptProfile).toBe("standard");
+	});
+});
+
+describe("blink prompt profile / micro-break preference defaults", () => {
+	it("defaults profile to standard and micro-break to 30s", () => {
+		expect(DEFAULT_PREFERENCES.blinkPromptProfile).toBe("standard");
+		expect(DEFAULT_PREFERENCES.microBreakInterval).toBe(30_000);
+		expect(DEFAULT_PREFERENCES.reminderInterval).toBe(3_000);
+	});
+
+	it("sanitizes blinkPromptProfile; unknown → standard", () => {
+		expect(sanitizeBlinkPromptProfile("gentle")).toBe("gentle");
+		expect(sanitizeBlinkPromptProfile("standard")).toBe("standard");
+		expect(sanitizeBlinkPromptProfile("loud")).toBe("standard");
+		expect(sanitizeBlinkPromptProfile(null)).toBe("standard");
+		expect(
+			sanitizePersistedPreferences({ blinkPromptProfile: "harsh" })
+				.blinkPromptProfile,
+		).toBe("standard");
+	});
+
+	it("sanitizes microBreakInterval to 15_000…120_000; missing → 30s", () => {
+		expect(sanitizeMicroBreakIntervalMs(null)).toBe(30_000);
+		expect(sanitizeMicroBreakIntervalMs(undefined)).toBe(30_000);
+		expect(sanitizeMicroBreakIntervalMs(0)).toBe(30_000);
+		expect(sanitizeMicroBreakIntervalMs(10_000)).toBe(15_000);
+		expect(sanitizeMicroBreakIntervalMs(200_000)).toBe(120_000);
+		expect(sanitizeMicroBreakIntervalMs(45_500.6)).toBe(45_501);
+	});
+
+	it("never copies reminderInterval into a missing microBreakInterval", () => {
+		const prefs = sanitizePersistedPreferences({
+			reminderInterval: 5_000,
+		});
+		expect(prefs.reminderInterval).toBe(5_000);
+		expect(prefs.microBreakInterval).toBe(30_000);
+	});
+
+	it("clamps reminderInterval to 1_000…10_000 ms", () => {
+		expect(sanitizeReminderIntervalMs(null)).toBe(3_000);
+		expect(sanitizeReminderIntervalMs(500)).toBe(1_000);
+		expect(sanitizeReminderIntervalMs(15_000)).toBe(10_000);
+		expect(sanitizeReminderIntervalMs(4_500.4)).toBe(4_500);
 	});
 });
 

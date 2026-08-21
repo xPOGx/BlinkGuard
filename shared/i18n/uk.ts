@@ -96,7 +96,7 @@ export const uk: MessageCatalog = {
 	"debug.preview.blink": "Моргання",
 	"debug.preview.starting": "Запуск",
 	"debug.preview.stopped": "Зупинка",
-	"debug.preview.coach": "Коуч частоти моргання",
+	"debug.preview.ambient": "Периферійне світло",
 	"debug.preview.noFace": "Немає обличчя",
 	"debug.preview.lookAway": "Подивіться вдалину (20-20-20)",
 	"debug.preview.exercise": "Вправа",
@@ -178,7 +178,8 @@ export const uk: MessageCatalog = {
 	"reminders.intervalAria": "Інтервал нагадувань",
 	"reminders.desc.camera":
 		"Показати нагадування, якщо ви не моргали.",
-	"reminders.desc.timer": "Показувати нагадування з цим інтервалом.",
+	"reminders.desc.timer":
+		"Підказка про мікроперерву на моргання з цим інтервалом.",
 	"reminders.snooze": "Тривалість відкладення",
 	"reminders.snoozeDesc":
 		"Ховати нагадування про моргання, вправи та погляд вдалину на {n} хвилину після «Відкласти».",
@@ -191,7 +192,17 @@ export const uk: MessageCatalog = {
 	"reminders.rateHint.camera":
 		"верхня межа, якщо моргати щоразу, коли спрацювало б нагадування (воно з’являється лише після паузи без моргання).",
 	"reminders.rateHint.timer":
-		"цільовий ритм, якщо моргати раз на інтервал нагадування.",
+		"ритм підказок мікроперерви на моргання — не виявлений пропуск.",
+	"reminders.profile.title": "Сила підказки проморгати",
+	"reminders.profile.description":
+		"Наскільки помітна перша підказка проморгати до будь-якого звуку.",
+	"reminders.profile.aria": "Профіль сили підказки проморгати",
+	"reminders.profile.standard": "Звичайний",
+	"reminders.profile.gentle": "М’який",
+	"reminders.profile.standardDesc":
+		"Спочатку накладка. Звук лише якщо ви далі ігноруєте візуальну підказку.",
+	"reminders.profile.gentleDesc":
+		"Спочатку м’яке світіння по краю екрана, потім накладка. Звук також чекає, доки ви не проігноруєте візуальну підказку.",
 	"reminders.inTypicalRange":
 		"У типовому діапазоні спокійного моргання (близько 15–20/хв).",
 	"reminders.guidanceTitle": "Орієнтири частоти моргання",
@@ -279,10 +290,11 @@ export const uk: MessageCatalog = {
 		"М’яка підказка під час спостереження, коли калібрування застаріло або змінилося освітлення.",
 	"camera.calibrationNudgeToggleAria":
 		"Перемкнути нагадування про калібрування",
-	"camera.coaching": "Підказки за частотою моргання",
+	"camera.coaching": "Підсилення при низькій частоті",
 	"camera.coachingDesc":
-		"М’яка підказка, коли нещодавня частота з камери низька. Жива частота — у Статистиці.",
-	"camera.coachingToggleAria": "Перемкнути підказки частоти моргання",
+		"Коли жива частота з камери нижча за поріг, пропускається м’яке світіння (Gentle) і на першій накладці може прозвучати сигнал. Це не окремий тост-коуч — жива частота лишається в Статистиці.",
+	"camera.coachingToggleAria":
+		"Перемкнути підсилення підказки при низькій частоті",
 	"camera.minBlinks": "Мін. морг. / хв",
 	"camera.autoStopNoFace": "Автостоп без обличчя",
 	"camera.autoStopNoFaceDesc":
@@ -393,7 +405,7 @@ export const uk: MessageCatalog = {
 	// Sound / launch / reset / quiet hours
 	"sound.title": "Звук сповіщень",
 	"sound.description":
-		"Відтворювати звуки для нагадувань про моргання, вправ, перерв «подивіться вдалину» та статусу старт/стоп",
+		"Відтворювати звуки для вправ, перерв «подивіться вдалину» та статусу старт/стоп. Сигнал проморгати — лише після ігнорованої візуальної підказки (ескалація).",
 	"sound.toggleAria": "Перемкнути звук сповіщень",
 	"sound.volume": "Гучність",
 	"sound.volumeAria": "Гучність звуку сповіщень",
@@ -718,6 +730,16 @@ export const uk: MessageCatalog = {
 
 	// Popup chrome
 	"popup.blink.title": "Нагадування проморгати",
+	"popup.blink.pool.0": "Моргни!",
+	"popup.blink.pool.1": "М’яко моргни",
+	"popup.blink.pool.2": "Одне повне моргання",
+	"popup.blink.pool.3": "Дай очам моргнути",
+	"popup.blink.pool.4": "Закрий і відкрий — моргни",
+	"popup.blink.timerPool.0": "Час моргнути",
+	"popup.blink.timerPool.1": "Перерва на моргання",
+	"popup.blink.timerPool.2": "Пауза — моргни",
+	"popup.blink.timerPool.3": "Моргання допоможе",
+	"popup.blink.timerPool.4": "М’яка підказка моргнути",
 	"popup.blink.snooze": "Відкласти ({n} хв)",
 	"popup.blink.snooze_few": "Відкласти ({n} хв)",
 	"popup.blink.snooze_plural": "Відкласти ({n} хв)",
@@ -738,6 +760,7 @@ export const uk: MessageCatalog = {
 	"popup.lookAway.snooze_plural": "Відкласти ({n} хв)",
 	"popup.noFace.message": "Обличчя не виявлено",
 	"popup.coach.message": "Моргайте трохи частіше — частота низька",
+	"popup.ambient.message": "Моргайте м’яко — тихе нагадування",
 	"popup.calibrationNudge.stale":
 		"Калібрування варто оновити — відкрийте розділ «Камера»",
 	"popup.calibrationNudge.drift":
