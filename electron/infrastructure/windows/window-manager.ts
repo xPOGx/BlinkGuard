@@ -53,7 +53,7 @@ import {
 } from "./window-position";
 
 type ReminderKind = "starting" | "blink" | "stopped";
-type ForceShowOptions = { force?: boolean };
+type ForceShowOptions = { force?: boolean; message?: string };
 const DISPLAY_RECOVER_DEBOUNCE_MS = 150;
 
 export type PopupPlacementPersist = {
@@ -72,11 +72,9 @@ export class WindowManager {
 	camera: BrowserWindow | null = null;
 	editor: BrowserWindow | null = null;
 	noFace: BrowserWindow | null = null;
-	blinkRateCoach: BrowserWindow | null = null;
+	ambient: BrowserWindow | null = null;
 	calibrationNudge: BrowserWindow | null = null;
 	cheerToast: BrowserWindow | null = null;
-	private blinkRateCoachDismissTimer: ReturnType<typeof setTimeout> | null =
-		null;
 	private calibrationNudgeDismissTimer: ReturnType<typeof setTimeout> | null =
 		null;
 	private cheerToastDismissTimer: ReturnType<typeof setTimeout> | null = null;
@@ -233,7 +231,8 @@ export class WindowManager {
 					this.preferences.locale === "uk" ? "uk" : "en";
 				popup.webContents.send(
 					IPC_CHANNELS.updateMessage,
-					resolvePopupMessage(this.preferences.popupMessage, locale),
+					options.message ??
+						resolvePopupMessage(this.preferences.popupMessage, locale),
 				);
 				popup.webContents.send(
 					IPC_CHANNELS.cameraMode,
@@ -249,10 +248,9 @@ export class WindowManager {
 		popup.on("closed", () => {
 			if (this.reminder === popup) this.reminder = null;
 		});
-		if (
-			kind === "stopped" ||
-			(kind === "blink" && !this.preferences.cameraEnabled)
-		) {
+		// Blink overlays stay until blink/snooze/gate (ReminderService). Only
+		// starting/stopped auto-close here.
+		if (kind === "stopped" || kind === "starting") {
 			setTimeout(
 				() => this.closeReminderIfCurrent(popup),
 				REMINDER_POPUP_VISIBLE_MS,
@@ -273,6 +271,51 @@ export class WindowManager {
 
 	hasReminder(): boolean {
 		return !!this.reminder && !this.reminder.isDestroyed();
+	}
+
+	showAmbient(options: ForceShowOptions = {}): void {
+		if (!options.force && !this.preferences.isTracking) {
+			return;
+		}
+		if (this.ambient && !this.ambient.isDestroyed()) {
+			this.repositionAmbient();
+			return;
+		}
+		const { x, y, width, height } = getActiveDisplay().workArea;
+		const popup = createPanelWindow(
+			{
+				width,
+				height,
+				x,
+				y,
+				focusable: false,
+			},
+			this.paths.preload,
+		);
+		this.ambient = popup;
+		void popup.loadFile(path.join(this.paths.publicDir, "ambient.html"));
+		popup.webContents.on("did-finish-load", () => {
+			this.sendI18n(popup);
+			popup.webContents.send(
+				IPC_CHANNELS.updateColors,
+				this.preferences.popupColors,
+			);
+			popup.setIgnoreMouseEvents(true);
+		});
+		popup.once("ready-to-show", () => {
+			if (!popup.isDestroyed()) popup.showInactive();
+		});
+		popup.on("closed", () => {
+			if (this.ambient === popup) this.ambient = null;
+		});
+	}
+
+	hideAmbient(): void {
+		this.closeWindow("ambient");
+	}
+
+	hasAmbient(): boolean {
+		return !!this.ambient && !this.ambient.isDestroyed();
 	}
 
 	showNoFace(options: ForceShowOptions = {}): void {
@@ -313,67 +356,6 @@ export class WindowManager {
 
 	hasNoFace(): boolean {
 		return !!this.noFace && !this.noFace.isDestroyed();
-	}
-
-	showBlinkRateCoach(options: ForceShowOptions = {}): void {
-		if (
-			!options.force &&
-			(!this.preferences.isTracking ||
-				!this.preferences.cameraEnabled ||
-				(this.blinkRateCoach && !this.blinkRateCoach.isDestroyed()))
-		) {
-			return;
-		}
-		if (this.blinkRateCoach && !this.blinkRateCoach.isDestroyed()) {
-			this.hideBlinkRateCoach();
-		}
-		const width = 280;
-		const { x, y } = getTopCenterPopupPosition(width);
-		const popup = createPanelWindow(
-			{
-				width,
-				height: 48,
-				x,
-				y,
-				focusable: false,
-			},
-			this.paths.preload,
-		);
-		this.blinkRateCoach = popup;
-		void popup.loadFile(
-			path.join(this.paths.publicDir, "blink-rate-coach.html"),
-		);
-		popup.webContents.on("did-finish-load", () => {
-			this.sendI18n(popup);
-			popup.setIgnoreMouseEvents(true);
-		});
-		popup.once("ready-to-show", () => popup.showInactive());
-		popup.on("closed", () => {
-			if (this.blinkRateCoach === popup) this.blinkRateCoach = null;
-			if (this.blinkRateCoachDismissTimer) {
-				clearTimeout(this.blinkRateCoachDismissTimer);
-				this.blinkRateCoachDismissTimer = null;
-			}
-		});
-		if (this.blinkRateCoachDismissTimer) {
-			clearTimeout(this.blinkRateCoachDismissTimer);
-		}
-		this.blinkRateCoachDismissTimer = setTimeout(() => {
-			this.blinkRateCoachDismissTimer = null;
-			if (this.blinkRateCoach === popup) this.hideBlinkRateCoach();
-		}, BLINK_RATE_COACH_DISMISS_MS);
-	}
-
-	hideBlinkRateCoach(): void {
-		if (this.blinkRateCoachDismissTimer) {
-			clearTimeout(this.blinkRateCoachDismissTimer);
-			this.blinkRateCoachDismissTimer = null;
-		}
-		this.closeWindow("blinkRateCoach");
-	}
-
-	hasBlinkRateCoach(): boolean {
-		return !!this.blinkRateCoach && !this.blinkRateCoach.isDestroyed();
 	}
 
 	showCalibrationNudge(
@@ -584,20 +566,11 @@ export class WindowManager {
 			case "stopped": {
 				const popup = this.showReminder(kind, { force: true });
 				if (!popup) return;
-				// Blink with camera on normally stays until a real blink; auto-dismiss for preview.
-				if (
-					kind === "starting" ||
-					(kind === "blink" && this.preferences.cameraEnabled)
-				) {
-					setTimeout(
-						() => this.closeReminderIfCurrent(popup),
-						REMINDER_POPUP_VISIBLE_MS,
-					);
-				}
+				// starting/stopped auto-close inside showReminder; blink stays up.
 				return;
 			}
-			case "coach":
-				this.showBlinkRateCoach({ force: true });
+			case "ambient":
+				this.showAmbient({ force: true });
 				return;
 			case "noFace": {
 				this.showNoFace({ force: true });
@@ -861,7 +834,7 @@ export class WindowManager {
 	applyPopupAppearance(): void {
 		// Push colors/transparency into CSS (card alpha). Do not use
 		// BrowserWindow.setOpacity — it soft-composites glyphs on Windows GPUs.
-		for (const window of [this.reminder, this.editor]) {
+		for (const window of [this.reminder, this.editor, this.ambient]) {
 			if (window && !window.isDestroyed()) {
 				window.webContents.send(
 					IPC_CHANNELS.updateColors,
@@ -978,6 +951,7 @@ export class WindowManager {
 			const next = getRightBiasedPopupPosition(340, 220);
 			this.setWindowPositionIfOpen(this.lookAway, next);
 		}
+		this.repositionAmbient();
 
 		if (changed) this.sendPreferences();
 	}
@@ -1011,7 +985,7 @@ export class WindowManager {
 		this.camera = null;
 		this.editor = null;
 		this.noFace = null;
-		this.blinkRateCoach = null;
+		this.ambient = null;
 		this.calibrationNudge = null;
 		this.cheerToast = null;
 	}
@@ -1024,6 +998,12 @@ export class WindowManager {
 			this.displayRecoverTimer = null;
 			this.recoverOpenPopupPositions();
 		}, DISPLAY_RECOVER_DEBOUNCE_MS);
+	}
+
+	private repositionAmbient(): void {
+		if (!this.ambient || this.ambient.isDestroyed()) return;
+		const { x, y, width, height } = getActiveDisplay().workArea;
+		this.ambient.setBounds({ x, y, width, height });
 	}
 
 	private setWindowPositionIfOpen(
@@ -1229,7 +1209,7 @@ export class WindowManager {
 			| "camera"
 			| "editor"
 			| "noFace"
-			| "blinkRateCoach"
+			| "ambient"
 			| "calibrationNudge"
 			| "cheerToast",
 	): void {

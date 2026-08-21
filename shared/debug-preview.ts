@@ -4,7 +4,7 @@ export const DEBUG_OVERLAY_KINDS = [
 	"stopped",
 	"lookAway",
 	"exercise",
-	"coach",
+	"ambient",
 	"noFace",
 ] as const;
 

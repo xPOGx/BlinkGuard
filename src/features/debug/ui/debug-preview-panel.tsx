@@ -12,7 +12,7 @@ const OVERLAY_BUTTONS: { kind: DebugOverlayKind; labelKey: string }[] = [
 	{ kind: "blink", labelKey: "debug.preview.blink" },
 	{ kind: "starting", labelKey: "debug.preview.starting" },
 	{ kind: "stopped", labelKey: "debug.preview.stopped" },
-	{ kind: "coach", labelKey: "debug.preview.coach" },
+	{ kind: "ambient", labelKey: "debug.preview.ambient" },
 	{ kind: "noFace", labelKey: "debug.preview.noFace" },
 	{ kind: "lookAway", labelKey: "debug.preview.lookAway" },
 	{ kind: "exercise", labelKey: "debug.preview.exercise" },

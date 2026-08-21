@@ -480,7 +480,7 @@ describe("settings shell", () => {
 		fireEvent.click(screen.getByRole("tab", { name: "Tuning" }));
 		send.mockClear();
 		fireEvent.click(
-			screen.getByRole("switch", { name: "Toggle blink rate coaching" }),
+			screen.getByRole("switch", { name: "Toggle low-rate prompt boost" }),
 		);
 		expect(send).toHaveBeenCalledWith(
 			IPC_CHANNELS.updateBlinkRateCoachingEnabled,
@@ -548,5 +548,69 @@ describe("settings shell", () => {
 				name: "Pass clicks through reminder popups",
 			}),
 		).toBeTruthy();
+	});
+
+	it("pushes blinkPromptProfile from Reminders Schedule", () => {
+		render(<App />);
+		hydratePreferences({ hasCompletedOnboarding: true });
+
+		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
+		send.mockClear();
+		fireEvent.change(
+			screen.getByRole("combobox", {
+				name: "Blink cue intensity profile",
+			}),
+			{ target: { value: "gentle" } },
+		);
+
+		expect(send).toHaveBeenCalledWith(
+			IPC_CHANNELS.updateBlinkPromptProfile,
+			"gentle",
+		);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
+	});
+
+	it("pushes microBreakInterval in ms when camera is off", () => {
+		render(<App />);
+		hydratePreferences({
+			hasCompletedOnboarding: true,
+			cameraEnabled: false,
+			microBreakInterval: 30,
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
+		send.mockClear();
+		fireEvent.change(screen.getByLabelText("Reminder interval"), {
+			target: { value: "45" },
+		});
+
+		expect(send).toHaveBeenCalledWith(
+			IPC_CHANNELS.updateMicroBreakInterval,
+			45_000,
+		);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateInterval, 45_000);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
+	});
+
+	it("pushes reminderInterval in ms when camera is on", () => {
+		render(<App />);
+		hydratePreferences({
+			hasCompletedOnboarding: true,
+			cameraEnabled: true,
+			reminderInterval: 3,
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Reminders" }));
+		send.mockClear();
+		fireEvent.change(screen.getByLabelText("Reminder interval"), {
+			target: { value: "5" },
+		});
+
+		expect(send).toHaveBeenCalledWith(IPC_CHANNELS.updateInterval, 5_000);
+		expect(send).not.toHaveBeenCalledWith(
+			IPC_CHANNELS.updateMicroBreakInterval,
+			5_000,
+		);
+		expect(send).not.toHaveBeenCalledWith(IPC_CHANNELS.updateLocale, "en");
 	});
 });

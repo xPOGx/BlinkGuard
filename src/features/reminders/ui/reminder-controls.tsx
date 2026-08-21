@@ -1,4 +1,4 @@
-import { Activity, Clock, Moon, Play, Square } from "lucide-react";
+import { Activity, ChevronDown, Clock, Moon, Play, Square } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import { Button } from "@/components/button";
 import { RangeSlider } from "@/components/range-slider";
@@ -8,6 +8,7 @@ import { SettingRow } from "@/components/setting-row";
 import type { SettingsPreferences } from "@/features/settings/model/preferences";
 import { useI18n } from "@/i18n";
 import { pluralKey } from "../../../../shared/i18n";
+import type { BlinkPromptProfile } from "../../../../shared/preferences";
 
 interface ReminderControlsProps {
 	preferences: SettingsPreferences;
@@ -21,6 +22,10 @@ function formatBlinksPerMinute(intervalSeconds: number): string {
 	return Number.isInteger(rate) ? String(rate) : rate.toFixed(1);
 }
 
+function isBlinkPromptProfile(value: string): value is BlinkPromptProfile {
+	return value === "standard" || value === "gentle";
+}
+
 export function ReminderControls({
 	preferences,
 	setPreferences,
@@ -28,8 +33,12 @@ export function ReminderControls({
 	onToggleTracking,
 }: ReminderControlsProps) {
 	const { t, locale } = useI18n();
-	const blinksPerMinute = 60 / preferences.reminderInterval;
-	const formattedRate = formatBlinksPerMinute(preferences.reminderInterval);
+	const cameraOn = preferences.cameraEnabled;
+	const intervalSeconds = cameraOn
+		? preferences.reminderInterval
+		: preferences.microBreakInterval;
+	const blinksPerMinute = 60 / intervalSeconds;
+	const formattedRate = formatBlinksPerMinute(intervalSeconds);
 	const inTypicalRange = blinksPerMinute >= 15 && blinksPerMinute <= 20;
 	const snoozeMinutes = preferences.snoozeMinutes;
 	const snoozeDescKey = pluralKey(
@@ -37,6 +46,11 @@ export function ReminderControls({
 		locale,
 		snoozeMinutes,
 	);
+	const profileDescKey =
+		preferences.blinkPromptProfile === "gentle"
+			? "reminders.profile.gentleDesc"
+			: "reminders.profile.standardDesc";
+
 	return (
 		<>
 			<SettingGrid>
@@ -51,9 +65,7 @@ export function ReminderControls({
 							</>
 						}
 						description={
-							preferences.cameraEnabled
-								? t("reminders.desc.camera")
-								: t("reminders.desc.timer")
+							cameraOn ? t("reminders.desc.camera") : t("reminders.desc.timer")
 						}
 					/>
 					<div className="mt-auto flex flex-col items-center gap-3 pt-3 sm:flex-row sm:items-end sm:gap-4">
@@ -61,14 +73,23 @@ export function ReminderControls({
 							<RangeSlider
 								id="reminder-interval"
 								aria-label={t("reminders.intervalAria")}
-								min={1}
-								max={10}
-								value={preferences.reminderInterval}
-								onChange={onIntervalChange}
+								min={cameraOn ? 1 : 15}
+								max={cameraOn ? 10 : 120}
+								value={intervalSeconds}
+								onChange={(next) => {
+									if (cameraOn) {
+										onIntervalChange(next);
+										return;
+									}
+									setPreferences((current) => ({
+										...current,
+										microBreakInterval: next,
+									}));
+								}}
 								className="min-w-0 flex-1"
 							/>
 							<div className="min-w-[4.5rem] shrink-0 rounded-md bg-accent px-3 py-1 text-center text-sm font-semibold text-accent-foreground">
-								{preferences.reminderInterval}s
+								{intervalSeconds}s
 							</div>
 						</div>
 						<div className="relative flex w-[5.75rem] shrink-0 flex-col items-center">
@@ -132,6 +153,45 @@ export function ReminderControls({
 				</SettingPanel>
 			</SettingGrid>
 
+			<SettingPanel>
+				<SettingRow
+					title={t("reminders.profile.title")}
+					description={t("reminders.profile.description")}
+					action={
+						<div className="relative">
+							<select
+								aria-label={t("reminders.profile.aria")}
+								value={preferences.blinkPromptProfile}
+								onChange={(event) => {
+									const blinkPromptProfile = event.target.value;
+									if (!isBlinkPromptProfile(blinkPromptProfile)) {
+										return;
+									}
+									setPreferences((current) => ({
+										...current,
+										blinkPromptProfile,
+									}));
+								}}
+								className="appearance-none rounded-md border border-border bg-background py-1.5 pl-2.5 pr-9 text-sm text-foreground"
+							>
+								<option value="standard">
+									{t("reminders.profile.standard")}
+								</option>
+								<option value="gentle">{t("reminders.profile.gentle")}</option>
+							</select>
+							<ChevronDown
+								className="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+								aria-hidden
+							/>
+						</div>
+					}
+				>
+					<p className="text-xs text-muted-foreground sm:text-sm">
+						{t(profileDescKey)}
+					</p>
+				</SettingRow>
+			</SettingPanel>
+
 			<aside
 				role="status"
 				className="rounded-md bg-accent/60 p-3 text-xs text-muted-foreground sm:text-sm"
@@ -141,7 +201,7 @@ export function ReminderControls({
 						{t("reminders.rateSummary", { rate: formattedRate })}
 					</span>
 					{" — "}
-					{preferences.cameraEnabled && !preferences.mgdMode
+					{cameraOn && !preferences.mgdMode
 						? t("reminders.rateHint.camera")
 						: t("reminders.rateHint.timer")}
 				</p>

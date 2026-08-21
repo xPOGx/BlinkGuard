@@ -14,6 +14,7 @@ describe("debug-preview", () => {
 	});
 
 	it("rejects unknown overlay values", () => {
+		expect(isDebugOverlayKind("coach")).toBe(false);
 		expect(isDebugOverlayKind("blink-rate")).toBe(false);
 		expect(isDebugOverlayKind(null)).toBe(false);
 		expect(isDebugOverlayKind(1)).toBe(false);
