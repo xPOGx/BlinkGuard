@@ -2134,6 +2134,15 @@ class BlinkDetectionState:
 					):
 						velocity_ok = True
 						waives.append("ocec_velocity")
+					# Intensity aperture often stays open on small laptop
+					# crops while OCEC/EAR see a real close (POG 2026-08-21:
+					# 113 reject_aperture, 29 with ocec≥0.35; smoking-gun
+					# 0.33s frontal closed=5 ocec=0.92 aperture_drop=0.03).
+					if not aperture_ok:
+						aperture_ok = True
+						self._confirm_aperture_ok = True
+						info_pose["aperture_ok"] = True
+						waives.append("ocec_aperture")
 				# Laptop look-down: OCEC crop stays open (drop≈0) on real
 				# multi-frame EAR blinks (POG 2026-08-15 soak: 60 LD
 				# closed≥2 reject_ocec, ocec_drop p50=0). Keep 1-frame

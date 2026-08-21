@@ -1913,6 +1913,111 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertFalse(credited_any)
 		self.assertIn("reject_aperture", phases)
 
+	def test_ocec_aperture_waives_when_aperture_open(self):
+		"""EAR blink + flat aperture + real OCEC close → credit (ocec_aperture)."""
+		state = BlinkDetectionState(target_fps=15)
+		t = _seed_open_eye(state, ear=0.28)
+		for _ in range(5):
+			t += 0.1
+			state.detect(
+				0.28,
+				t,
+				left_ear=0.28,
+				right_ear=0.28,
+				left_aperture=0.30,
+				right_aperture=0.30,
+				left_ocec=0.90,
+				right_ocec=0.90,
+			)
+		# Same shape as reject_aperture fixture, but OCEC collapses.
+		steps = (
+			(0.1, 0.16, 0.17, 0.15, 0.30, 0.30, 0.40, 0.40),
+			(0.1, 0.10, 0.11, 0.09, 0.30, 0.30, 0.15, 0.15),
+			(0.1, 0.08, 0.09, 0.07, 0.29, 0.29, 0.08, 0.08),
+			(0.1, 0.07, 0.08, 0.06, 0.29, 0.29, 0.05, 0.05),
+			(0.1, 0.22, 0.22, 0.22, 0.30, 0.30, 0.70, 0.70),
+			(0.1, 0.28, 0.28, 0.28, 0.30, 0.30, 0.90, 0.90),
+			(0.1, 0.28, 0.28, 0.28, 0.30, 0.30, 0.90, 0.90),
+		)
+		credited_any = False
+		phases = []
+		last_info = None
+		for step in steps:
+			dt, ear, left, right, lap, rap, loc, roc = step
+			t += dt
+			credited, info = state.detect(
+				ear,
+				t,
+				left_ear=left,
+				right_ear=right,
+				left_aperture=lap,
+				right_aperture=rap,
+				left_ocec=loc,
+				right_ocec=roc,
+			)
+			last_info = info
+			if info:
+				phases.append(info.get("phase"))
+			if credited:
+				credited_any = True
+		self.assertTrue(credited_any, msg=last_info)
+		self.assertIn("complete", phases)
+		self.assertIn("ocec_aperture", (last_info or {}).get("waives") or [])
+
+	def test_ocec_aperture_does_not_waive_when_ocec_open(self):
+		"""Flat aperture + flat OCEC still reject_aperture (no false waive)."""
+		state = BlinkDetectionState(target_fps=15)
+		t = _seed_open_eye(state, ear=0.28)
+		for _ in range(5):
+			t += 0.1
+			state.detect(
+				0.28,
+				t,
+				left_ear=0.28,
+				right_ear=0.28,
+				left_aperture=0.30,
+				right_aperture=0.30,
+				left_ocec=0.90,
+				right_ocec=0.90,
+			)
+		steps = (
+			(0.1, 0.16, 0.17, 0.15, 0.30, 0.30, 0.90, 0.90),
+			(0.1, 0.10, 0.11, 0.09, 0.30, 0.30, 0.88, 0.88),
+			(0.1, 0.08, 0.09, 0.07, 0.29, 0.29, 0.88, 0.87),
+			(0.1, 0.07, 0.08, 0.06, 0.29, 0.29, 0.89, 0.89),
+			(0.1, 0.22, 0.22, 0.22, 0.30, 0.30, 0.90, 0.90),
+			(0.1, 0.28, 0.28, 0.28, 0.30, 0.30, 0.90, 0.90),
+			(0.1, 0.28, 0.28, 0.28, 0.30, 0.30, 0.90, 0.90),
+		)
+		credited_any = False
+		phases = []
+		last_info = None
+		for step in steps:
+			dt, ear, left, right, lap, rap, loc, roc = step
+			t += dt
+			credited, info = state.detect(
+				ear,
+				t,
+				left_ear=left,
+				right_ear=right,
+				left_aperture=lap,
+				right_aperture=rap,
+				left_ocec=loc,
+				right_ocec=roc,
+			)
+			last_info = info
+			if info:
+				phases.append(info.get("phase"))
+			if credited:
+				credited_any = True
+		self.assertFalse(credited_any)
+		# Flat aperture + flat OCEC: aperture confirm fails; no ocec_aperture.
+		self.assertIn("reject_aperture", phases)
+		self.assertNotIn(
+			"ocec_aperture",
+			(last_info or {}).get("waives") or [],
+		)
+
 	def test_aperture_confirm_credits_when_both_deep(self):
 		state = BlinkDetectionState(target_fps=15)
 		t = _seed_open_eye(state, ear=0.28)
