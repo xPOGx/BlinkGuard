@@ -7,6 +7,7 @@ import {
 	samePauseAppRules,
 	samePopupPositionsByDisplayId,
 	samePopupSizesByDisplayId,
+	sameQuietHoursByWeekday,
 } from "../../../../shared/preferences";
 import type { SettingsPreferences } from "./preferences";
 
@@ -95,6 +96,7 @@ export function sameRendererPrefs(
 		a.quietHoursEnabled === b.quietHoursEnabled &&
 		a.quietHoursStart === b.quietHoursStart &&
 		a.quietHoursEnd === b.quietHoursEnd &&
+		sameQuietHoursByWeekday(a.quietHoursByWeekday, b.quietHoursByWeekday) &&
 		a.pauseOnFullscreen === b.pauseOnFullscreen &&
 		samePauseAppRules(a.pauseAppRules, b.pauseAppRules) &&
 		a.hasCompletedOnboarding === b.hasCompletedOnboarding &&
@@ -238,6 +240,15 @@ export function pushPreferenceDiff(
 	}
 	if (!previous || previous.quietHoursEnd !== next.quietHoursEnd) {
 		rendererIpc.updateQuietHoursEnd(next.quietHoursEnd);
+	}
+	if (
+		!previous ||
+		!sameQuietHoursByWeekday(
+			previous.quietHoursByWeekday,
+			next.quietHoursByWeekday,
+		)
+	) {
+		rendererIpc.updateQuietHoursByWeekday(next.quietHoursByWeekday);
 	}
 	if (!previous || previous.pauseOnFullscreen !== next.pauseOnFullscreen) {
 		rendererIpc.updatePauseOnFullscreen(next.pauseOnFullscreen);

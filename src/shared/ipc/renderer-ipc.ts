@@ -36,6 +36,7 @@ import {
 	type PauseAppPickerPayload,
 	type PauseAppRule,
 	type PopupColors,
+	type QuietHoursByWeekday,
 	type RendererPreferences,
 	type ShortcutErrorPayload,
 	sanitizePauseAppPickerPayload,
@@ -206,6 +207,8 @@ export const rendererIpc = {
 		send(IPC_CHANNELS.updateQuietHoursStart, value),
 	updateQuietHoursEnd: (value: string) =>
 		send(IPC_CHANNELS.updateQuietHoursEnd, value),
+	updateQuietHoursByWeekday: (map: QuietHoursByWeekday) =>
+		send(IPC_CHANNELS.updateQuietHoursByWeekday, map),
 	updatePauseOnFullscreen: (enabled: boolean) =>
 		send(IPC_CHANNELS.updatePauseOnFullscreen, enabled),
 	updatePauseAppRules: (rules: PauseAppRule[]) =>

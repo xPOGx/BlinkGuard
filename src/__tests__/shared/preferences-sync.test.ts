@@ -41,6 +41,7 @@ vi.mock("@/shared/ipc/renderer-ipc", () => ({
 		updateQuietHoursEnabled: vi.fn(),
 		updateQuietHoursStart: vi.fn(),
 		updateQuietHoursEnd: vi.fn(),
+		updateQuietHoursByWeekday: vi.fn(),
 		updatePauseOnFullscreen: vi.fn(),
 		updatePauseAppRules: vi.fn(),
 		updateBlinkRateCoachingEnabled: vi.fn(),
@@ -232,6 +233,9 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateKeyboardShortcuts).not.toHaveBeenCalled();
 		expect(rendererIpc.updateAutoStopNoFaceEnabled).not.toHaveBeenCalled();
 		expect(rendererIpc.updateCameraDevice).not.toHaveBeenCalled();
+		expect(rendererIpc.updateQuietHoursByWeekday).not.toHaveBeenCalled();
+		expect(rendererIpc.updateQuietHoursStart).not.toHaveBeenCalled();
+		expect(rendererIpc.updateQuietHoursEnd).not.toHaveBeenCalled();
 	});
 
 	it("does not push IPC when only popupPositionsByDisplayId changes", () => {
@@ -484,6 +488,41 @@ describe("pushPreferenceDiff", () => {
 		);
 		expect(rendererIpc.updatePauseOnFullscreen).not.toHaveBeenCalled();
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+	});
+
+	it("pushes only quietHoursByWeekday when the weekday map changes", () => {
+		const previous = { ...DEFAULT_RENDERER_PREFERENCES };
+		const next = {
+			...previous,
+			quietHoursByWeekday: { sat: { mode: "off" as const } },
+		};
+
+		pushPreferenceDiff(previous, next);
+
+		expect(rendererIpc.updateQuietHoursByWeekday).toHaveBeenCalledWith(
+			next.quietHoursByWeekday,
+		);
+		expect(rendererIpc.updateQuietHoursStart).not.toHaveBeenCalled();
+		expect(rendererIpc.updateQuietHoursEnd).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+	});
+
+	it("treats quietHoursByWeekday key-order-only diffs as equal", () => {
+		const a = {
+			...DEFAULT_RENDERER_PREFERENCES,
+			quietHoursByWeekday: {
+				fri: { mode: "custom" as const, start: "22:00", end: "08:00" },
+				sat: { mode: "off" as const },
+			},
+		};
+		const b = {
+			...DEFAULT_RENDERER_PREFERENCES,
+			quietHoursByWeekday: {
+				sat: { mode: "off" as const },
+				fri: { mode: "custom" as const, start: "22:00", end: "08:00" },
+			},
+		};
+		expect(sameRendererPrefs(a, b)).toBe(true);
 	});
 
 	it("pushes only cameraDevice when the picker changes", () => {

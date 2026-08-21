@@ -137,4 +137,51 @@ describe("backup document", () => {
 		expect(parseBackupDocument(null, "preferences").ok).toBe(false);
 		expect(parseBackupDocument("{}", "preferences").ok).toBe(false);
 	});
+
+	it("imports prefs without quietHoursByWeekday as inherit-all", () => {
+		const legacyPrefs = { ...DEFAULT_PREFERENCES };
+		delete (legacyPrefs as { quietHoursByWeekday?: unknown }).quietHoursByWeekday;
+		const document = buildBackupDocument({
+			scope: "preferences",
+			appVersion: "1.0.0",
+			preferences: legacyPrefs,
+		});
+		// Simulate an older backup blob that never had the map key.
+		if (document.preferences) {
+			delete (document.preferences as { quietHoursByWeekday?: unknown })
+				.quietHoursByWeekday;
+		}
+		const result = parseBackupDocument(document, "preferences");
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.preferences?.quietHoursByWeekday).toEqual({});
+		expect(result.value.preferences?.quietHoursStart).toBe("22:00");
+		expect(result.value.preferences?.quietHoursEnd).toBe("08:00");
+	});
+
+	it("imports hostile quietHoursByWeekday as a sanitized sparse map", () => {
+		const document = buildBackupDocument({
+			scope: "preferences",
+			appVersion: "1.0.0",
+			preferences: DEFAULT_PREFERENCES,
+		});
+		if (document.preferences) {
+			(
+				document.preferences as {
+					quietHoursByWeekday: unknown;
+				}
+			).quietHoursByWeekday = {
+				__proto__: { polluted: true },
+				constructor: { mode: "off" },
+				sat: { mode: "custom", start: "24:00", end: "08:00" },
+				fri: { mode: "off" },
+			};
+		}
+		const result = parseBackupDocument(document, "preferences");
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.value.preferences?.quietHoursByWeekday).toEqual({
+			fri: { mode: "off" },
+		});
+	});
 });

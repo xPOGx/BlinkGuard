@@ -20,6 +20,7 @@ import {
 	sanitizeKeyboardShortcuts,
 	sanitizeMicroBreakIntervalMs,
 	sanitizePauseAppPickerPayload,
+	sanitizeQuietHoursByWeekday,
 	emptyPauseAppPicker,
 } from "../../../shared/preferences";
 import type { AppRuntimeState } from "../../application/app-runtime-state";
@@ -395,6 +396,13 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		const normalized = normalizeQuietHoursTime(value as string);
 		if (!normalized) return;
 		preferences.set("quietHoursEnd", normalized);
+		focusPause.recompute();
+	});
+	on(IPC_CHANNELS.updateQuietHoursByWeekday, (_event, map: unknown) => {
+		preferences.set(
+			"quietHoursByWeekday",
+			sanitizeQuietHoursByWeekday(map),
+		);
 		focusPause.recompute();
 	});
 	on(IPC_CHANNELS.updatePauseOnFullscreen, (_event, enabled: unknown) => {

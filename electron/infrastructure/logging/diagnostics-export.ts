@@ -12,7 +12,10 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { ExportDiagnosticsResult } from "../../../shared/diagnostics";
-import type { AppPreferences } from "../../../shared/preferences";
+import {
+	sanitizeQuietHoursByWeekday,
+	type AppPreferences,
+} from "../../../shared/preferences";
 import { getAppLogPath } from "./configure-file-logging";
 
 const execFileAsync = promisify(execFile);
@@ -141,7 +144,7 @@ function buildMeta(preferences: AppPreferences): Record<string, unknown> {
 	};
 }
 
-function buildAlgorithmPrefs(
+export function buildAlgorithmPrefs(
 	preferences: AppPreferences,
 ): Record<string, unknown> {
 	return {
@@ -165,6 +168,9 @@ function buildAlgorithmPrefs(
 		quietHoursEnabled: preferences.quietHoursEnabled,
 		quietHoursStart: preferences.quietHoursStart,
 		quietHoursEnd: preferences.quietHoursEnd,
+		quietHoursByWeekday: sanitizeQuietHoursByWeekday(
+			preferences.quietHoursByWeekday,
+		),
 		pauseOnFullscreen: preferences.pauseOnFullscreen,
 		pauseAppRules: preferences.pauseAppRules,
 		notificationStyle: preferences.notificationStyle,
