@@ -4,6 +4,20 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-08-21
+
+### Added
+
+- Settings: named Setups to save and hot-apply preference snapshots
+- Reminders: Strong cue profile (glow, overlay, sound)
+- Quiet hours: per-weekday schedule overrides in Pause
+
+### Fixed
+
+- Camera: resync capture-status chip after cold-start subscribe
+- Camera: credit real OCEC closes that hit reject_aperture
+- Reminders: keep Gentle ambient under the blink overlay; pin glow above the Windows taskbar
+
 ## [2.13.0] - 2026-08-21
 
 ### Added

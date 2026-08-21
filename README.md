@@ -6,7 +6,7 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 
 ## Features
 
-- **Blink reminders** — start/stop tracking from the control panel; camera miss-gap (1–10s) and Standard / Gentle prompt profile (ambient glow → overlay → escalate)
+- **Blink reminders** — start/stop tracking from the control panel; camera miss-gap (1–10s) and Standard / Gentle / Strong prompt profiles (ambient glow → overlay → escalate)
 - **Timer mode** — fixed micro-break interval (15–120s) with the same prompt ladder
 - **Camera blink detection (optional)** — OpenCV YuNet + dlib sidecar; ROI gates, personal blink calibration, pose/per-eye vetoes, OCEC open/closed confirm, and adaptive EAR; reminds you only when you haven’t blinked for the set miss-gap
 - **MGD mode** — when camera detection is on, show timed popups even while blinking; the popup still closes when a blink is detected
@@ -16,11 +16,11 @@ Cross-platform desktop app that helps prevent dry eyes and eye strain with blink
 - **Customizable reminder popup** — drag to reposition, resize with edge handles, custom message, colors, and transparency; layout remembered per display
 - **Global keyboard shortcuts** — multi-action bindings (default includes `Ctrl+I`; rebindable)
 - **Sounds & OS toasts** — optional notification sounds (per-kind volume); blink / exercise / look-away can use overlay, native OS banners, or both
-- **Quiet hours, fullscreen, and per-app pause** — hide popups during quiet time, fullscreen, or listed foreground apps
+- **Quiet hours, fullscreen, and per-app pause** — hide popups during quiet time (optional per-weekday hours), fullscreen, or listed foreground apps
 - **Progress** — stats, goals/streaks, blink levels, achievements, rewards shop, and share-card preview in one nav section
 - **Backup** — export/import local prefs and stats as JSON
 - **Dark / light mode** · **EN / UK** localization
-- **Persistent preferences** — saved locally via `electron-store` (reset-to-defaults supported)
+- **Persistent preferences** — saved locally via `electron-store`; named Setups to save and apply preference snapshots; reset-to-defaults supported
 - **Sleep / wake / lid handling** — pauses on suspend, lock, or display-off with a distinct reason in settings and tray; auto-resumes tracking and timers when the session is active again
 - **In-app updates (Windows & macOS)** — GitHub Releases (background check every 6h); silent install on quit; About opens Release Notes
 - **Diagnostics export** — local logs and interaction trail for support
