@@ -94,6 +94,39 @@ describe("nextBlinkPromptStep", () => {
 		).toBe("escalate");
 	});
 
+	it("Strong: first miss is full (glow + overlay + sound)", () => {
+		expect(nextBlinkPromptStep(baseStep({ profile: "strong" }))).toBe(
+			"full",
+		);
+		expect(
+			nextBlinkPromptStep(
+				baseStep({
+					profile: "strong",
+					overlayShowing: true,
+					ambientShowing: true,
+					escalateChimePlayed: true,
+				}),
+			),
+		).toBeNull();
+	});
+
+	it("Strong + MGD: no ambient; escalate when sound on", () => {
+		expect(
+			nextBlinkPromptStep(
+				baseStep({ profile: "strong", mgdMode: true, soundEnabled: true }),
+			),
+		).toBe("escalate");
+		expect(
+			nextBlinkPromptStep(
+				baseStep({
+					profile: "strong",
+					mgdMode: true,
+					soundEnabled: false,
+				}),
+			),
+		).toBe("overlay");
+	});
+
 	it("MGD: always overlay first (never ambient), then escalate", () => {
 		expect(
 			nextBlinkPromptStep(baseStep({ mgdMode: true, profile: "gentle" })),

@@ -2,10 +2,10 @@ import { t } from "../../shared/i18n/t";
 import type { Locale } from "../../shared/i18n/types";
 
 /** Intensity ladder step for a blink miss / micro-break cue. */
-export type BlinkPromptStep = "ambient" | "overlay" | "escalate";
+export type BlinkPromptStep = "ambient" | "overlay" | "escalate" | "full";
 
 /** Reminder interruptiveness profile (prefs `blinkPromptProfile`). */
-export type BlinkPromptProfile = "standard" | "gentle";
+export type BlinkPromptProfile = "standard" | "gentle" | "strong";
 
 /** Absolute cap for ICMU-style healthy-BPM prompt spacing (ms). */
 export const BLINK_BACKOFF_IMAX_MS = 60_000;
@@ -100,8 +100,16 @@ export function nextBlinkPromptStep(
 
 	// First visual of this miss session
 	if (input.mgdMode) {
-		// FR-4: never ambient; sound waits for a later escalate interval
+		// FR-4: never ambient. Strong may chime on first overlay.
+		if (input.profile === "strong" && input.soundEnabled) {
+			return "escalate";
+		}
 		return "overlay";
+	}
+
+	if (input.profile === "strong") {
+		// Glow + overlay + sound in one step (sound gated in ReminderService).
+		return "full";
 	}
 
 	const lowBpm = isLowBpmCoachingActive(input);

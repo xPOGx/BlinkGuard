@@ -1379,6 +1379,45 @@ describe("ReminderService prompt ladder", () => {
 		service.ensureStopped();
 	});
 
+	it("Strong first miss shows glow, overlay, and sound together", () => {
+		const preferences = createPreferences({
+			reminderInterval: 1000,
+			blinkPromptProfile: "strong",
+			soundEnabled: true,
+			blinkRateCoachingEnabled: false,
+		});
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		state.lastBlinkTime = Date.now() - 5000;
+		state.lastReminderShownAt = Date.now() - 5000;
+		const windows = createWindows();
+		const sound = createSound();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			createSidecar(),
+			sound,
+			createStore(),
+			createStats({ blinkRateReady: false }),
+		);
+
+		service.syncCameraLoopForMgdMode();
+		vi.advanceTimersByTime(100);
+		expect(windows.showAmbient).toHaveBeenCalled();
+		expectBlinkOverlayShown(windows);
+		expect(sound.play).toHaveBeenCalledWith("blink");
+		expect(windows.hasAmbient()).toBe(true);
+
+		windows.hideAmbient.mockClear();
+		sound.play.mockClear();
+		vi.advanceTimersByTime(1100);
+		expect(sound.play).not.toHaveBeenCalledWith("blink");
+		expect(windows.hideAmbient).not.toHaveBeenCalled();
+		expect(windows.hasAmbient()).toBe(true);
+		service.ensureStopped();
+	});
+
 	it("FR-6 low ready BPM with coaching + sound escalates on first Standard overlay", () => {
 		const preferences = createPreferences({
 			reminderInterval: 1000,

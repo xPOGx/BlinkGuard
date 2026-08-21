@@ -746,6 +746,24 @@ export class ReminderService {
 		const { body, shouldAdvancePool, index } =
 			this.resolveBlinkOverlayBody(locale);
 
+		if (step === "full") {
+			// Strong: soft glow + overlay (+ chime) together; glow stays until dismiss.
+			if (!this.windows.hasAmbient()) {
+				this.windows.showAmbient();
+			}
+			this.showOverlaySurfaces(locale, body, {
+				shouldAdvancePool,
+				index,
+			});
+			if (this.blinkSession && !this.blinkSession.escalateChimePlayed) {
+				if (this.preferences.soundEnabled) {
+					this.sound.play("blink");
+				}
+				this.blinkSession.escalateChimePlayed = true;
+			}
+			return;
+		}
+
 		if (step === "overlay") {
 			// Keep Gentle soft glow under the blink popup (dismiss only on blink/snooze/stop).
 			this.showOverlaySurfaces(locale, body, {

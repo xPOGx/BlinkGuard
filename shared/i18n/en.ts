@@ -196,10 +196,13 @@ export const en: MessageCatalog = {
 	"reminders.profile.aria": "Blink cue intensity profile",
 	"reminders.profile.standard": "Standard",
 	"reminders.profile.gentle": "Gentle",
+	"reminders.profile.strong": "Strong",
 	"reminders.profile.standardDesc":
 		"Overlay first. Sound only if you keep ignoring the visual cue.",
 	"reminders.profile.gentleDesc":
 		"Soft screen-edge glow first, then the overlay. Sound still waits until you ignore a visual cue.",
+	"reminders.profile.strongDesc":
+		"Glow, overlay, and sound together on the first miss — the most interruptive cue.",
 	"reminders.inTypicalRange":
 		"Within the typical resting blink range (about 15–20/min).",
 	"reminders.guidanceTitle": "Blink rate guidance",

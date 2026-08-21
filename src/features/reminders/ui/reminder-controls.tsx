@@ -23,7 +23,7 @@ function formatBlinksPerMinute(intervalSeconds: number): string {
 }
 
 function isBlinkPromptProfile(value: string): value is BlinkPromptProfile {
-	return value === "standard" || value === "gentle";
+	return value === "standard" || value === "gentle" || value === "strong";
 }
 
 export function ReminderControls({
@@ -49,7 +49,9 @@ export function ReminderControls({
 	const profileDescKey =
 		preferences.blinkPromptProfile === "gentle"
 			? "reminders.profile.gentleDesc"
-			: "reminders.profile.standardDesc";
+			: preferences.blinkPromptProfile === "strong"
+				? "reminders.profile.strongDesc"
+				: "reminders.profile.standardDesc";
 
 	return (
 		<>
@@ -174,10 +176,11 @@ export function ReminderControls({
 								}}
 								className="appearance-none rounded-md border border-border bg-background py-1.5 pl-2.5 pr-9 text-sm text-foreground"
 							>
+								<option value="gentle">{t("reminders.profile.gentle")}</option>
 								<option value="standard">
 									{t("reminders.profile.standard")}
 								</option>
-								<option value="gentle">{t("reminders.profile.gentle")}</option>
+								<option value="strong">{t("reminders.profile.strong")}</option>
 							</select>
 							<ChevronDown
 								className="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"

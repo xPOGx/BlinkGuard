@@ -88,6 +88,7 @@ describe("blink prompt profile / micro-break preference defaults", () => {
 	it("sanitizes blinkPromptProfile; unknown → standard", () => {
 		expect(sanitizeBlinkPromptProfile("gentle")).toBe("gentle");
 		expect(sanitizeBlinkPromptProfile("standard")).toBe("standard");
+		expect(sanitizeBlinkPromptProfile("strong")).toBe("strong");
 		expect(sanitizeBlinkPromptProfile("loud")).toBe("standard");
 		expect(sanitizeBlinkPromptProfile(null)).toBe("standard");
 		expect(

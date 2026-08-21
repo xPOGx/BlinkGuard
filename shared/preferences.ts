@@ -184,7 +184,7 @@ const MICRO_BREAK_INTERVAL_MS_MAX = 120_000;
 const MICRO_BREAK_INTERVAL_MS_DEFAULT = 30_000;
 
 /** Blink prompt intensity ladder profile. */
-export type BlinkPromptProfile = "standard" | "gentle";
+export type BlinkPromptProfile = "standard" | "gentle" | "strong";
 
 /** Global shortcut actions bound via Electron `globalShortcut`. */
 export const SHORTCUT_ACTIONS = [
@@ -414,7 +414,9 @@ export function sanitizeSoundVolume(input: unknown): number {
 
 /** Coerce stored/IPC blink prompt profile; unknown → standard. */
 export function sanitizeBlinkPromptProfile(input: unknown): BlinkPromptProfile {
-	return input === "standard" || input === "gentle" ? input : "standard";
+	return input === "standard" || input === "gentle" || input === "strong"
+		? input
+		: "standard";
 }
 
 /** Coerce stored/IPC camera miss-gap interval to 1_000…10_000 ms. */
