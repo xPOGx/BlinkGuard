@@ -251,6 +251,98 @@ describe("FocusPauseService app-rule / fullscreen / quiet hours", () => {
 			}),
 		);
 	});
+
+	it("picks up quietHoursByWeekday changes on recompute", () => {
+		const prefs = {
+			...DEFAULT_PREFERENCES,
+			quietHoursEnabled: true,
+			quietHoursStart: "22:00",
+			quietHoursEnd: "08:00",
+			quietHoursByWeekday: {},
+			cameraEnabled: true,
+			isTracking: true,
+		};
+		const sendToMain = vi.fn();
+		const service = new FocusPauseService(
+			prefs,
+			{
+				closeReminder: vi.fn(),
+				closeExercise: vi.fn(),
+				closeLookAway: vi.fn(),
+				hideNoFace: vi.fn(),
+				hideAmbient: vi.fn(),
+				hideCalibrationNudge: vi.fn(),
+				sendToMain,
+			},
+			{
+				pauseCameraForFocus: vi.fn(),
+				resumeCameraIfNeeded: vi.fn(),
+			} as never,
+			"focus-pause-state",
+			true,
+		);
+
+		const dayKeys = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+		const todayIndex = new Date().getDay();
+		const today = dayKeys[todayIndex] ?? "mon";
+		const yesterday = dayKeys[(todayIndex + 6) % 7] ?? "sun";
+		const { start, end } = hoursWindowContainingNow();
+
+		prefs.quietHoursByWeekday = {
+			[today]: { mode: "custom", start, end },
+		};
+		service.recompute();
+		expect(service.pauseReason()).toBe("quiet-hours");
+
+		prefs.quietHoursByWeekday = {
+			[today]: { mode: "off" },
+			[yesterday]: { mode: "off" },
+		};
+		service.recompute();
+		expect(service.pauseReason()).toBeNull();
+	});
+
+	it("keeps the 30s quiet-hours watch interval", () => {
+		vi.useFakeTimers();
+		try {
+			const { service } = makeService({ quietHoursEnabled: false });
+			const spy = vi.spyOn(service, "recompute");
+			service.startQuietHoursWatch(30_000);
+			expect(spy).toHaveBeenCalled();
+			spy.mockClear();
+			vi.advanceTimersByTime(30_000);
+			expect(spy).toHaveBeenCalledTimes(1);
+			service.stopQuietHoursWatch();
+			spy.mockClear();
+			vi.advanceTimersByTime(30_000);
+			expect(spy).not.toHaveBeenCalled();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("keeps quiet hours after midnight when Saturday is off and Friday wrapped", () => {
+		vi.useFakeTimers();
+		try {
+			// 2026-08-21 is Friday; overnight default 22:00–08:00.
+			vi.setSystemTime(new Date(2026, 7, 21, 23, 0, 0));
+			const { service } = makeService({
+				quietHoursEnabled: true,
+				quietHoursStart: "22:00",
+				quietHoursEnd: "08:00",
+				quietHoursByWeekday: { sat: { mode: "off" } },
+			});
+			service.startQuietHoursWatch(30_000);
+			expect(service.pauseReason()).toBe("quiet-hours");
+
+			vi.setSystemTime(new Date(2026, 7, 22, 1, 0, 0));
+			vi.advanceTimersByTime(30_000);
+			expect(service.pauseReason()).toBe("quiet-hours");
+			service.stopQuietHoursWatch();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
 });
 
 describe("FocusPauseService lastExternalForeground", () => {

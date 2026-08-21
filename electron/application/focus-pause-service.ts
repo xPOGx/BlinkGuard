@@ -6,7 +6,7 @@ import type {
 } from "../../shared/session-pause-status";
 import {
 	foregroundMatchesAppRules,
-	isInQuietHours,
+	isInQuietHoursForSchedule,
 	resolveFocusPauseReason,
 	type FocusPauseReason,
 } from "../domain/focus-policy";
@@ -141,10 +141,12 @@ export class FocusPauseService implements NotificationGate {
 		);
 		const next = resolveFocusPauseReason({
 			quietHoursEnabled: this.preferences.quietHoursEnabled,
-			inQuietHours: isInQuietHours(
+			inQuietHours: isInQuietHoursForSchedule(
 				new Date(),
+				this.preferences.quietHoursEnabled,
 				this.preferences.quietHoursStart,
 				this.preferences.quietHoursEnd,
+				this.preferences.quietHoursByWeekday,
 			),
 			pauseOnFullscreen: this.preferences.pauseOnFullscreen,
 			isFullscreen: this.foreground.isFullscreen,

@@ -49,6 +49,29 @@ export type PauseAppRule = {
 	windowTitle: string;
 };
 
+/** Monday-first weekday keys for quiet-hours overrides (never persist Date.getDay()). */
+export const QUIET_HOURS_WEEKDAY_KEYS = [
+	"mon",
+	"tue",
+	"wed",
+	"thu",
+	"fri",
+	"sat",
+	"sun",
+] as const;
+
+export type WeekdayKey = (typeof QUIET_HOURS_WEEKDAY_KEYS)[number];
+
+export type QuietHoursDayOverride =
+	| { mode: "default" }
+	| { mode: "off" }
+	| { mode: "custom"; start: string; end: string };
+
+/** Sparse per-weekday quiet-hours overrides; missing key / `{}` = inherit default window. */
+export type QuietHoursByWeekday = Partial<
+	Record<WeekdayKey, QuietHoursDayOverride>
+>;
+
 export const PAUSE_APP_RULE_FIELD_MAX = 128;
 export const PAUSE_APP_RULES_MAX = 32;
 export const PAUSE_APP_CANDIDATES_MAX = 64;
@@ -506,6 +529,11 @@ export interface PersistedPreferences {
 	quietHoursStart: string;
 	/** Quiet-hours end as local HH:mm (24h); may be earlier than start (overnight). */
 	quietHoursEnd: string;
+	/**
+	 * Optional per-weekday quiet-hours overrides (inherit / off / custom).
+	 * Missing map or `{}` = every day uses quietHoursStart/End.
+	 */
+	quietHoursByWeekday: QuietHoursByWeekday;
 	/** Suppress interruptive popups while another app is fullscreen. */
 	pauseOnFullscreen: boolean;
 	/** Foreground process/title blocklist; empty = off. */
@@ -628,6 +656,7 @@ export const DEFAULT_PREFERENCES: Readonly<PersistedPreferences> = {
 	quietHoursEnabled: true,
 	quietHoursStart: "22:00",
 	quietHoursEnd: "08:00",
+	quietHoursByWeekday: {},
 	pauseOnFullscreen: true,
 	pauseAppRules: [],
 	hasCompletedOnboarding: false,
@@ -675,6 +704,62 @@ function normalizeQuietHoursTime(value: string): string | null {
 	const hours = Math.floor(minutes / 60);
 	const mins = minutes % 60;
 	return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+}
+
+/**
+ * Coerce stored/IPC weekday quiet-hours map. Missing/invalid → inherit-all (`{}`).
+ * Drops `{mode:"default"}` so upgrades stay sparse; `off` ignores times.
+ */
+export function sanitizeQuietHoursByWeekday(
+	input: unknown,
+): QuietHoursByWeekday {
+	if (!input || typeof input !== "object" || Array.isArray(input)) {
+		return {};
+	}
+	const record = input as Record<string, unknown>;
+	const cleaned: QuietHoursByWeekday = {};
+	for (const key of QUIET_HOURS_WEEKDAY_KEYS) {
+		if (!Object.prototype.hasOwnProperty.call(record, key)) continue;
+		const raw = record[key];
+		if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+		const day = raw as Record<string, unknown>;
+		const mode = day.mode;
+		if (mode === "off") {
+			cleaned[key] = { mode: "off" };
+			continue;
+		}
+		if (mode === "custom") {
+			const start =
+				typeof day.start === "string"
+					? normalizeQuietHoursTime(day.start)
+					: null;
+			const end =
+				typeof day.end === "string" ? normalizeQuietHoursTime(day.end) : null;
+			if (start === null || end === null) continue;
+			cleaned[key] = { mode: "custom", start, end };
+			continue;
+		}
+		// mode "default" or unknown → omit (inherit)
+	}
+	return cleaned;
+}
+
+/** Structural equality; key order must not spuriously fail. */
+export function sameQuietHoursByWeekday(
+	a: QuietHoursByWeekday,
+	b: QuietHoursByWeekday,
+): boolean {
+	for (const key of QUIET_HOURS_WEEKDAY_KEYS) {
+		const left = a[key];
+		const right = b[key];
+		if (left === right) continue;
+		if (!left || !right) return false;
+		if (left.mode !== right.mode) return false;
+		if (left.mode === "custom" && right.mode === "custom") {
+			if (left.start !== right.start || left.end !== right.end) return false;
+		}
+	}
+	return true;
 }
 
 function isCameraQualityValue(value: unknown): value is CameraQuality {
@@ -1055,6 +1140,9 @@ export function sanitizePersistedPreferences(
 		),
 		quietHoursStart,
 		quietHoursEnd,
+		quietHoursByWeekday: sanitizeQuietHoursByWeekday(
+			record.quietHoursByWeekday,
+		),
 		pauseOnFullscreen: asBoolean(
 			record.pauseOnFullscreen,
 			defaults.pauseOnFullscreen,

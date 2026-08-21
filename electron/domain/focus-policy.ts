@@ -1,4 +1,8 @@
-import type { PauseAppRule } from "../../shared/preferences";
+import type {
+	PauseAppRule,
+	QuietHoursByWeekday,
+	WeekdayKey,
+} from "../../shared/preferences";
 
 export type FocusPauseReason = "quiet-hours" | "fullscreen" | "app-rule" | null;
 
@@ -6,6 +10,94 @@ export type PauseAppForeground = {
 	processName: string;
 	windowTitle: string;
 };
+
+const WEEKDAY_KEYS: readonly WeekdayKey[] = [
+	"sun",
+	"mon",
+	"tue",
+	"wed",
+	"thu",
+	"fri",
+	"sat",
+];
+
+/** Map local Date.getDay() (Sun=0) → named Monday-first key. Never persist the int. */
+export function weekdayKeyFromDate(now: Date): WeekdayKey {
+	return WEEKDAY_KEYS[now.getDay()] ?? "mon";
+}
+
+function previousWeekdayKey(key: WeekdayKey): WeekdayKey {
+	const ordered: WeekdayKey[] = [
+		"mon",
+		"tue",
+		"wed",
+		"thu",
+		"fri",
+		"sat",
+		"sun",
+	];
+	const index = ordered.indexOf(key);
+	return ordered[(index + 6) % 7] ?? "sun";
+}
+
+type ResolvedWindow = { start: string; end: string } | null;
+
+function resolveDayWindow(
+	override: QuietHoursByWeekday[WeekdayKey] | undefined,
+	defaultStart: string,
+	defaultEnd: string,
+): ResolvedWindow {
+	if (!override || override.mode === "default") {
+		return { start: defaultStart, end: defaultEnd };
+	}
+	if (override.mode === "off") return null;
+	return { start: override.start, end: override.end };
+}
+
+/**
+ * True when local clock is inside the weekday-aware quiet-hours schedule.
+ * Overnight option A: today's resolved window OR yesterday's wrapping tail
+ * (`start > end` and `nowMinutes < end`).
+ */
+export function isInQuietHoursForSchedule(
+	now: Date,
+	enabled: boolean,
+	defaultStart: string,
+	defaultEnd: string,
+	overrides: QuietHoursByWeekday = {},
+): boolean {
+	if (!enabled) return false;
+
+	const todayKey = weekdayKeyFromDate(now);
+	const todayWindow = resolveDayWindow(
+		overrides[todayKey],
+		defaultStart,
+		defaultEnd,
+	);
+	if (
+		todayWindow &&
+		isInQuietHours(now, todayWindow.start, todayWindow.end)
+	) {
+		return true;
+	}
+
+	const yesterdayKey = previousWeekdayKey(todayKey);
+	const yesterdayWindow = resolveDayWindow(
+		overrides[yesterdayKey],
+		defaultStart,
+		defaultEnd,
+	);
+	if (!yesterdayWindow) return false;
+
+	const startMinutes = parseQuietHoursMinutes(yesterdayWindow.start);
+	const endMinutes = parseQuietHoursMinutes(yesterdayWindow.end);
+	if (startMinutes === null || endMinutes === null) return false;
+	// Only the overnight wrap's morning tail belongs to yesterday.
+	if (startMinutes <= endMinutes) return false;
+
+	const nowMinutes = now.getHours() * 60 + now.getMinutes();
+	return nowMinutes < endMinutes;
+}
 
 function processBasename(value: string): string {
 	const trimmed = value.trim();

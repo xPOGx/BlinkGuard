@@ -18,6 +18,7 @@ import {
 	prunePopupSizesByDisplayId,
 	samePopupPositionsByDisplayId,
 	samePopupSizesByDisplayId,
+	sameQuietHoursByWeekday,
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeEpochMs,
@@ -31,6 +32,7 @@ import {
 	sanitizePersistedPreferences,
 	sanitizePopupPositionsByDisplayId,
 	sanitizePopupSizesByDisplayId,
+	sanitizeQuietHoursByWeekday,
 	sanitizeBlinkPromptProfile,
 	sanitizeMicroBreakIntervalMs,
 	sanitizeReminderIntervalMs,
@@ -246,8 +248,65 @@ describe("quiet hours / focus preference defaults", () => {
 		expect(DEFAULT_PREFERENCES.quietHoursEnabled).toBe(true);
 		expect(DEFAULT_PREFERENCES.quietHoursStart).toBe("22:00");
 		expect(DEFAULT_PREFERENCES.quietHoursEnd).toBe("08:00");
+		expect(DEFAULT_PREFERENCES.quietHoursByWeekday).toEqual({});
 		expect(DEFAULT_PREFERENCES.pauseOnFullscreen).toBe(true);
 		expect(DEFAULT_PREFERENCES.pauseAppRules).toEqual([]);
+	});
+});
+
+describe("sanitizeQuietHoursByWeekday", () => {
+	it("returns inherit-all for missing, null, and non-objects", () => {
+		expect(sanitizeQuietHoursByWeekday(undefined)).toEqual({});
+		expect(sanitizeQuietHoursByWeekday(null)).toEqual({});
+		expect(sanitizeQuietHoursByWeekday("fri")).toEqual({});
+		expect(sanitizeQuietHoursByWeekday([])).toEqual({});
+	});
+
+	it("keeps off and custom; drops default, unknown keys, and invalid times", () => {
+		expect(
+			sanitizeQuietHoursByWeekday({
+				mon: { mode: "off", start: "09:00", end: "17:00" },
+				tue: { mode: "custom", start: "21:00", end: "07:00" },
+				wed: { mode: "default" },
+				thu: { mode: "custom", start: "24:00", end: "08:00" },
+				fri: { mode: "custom", start: "22:00", end: "12:60" },
+				__proto__: { mode: "off" },
+				constructor: { mode: "off" },
+				0: { mode: "off" },
+				sat: "nope",
+			}),
+		).toEqual({
+			mon: { mode: "off" },
+			tue: { mode: "custom", start: "21:00", end: "07:00" },
+		});
+	});
+
+	it("normalizes custom times and ignores key order for equality", () => {
+		expect(
+			sanitizeQuietHoursByWeekday({
+				fri: { mode: "custom", start: "8:05", end: "9:00:00" },
+			}),
+		).toEqual({
+			fri: { mode: "custom", start: "08:05", end: "09:00" },
+		});
+		expect(
+			sameQuietHoursByWeekday(
+				{ sat: { mode: "off" }, fri: { mode: "custom", start: "22:00", end: "08:00" } },
+				{ fri: { mode: "custom", start: "22:00", end: "08:00" }, sat: { mode: "off" } },
+			),
+		).toBe(true);
+	});
+
+	it("hydrates three-field-only prefs with overnight defaults and empty map", () => {
+		const prefs = sanitizePersistedPreferences({
+			quietHoursEnabled: true,
+			quietHoursStart: "22:00",
+			quietHoursEnd: "08:00",
+		});
+		expect(prefs.quietHoursEnabled).toBe(true);
+		expect(prefs.quietHoursStart).toBe("22:00");
+		expect(prefs.quietHoursEnd).toBe("08:00");
+		expect(prefs.quietHoursByWeekday).toEqual({});
 	});
 });
 

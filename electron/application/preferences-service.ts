@@ -10,6 +10,7 @@ import {
 	samePauseAppRules,
 	samePopupPositionsByDisplayId,
 	samePopupSizesByDisplayId,
+	sameQuietHoursByWeekday,
 	sanitizeAutoStopNoFaceMinutes,
 	sanitizeBlinkRateThresholdPerMin,
 	sanitizeEpochMs,
@@ -21,6 +22,7 @@ import {
 	sanitizePersistedPreferences,
 	sanitizePopupPositionsByDisplayId,
 	sanitizePopupSizesByDisplayId,
+	sanitizeQuietHoursByWeekday,
 	sanitizeSnoozeMinutes,
 	sanitizeSoundVolume,
 	seedPopupPositionsFromLegacy,
@@ -29,6 +31,7 @@ import {
 	type KeyboardShortcuts,
 	type PersistedPreferences,
 	type Point,
+	type QuietHoursByWeekday,
 	type Size,
 } from "../../shared/preferences";
 import { sanitizeLocale } from "../../shared/i18n";
@@ -99,6 +102,12 @@ function samePreferenceValue(
 		return samePauseAppRules(
 			previous as PersistedPreferences["pauseAppRules"],
 			next as PersistedPreferences["pauseAppRules"],
+		);
+	}
+	if (key === "quietHoursByWeekday") {
+		return sameQuietHoursByWeekday(
+			previous as QuietHoursByWeekday,
+			next as QuietHoursByWeekday,
 		);
 	}
 	if (key === "cameraDevice") {
@@ -209,6 +218,8 @@ export class PreferencesService {
 			next = sanitizeClassifierThreshold(value) as PersistedPreferences[K];
 		} else if (key === "pauseAppRules") {
 			next = sanitizePauseAppRules(value) as PersistedPreferences[K];
+		} else if (key === "quietHoursByWeekday") {
+			next = sanitizeQuietHoursByWeekday(value) as PersistedPreferences[K];
 		} else if (key === "cameraDevice") {
 			next = sanitizeCameraDevice(value) as PersistedPreferences[K];
 		} else if (key === "popupPositionsByDisplayId") {

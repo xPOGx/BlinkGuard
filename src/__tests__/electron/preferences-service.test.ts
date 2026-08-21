@@ -583,4 +583,29 @@ describe("PreferencesService", () => {
 		service.set("pauseAppRules", [{ processName: "", windowTitle: "" }]);
 		expect(service.current.pauseAppRules).toEqual([]);
 	});
+
+	it("sanitizes quietHoursByWeekday on set() and hydrates missing to {}", () => {
+		const store = new FakePreferenceStore();
+		const service = new PreferencesService(store);
+		expect(service.current.quietHoursByWeekday).toEqual({});
+
+		service.set("quietHoursByWeekday", {
+			sat: { mode: "off" },
+			fri: { mode: "custom", start: "24:00", end: "08:00" },
+			mon: { mode: "default" },
+			__proto__: { mode: "off" },
+		} as never);
+		expect(service.current.quietHoursByWeekday).toEqual({
+			sat: { mode: "off" },
+		});
+		expect(store.get("quietHoursByWeekday")).toEqual({
+			sat: { mode: "off" },
+		});
+
+		service.set("quietHoursByWeekday", { sat: { mode: "off" } });
+		expect(store.setCounts.get("quietHoursByWeekday")).toBe(1);
+
+		service.set("quietHoursByWeekday", "garbage" as never);
+		expect(service.current.quietHoursByWeekday).toEqual({});
+	});
 });

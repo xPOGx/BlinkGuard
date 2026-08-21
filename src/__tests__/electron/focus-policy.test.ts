@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
 	foregroundMatchesAppRules,
 	isInQuietHours,
+	isInQuietHoursForSchedule,
 	isValidQuietHoursTime,
 	matchesPauseAppRule,
 	normalizeQuietHoursTime,
 	parseQuietHoursMinutes,
 	resolveFocusPauseReason,
 	shouldSuppressNotifications,
+	weekdayKeyFromDate,
 } from "../../../electron/domain/focus-policy";
 
 describe("quiet hours parsing", () => {
@@ -54,6 +56,99 @@ describe("isInQuietHours", () => {
 	it("uses half-open end bound", () => {
 		const atEnd = new Date(2026, 7, 7, 8, 0, 0);
 		expect(isInQuietHours(atEnd, "22:00", "08:00")).toBe(false);
+	});
+});
+
+describe("isInQuietHoursForSchedule", () => {
+	// 2026-08-07 is Friday; 2026-08-08 is Saturday (fixed constructors).
+	const fridayLate = new Date(2026, 7, 7, 23, 0, 0);
+	const saturdayEarly = new Date(2026, 7, 8, 1, 0, 0);
+	const saturdayMorning = new Date(2026, 7, 8, 10, 30, 0);
+
+	it("maps Date.getDay() to named weekday keys (locale-independent)", () => {
+		expect(weekdayKeyFromDate(fridayLate)).toBe("fri");
+		expect(weekdayKeyFromDate(saturdayEarly)).toBe("sat");
+		expect(weekdayKeyFromDate(new Date(2026, 7, 9, 12, 0, 0))).toBe("sun");
+		expect(weekdayKeyFromDate(new Date(2026, 7, 10, 12, 0, 0))).toBe("mon");
+	});
+
+	it("treats missing map as legacy overnight wrap", () => {
+		expect(
+			isInQuietHoursForSchedule(saturdayEarly, true, "22:00", "08:00"),
+		).toBe(true);
+		expect(
+			isInQuietHoursForSchedule(saturdayMorning, true, "22:00", "08:00", {}),
+		).toBe(false);
+	});
+
+	it("keeps Friday wrap on Saturday morning when Saturday is off", () => {
+		expect(
+			isInQuietHoursForSchedule(saturdayEarly, true, "22:00", "08:00", {
+				sat: { mode: "off" },
+			}),
+		).toBe(true);
+	});
+
+	it("ORs Friday overnight tail with Saturday custom daytime", () => {
+		const overrides = {
+			sat: { mode: "custom" as const, start: "10:00", end: "12:00" },
+		};
+		expect(
+			isInQuietHoursForSchedule(
+				saturdayEarly,
+				true,
+				"22:00",
+				"08:00",
+				overrides,
+			),
+		).toBe(true);
+		expect(
+			isInQuietHoursForSchedule(
+				saturdayMorning,
+				true,
+				"22:00",
+				"08:00",
+				overrides,
+			),
+		).toBe(true);
+	});
+
+	it("applies Saturday custom morning even when Friday is off", () => {
+		expect(
+			isInQuietHoursForSchedule(saturdayEarly, true, "22:00", "08:00", {
+				fri: { mode: "off" },
+				sat: { mode: "custom", start: "00:00", end: "06:00" },
+			}),
+		).toBe(true);
+	});
+
+	it("uses Saturday wrap when Friday is off and Saturday inherits", () => {
+		expect(
+			isInQuietHoursForSchedule(saturdayEarly, true, "22:00", "08:00", {
+				fri: { mode: "off" },
+			}),
+		).toBe(true);
+		expect(
+			isInQuietHoursForSchedule(fridayLate, true, "22:00", "08:00", {
+				fri: { mode: "off" },
+			}),
+		).toBe(false);
+	});
+
+	it("treats custom equal start/end as an empty day window", () => {
+		expect(
+			isInQuietHoursForSchedule(saturdayMorning, true, "22:00", "08:00", {
+				sat: { mode: "custom", start: "10:00", end: "10:00" },
+			}),
+		).toBe(false);
+	});
+
+	it("returns false when master switch is off", () => {
+		expect(
+			isInQuietHoursForSchedule(saturdayEarly, false, "22:00", "08:00", {
+				sat: { mode: "custom", start: "00:00", end: "06:00" },
+			}),
+		).toBe(false);
 	});
 });
 
