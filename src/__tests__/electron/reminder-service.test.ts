@@ -3,7 +3,6 @@ import { AppRuntimeState } from "../../../electron/application/app-runtime-state
 import type { PreferenceStore } from "../../../electron/application/ports/preference-store";
 import type {
 	BlinkDetectorPort,
-	NotificationSoundPort,
 } from "../../../electron/application/ports/runtime-ports";
 import { ReminderService } from "../../../electron/application/reminder-service";
 import { stopTrackingSession } from "../../../electron/application/tracking-session";
@@ -146,7 +145,7 @@ function createSidecar(
 	};
 }
 
-function createSound(): NotificationSoundPort {
+function createSound() {
 	return { play: vi.fn() };
 }
 
@@ -474,6 +473,72 @@ describe("ReminderService credit semantics", () => {
 		expect(sidecar.stopCamera).not.toHaveBeenCalled();
 		expect(windows.closeReminder).not.toHaveBeenCalled();
 		expect(state.cameraMonitoringInterval).toBeNull();
+	});
+
+	it("resyncLoopsForCameraModeChange starts camera when flipping timer→camera while tracking", () => {
+		const preferences = createPreferences({
+			cameraEnabled: false,
+			reminderInterval: 3000,
+		});
+		const state = new AppRuntimeState();
+		const windows = createWindows();
+		const sidecar = createSidecar({
+			isRunning: false,
+			isCameraReady: false,
+		});
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+
+		service.start(3000);
+		expect(state.blinkInterval).not.toBeNull();
+		vi.mocked(sidecar.startCamera).mockClear();
+		vi.mocked(sidecar.start).mockClear();
+
+		preferences.cameraEnabled = true;
+		service.resyncLoopsForCameraModeChange();
+
+		expect(preferences.isTracking).toBe(true);
+		expect(state.blinkInterval).toBeNull();
+		expect(sidecar.start).toHaveBeenCalled();
+		expect(sidecar.startCamera).toHaveBeenCalled();
+	});
+
+	it("resyncLoopsForCameraModeChange releases camera and arms timer when flipping camera→timer", () => {
+		const preferences = createPreferences({
+			cameraEnabled: true,
+			reminderInterval: 3000,
+		});
+		const state = new AppRuntimeState();
+		state.isFaceDetected = true;
+		const windows = createWindows();
+		const sidecar = createSidecar();
+		const service = new ReminderService(
+			preferences,
+			state,
+			windows,
+			sidecar,
+			createSound(),
+			createStore(),
+		);
+
+		service.syncCameraLoopForMgdMode();
+		expect(state.cameraMonitoringInterval).not.toBeNull();
+		vi.mocked(sidecar.stopCamera).mockClear();
+
+		preferences.cameraEnabled = false;
+		service.resyncLoopsForCameraModeChange();
+
+		expect(preferences.isTracking).toBe(true);
+		expect(sidecar.stopCamera).toHaveBeenCalled();
+		expect(state.cameraMonitoringInterval).toBeNull();
+		expect(state.blinkInterval).not.toBeNull();
+		expect(state.blinkReminderActive).toBe(true);
 	});
 
 	it("markReminderShown does not touch lastBlinkTime", () => {
@@ -1410,7 +1475,7 @@ describe("ReminderService prompt ladder", () => {
 		expect(windows.hasAmbient()).toBe(true);
 
 		windows.hideAmbient.mockClear();
-		sound.play.mockClear();
+		vi.mocked(sound.play).mockClear();
 		vi.advanceTimersByTime(1100);
 		expect(sound.play).not.toHaveBeenCalledWith("blink");
 		expect(windows.hideAmbient).not.toHaveBeenCalled();

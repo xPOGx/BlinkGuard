@@ -380,6 +380,32 @@ export class ReminderService {
 		}
 	}
 
+	/**
+	 * After a settings-setup switch flips `cameraEnabled` while tracking.
+	 * Arms camera monitoring or the timer loop without clearing `isTracking`.
+	 * Prefer this over {@link applyReminderInterval} when the mode itself changed
+	 * — interval-only apply clears timers then no-ops if the sidecar is not ready.
+	 */
+	resyncLoopsForCameraModeChange(): void {
+		if (!this.preferences.isTracking) return;
+
+		this.state.clearReminderTimers();
+		this.dismissVisibleBlink();
+		this.backoff = createBackoffState(this.preferences.reminderInterval);
+
+		if (this.preferences.cameraEnabled) {
+			this.startCameraMonitoring(false);
+			return;
+		}
+
+		this.coaching?.stop();
+		this.calibrationNudge?.stop();
+		this.sidecar.stopCamera();
+		this.resetFaceTracking();
+		this.stats?.onFaceVisibility(false);
+		this.startTimerLoop(false);
+	}
+
 	/** Ensure camera sidecar is running so preview / face tracking can work. */
 	ensureCameraActive(): void {
 		if (!this.preferences.cameraEnabled) return;

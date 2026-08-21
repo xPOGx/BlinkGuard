@@ -4,10 +4,10 @@ import {
 	backupScopeIncludesStatistics,
 	type BackupScope,
 } from "../../shared/backup";
+import { sameCameraDevice, type CameraDevicePref } from "../../shared/camera-devices";
 import { sanitizeLocale, type Locale } from "../../shared/i18n";
 import { IPC_CHANNELS } from "../../shared/ipc-channels";
 import type { ClassifierCalibrationPayload } from "../../shared/classifier-calibration";
-import type { CameraDevicePref } from "../../shared/camera-devices";
 import type {
 	CameraQuality,
 	KeyboardShortcuts,
@@ -30,6 +30,9 @@ export interface PreferenceActionSidecar {
 	applyClassifierCalibration(
 		payload?: ClassifierCalibrationPayload | null,
 	): void;
+	applySessionConfig(): void;
+	restartCamera(): boolean;
+	readonly isCameraReady: boolean;
 }
 
 export interface PreferenceActionWindows {
@@ -37,6 +40,7 @@ export interface PreferenceActionWindows {
 	sendToMain(channel: string, ...args: unknown[]): void;
 	showCamera(onClosed: () => void): void;
 	getPopupPositionSeedDisplayId(legacyPoint: Point | null): string;
+	sendCameraModeToReminder(enabled: boolean): void;
 }
 
 export interface PreferenceActionShortcuts {
@@ -185,5 +189,78 @@ export class PreferenceActions {
 				);
 			}
 		}
+	}
+
+	/**
+	 * Hot-apply a settings-profile snapshot. Keeps tracking running; never
+	 * clears the prefs store or writes blink stats.
+	 */
+	applySettingsProfile(snapshot: unknown): void {
+		const before = this.preferences.current;
+		const previousDevice = before.cameraDevice;
+		const cameraWasLive = this.sidecar.isCameraReady;
+		const previousCameraEnabled = before.cameraEnabled;
+		const previousSnooze = before.snoozeMinutes;
+		const previousEar = before.earCalibration;
+		const previousBias = before.classifierBias;
+		const previousThreshold = before.classifierThreshold;
+
+		this.preferences.applyProfileSnapshot(snapshot);
+		const next = this.preferences.current;
+
+		const identityChanged =
+			previousEar !== next.earCalibration ||
+			previousBias !== next.classifierBias ||
+			previousThreshold !== next.classifierThreshold;
+		if (identityChanged) {
+			this.sidecar.cancelEarCalibration("Settings setup switched");
+		}
+
+		this.sidecar.applySessionConfig();
+
+		if (
+			cameraWasLive &&
+			!sameCameraDevice(previousDevice, next.cameraDevice)
+		) {
+			this.sidecar.restartCamera();
+		}
+
+		if (previousCameraEnabled !== next.cameraEnabled) {
+			this.windows.sendCameraModeToReminder(next.cameraEnabled);
+			// Interval-only apply clears timers then no-ops when the sidecar is
+			// not ready yet — timer→camera would leave reminders dead. Resync
+			// starts monitoring (or the timer loop) without clearing tracking.
+			this.reminders.resyncLoopsForCameraModeChange();
+		} else {
+			this.reminders.applyReminderInterval();
+			this.reminders.syncCameraLoopForMgdMode();
+		}
+
+		if (previousSnooze !== next.snoozeMinutes) {
+			this.tray?.rebuildMenu();
+		}
+
+		const eyeCareActive =
+			next.eyeCareIndependentOfTracking || next.isTracking;
+		if (eyeCareActive) {
+			if (next.eyeExercisesEnabled) {
+				this.exercises.stop();
+				this.exercises.start();
+			} else {
+				this.exercises.stop();
+			}
+			if (next.lookAwayEnabled) {
+				this.lookAway.stop();
+				this.lookAway.start();
+			} else {
+				this.lookAway.stop();
+			}
+		} else {
+			this.exercises.stop();
+			this.lookAway.stop();
+		}
+
+		this.focusPause.recompute();
+		this.windows.sendPreferences();
 	}
 }

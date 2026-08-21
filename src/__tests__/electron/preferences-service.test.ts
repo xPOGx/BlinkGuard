@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { PreferenceStore } from "../../../electron/application/ports/preference-store";
 import { PreferencesService } from "../../../electron/application/preferences-service";
 import {
@@ -607,5 +607,66 @@ describe("PreferencesService", () => {
 
 		service.set("quietHoursByWeekday", "garbage" as never);
 		expect(service.current.quietHoursByWeekday).toEqual({});
+	});
+
+	it("applyProfileSnapshot writes only SNAPSHOT_KEYS and never clears the store", () => {
+		const store = new FakePreferenceStore();
+		store.clear = vi.fn(store.clear.bind(store));
+		const service = new PreferencesService(store);
+		service.set("locale", "uk");
+		service.set("darkMode", false);
+		service.set("isTracking", true);
+		service.set("launchAtLogin", true);
+		service.set("hasCompletedOnboarding", true);
+		service.set("goalsEnabled", true);
+		service.set("dailyBlinkGoal", 80);
+		service.set("popupMessage", "Keep blinking");
+		service.set("popupColors", {
+			...DEFAULT_PREFERENCES.popupColors,
+			transparency: 0.4,
+		});
+		service.set("eyeCareIndependentOfTracking", false);
+		service.set("autoStopNoFaceEnabled", false);
+		service.set("autoStopNoFaceMinutes", 5);
+		service.set("reminderInterval", 2000);
+
+		const clearSpy = store.clear as ReturnType<typeof vi.fn>;
+		clearSpy.mockClear();
+
+		service.applyProfileSnapshot({
+			reminderInterval: 7000,
+			blinkPromptProfile: "strong",
+			cameraEnabled: true,
+			earCalibration: 0.3,
+			calibrationAt: 1_700_000_000_000,
+			locale: "en",
+			isTracking: false,
+			hasCompletedOnboarding: false,
+			goalsEnabled: false,
+			dailyBlinkGoal: 1,
+			popupMessage: "Hacked",
+			unknownKey: true,
+		});
+
+		expect(clearSpy).not.toHaveBeenCalled();
+		expect(service.current.reminderInterval).toBe(7000);
+		expect(service.current.blinkPromptProfile).toBe("strong");
+		expect(service.current.cameraEnabled).toBe(true);
+		expect(service.current.earCalibration).toBe(0.3);
+		expect(service.current.locale).toBe("uk");
+		expect(service.current.darkMode).toBe(false);
+		expect(service.current.isTracking).toBe(true);
+		expect(service.current.launchAtLogin).toBe(true);
+		expect(service.current.hasCompletedOnboarding).toBe(true);
+		expect(service.current.goalsEnabled).toBe(true);
+		expect(service.current.dailyBlinkGoal).toBe(80);
+		expect(service.current.popupMessage).toBe("Keep blinking");
+		expect(service.current.popupColors.transparency).toBe(0.4);
+		expect(service.current.eyeCareIndependentOfTracking).toBe(false);
+		expect(service.current.autoStopNoFaceEnabled).toBe(false);
+		expect(service.current.autoStopNoFaceMinutes).toBe(5);
+		expect(Object.prototype.hasOwnProperty.call(service.current, "unknownKey")).toBe(
+			false,
+		);
 	});
 });

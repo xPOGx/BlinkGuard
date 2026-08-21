@@ -194,6 +194,13 @@ export class WindowManager {
 		);
 	}
 
+	/** Notify an open blink reminder popup of camera mode (settings-profile switch). */
+	sendCameraModeToReminder(enabled: boolean): void {
+		if (this.reminder && !this.reminder.isDestroyed()) {
+			this.reminder.webContents.send(IPC_CHANNELS.cameraMode, enabled);
+		}
+	}
+
 	showReminder(
 		kind: ReminderKind,
 		options: ForceShowOptions = {},

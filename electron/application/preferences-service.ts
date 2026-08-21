@@ -34,6 +34,10 @@ import {
 	type QuietHoursByWeekday,
 	type Size,
 } from "../../shared/preferences";
+import {
+	SNAPSHOT_KEYS,
+	overlaySettingsProfilePrefs,
+} from "../../shared/settings-profiles";
 import { sanitizeLocale } from "../../shared/i18n";
 import type { PreferenceStore } from "./ports/preference-store";
 
@@ -282,6 +286,17 @@ export class PreferencesService {
 		}
 		this.set("popupSizesByDisplayId", next);
 		return true;
+	}
+
+	/**
+	 * Overlay a settings-profile snapshot onto live prefs via per-key `set`.
+	 * Never clears the store; excluded keys stay unchanged.
+	 */
+	applyProfileSnapshot(snapshot: unknown): void {
+		const next = overlaySettingsProfilePrefs(this.current, snapshot);
+		for (const key of SNAPSHOT_KEYS) {
+			this.set(key, next[key]);
+		}
 	}
 
 	/**

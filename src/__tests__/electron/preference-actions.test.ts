@@ -41,20 +41,22 @@ function createActions(
 	return new PreferenceActions(
 		preferences,
 		(overrides.reminders ?? {}) as never,
-		(overrides.exercises ?? { stop: vi.fn() }) as never,
-		(overrides.lookAway ?? { stop: vi.fn() }) as never,
+		(overrides.exercises ?? { stop: vi.fn(), start: vi.fn() }) as never,
+		(overrides.lookAway ?? { stop: vi.fn(), start: vi.fn() }) as never,
 		(overrides.focusPause ?? { recompute: vi.fn() }) as never,
 		(overrides.blinkStats ?? {
 			invalidateCharts: vi.fn(),
 			isLivePushEnabled: () => false,
 			getSnapshot: vi.fn(),
 			reconcileAchievements: vi.fn(),
+			replaceState: vi.fn(),
 		}) as never,
 		(overrides.windows ?? {
 			sendPreferences: vi.fn(),
 			sendToMain: vi.fn(),
 			showCamera: vi.fn(),
 			getPopupPositionSeedDisplayId: () => "1",
+			sendCameraModeToReminder: vi.fn(),
 		}) as never,
 		(overrides.sidecar ?? {
 			startEarCalibration: vi.fn(),
@@ -63,11 +65,29 @@ function createActions(
 			applyCameraDevice: vi.fn(),
 			applyEarCalibration: vi.fn(),
 			applyClassifierCalibration: vi.fn(),
+			applySessionConfig: vi.fn(),
+			restartCamera: vi.fn(),
+			isCameraReady: false,
 		}) as never,
 		(overrides.shortcuts ?? { registerAll: vi.fn() }) as never,
 		overrides.applyLaunchAtLogin ?? vi.fn(),
 		overrides.tray as never,
 	);
+}
+
+function defaultSidecar(overrides: Record<string, unknown> = {}) {
+	return {
+		startEarCalibration: vi.fn(),
+		cancelEarCalibration: vi.fn(),
+		applyCameraQuality: vi.fn(),
+		applyCameraDevice: vi.fn(),
+		applyEarCalibration: vi.fn(),
+		applyClassifierCalibration: vi.fn(),
+		applySessionConfig: vi.fn(),
+		restartCamera: vi.fn(() => true),
+		isCameraReady: false,
+		...overrides,
+	};
 }
 
 describe("PreferenceActions", () => {
@@ -498,5 +518,202 @@ describe("PreferenceActions", () => {
 		);
 		expect(preferences.current.hasCompletedOnboarding).toBe(false);
 		expect(focusPause.recompute).toHaveBeenCalledOnce();
+	});
+
+	it("applySettingsProfile keeps tracking running and never writes stats", () => {
+		const store = createStore();
+		const clearSpy = vi.fn();
+		const originalClear = store.clear.bind(store);
+		store.clear = () => {
+			clearSpy();
+			originalClear();
+		};
+		const preferences = new PreferencesService(store);
+		preferences.set("isTracking", true);
+		preferences.set("locale", "uk");
+		preferences.set("reminderInterval", 2000);
+		preferences.set("cameraEnabled", false);
+		preferences.set("snoozeMinutes", 5);
+		preferences.set("eyeExercisesEnabled", true);
+		preferences.set("eyeCareIndependentOfTracking", true);
+
+		const reminders = {
+			stop: vi.fn(),
+			applyReminderInterval: vi.fn(),
+			syncCameraLoopForMgdMode: vi.fn(),
+			resyncLoopsForCameraModeChange: vi.fn(),
+		};
+		const exercises = { stop: vi.fn(), start: vi.fn() };
+		const lookAway = { stop: vi.fn(), start: vi.fn() };
+		const focusPause = { recompute: vi.fn() };
+		const replaceState = vi.fn();
+		const blinkStats = {
+			invalidateCharts: vi.fn(),
+			isLivePushEnabled: () => false,
+			getSnapshot: vi.fn(),
+			reconcileAchievements: vi.fn(),
+			replaceState,
+		};
+		const windows = {
+			sendPreferences: vi.fn(),
+			sendToMain: vi.fn(),
+			showCamera: vi.fn(),
+			getPopupPositionSeedDisplayId: () => "1",
+			sendCameraModeToReminder: vi.fn(),
+		};
+		const sidecar = defaultSidecar({ isCameraReady: true });
+		const shortcuts = { registerAll: vi.fn() };
+		const applyLaunchAtLogin = vi.fn();
+		const tray = { rebuildMenu: vi.fn() };
+		const actions = createActions(preferences, {
+			reminders,
+			exercises,
+			lookAway,
+			focusPause,
+			blinkStats,
+			windows,
+			sidecar,
+			shortcuts,
+			applyLaunchAtLogin,
+			tray,
+		});
+
+		actions.applySettingsProfile({
+			reminderInterval: 8000,
+			blinkPromptProfile: "strong",
+			cameraEnabled: true,
+			snoozeMinutes: 15,
+			cameraQuality: "high",
+			earCalibration: 0.29,
+			calibrationAt: 1_700_000_000_000,
+		});
+
+		expect(reminders.stop).not.toHaveBeenCalled();
+		expect(replaceState).not.toHaveBeenCalled();
+		expect(clearSpy).not.toHaveBeenCalled();
+		expect(shortcuts.registerAll).not.toHaveBeenCalled();
+		expect(applyLaunchAtLogin).not.toHaveBeenCalled();
+		expect(preferences.current.isTracking).toBe(true);
+		expect(preferences.current.locale).toBe("uk");
+		expect(preferences.current.reminderInterval).toBe(8000);
+		expect(preferences.current.cameraEnabled).toBe(true);
+		expect(sidecar.applySessionConfig).toHaveBeenCalledOnce();
+		expect(sidecar.restartCamera).not.toHaveBeenCalled();
+		expect(sidecar.cancelEarCalibration).toHaveBeenCalledWith(
+			"Settings setup switched",
+		);
+		expect(reminders.resyncLoopsForCameraModeChange).toHaveBeenCalledOnce();
+		expect(reminders.applyReminderInterval).not.toHaveBeenCalled();
+		expect(reminders.syncCameraLoopForMgdMode).not.toHaveBeenCalled();
+		expect(windows.sendCameraModeToReminder).toHaveBeenCalledWith(true);
+		expect(tray.rebuildMenu).toHaveBeenCalledOnce();
+		expect(exercises.stop).toHaveBeenCalled();
+		expect(exercises.start).toHaveBeenCalled();
+		expect(windows.sendPreferences).toHaveBeenCalledOnce();
+		expect(focusPause.recompute).toHaveBeenCalledOnce();
+	});
+
+	it("applySettingsProfile uses interval apply when cameraEnabled is unchanged", () => {
+		const preferences = new PreferencesService(createStore());
+		preferences.set("isTracking", true);
+		preferences.set("cameraEnabled", true);
+		preferences.set("reminderInterval", 2000);
+		const reminders = {
+			stop: vi.fn(),
+			applyReminderInterval: vi.fn(),
+			syncCameraLoopForMgdMode: vi.fn(),
+			resyncLoopsForCameraModeChange: vi.fn(),
+		};
+		const actions = createActions(preferences, { reminders });
+
+		actions.applySettingsProfile({
+			reminderInterval: 8000,
+			cameraEnabled: true,
+		});
+
+		expect(reminders.applyReminderInterval).toHaveBeenCalledOnce();
+		expect(reminders.syncCameraLoopForMgdMode).toHaveBeenCalledOnce();
+		expect(reminders.resyncLoopsForCameraModeChange).not.toHaveBeenCalled();
+		expect(reminders.stop).not.toHaveBeenCalled();
+	});
+
+	it("applySettingsProfile restarts camera only when device changes and camera is live", () => {
+		const preferences = new PreferencesService(createStore());
+		preferences.set("cameraDevice", {
+			id: "cam-a",
+			index: 0,
+			name: "Desk",
+		});
+		const sidecar = defaultSidecar({ isCameraReady: true });
+		const reminders = {
+			applyReminderInterval: vi.fn(),
+			syncCameraLoopForMgdMode: vi.fn(),
+			stop: vi.fn(),
+		};
+		const actions = createActions(preferences, { sidecar, reminders });
+
+		actions.applySettingsProfile({
+			cameraDevice: { id: "cam-b", index: 1, name: "Sofa" },
+		});
+
+		expect(sidecar.restartCamera).toHaveBeenCalledOnce();
+		expect(reminders.stop).not.toHaveBeenCalled();
+	});
+
+	it("applySettingsProfile skips camera restart when device unchanged or camera idle", () => {
+		const preferences = new PreferencesService(createStore());
+		preferences.set("cameraDevice", {
+			id: "cam-a",
+			index: 0,
+			name: "Desk",
+		});
+		const sidecarLiveSame = defaultSidecar({ isCameraReady: true });
+		const reminders = {
+			applyReminderInterval: vi.fn(),
+			syncCameraLoopForMgdMode: vi.fn(),
+		};
+		createActions(preferences, {
+			sidecar: sidecarLiveSame,
+			reminders,
+		}).applySettingsProfile({
+			cameraDevice: { id: "cam-a", index: 0, name: "Desk" },
+			cameraQuality: "ultra",
+		});
+		expect(sidecarLiveSame.restartCamera).not.toHaveBeenCalled();
+		expect(sidecarLiveSame.cancelEarCalibration).not.toHaveBeenCalled();
+
+		const sidecarIdle = defaultSidecar({ isCameraReady: false });
+		createActions(preferences, {
+			sidecar: sidecarIdle,
+			reminders,
+		}).applySettingsProfile({
+			cameraDevice: { id: "cam-b", index: 1, name: "Sofa" },
+		});
+		expect(sidecarIdle.restartCamera).not.toHaveBeenCalled();
+	});
+
+	it("applySettingsProfile skips EAR cancel when identity fields are unchanged", () => {
+		const preferences = new PreferencesService(createStore());
+		preferences.set("earCalibration", 0.3);
+		preferences.set("calibrationAt", 1_700_000_000_000);
+		preferences.set("classifierBias", 0.1);
+		preferences.set("classifierThreshold", 0.25);
+		const sidecar = defaultSidecar();
+		const reminders = {
+			applyReminderInterval: vi.fn(),
+			syncCameraLoopForMgdMode: vi.fn(),
+		};
+		const actions = createActions(preferences, { sidecar, reminders });
+
+		actions.applySettingsProfile({
+			cameraQuality: "high",
+			earCalibration: 0.3,
+			calibrationAt: 1_700_000_000_000,
+			classifierBias: 0.1,
+			classifierThreshold: 0.25,
+		});
+
+		expect(sidecar.cancelEarCalibration).not.toHaveBeenCalled();
+		expect(sidecar.applySessionConfig).toHaveBeenCalledOnce();
 	});
 });
