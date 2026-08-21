@@ -37,12 +37,27 @@ describe("CameraCaptureStatusService", () => {
 
 	it("skips duplicate identical payloads", () => {
 		const { service, sendToMain, onState } = makeService();
-		service.hydrate(true, true);
-		expect(sendToMain).toHaveBeenCalledTimes(1);
 		service.notifyCapture(true);
 		service.notifyTracking(true);
+		expect(sendToMain).toHaveBeenCalledTimes(2);
+		expect(onState).toHaveBeenLastCalledWith({
+			capturing: true,
+			surface: "monitoring",
+		});
+		service.notifyCapture(true);
+		service.notifyTracking(true);
+		expect(sendToMain).toHaveBeenCalledTimes(2);
+		expect(onState).toHaveBeenCalledTimes(2);
+	});
+
+	it("hydrate force-sends even when the payload is unchanged", () => {
+		const { service, sendToMain } = makeService();
+		service.hydrate(true, true);
 		expect(sendToMain).toHaveBeenCalledTimes(1);
-		expect(onState).toHaveBeenCalledTimes(1);
+		service.hydrate(true, true);
+		expect(sendToMain).toHaveBeenCalledTimes(2);
+		service.pushSnapshot();
+		expect(sendToMain).toHaveBeenCalledTimes(3);
 	});
 
 	it("flips preview to monitoring on tracking without a capture flip", () => {

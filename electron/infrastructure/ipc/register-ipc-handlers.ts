@@ -84,6 +84,8 @@ interface IpcDependencies {
 	interactions: InteractionLogger;
 	/** Cold-start gate: settings shell hydrated + boot splash dismissed. */
 	onShellReady?: () => void;
+	/** Forced capture-status snapshot for late Settings subscribers. */
+	pushCameraCaptureStatus?: () => void;
 	/** Tray label refresh when snooze duration changes (no prefs echo). */
 	onSnoozeMinutesChanged?: () => void;
 	settingsProfiles: SettingsProfilesService;
@@ -109,6 +111,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		installUpdate,
 		interactions,
 		onShellReady,
+		pushCameraCaptureStatus,
 		onSnoozeMinutesChanged,
 		settingsProfiles,
 	} = deps;
@@ -138,6 +141,9 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 	);
 	on(IPC_CHANNELS.shellReady, () => {
 		onShellReady?.();
+	});
+	on(IPC_CHANNELS.requestCameraCaptureStatus, () => {
+		pushCameraCaptureStatus?.();
 	});
 	on(IPC_CHANNELS.updateInterval, (_event, interval: unknown) => {
 		preferences.set("reminderInterval", interval as number);

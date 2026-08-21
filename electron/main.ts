@@ -431,6 +431,12 @@ function bootstrap(): void {
 		onShellReady: () => {
 			blinkStats.reconcileAchievements({ celebrate: "summary" });
 			trackingRestore.onShellReady();
+			// Restore may start camera async; push current flags now, and the
+			// renderer also requests a snapshot on mount after ACK.
+			captureStatus.hydrate(sidecar.isCameraReady, preferences.isTracking);
+		},
+		pushCameraCaptureStatus: () => {
+			captureStatus.hydrate(sidecar.isCameraReady, preferences.isTracking);
 		},
 		onSnoozeMinutesChanged: () => tray.rebuildMenu(),
 	});

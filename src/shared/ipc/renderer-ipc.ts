@@ -88,6 +88,8 @@ export const rendererIpc = {
 		subscribe(IPC_CHANNELS.cameraCaptureStatus, (payload) => {
 			listener(sanitizeCameraCaptureStatusPayload(payload));
 		}),
+	requestCameraCaptureStatus: () =>
+		send(IPC_CHANNELS.requestCameraCaptureStatus),
 	onCameraDevices: (listener: (payload: CameraDevicesPayload) => void) =>
 		subscribe(IPC_CHANNELS.cameraDevices, (payload) => {
 			listener(sanitizeCameraDevicesPayload(payload));

@@ -33,13 +33,19 @@ export class CameraCaptureStatusService {
 		this.pushState();
 	}
 
+	/** Snapshot for late Settings subscribers (force-send even if unchanged). */
 	hydrate(capturing: boolean, isTracking: boolean): void {
 		this.capturing = capturing;
 		this.isTracking = isTracking;
-		this.pushState();
+		this.pushState(true);
 	}
 
-	pushState(): void {
+	/** Re-push current flags (renderer mount / shellReady). */
+	pushSnapshot(): void {
+		this.pushState(true);
+	}
+
+	pushState(force = false): void {
 		const surface = deriveCameraCaptureSurface(
 			this.capturing,
 			this.isTracking,
@@ -49,6 +55,7 @@ export class CameraCaptureStatusService {
 			surface,
 		};
 		if (
+			!force &&
 			this.lastPayload &&
 			this.lastPayload.capturing === payload.capturing &&
 			this.lastPayload.surface === payload.surface

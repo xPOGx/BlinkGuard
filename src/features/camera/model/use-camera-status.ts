@@ -23,6 +23,9 @@ export function useCameraStatus() {
 		const unsubscribeClosed = rendererIpc.onCameraWindowClosed(() =>
 			setIsWindowOpen(false),
 		);
+		// Cold start / Strict Mode remount can miss the live push while lastPayload
+		// already matches — request a forced snapshot after the listener attaches.
+		rendererIpc.requestCameraCaptureStatus();
 		return () => {
 			unsubscribeError();
 			unsubscribeReady();
