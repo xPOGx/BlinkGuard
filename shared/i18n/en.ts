@@ -224,6 +224,10 @@ export const en: MessageCatalog = {
 	"camera.error": "Camera Error:",
 	"camera.dismissError": "Dismiss camera error",
 	"camera.detection": "Camera Detection",
+	"camera.status.idle": "Idle",
+	"camera.status.preview": "Preview",
+	"camera.status.live": "Camera on",
+	"camera.status.error": "Error",
 	"camera.detectionDesc":
 		"Off — timer reminders only. Turn this on to unlock blink-aware reminders, live stats, coaching, and rewards.",
 	"camera.detectionDescOn":
@@ -687,6 +691,9 @@ export const en: MessageCatalog = {
 	"tray.snoozeLookAway_plural": "Snooze look-away ({n} min)",
 	"tray.checkForUpdates": "Check for updates",
 	"tray.quit": "Quit",
+	"tray.cameraIdle": "Camera idle",
+	"tray.cameraPreview": "Camera preview",
+	"tray.cameraOn": "Camera on",
 	"window.cameraTitle": "Camera Visualization",
 
 	// Auto-update dialogs

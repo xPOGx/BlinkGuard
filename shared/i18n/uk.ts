@@ -229,6 +229,10 @@ export const uk: MessageCatalog = {
 	"camera.error": "Помилка камери:",
 	"camera.dismissError": "Закрити повідомлення про помилку камери",
 	"camera.detection": "Виявлення через камеру",
+	"camera.status.idle": "Неактивна",
+	"camera.status.preview": "Перегляд",
+	"camera.status.live": "Камера увімкнена",
+	"camera.status.error": "Помилка",
 	"camera.detectionDesc":
 		"Вимкнено — лише таймерні нагадування. Увімкніть, щоб розблокувати нагадування за морганнями, живу статистику, коучинг і нагороди.",
 	"camera.detectionDescOn":
@@ -699,6 +703,9 @@ export const uk: MessageCatalog = {
 	"tray.snoozeLookAway_plural": "Відкласти погляд вдалину ({n} хв)",
 	"tray.checkForUpdates": "Перевірити оновлення",
 	"tray.quit": "Вийти",
+	"tray.cameraIdle": "Камера неактивна",
+	"tray.cameraPreview": "Перегляд камери",
+	"tray.cameraOn": "Камера увімкнена",
 	"window.cameraTitle": "Візуалізація камери",
 
 	// Auto-update dialogs

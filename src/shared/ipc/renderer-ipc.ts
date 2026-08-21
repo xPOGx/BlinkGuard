@@ -10,6 +10,10 @@ import {
 	sanitizeCalibrationNudgePayload,
 } from "../../../shared/calibration-freshness";
 import {
+	type CameraCaptureStatusPayload,
+	sanitizeCameraCaptureStatusPayload,
+} from "../../../shared/camera-capture-status";
+import {
 	type CameraDeviceNotice,
 	type CameraDevicePref,
 	type CameraDevicesPayload,
@@ -76,6 +80,12 @@ export const rendererIpc = {
 		subscribe(IPC_CHANNELS.cameraError, listener),
 	onCameraReady: (listener: () => void) =>
 		subscribe(IPC_CHANNELS.cameraReady, listener),
+	onCameraCaptureStatus: (
+		listener: (payload: CameraCaptureStatusPayload) => void,
+	) =>
+		subscribe(IPC_CHANNELS.cameraCaptureStatus, (payload) => {
+			listener(sanitizeCameraCaptureStatusPayload(payload));
+		}),
 	onCameraDevices: (listener: (payload: CameraDevicesPayload) => void) =>
 		subscribe(IPC_CHANNELS.cameraDevices, (payload) => {
 			listener(sanitizeCameraDevicesPayload(payload));
