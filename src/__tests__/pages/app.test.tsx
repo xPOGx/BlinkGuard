@@ -75,6 +75,14 @@ beforeEach(() => {
 				if (channel === IPC_CHANNELS.listCameraDevices) {
 					return { devices: [] };
 				}
+				if (channel === IPC_CHANNELS.listSettingsProfiles) {
+					return {
+						ok: true,
+						profiles: [],
+						activeProfileId: null,
+						dirty: false,
+					};
+				}
 				return { status: "error", message: "unexpected" };
 			}),
 			on: vi.fn((channel: string, listener: (...args: unknown[]) => void) => {
@@ -101,6 +109,7 @@ describe("settings shell", () => {
 		expect(screen.queryByText("Backup")).toBeNull();
 		expect(screen.queryByText("Quiet hours")).toBeNull();
 		fireEvent.click(screen.getByRole("tab", { name: "Data" }));
+		expect(screen.getByText("Setups")).toBeDefined();
 		expect(screen.getByText("Backup")).toBeDefined();
 		expect(screen.getByText("Danger Zone")).toBeDefined();
 		expect(screen.queryByText("Keyboard shortcuts")).toBeNull();

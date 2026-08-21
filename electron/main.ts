@@ -10,6 +10,10 @@ import { FocusPauseService } from "./application/focus-pause-service";
 import { LookAwayService } from "./application/look-away-service";
 import type { NotificationGate } from "./application/ports/notification-gate";
 import { PreferenceActions } from "./application/preference-actions";
+import {
+	PreferenceStoreSettingsProfilesAdapter,
+	SettingsProfilesService,
+} from "./application/settings-profiles-service";
 import { PreferencesService } from "./application/preferences-service";
 import { DeferredTrackingRestore } from "./application/deferred-tracking-restore";
 import { ReminderService } from "./application/reminder-service";
@@ -73,6 +77,9 @@ function bootstrap(): void {
 
 	const store = new ElectronPreferenceStore();
 	const statsStore = new ElectronPreferenceStore({ name: "blinkguard-stats" });
+	const settingsProfilesStore = new ElectronPreferenceStore({
+		name: "blinkguard-settings-profiles",
+	});
 	const preferencesService = new PreferencesService(store);
 	const preferences = preferencesService.current;
 	const blinkStats = new BlinkStatsService(
@@ -383,6 +390,11 @@ function bootstrap(): void {
 		applyLaunchAtLogin,
 		tray,
 	);
+	const settingsProfiles = new SettingsProfilesService(
+		new PreferenceStoreSettingsProfilesAdapter(settingsProfilesStore),
+		() => preferencesService.current,
+		(snapshot) => preferenceActions.applySettingsProfile(snapshot),
+	);
 	shortcuts.setOpenCameraPreview(() => preferenceActions.showCameraWindow());
 
 	const trackingRestore = new DeferredTrackingRestore({
@@ -415,6 +427,7 @@ function bootstrap(): void {
 		checkForUpdates: () => autoUpdates.checkForUpdates({ interactive: true }),
 		installUpdate: () => autoUpdates.installUpdate(),
 		interactions: interactionLogger,
+		settingsProfiles,
 		onShellReady: () => {
 			blinkStats.reconcileAchievements({ celebrate: "summary" });
 			trackingRestore.onShellReady();

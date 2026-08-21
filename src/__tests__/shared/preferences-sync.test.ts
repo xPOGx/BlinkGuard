@@ -569,4 +569,36 @@ describe("pushPreferenceDiff", () => {
 		expect(rendererIpc.updateCalibrationNudgeEnabled).not.toHaveBeenCalled();
 		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
 	});
+
+	it("does not re-push snapshot keys after a settings-setup switch echo", () => {
+		const previous = {
+			...DEFAULT_RENDERER_PREFERENCES,
+			reminderInterval: 2000,
+			microBreakInterval: 30_000,
+			blinkPromptProfile: "standard" as const,
+			cameraEnabled: false,
+			cameraQuality: "medium" as const,
+			snoozeMinutes: 5,
+			quietHoursEnabled: false,
+			notificationStyle: "overlay" as const,
+			earCalibration: null,
+		};
+		// applySettingsProfile → one sendPreferences; React lastSynced already
+		// matches the echoed snapshot (see preference-actions applySettingsProfile
+		// sendPreferences-once spy). Equal previous→next must not fan out update-*.
+		const echoed = structuredClone(previous);
+
+		pushPreferenceDiff(previous, echoed);
+
+		expect(rendererIpc.updateCameraEnabled).not.toHaveBeenCalled();
+		expect(rendererIpc.updateCameraQuality).not.toHaveBeenCalled();
+		expect(rendererIpc.updateCameraDevice).not.toHaveBeenCalled();
+		expect(rendererIpc.updateSnoozeMinutes).not.toHaveBeenCalled();
+		expect(rendererIpc.updateMicroBreakInterval).not.toHaveBeenCalled();
+		expect(rendererIpc.updateBlinkPromptProfile).not.toHaveBeenCalled();
+		expect(rendererIpc.updateQuietHoursEnabled).not.toHaveBeenCalled();
+		expect(rendererIpc.updateNotificationStyle).not.toHaveBeenCalled();
+		expect(rendererIpc.updateEarCalibration).not.toHaveBeenCalled();
+		expect(rendererIpc.updateLocale).not.toHaveBeenCalled();
+	});
 });

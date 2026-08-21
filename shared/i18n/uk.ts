@@ -460,6 +460,32 @@ export const uk: MessageCatalog = {
 	"backup.import.success": "Резервну копію імпортовано",
 	"backup.import.cancelled": "Імпорт скасовано",
 	"backup.import.error": "Помилка імпорту: {message}",
+	"settingsProfiles.title": "Набори",
+	"settingsProfiles.body":
+		"Зберігайте іменовані знімки камери, нагадувань, паузи та поведінки сповіщень. Перемикання не змінює статистику моргань і мову.",
+	"settingsProfiles.nameLabel": "Назва набору",
+	"settingsProfiles.namePlaceholder": "Стіл, Диван, Вихідні…",
+	"settingsProfiles.save.button": "Зберегти набір",
+	"settingsProfiles.saveOver.button": "Оновити набір",
+	"settingsProfiles.saveOver.confirm":
+		"Замінити цей набір поточними налаштуваннями?",
+	"settingsProfiles.switch.button": "Перемкнути",
+	"settingsProfiles.rename.button": "Перейменувати",
+	"settingsProfiles.delete.button": "Видалити",
+	"settingsProfiles.delete.confirm": "Видалити набір «{name}»?",
+	"settingsProfiles.active": "Активний",
+	"settingsProfiles.cap.reached":
+		"Уже є 5 наборів. Оновіть один або видаліть набір, щоб зберегти ще.",
+	"settingsProfiles.dirty.body": "У цьому наборі є незбережені зміни.",
+	"settingsProfiles.dirty.hint":
+		"Поточні налаштування відрізняються від збереженого набору.",
+	"settingsProfiles.dirty.switchPrompt": "Перемкнути на «{name}» все одно?",
+	"settingsProfiles.dirty.switchAnyway": "Перемкнути все одно",
+	"settingsProfiles.error.cap": "Досягнуто ліміту наборів (5).",
+	"settingsProfiles.error.invalidName":
+		"Введіть назву набору (до 40 символів).",
+	"settingsProfiles.error.notFound": "Такий набір не знайдено.",
+	"settingsProfiles.error.generic": "Щось пішло не так із наборами.",
 	"quietHours.title": "Тихі години",
 	"quietHours.description":
 		"Ховати спливаючі вікна моргання, вправ і «подивіться вдалину» у цей локальний час",

@@ -33,6 +33,7 @@ import type { LookAwayService } from "../../application/look-away-service";
 import type { PreferenceActions } from "../../application/preference-actions";
 import type { PreferencesService } from "../../application/preferences-service";
 import type { ReminderService } from "../../application/reminder-service";
+import type { SettingsProfilesService } from "../../application/settings-profiles-service";
 import { snoozeAllPrompts } from "../../application/snooze-all";
 import {
 	startTrackingSession,
@@ -85,6 +86,7 @@ interface IpcDependencies {
 	onShellReady?: () => void;
 	/** Tray label refresh when snooze duration changes (no prefs echo). */
 	onSnoozeMinutesChanged?: () => void;
+	settingsProfiles: SettingsProfilesService;
 }
 
 export function registerIpcHandlers(deps: IpcDependencies): void {
@@ -108,6 +110,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 		interactions,
 		onShellReady,
 		onSnoozeMinutesChanged,
+		settingsProfiles,
 	} = deps;
 	const current = preferences.current;
 
@@ -656,6 +659,43 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 					preferenceActions.applyBackup(scope, parsed);
 				},
 			});
+		},
+	);
+
+	ipcMain.handle(IPC_CHANNELS.listSettingsProfiles, async () => {
+		interactions.logIpc(IPC_CHANNELS.listSettingsProfiles, []);
+		return settingsProfiles.list();
+	});
+
+	ipcMain.handle(
+		IPC_CHANNELS.saveSettingsProfile,
+		async (_event: IpcMainInvokeEvent, raw: unknown) => {
+			interactions.logIpc(IPC_CHANNELS.saveSettingsProfile, [raw]);
+			return settingsProfiles.save(raw);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.renameSettingsProfile,
+		async (_event: IpcMainInvokeEvent, raw: unknown) => {
+			interactions.logIpc(IPC_CHANNELS.renameSettingsProfile, [raw]);
+			return settingsProfiles.rename(raw);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.deleteSettingsProfile,
+		async (_event: IpcMainInvokeEvent, raw: unknown) => {
+			interactions.logIpc(IPC_CHANNELS.deleteSettingsProfile, [raw]);
+			return settingsProfiles.delete(raw);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.switchSettingsProfile,
+		async (_event: IpcMainInvokeEvent, raw: unknown) => {
+			interactions.logIpc(IPC_CHANNELS.switchSettingsProfile, [raw]);
+			return settingsProfiles.switch(raw);
 		},
 	);
 

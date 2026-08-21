@@ -42,6 +42,7 @@ import { LaunchAtLoginSettings } from "@/features/settings/ui/launch-at-login-se
 import { NotificationStyleSettings } from "@/features/settings/ui/notification-style-settings";
 import { QuietHoursFocusSettings } from "@/features/settings/ui/quiet-hours-focus-settings";
 import { ResetPreferencesButton } from "@/features/settings/ui/reset-preferences-button";
+import { SettingsProfilesPanel } from "@/features/settings/ui/settings-profiles-panel";
 import { SoundSettings } from "@/features/settings/ui/sound-settings";
 import { TrackingEyeButton } from "@/features/settings/ui/tracking-eye-button";
 import { useShortcutControls } from "@/features/shortcuts/model/use-shortcut-controls";
@@ -423,6 +424,9 @@ function SettingsShell({
 								</>
 							) : (
 								<>
+									<SettingsProfilesPanel
+										active={settingsTab === "data"}
+									/>
 									<BackupSettings />
 									<ResetPreferencesButton />
 								</>

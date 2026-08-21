@@ -47,6 +47,7 @@ import {
 	type FocusPauseStatePayload,
 	sanitizeFocusPauseStatePayload,
 } from "../../../shared/session-pause-status";
+import type { SettingsProfilesResult } from "../../../shared/settings-profiles";
 import type { TraceRecordingResult } from "../../../shared/trace-recording";
 
 type Listener = (...args: unknown[]) => void;
@@ -369,6 +370,64 @@ export const rendererIpc = {
 			status: "error",
 			message: "Backup import is unavailable in this environment",
 		};
+	},
+	listSettingsProfiles: async (): Promise<SettingsProfilesResult> => {
+		const result = await bridge()?.invoke(IPC_CHANNELS.listSettingsProfiles);
+		if (result && typeof result === "object" && "ok" in result) {
+			return result as SettingsProfilesResult;
+		}
+		return { ok: false, code: "error" };
+	},
+	saveSettingsProfile: async (payload: {
+		name: string;
+		replaceId?: string;
+	}): Promise<SettingsProfilesResult> => {
+		const result = await bridge()?.invoke(
+			IPC_CHANNELS.saveSettingsProfile,
+			payload,
+		);
+		if (result && typeof result === "object" && "ok" in result) {
+			return result as SettingsProfilesResult;
+		}
+		return { ok: false, code: "error" };
+	},
+	renameSettingsProfile: async (payload: {
+		id: string;
+		name: string;
+	}): Promise<SettingsProfilesResult> => {
+		const result = await bridge()?.invoke(
+			IPC_CHANNELS.renameSettingsProfile,
+			payload,
+		);
+		if (result && typeof result === "object" && "ok" in result) {
+			return result as SettingsProfilesResult;
+		}
+		return { ok: false, code: "error" };
+	},
+	deleteSettingsProfile: async (payload: {
+		id: string;
+	}): Promise<SettingsProfilesResult> => {
+		const result = await bridge()?.invoke(
+			IPC_CHANNELS.deleteSettingsProfile,
+			payload,
+		);
+		if (result && typeof result === "object" && "ok" in result) {
+			return result as SettingsProfilesResult;
+		}
+		return { ok: false, code: "error" };
+	},
+	switchSettingsProfile: async (payload: {
+		id: string;
+		confirmDirty?: boolean;
+	}): Promise<SettingsProfilesResult> => {
+		const result = await bridge()?.invoke(
+			IPC_CHANNELS.switchSettingsProfile,
+			payload,
+		);
+		if (result && typeof result === "object" && "ok" in result) {
+			return result as SettingsProfilesResult;
+		}
+		return { ok: false, code: "error" };
 	},
 	startTraceRecording: async (): Promise<TraceRecordingResult> => {
 		const result = await bridge()?.invoke(IPC_CHANNELS.startTraceRecording);
