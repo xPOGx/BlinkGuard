@@ -126,7 +126,7 @@ def _payload(
 	note: str,
 ) -> dict[str, Any]:
 	return {
-		"version": 1,
+		"version": 2,
 		"features": list(FEATURE_NAMES),
 		"mean": [float(v) for v in mean],
 		"std": [float(v) for v in std],
@@ -145,10 +145,20 @@ def _per_trace_f1(result: dict[str, Any], name: str) -> float | None:
 	return None
 
 
-def _evaluate_with(payload: dict[str, Any], directory: Path, match_window_s: float):
+def _evaluate_with(
+	payload: dict[str, Any],
+	directory: Path,
+	match_window_s: float,
+	*,
+	kind: str = "primary",
+):
 	set_cached_weights(payload)
 	try:
-		return evaluate_dir(directory, match_window_s=match_window_s)
+		return evaluate_dir(
+			directory,
+			match_window_s=match_window_s,
+			kind=kind,
+		)
 	finally:
 		clear_weights_cache()
 
@@ -213,11 +223,36 @@ def main(argv: list[str] | None = None) -> int:
 		action="store_true",
 		help="Train on reject_* rows too (default: completes / gates_ok only)",
 	)
+	parser.add_argument(
+		"--joined",
+		action="store_true",
+		help="Harvest/eval *.joined.ndjson (aperture/OCEC populated)",
+	)
 	args = parser.parse_args(argv)
 	directory = args.dir or fixtures_sessions_dir()
-	harvested = harvest_dir(directory, match_window_s=args.match_window)
+	harvested = harvest_dir(
+		directory,
+		match_window_s=args.match_window,
+		kind="joined" if args.joined else "primary",
+	)
+	if args.joined:
+		# Mix baked EAR (aperture_missing=1) so the logistic cannot
+		# learn "no confirm fields ⇒ reject" (joined-only fit: F1 0.589).
+		primary_rows = harvest_dir(
+			directory,
+			match_window_s=args.match_window,
+			kind="primary",
+		)
+		harvested = list(harvested) + list(primary_rows)
 	if not harvested:
-		print("No harvested rows", file=sys.stderr)
+		if args.joined:
+			print(
+				"SKIP: no joined traces to harvest; "
+				"not fitting v2 on EAR-only completes",
+				file=sys.stderr,
+			)
+		else:
+			print("No harvested rows", file=sys.stderr)
 		return 1
 
 	if args.all_phases:
@@ -239,7 +274,11 @@ def main(argv: list[str] | None = None) -> int:
 	classifier_mod.CLASSIFIER_ENABLED = False
 	clear_weights_cache()
 	try:
-		baseline = evaluate_dir(directory, match_window_s=args.match_window)
+		baseline = evaluate_dir(
+			directory,
+			match_window_s=args.match_window,
+			kind="primary",
+		)
 	finally:
 		classifier_mod.CLASSIFIER_ENABLED = previous_enabled
 		clear_weights_cache()
@@ -259,7 +298,12 @@ def main(argv: list[str] | None = None) -> int:
 			threshold=threshold,
 			note="sweep",
 		)
-		result = _evaluate_with(payload, directory, args.match_window)
+		result = _evaluate_with(
+			payload,
+			directory,
+			args.match_window,
+			kind="primary",
+		)
 		ok_floor = result["f1"] + 1e-9 >= F1_FLOOR
 		ok_protected = True
 		for name, base in protected_base.items():
@@ -303,6 +347,7 @@ def main(argv: list[str] | None = None) -> int:
 		note=(
 			f"stage4 {backend} l2={args.l2} n={len(rows)} "
 			f"pos={n_pos} neg={n_neg} completes_only={not args.all_phases}"
+			f"{' mixed_primary+joined' if args.joined else ''}"
 		),
 	)
 	args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -336,6 +381,17 @@ def main(argv: list[str] | None = None) -> int:
 		print(
 			f"  {name}: P={row['precision']:.3f} R={row['recall']:.3f} "
 			f"F1={row['f1']:.3f}"
+		)
+	if args.joined:
+		joined = _evaluate_with(
+			payload,
+			directory,
+			args.match_window,
+			kind="joined",
+		)
+		print(
+			f"joined-eval P={joined['precision']:.3f} "
+			f"R={joined['recall']:.3f} F1={joined['f1']:.3f}"
 		)
 	return 0 if best["f1"] + 1e-9 >= F1_FLOOR else 1
 

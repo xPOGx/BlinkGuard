@@ -68,6 +68,26 @@ class ClassifierScoreTests(unittest.TestCase):
 		self.assertEqual(vector[FEATURE_NAMES.index("aperture_drop")], 0.0)
 		self.assertEqual(vector[FEATURE_NAMES.index("aperture_missing")], 1.0)
 
+	def test_feature_name_mismatch_is_passthrough(self):
+		weights = _passthrough_weights(bias=-4.0, threshold=0.5)
+		weights["features"] = list(FEATURE_NAMES)
+		weights["features"][-1] = "not_ocec_missing"
+		p, veto = score(_sample_info(), weights=weights, enabled=True)
+		self.assertIsNone(p)
+		self.assertFalse(veto)
+
+	def test_ocec_missing_flag(self):
+		self.assertEqual(len(FEATURE_NAMES), 19)
+		self.assertEqual(FEATURE_NAMES[-2], "ocec_drop")
+		info = _sample_info()
+		vector = features_from_info(info)
+		self.assertEqual(vector[FEATURE_NAMES.index("ocec_missing")], 1.0)
+		self.assertEqual(vector[FEATURE_NAMES.index("ocec_drop")], 0.0)
+		info["ocec_drop"] = 0.40
+		vector = features_from_info(info)
+		self.assertEqual(vector[FEATURE_NAMES.index("ocec_missing")], 0.0)
+		self.assertAlmostEqual(vector[FEATURE_NAMES.index("ocec_drop")], 0.40)
+
 	def test_known_vector_stable_p(self):
 		p, veto = score(
 			_sample_info(),

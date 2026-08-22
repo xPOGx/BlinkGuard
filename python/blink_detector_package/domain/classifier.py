@@ -37,6 +37,8 @@ FEATURE_NAMES = (
 	"merge_both",
 	"merge_stronger",
 	"merge_single",
+	"ocec_drop",
+	"ocec_missing",
 )
 
 def _default_weights_path() -> Path:
@@ -81,6 +83,8 @@ def features_from_info(info: dict[str, Any] | None) -> list[float]:
 	merge = str(info.get("merge") or "single")
 	aperture = info.get("aperture_drop")
 	aperture_missing = 1.0 if aperture is None else 0.0
+	ocec = info.get("ocec_drop")
+	ocec_missing = 1.0 if ocec is None else 0.0
 	return [
 		_f(info.get("drop")),
 		_f(info.get("duration")),
@@ -99,6 +103,8 @@ def features_from_info(info: dict[str, Any] | None) -> list[float]:
 		1.0 if merge == "both" else 0.0,
 		1.0 if merge == "stronger" else 0.0,
 		1.0 if merge == "single" else 0.0,
+		_f(ocec) if ocec is not None else 0.0,
+		ocec_missing,
 	]
 
 
@@ -215,6 +221,9 @@ def score(
 		return None, False
 	w = payload.get("weights")
 	if not isinstance(w, list) or len(w) != len(FEATURE_NAMES):
+		return None, False
+	names = payload.get("features")
+	if isinstance(names, list) and names != list(FEATURE_NAMES):
 		return None, False
 	vector = _normalize(features_from_info(info), payload)
 	z = float(payload.get("bias") or 0.0)
