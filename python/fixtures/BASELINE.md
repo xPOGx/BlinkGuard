@@ -186,3 +186,24 @@ Corpus floor held: overall F1 ≥ 0.90 and not below Stage 6 **0.929**; `frontal
 **Live look-down `reject_velocity` (2026-08-16, ~32 min after `ocec_look_down`):** 420 rejects (367 look-down); peak p50≈0.36 vs `short_look_down_velocity` 0.55; duration p50≈0.08; **101** look-down with `ocec_drop≥0.35`. `ocec_look_down` cleared LD `closed≥2` `reject_ocec` (0 leftover). Fix: `ocec_velocity` waive (same scored-yaw band, `duration≥0.06`). Do not lower `short_look_down_velocity` / LOOK_DOWN_*. Baked corpus F1 **0.929**.
 
 **Live `reject_aperture` (2026-08-21):** 113 rejects / 889 complete (last 3d JSONL); aperture_drop p50=0.058 vs complete 0.242; 29 with `ocec_drop≥0.35` (incl. 0.33s frontal closed=5 ocec=0.92 aperture=0.03). Intensity channel stays open on small laptop crops while OCEC/EAR see a close. Fix: `ocec_aperture` waive (same scored-yaw band as `ocec_opening`). Do not lower aperture ×0.28 / full-adaptive side+LD bar. Baked corpus has no aperture fields → F1 unchanged.
+
+## improve-blink-algorithm (2026-08-22)
+
+Eval hygiene + Stage 4 mixed retrain + one look-down opening knob. No new `ocec_*` waives. Windows open path / CLAHE / Ultra `normal` unchanged.
+
+Joined confirm uses AppData `traces/*.ap.ndjson` (aperture) joined onto baked EAR by `video_index`. No `.ocec` companions / AVI on disk — OCEC columns stay missing. Joined-only fit **rejected**: baked F1 fell to **0.589** (`aperture_missing` became a veto). Mixed primary+joined harvest is the shipped train path.
+
+| Path | P | R | F1 | notes |
+|---|---|---|---|---|
+| Primary baked EAR (unsuffixed) | 0.962 | 0.910 | **0.935** | `metrics.py --dir fixtures/sessions`; `frontal_calm` **0.974** |
+| Joined (baked EAR + AppData aperture) | 0.968 | 0.910 | **0.938** | `metrics.py --confirm-joined`; `chat_look_down` 0.952 |
+
+Stage 4 weights `version: 2`: 19 features (`ocec_drop` / `ocec_missing`); mixed fit `t=0.25` n=318 completes (221 pos / 97 neg). `ocec_clf` waive kept.
+
+PR3 named split: `fixtures/sessions/chat_look_down.ndjson` leftover **`reject_opening=3`**. `LOOK_DOWN_ONE_FRAME_MIN_OPENING` 0.25→**0.22**.
+
+Sidecar **rebuilt and installed** 2026-08-22 (`check_exe_mtime` = OK vs `classifier_weights.json` / `blink_detection.py`).
+
+**Soak follow-up — `skip_eyes_closed`:** glance + look-down compressed EAR vs stale frontal `live_open` (ratio 0.44–0.66) latched `eyes_closed` and froze the ref. Fix: do not latch while `_recent_pose_motion` is high; look-down open lids release at `LOOK_DOWN_CLOSED_RELEASE_RATIO` 0.58; do not freeze `live_open` on look-down. Held-shut still blocks credit storms.
+
+**Still human:** fully quit BlinkGuard, restart, live soak `lt_0.5s=0`. Extra-face / true no-blink tape still out of epic.

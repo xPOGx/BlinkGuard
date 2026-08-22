@@ -70,6 +70,16 @@ Stage 3.2 live pose: `infrastructure/head_pose.py` (`solvePnP`); labels also res
 Stage 3.5 aperture: reprocess writes `left_aperture`/`right_aperture`; use `--out session.ap.ndjson` (labels strip `.ap`).
 Stage 7 OCEC confirm: `reprocess_video.py --ocec` writes `left_ocec`/`right_ocec` → `session.ocec.ndjson` (labels strip `.ocec`). Fair A/B joins those fields onto baked EAR by `video_index` (see BASELINE Stage 7); full reprocess EAR is geometry-only. Live flag `OCEC_ENABLED=True` (soak held). Missing fields skip confirm.
 
+Join-at-test-time (do **not** overwrite baked EAR):
+
+```bat
+venv\Scripts\python.exe log_tools\join_confirm.py --dir fixtures\sessions
+venv\Scripts\python.exe log_tools\metrics.py --dir fixtures\sessions --match-window 0.45
+venv\Scripts\python.exe log_tools\metrics.py --dir fixtures\sessions --confirm-joined --match-window 0.45
+```
+
+`--confirm-joined` requires `*.joined.ndjson` with aperture/OCEC fields. If companions are missing it prints `SKIP` and is **not** a Stage-7 pass. Labels strip `.joined` like `.ocec`. Primary `metrics.py --dir` ignores suffixed traces (`.joined` / `.ocec` / `.ap` / …).
+
 ## Scenarios
 
 | File stem | What to do |
