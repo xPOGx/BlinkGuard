@@ -1,36 +1,68 @@
-# BlinkGuard
+<p align="center">
+  <img src="assets/icons/icon.png" alt="BlinkGuard" width="128" height="128">
+</p>
 
-Cross-platform desktop app that helps prevent dry eyes and eye strain with blink reminders and optional camera-based blink detection.
+<h1 align="center">BlinkGuard</h1>
 
-**Homepage / source:** https://github.com/xpogx-org/BlinkGuard · **Privacy:** [PRIVACY.md](PRIVACY.md) · **Security:** [SECURITY.md](SECURITY.md) · **Changelog:** [CHANGELOG.md](CHANGELOG.md)
+<p align="center">
+  <strong>Windows and macOS</strong> desktop app that helps prevent dry eyes and eye strain — blink reminders, optional on-device camera detection, and 20-20-20 breaks. No account. No cloud.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg?style=for-the-badge" alt="MIT License"></a>
+  <a href="https://github.com/xpogx-org/BlinkGuard/releases/latest"><img src="https://img.shields.io/github/v/release/xpogx-org/BlinkGuard?style=for-the-badge" alt="Latest release"></a>
+  <a href="https://github.com/xpogx-org/BlinkGuard/releases/latest"><img src="https://img.shields.io/badge/Windows-supported-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows"></a>
+  <a href="https://github.com/xpogx-org/BlinkGuard/releases/latest"><img src="https://img.shields.io/badge/macOS-supported-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/xpogx-org/BlinkGuard/releases/latest"><strong>Download</strong></a>
+  ·
+  <a href="PRIVACY.md">Privacy</a>
+  ·
+  <a href="SECURITY.md">Security</a>
+  ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
+
+## Contents
+
+- [Features](#features)
+- [Intro](#intro)
+- [Screenshots](#screenshots)
+- [Install](#install)
+- [Development](#development)
+- [Connect](#connect)
+- [Support](#support)
+- [Third-party attribution](#third-party-attribution)
 
 ## Features
 
-- **Blink reminders** — start/stop tracking from the control panel; camera miss-gap (1–10s) and Standard / Gentle / Strong prompt profiles (ambient glow → overlay → escalate)
-- **Timer mode** — fixed micro-break interval (15–120s) with the same prompt ladder
-- **Camera blink detection (optional)** — OpenCV YuNet + dlib sidecar; ROI gates, personal blink calibration, pose/per-eye vetoes, OCEC open/closed confirm, and adaptive EAR; reminds you only when you haven’t blinked for the set miss-gap
-- **MGD mode** — when camera detection is on, show timed popups even while blinking; the popup still closes when a blink is detected
-- **Camera visualization** — optional live preview (up to Ultra 30 FPS) with face/eye landmarks and EAR status; Setup vs Tuning tabs; capture-status chip; nudge when EAR calibration is stale
-- **Eye exercise reminders** — can run independently of blink reminders; configurable interval (5–60 minutes); Skip / configurable Snooze; auto-close after 30 seconds
-- **20-20-20 look-away breaks** — independent timer alongside exercises; editable title/hint
-- **Customizable reminder popup** — drag to reposition, resize with edge handles, custom message, colors, and transparency; layout remembered per display
-- **Global keyboard shortcuts** — multi-action bindings (default includes `Ctrl+I`; rebindable)
-- **Sounds & OS toasts** — optional notification sounds (per-kind volume); blink / exercise / look-away can use overlay, native OS banners, or both
-- **Quiet hours, fullscreen, and per-app pause** — hide popups during quiet time (optional per-weekday hours), fullscreen, or listed foreground apps
-- **Progress** — stats, goals/streaks, blink levels, achievements, rewards shop, and share-card preview in one nav section
-- **Backup** — export/import local prefs and stats as JSON
-- **Dark / light mode** · **EN / UK** localization
-- **Persistent preferences** — saved locally via `electron-store`; named Setups to save and apply preference snapshots; reset-to-defaults supported
-- **Sleep / wake / lid handling** — pauses on suspend, lock, or display-off with a distinct reason in settings and tray; auto-resumes tracking and timers when the session is active again
-- **In-app updates (Windows & macOS)** — GitHub Releases (background check every 6h); silent install on quit; About opens Release Notes
-- **Diagnostics export** — local logs and interaction trail for support
-- **Cross-platform packaging** — Windows and macOS (Electron Builder)
+### For your eyes
+
+- **Blink reminders** — camera miss-gap (1–10s) or a timer micro-break (15–120s), with Standard / Gentle / Strong prompt profiles (ambient glow → overlay → escalate)
+- **20-20-20 look-away** and **eye exercises** — independent timers; Skip / Snooze; exercises auto-close after 30 seconds
+- **Quiet hours, fullscreen, and per-app pause** — hide prompts during quiet time (optional per-weekday hours), fullscreen, or listed foreground apps
+- **Progress** — stats, goals, levels, achievements, rewards, and a shareable card
+- **Your overlay** — drag, resize, colors, transparency; layout remembered per display; optional sounds and native OS toasts
+- **Local by design** — preferences via `electron-store`; named Setups; backup/import JSON; English and Ukrainian; dark / light. Camera frames never leave the machine ([PRIVACY.md](PRIVACY.md))
+
+### Camera and power users
+
+- **Optional blink detection** — OpenCV YuNet + dlib sidecar; personal EAR calibration; reminds you only when you haven’t blinked for the miss-gap
+- **MGD mode** — timed popups even while blinking; the popup still closes on a detected blink
+- **Setup vs Tuning** — live preview (up to Ultra 30 FPS), capture-status chip, nudge when EAR calibration is stale
+- **Sleep / lock / lid** — pauses with a distinct reason in Settings and the tray; resumes when the session is active again
+- **In-app updates** — GitHub Releases (Windows and macOS); About opens Release Notes
+- **Diagnostics export** — local logs for support
+
+Full history: [CHANGELOG.md](CHANGELOG.md).
 
 ## Intro
 
 [![Watch the BlinkGuard intro](docs/intro/poster.png)](docs/intro/blinkguard-intro.mp4)
 
-Silent 18-second 1080p overview. Regenerate with `npm run generate:intro-video` after README screenshots change.
+Silent 18-second 1080p overview. After README screenshots change, regenerate with `npm run generate:intro-video`.
 
 ## Screenshots
 
@@ -68,41 +100,22 @@ Then open the app again. If it lives somewhere else, pass that path instead.
 
 Signed + notarized builds do not need this step.
 
-## Technology stack
-
-| Area | Stack |
-|---|---|
-| UI | React 18, TypeScript, Vite, Tailwind CSS, Lucide |
-| Desktop | Electron 30, `electron-store`, `electron-updater` |
-| Computer vision (optional) | Python, OpenCV, dlib, NumPy, PyInstaller |
-| Tooling | Biome, Vitest, Electron Builder |
-
-## Architecture
-
-Pragmatic Clean Architecture: domain/application stay free of Electron/React/OpenCV; infrastructure and UI adapters sit outside. `electron/main.ts` is a thin composition root — orchestration lives in `electron/application/`, Electron/Node I/O in `electron/infrastructure/`. Details, Flutter analogies, and anti-patterns: [docs/architecture.md](docs/architecture.md). IPC/preference traps: [docs/ipc-and-preferences.md](docs/ipc-and-preferences.md).
-
-```text
-React settings / public popups / IPC
-        ↓
-application services + ports
-        ↓
-domain policies          ←  infrastructure adapters (store, paths, process, sidecar protocol, …)
-shared/ (IPC + preference contracts)
-optional Python package: domain → application → infrastructure
-```
-
-| Want to change… | Open… |
-|---|---|
-| Settings UI | `src/app.tsx`, `src/features/*/ui`, `src/features/*/model`, `src/shared/ipc/` |
-| Popup look / copy | `public/*.html`, `public/css/`, `public/js/` |
-| Reminder / face-gate rules | `electron/domain/reminder-policy.ts`, `electron/application/reminder-service.ts` |
-| Preferences shape / defaults | `shared/preferences.ts`, `electron/application/preferences-service.ts`, `electron/infrastructure/store/` |
-| Camera / sidecar | `python/blink_detector_package/`, `electron/infrastructure/sidecar/` |
-| Packaging | `package.json` → `"build"` (Electron Builder); optional binary via `python/build_and_install.sh` |
+---
 
 ## Development
 
-The desktop app runs **without** the camera sidecar. Reminders, exercises, look-away, progress, and settings all work with Node/npm only. Camera blink detection is optional and off by default (`cameraEnabled: false`); when you enable it, frames stay on-device (see [PRIVACY.md](PRIVACY.md)).
+The desktop app runs **without** the camera sidecar. Reminders, exercises, look-away, progress, and settings all work with Node/npm only. Camera blink detection is optional and off by default; when you enable it, frames stay on-device (see [PRIVACY.md](PRIVACY.md)).
+
+Layout and IPC traps: [docs/architecture.md](docs/architecture.md), [docs/ipc-and-preferences.md](docs/ipc-and-preferences.md). Cursor Cloud notes: [AGENTS.md](AGENTS.md).
+
+### Stack
+
+| Area | Stack |
+|---|---|
+| UI | React 19, TypeScript, Vite 8, Tailwind CSS 4, Lucide |
+| Desktop | Electron 43, `electron-store`, `electron-updater` |
+| Computer vision (optional) | Python, OpenCV, dlib, NumPy, PyInstaller |
+| Tooling | Biome, Vitest, Electron Builder |
 
 ### Core app
 
@@ -117,8 +130,6 @@ npm run build:electron
 ```
 
 On startup you may see `Blink detector binary not found …` — that is expected until you build the optional sidecar below. Timer-mode reminders still work.
-
-See `AGENTS.md` for Cursor Cloud–specific notes.
 
 ### Optional camera sidecar
 
@@ -144,6 +155,8 @@ build_and_install.bat
 
 That installs deps into `python/venv`, builds a PyInstaller binary, and copies it to `electron/resources/`. Restart `npm run dev` afterward. Without the binary, leave camera detection off — the rest of the app is unaffected.
 
+Linux appears here only as a **sidecar build host**, not a packaged BlinkGuard target.
+
 ### Sharper UI text (Windows + NVIDIA)
 
 Popup transparency is applied to the **panel background** (CSS alpha), not `BrowserWindow.setOpacity`, so glyphs stay fully opaque. Frosted panels use a blur underlay behind text. Settings no longer force grayscale font smoothing.
@@ -156,19 +169,6 @@ If text still looks soft on NVIDIA:
 4. Compare at **100%** Windows display scale when testing
 
 Tradeoff: less driver AA for that app profile; in-app glass may look slightly less frosted than before.
-
-### Packaging notes
-
-- Local Windows package (always unsigned): `npm run build:windows`
-- CI publish (GitHub Actions on **Release published**, or manual workflow_dispatch): `npm run build:windows:publish` via `scripts/publish-windows.js`
-  - Signs when `CSC_LINK` (and `CSC_KEY_PASSWORD` if needed) are set
-  - Otherwise packages unsigned so CI still ships artifacts
-- Local macOS package (unsigned, no notarize): `npm run build:mac`
-- CI macOS publish: `npm run build:mac:publish` via `scripts/publish-mac.js`
-  - Signs/notarizes when Apple + signing secrets (`CSC_LINK` / `CSC_NAME`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`) are set
-  - Otherwise packages **unsigned** so CI still ships DMG/ZIP + `latest-mac.yml` (job does not skip)
-- In-app updates need a **published** build with embedded `app-update.yml` (tag/`build:*:publish`); local `--publish never` packages have no feed. Signed + notarized mac builds are recommended for Gatekeeper; unsigned releases may still publish updater metadata but install can fail at runtime without crashing the app.
-- End-user workaround for unsigned Mac downloads: see [Install](#install) (`xattr -cr`). Local `npm run remove-quarantine` only clears the builder machine, not testers who downloaded via Chrome/Safari.
 
 ---
 
