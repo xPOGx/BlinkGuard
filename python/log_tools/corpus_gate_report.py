@@ -21,7 +21,7 @@ if str(_TOOLS) not in sys.path:
 if str(_PYTHON) not in sys.path:
 	sys.path.insert(0, str(_PYTHON))
 
-from paths import fixtures_sessions_dir  # noqa: E402
+from paths import fixtures_sessions_dir, iter_session_traces  # noqa: E402
 from replay import replay_trace  # noqa: E402
 from trace_io import label_path_for_trace, load_labels  # noqa: E402
 
@@ -92,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
 	reject_total: Counter[str] = Counter()
 	n = 0
 
-	for path in sorted(root.glob("*.ndjson")):
+	for path in iter_session_traces(root, kind="primary"):
 		lp = label_path_for_trace(path)
 		if not lp.exists():
 			continue

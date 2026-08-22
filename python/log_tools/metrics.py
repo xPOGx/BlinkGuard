@@ -25,9 +25,10 @@ if str(_TOOLS) not in sys.path:
 if str(_PYTHON) not in sys.path:
 	sys.path.insert(0, str(_PYTHON))
 
-from paths import fixtures_sessions_dir  # noqa: E402
+from paths import fixtures_sessions_dir, iter_session_traces  # noqa: E402
 from replay import replay_trace  # noqa: E402
-from trace_io import label_path_for_trace, load_labels  # noqa: E402
+from trace_io import label_path_for_trace, load_labels, load_trace  # noqa: E402
+from join_confirm import frames_have_confirm  # noqa: E402
 
 DEFAULT_MATCH_WINDOW_S = 0.45
 # Credits are stamped at reopen/complete; auto trough labels sit at the EAR
@@ -151,10 +152,10 @@ def evaluate_dir(
 	directory: Path,
 	*,
 	match_window_s: float = DEFAULT_MATCH_WINDOW_S,
+	kind: str = "primary",
+	require_confirm: bool = False,
 ) -> dict[str, Any]:
-	traces = sorted(directory.glob("*.ndjson")) + sorted(
-		directory.glob("*.jsonl")
-	)
+	traces = iter_session_traces(directory, kind=kind)
 	# Prefer .ndjson; skip duplicates if both exist.
 	seen: set[str] = set()
 	unique: list[Path] = []
@@ -169,12 +170,18 @@ def evaluate_dir(
 
 	per_trace: list[dict[str, Any]] = []
 	skipped: list[str] = []
+	skipped_no_confirm: list[str] = []
 	tp = fp = fn = 0
 	for trace in unique:
 		labels = label_path_for_trace(trace)
 		if not labels.exists():
 			skipped.append(str(trace))
 			continue
+		if require_confirm:
+			_header, frames = load_trace(trace)
+			if not frames_have_confirm(frames):
+				skipped_no_confirm.append(str(trace))
+				continue
 		row = evaluate_trace(
 			trace,
 			labels,
@@ -192,10 +199,26 @@ def evaluate_dir(
 		if (precision + recall)
 		else 0.0
 	)
+	skip_reason = None
+	if require_confirm and not per_trace:
+		if not unique:
+			skip_reason = (
+				"no joined siblings (*.joined.ndjson); "
+				"not a Stage-7 claim"
+			)
+		elif skipped_no_confirm:
+			skip_reason = (
+				"joined traces missing aperture/ocec fields; "
+				"not a Stage-7 claim"
+			)
 	return {
 		"dir": str(directory),
+		"kind": kind,
+		"require_confirm": require_confirm,
 		"traces_evaluated": len(per_trace),
 		"traces_skipped_no_labels": skipped,
+		"traces_skipped_no_confirm": skipped_no_confirm,
+		"skipped_reason": skip_reason,
 		"tp": tp,
 		"fp": fp,
 		"fn": fn,
@@ -241,6 +264,15 @@ def main(argv: list[str] | None = None) -> int:
 		help=f"Match window seconds (default {DEFAULT_MATCH_WINDOW_S})",
 	)
 	parser.add_argument("--json", action="store_true")
+	parser.add_argument(
+		"--confirm-joined",
+		action="store_true",
+		help=(
+			"Evaluate *.joined.ndjson and require aperture/ocec fields "
+			"(Stage 3.5/7). Missing companions skip with a reason — "
+			"not a green Stage-7 claim."
+		),
+	)
 	args = parser.parse_args(argv)
 
 	if args.trace is None and args.dir is None:
@@ -280,9 +312,16 @@ def main(argv: list[str] | None = None) -> int:
 	if not directory.exists():
 		print(f"Directory not found: {directory}", file=sys.stderr)
 		return 1
-	result = evaluate_dir(directory, match_window_s=args.match_window)
+	result = evaluate_dir(
+		directory,
+		match_window_s=args.match_window,
+		kind="joined" if args.confirm_joined else "primary",
+		require_confirm=bool(args.confirm_joined),
+	)
 	if args.json:
 		print(json.dumps(result, indent=2))
+		if args.confirm_joined and result.get("skipped_reason"):
+			return 0
 		return 0
 
 	print(f"dir: {result['dir']}")
@@ -298,6 +337,12 @@ def main(argv: list[str] | None = None) -> int:
 		print("skipped (no labels):")
 		for path in result["traces_skipped_no_labels"]:
 			print(f"  {path}")
+	if result.get("traces_skipped_no_confirm"):
+		print("skipped (no confirm fields):")
+		for path in result["traces_skipped_no_confirm"]:
+			print(f"  {path}")
+	if result.get("skipped_reason"):
+		print(f"SKIP: {result['skipped_reason']}")
 	return 0
 
 

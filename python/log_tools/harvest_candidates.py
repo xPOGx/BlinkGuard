@@ -33,7 +33,7 @@ from blink_detector_package.domain.classifier import (  # noqa: E402
 	features_from_info,
 )
 from metrics import DEFAULT_MATCH_WINDOW_S, match_events  # noqa: E402
-from paths import fixtures_sessions_dir  # noqa: E402
+from paths import fixtures_sessions_dir, iter_session_traces  # noqa: E402
 from replay import replay_trace  # noqa: E402
 from trace_io import label_path_for_trace, load_labels  # noqa: E402
 
@@ -106,13 +106,12 @@ def harvest_dir(
 	directory: Path,
 	*,
 	match_window_s: float = DEFAULT_MATCH_WINDOW_S,
+	kind: str = "primary",
 ) -> list[dict[str, Any]]:
 	previous = _disable_classifier()
 	try:
 		rows: list[dict[str, Any]] = []
-		for path in sorted(directory.glob("*.ndjson")):
-			if path.name.startswith("_"):
-				continue
+		for path in iter_session_traces(directory, kind=kind):
 			labels = label_path_for_trace(path)
 			if not labels.exists():
 				continue
@@ -144,13 +143,19 @@ def main(argv: list[str] | None = None) -> int:
 		default=DEFAULT_MATCH_WINDOW_S,
 	)
 	parser.add_argument("--json", action="store_true")
+	parser.add_argument(
+		"--joined",
+		action="store_true",
+		help="Harvest *.joined.ndjson siblings (confirm fields), not the baked EAR floor",
+	)
 	args = parser.parse_args(argv)
 	directory = args.dir or fixtures_sessions_dir()
 	if not directory.exists():
 		print(f"Directory not found: {directory}", file=sys.stderr)
 		return 1
 
-	rows = harvest_dir(directory, match_window_s=args.match_window)
+	kind = "joined" if args.joined else "primary"
+	rows = harvest_dir(directory, match_window_s=args.match_window, kind=kind)
 	n_pos = sum(1 for r in rows if r["y"] == 1)
 	n_complete = sum(1 for r in rows if r["phase"] == "complete")
 	n_fp = sum(

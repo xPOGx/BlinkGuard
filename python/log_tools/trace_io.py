@@ -94,7 +94,16 @@ def label_path_for_trace(trace_path: Path) -> Path:
 		stem = name[: -len(".jsonl")]
 	else:
 		stem = trace_path.stem
-	for suffix in (".repro", ".u1", ".u2", ".u3", ".pnp", ".ap", ".ocec"):
+	for suffix in (
+		".joined",
+		".repro",
+		".u1",
+		".u2",
+		".u3",
+		".pnp",
+		".ap",
+		".ocec",
+	):
 		if stem.endswith(suffix):
 			stem = stem[: -len(suffix)]
 			break

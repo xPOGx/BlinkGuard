@@ -16,7 +16,8 @@ if str(_TOOLS) not in sys.path:
 if str(_PYTHON) not in sys.path:
 	sys.path.insert(0, str(_PYTHON))
 
-from metrics import evaluate_trace, match_events  # noqa: E402
+from metrics import evaluate_dir, evaluate_trace, match_events  # noqa: E402
+from paths import is_primary_trace  # noqa: E402
 from replay import replay_trace  # noqa: E402
 from trace_io import label_path_for_trace, load_trace  # noqa: E402
 
@@ -141,6 +142,34 @@ class TraceReplayTests(unittest.TestCase):
 			"frontal_calm.labels.json",
 		)
 
+	def test_label_path_strips_joined_suffix(self):
+		path = Path("fixtures/sessions/frontal_calm.joined.ndjson")
+		self.assertEqual(
+			label_path_for_trace(path).name,
+			"frontal_calm.labels.json",
+		)
+
+	def test_human_corpus_skips_joined_siblings(self):
+		sessions = _PYTHON / "fixtures" / "sessions"
+		if not sessions.is_dir():
+			self.skipTest("fixtures/sessions missing")
+		joined = sessions / "frontal_calm.joined.ndjson"
+		ocec = sessions / "frontal_calm.ocec.ndjson"
+		created = []
+		try:
+			for extra in (joined, ocec):
+				if not extra.exists():
+					extra.write_text("{}\n", encoding="utf-8")
+					created.append(extra)
+			primary = evaluate_dir(sessions, kind="primary")
+			names = [Path(row["trace"]).name for row in primary["per_trace"]]
+			self.assertTrue(all(is_primary_trace(Path(n)) for n in names))
+			self.assertFalse(any(n.endswith(".joined.ndjson") for n in names))
+			self.assertFalse(any(".ocec." in n for n in names))
+		finally:
+			for extra in created:
+				extra.unlink(missing_ok=True)
+
 	def test_human_corpus_f1_floor(self):
 		"""Regression floor vs Stage-0 video-verified labels (skip if missing)."""
 		sessions = _PYTHON / "fixtures" / "sessions"
@@ -150,6 +179,8 @@ class TraceReplayTests(unittest.TestCase):
 		rows = []
 		frontal = None
 		for path in sorted(sessions.glob("*.ndjson")):
+			if not is_primary_trace(path):
+				continue
 			lp = label_path_for_trace(path)
 			if not lp.exists():
 				continue
