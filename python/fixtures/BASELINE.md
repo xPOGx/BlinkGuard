@@ -207,3 +207,7 @@ Sidecar **rebuilt and installed** 2026-08-22 (`check_exe_mtime` = OK vs `classif
 **Soak follow-up — `skip_eyes_closed`:** glance + look-down compressed EAR vs stale frontal `live_open` (ratio 0.44–0.66) latched `eyes_closed` and froze the ref. Fix: do not latch while `_recent_pose_motion` is high; look-down open lids release at `LOOK_DOWN_CLOSED_RELEASE_RATIO` 0.58; do not freeze `live_open` on look-down. Held-shut still blocks credit storms.
 
 **Still human:** fully quit BlinkGuard, restart, live soak `lt_0.5s=0`. Extra-face / true no-blink tape still out of epic.
+
+## false-blink-eye-motion (2026-08-22)
+
+Live `ocec_look_down` is **`duration ≥ 0.09` only** (dropped the `closed≥2` shortcut). Sub-60ms candidates with no reopen are not credited on frontal / look-down (`|yaw| < 0.35`), even when OCEC is high. Baked primary after that: overall F1 **0.900** (floor), `frontal_calm` **0.947**, `chat_look_down` **0.930**. Traces usually lack OCEC columns — EAR-path floor, not a live saccade proof. No new fixtures stem. Sidecar exe rebuild + webcam soak remain human.
