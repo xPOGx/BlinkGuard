@@ -23,6 +23,9 @@ import {
 	getTopCenterPopupPosition,
 	isPointInAnyWorkArea,
 	isPointInWorkArea,
+	isSystemChromeVisible,
+	ambientDesktopBounds,
+	systemChromeRects,
 	layoutForDisplays,
 	nextUnsavedDisplayId,
 	resolveOpenWindowPosition,
@@ -63,6 +66,61 @@ describe("window-position", () => {
 			{ workArea: primaryWorkArea },
 			{ workArea: secondaryWorkArea },
 		]);
+	});
+
+	describe("isSystemChromeVisible", () => {
+		const bounds = { x: 0, y: 0, width: 1920, height: 1080 };
+
+		it("is true when a bottom taskbar shrinks workArea", () => {
+			expect(
+				isSystemChromeVisible(bounds, {
+					x: 0,
+					y: 0,
+					width: 1920,
+					height: 1040,
+				}),
+			).toBe(true);
+		});
+
+		it("is true when a top menu bar or left dock insets workArea", () => {
+			expect(
+				isSystemChromeVisible(bounds, {
+					x: 0,
+					y: 25,
+					width: 1920,
+					height: 1055,
+				}),
+			).toBe(true);
+			expect(
+				isSystemChromeVisible(bounds, {
+					x: 48,
+					y: 0,
+					width: 1872,
+					height: 1080,
+				}),
+			).toBe(true);
+		});
+
+		it("is false when workArea matches bounds (hidden / auto-hide chrome)", () => {
+			expect(isSystemChromeVisible(bounds, bounds)).toBe(false);
+		});
+	});
+
+	describe("ambientDesktopBounds / systemChromeRects", () => {
+		const bounds = { x: 0, y: 0, width: 1920, height: 1080 };
+
+		it("keeps the desktop glow in workArea when a bottom taskbar is visible", () => {
+			const workArea = { x: 0, y: 0, width: 1920, height: 1040 };
+			expect(ambientDesktopBounds(bounds, workArea)).toEqual(workArea);
+			expect(systemChromeRects(bounds, workArea)).toEqual([
+				{ x: 0, y: 1040, width: 1920, height: 40 },
+			]);
+		});
+
+		it("returns full bounds and no chrome strips when chrome is hidden", () => {
+			expect(ambientDesktopBounds(bounds, bounds)).toEqual(bounds);
+			expect(systemChromeRects(bounds, bounds)).toEqual([]);
+		});
 	});
 
 	it("resolves the display nearest the cursor", () => {

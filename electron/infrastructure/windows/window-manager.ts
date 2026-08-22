@@ -36,7 +36,10 @@ import {
 	REMINDER_POPUP_VISIBLE_MS,
 } from "../../domain/reminder-policy";
 import type { AppPaths } from "../paths/app-paths";
-import { createPanelWindow, pinPanelAboveSystemChrome } from "./panel-window";
+import {
+	createPanelWindow,
+	pinPanelAboveSystemChrome,
+} from "./panel-window";
 import {
 	getActiveDisplay,
 	getDisplayForPopupRect,
@@ -45,6 +48,8 @@ import {
 	getRightBiasedPopupPosition,
 	getTopCenterPopupPosition,
 	clampPopupSizeToWorkArea,
+	ambientDesktopBounds,
+	systemChromeRects,
 	layoutForDisplays,
 	nextUnsavedDisplayId,
 	resolveOpenWindowPosition,
@@ -73,6 +78,8 @@ export class WindowManager {
 	editor: BrowserWindow | null = null;
 	noFace: BrowserWindow | null = null;
 	ambient: BrowserWindow | null = null;
+	/** Taskbar/dock strips only — keeps the OS bar visible while glow paints over it. */
+	private ambientChrome: BrowserWindow[] = [];
 	calibrationNudge: BrowserWindow | null = null;
 	cheerToast: BrowserWindow | null = null;
 	private calibrationNudgeDismissTimer: ReturnType<typeof setTimeout> | null =
@@ -288,48 +295,20 @@ export class WindowManager {
 			this.repositionAmbient();
 			return;
 		}
-		// Full display bounds so the glow covers the taskbar / dock, not only workArea.
-		const bounds = getActiveDisplay().bounds;
-		const { x, y, width, height } = bounds;
-		const popup = createPanelWindow(
-			{
-				width,
-				height,
-				x,
-				y,
-				focusable: false,
-				coverSystemChrome: true,
-			},
-			this.paths.preload,
-		);
+		const display = getActiveDisplay();
+		const desktop = ambientDesktopBounds(display.bounds, display.workArea);
+		const popup = this.createAmbientOverlay(desktop);
 		this.ambient = popup;
-		void popup.loadFile(path.join(this.paths.publicDir, "ambient.html"));
-		popup.webContents.on("did-finish-load", () => {
-			this.sendI18n(popup);
-			popup.webContents.send(
-				IPC_CHANNELS.updateColors,
-				this.preferences.popupColors,
-			);
-			popup.setIgnoreMouseEvents(true);
-			pinPanelAboveSystemChrome(popup, getActiveDisplay().bounds);
-		});
-		popup.once("ready-to-show", () => {
-			if (popup.isDestroyed()) return;
-			pinPanelAboveSystemChrome(popup, getActiveDisplay().bounds);
-			popup.showInactive();
-			// Windows may re-stack under the taskbar on first show — pin again.
-			pinPanelAboveSystemChrome(popup, getActiveDisplay().bounds);
-			// Keep blink overlay above the glow when both are up.
-			if (this.reminder && !this.reminder.isDestroyed()) {
-				this.reminder.moveTop();
-			}
-		});
 		popup.on("closed", () => {
 			if (this.ambient === popup) this.ambient = null;
+			this.closeAmbientChromeOverlays();
 		});
+		this.syncAmbientChromeOverlays();
+		this.raiseReminderAboveAmbient();
 	}
 
 	hideAmbient(): void {
+		this.closeAmbientChromeOverlays();
 		this.closeWindow("ambient");
 	}
 
@@ -853,7 +832,12 @@ export class WindowManager {
 	applyPopupAppearance(): void {
 		// Push colors/transparency into CSS (card alpha). Do not use
 		// BrowserWindow.setOpacity — it soft-composites glyphs on Windows GPUs.
-		for (const window of [this.reminder, this.editor, this.ambient]) {
+		for (const window of [
+			this.reminder,
+			this.editor,
+			this.ambient,
+			...this.ambientChrome,
+		]) {
 			if (window && !window.isDestroyed()) {
 				window.webContents.send(
 					IPC_CHANNELS.updateColors,
@@ -1005,6 +989,7 @@ export class WindowManager {
 		this.editor = null;
 		this.noFace = null;
 		this.ambient = null;
+		this.ambientChrome = [];
 		this.calibrationNudge = null;
 		this.cheerToast = null;
 	}
@@ -1019,12 +1004,78 @@ export class WindowManager {
 		}, DISPLAY_RECOVER_DEBOUNCE_MS);
 	}
 
-	private repositionAmbient(): void {
-		if (!this.ambient || this.ambient.isDestroyed()) return;
-		pinPanelAboveSystemChrome(this.ambient, getActiveDisplay().bounds);
+	private createAmbientOverlay(bounds: {
+		x: number;
+		y: number;
+		width: number;
+		height: number;
+	}): BrowserWindow {
+		const popup = createPanelWindow(
+			{
+				width: bounds.width,
+				height: bounds.height,
+				x: bounds.x,
+				y: bounds.y,
+				focusable: false,
+				coverSystemChrome: true,
+			},
+			this.paths.preload,
+		);
+		void popup.loadFile(path.join(this.paths.publicDir, "ambient.html"));
+		popup.webContents.on("did-finish-load", () => {
+			this.sendI18n(popup);
+			popup.webContents.send(
+				IPC_CHANNELS.updateColors,
+				this.preferences.popupColors,
+			);
+			popup.setIgnoreMouseEvents(true);
+			pinPanelAboveSystemChrome(popup, bounds);
+		});
+		popup.once("ready-to-show", () => {
+			if (popup.isDestroyed()) return;
+			pinPanelAboveSystemChrome(popup, bounds);
+			popup.showInactive();
+			pinPanelAboveSystemChrome(popup, bounds);
+			this.raiseReminderAboveAmbient();
+		});
+		return popup;
+	}
+
+	private closeAmbientChromeOverlays(): void {
+		for (const overlay of this.ambientChrome) {
+			if (!overlay.isDestroyed()) overlay.close();
+		}
+		this.ambientChrome = [];
+	}
+
+	private syncAmbientChromeOverlays(): void {
+		const display = getActiveDisplay();
+		const rects = systemChromeRects(display.bounds, display.workArea);
+		this.closeAmbientChromeOverlays();
+		this.ambientChrome = rects.map((rect) => {
+			const overlay = this.createAmbientOverlay(rect);
+			overlay.on("closed", () => {
+				this.ambientChrome = this.ambientChrome.filter(
+					(open) => open !== overlay,
+				);
+			});
+			return overlay;
+		});
+	}
+
+	private raiseReminderAboveAmbient(): void {
 		if (this.reminder && !this.reminder.isDestroyed()) {
 			this.reminder.moveTop();
 		}
+	}
+
+	private repositionAmbient(): void {
+		if (!this.ambient || this.ambient.isDestroyed()) return;
+		const display = getActiveDisplay();
+		const desktop = ambientDesktopBounds(display.bounds, display.workArea);
+		pinPanelAboveSystemChrome(this.ambient, desktop);
+		this.syncAmbientChromeOverlays();
+		this.raiseReminderAboveAmbient();
 	}
 
 	private setWindowPositionIfOpen(

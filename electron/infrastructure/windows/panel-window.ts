@@ -75,6 +75,7 @@ export function createPanelWindow(
 		show: false,
 		hasShadow: false,
 		acceptFirstMouse: false,
+		fullscreenable: false,
 		// `type: "panel"` + default thickFrame keep Win overlays under the taskbar.
 		...(coverSystemChrome && process.platform === "win32"
 			? { thickFrame: false }

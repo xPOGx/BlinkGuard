@@ -20,7 +20,7 @@ Pragmatic Clean Architecture with a thin `electron/main.ts` composition root. Fe
 | `src/components/` | Shared React UI (1 file = 1 component); catalog in `.cursor/skills/ui-reuse/catalog.json` |
 | `src/features/*` | Feature `model/` + `ui/` (reminders, camera, exercises, look-away, popup-appearance, statistics, profile, achievements, rewards, settings, onboarding, about, shortcuts, debug) |
 | `src/shared/ipc/` | Renderer IPC adapter |
-| `public/js`, `public/css` | Vanilla popup scripts/styles (`ambient.html` + `ambient.css`/`ambient.js` for Gentle glow; `blink-rate-coach.css` kept for calibration-nudge only — coach HTML removed); panel transparency via CSS alpha in `theme.js` (not `BrowserWindow.setOpacity`); frosted panels use `.popup-glass` underlay blur; interactive dialog a11y in `popup-a11y.js` |
+| `public/js`, `public/css` | Vanilla popup scripts/styles (`ambient.html` + `ambient.css`/`ambient.js` for Gentle glow in the workArea plus a taskbar/dock strip; `blink-rate-coach.css` kept for calibration-nudge only — coach HTML removed); panel transparency via CSS alpha in `theme.js` (not `BrowserWindow.setOpacity`); frosted panels use `.popup-glass` underlay blur; interactive dialog a11y in `popup-a11y.js` |
 | `python/blink_detector.py` | Thin entry |
 | `python/blink_detector_package/` | `domain` / `application` / `infrastructure` for the sidecar |
 

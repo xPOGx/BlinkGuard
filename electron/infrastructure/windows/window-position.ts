@@ -71,6 +71,78 @@ export function getTopCenterPopupPosition(popupWidth: number) {
 	};
 }
 
+/**
+ * True when Dock / taskbar / menu bar insets the usable workArea.
+ * Auto-hide (or already-fullscreen) usually makes workArea equal bounds.
+ */
+export function isSystemChromeVisible(
+	bounds: WorkArea,
+	workArea: WorkArea,
+): boolean {
+	return (
+		workArea.x > bounds.x ||
+		workArea.y > bounds.y ||
+		workArea.x + workArea.width < bounds.x + bounds.width ||
+		workArea.y + workArea.height < bounds.y + bounds.height
+	);
+}
+
+/**
+ * Desktop region for ambient: keep the window inside `workArea` when a
+ * taskbar/dock is showing so Windows does not treat us as fullscreen and hide it.
+ */
+export function ambientDesktopBounds(
+	bounds: WorkArea,
+	workArea: WorkArea,
+): WorkArea {
+	return isSystemChromeVisible(bounds, workArea) ? workArea : bounds;
+}
+
+/** Taskbar / dock / menu-bar strips (`bounds` minus `workArea`). */
+export function systemChromeRects(
+	bounds: WorkArea,
+	workArea: WorkArea,
+): WorkArea[] {
+	const rects: WorkArea[] = [];
+	if (workArea.y > bounds.y) {
+		rects.push({
+			x: bounds.x,
+			y: bounds.y,
+			width: bounds.width,
+			height: workArea.y - bounds.y,
+		});
+	}
+	if (workArea.x > bounds.x) {
+		rects.push({
+			x: bounds.x,
+			y: workArea.y,
+			width: workArea.x - bounds.x,
+			height: workArea.height,
+		});
+	}
+	const workRight = workArea.x + workArea.width;
+	const boundsRight = bounds.x + bounds.width;
+	if (workRight < boundsRight) {
+		rects.push({
+			x: workRight,
+			y: workArea.y,
+			width: boundsRight - workRight,
+			height: workArea.height,
+		});
+	}
+	const workBottom = workArea.y + workArea.height;
+	const boundsBottom = bounds.y + bounds.height;
+	if (workBottom < boundsBottom) {
+		rects.push({
+			x: bounds.x,
+			y: workBottom,
+			width: bounds.width,
+			height: boundsBottom - workBottom,
+		});
+	}
+	return rects.filter((rect) => rect.width > 0 && rect.height > 0);
+}
+
 /** Inclusive top/left, exclusive bottom/right — matches typical workArea hit-tests. */
 export function isPointInWorkArea(point: Point, area: WorkArea): boolean {
 	return (
