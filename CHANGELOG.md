@@ -4,6 +4,12 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.15.1] - 2026-08-22
+
+### Fixed
+
+- Camera: reject sub-60ms saccades as blinks when there is no reopen
+
 ## [2.15.0] - 2026-08-22
 
 ### Changed
