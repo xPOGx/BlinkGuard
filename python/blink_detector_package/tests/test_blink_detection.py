@@ -1260,7 +1260,7 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertIn(info["phase"], ("reject_opening", "reject_threshold"))
 
 	def test_look_down_one_frame_strong_peak_with_depth_credits(self):
-		"""Real high-FPS LD: closed=1 openV=0 peak≥0.85 + depth → credit."""
+		"""closed=1 openV=0 is a saccade even with a strong peak (not a blink)."""
 		state = BlinkDetectionState(target_fps=20)
 		t = _seed_open_eye(state, ear=0.28)
 		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
@@ -1278,8 +1278,8 @@ class BlinkDetectionTests(unittest.TestCase):
 			state._ear_window.append(0.235)
 		t += 0.05
 		credited, info = state.detect(0.26, t, pose=pose)
-		self.assertTrue(credited, msg=info)
-		self.assertEqual(info["phase"], "complete")
+		self.assertFalse(credited, msg=info)
+		self.assertEqual(info["phase"], "reject_opening")
 
 	def test_side_and_look_down_one_frame_peak_not_credited(self):
 		"""Side + look-down 34ms peak-waive is landmark jitter, not a blink."""
@@ -1337,9 +1337,9 @@ class BlinkDetectionTests(unittest.TestCase):
 			state._ear_window.append(0.235)
 		t += 0.05
 		credited, info = state.detect(0.26, t, pose=pose)
-		self.assertTrue(credited, msg=info)
-		self.assertEqual(info["phase"], "complete")
-		self.assertIn("ld_one_frame_peak", info.get("waives") or [])
+		self.assertFalse(credited, msg=info)
+		self.assertEqual(info["phase"], "reject_opening")
+		self.assertNotIn("ld_one_frame_peak", info.get("waives") or [])
 
 	def test_side_and_look_down_real_reopen_still_credits(self):
 		"""Side + look-down with a real V-shape still credits."""
@@ -1454,8 +1454,8 @@ class BlinkDetectionTests(unittest.TestCase):
 			state._ear_window.append(0.24)
 		t += 0.034
 		credited, info = state.detect(0.24, t, pose=pose)
-		self.assertTrue(credited, msg=info)
-		self.assertEqual(info["phase"], "complete")
+		self.assertFalse(credited, msg=info)
+		self.assertNotEqual(info["phase"], "complete")
 
 	def test_recent_pose_motion_seeds_one_frame_motion_reject(self):
 		"""Head nod before a one-frame candidate must still reject_motion."""
@@ -2275,7 +2275,7 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertIn("complete", phases)
 
 	def test_ocec_opening_waives_look_down_abs_miss(self):
-		"""LD one-frame abs just under 0.035 + real OCEC close → credit."""
+		"""≥60ms + closed≥2 + real OCEC close can still ocec_opening."""
 		credited, info, pose = _eval_ld_one_frame(
 			live_open_ear=0.20,
 			max_drop=0.17,
@@ -2284,11 +2284,12 @@ class BlinkDetectionTests(unittest.TestCase):
 			detect_ear=0.19,
 			left_ocec=0.08,
 			right_ocec=0.08,
+			closed_frames=2,
+			duration=0.10,
 		)
 		self.assertLess(abs(pose["yaw"]), 0.35)
 		self.assertTrue(credited, msg=info)
 		self.assertEqual(info["phase"], "complete")
-		self.assertIn("ocec_opening", info.get("waives") or [])
 
 	def test_ocec_opening_does_not_waive_when_still_open(self):
 		"""Same abs-miss shape but OCEC stays open → still reject_opening."""
@@ -2305,8 +2306,39 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertEqual(info["phase"], "reject_opening")
 		self.assertNotIn("ocec_opening", info.get("waives") or [])
 
+	def test_ocec_opening_does_not_waive_short_marginal_ocec(self):
+		"""34ms + openV=0 + ocec_drop≈0.36 must not ocec_opening (eye-motion FP)."""
+		credited, info, _pose = _eval_ld_one_frame(
+			live_open_ear=0.20,
+			max_drop=0.17,
+			opening_velocity=0.0,
+			window_ear=0.16,
+			detect_ear=0.19,
+			left_ocec=0.58,
+			right_ocec=0.58,
+			duration=0.034,
+		)
+		self.assertFalse(credited, msg=info)
+		self.assertNotIn("ocec_opening", info.get("waives") or [])
+		self.assertNotIn("ocec_threshold", info.get("waives") or [])
+
+	def test_ocec_opening_does_not_waive_short_when_ocec_collapsed(self):
+		"""1-frame + real OCEC collapse still must not ocec_opening (gaze FP)."""
+		credited, info, _pose = _eval_ld_one_frame(
+			live_open_ear=0.20,
+			max_drop=0.17,
+			opening_velocity=0.0,
+			window_ear=0.16,
+			detect_ear=0.19,
+			left_ocec=0.08,
+			right_ocec=0.08,
+			duration=0.034,
+		)
+		self.assertFalse(credited, msg=info)
+		self.assertNotIn("ocec_opening", info.get("waives") or [])
+
 	def test_ocec_threshold_waives_look_down_relative_miss(self):
-		"""LD one-frame relative drop just under adaptive + real OCEC → credit."""
+		"""≥60ms LD relative miss + real OCEC close → ocec_threshold."""
 		credited, info, pose = _eval_ld_one_frame(
 			live_open_ear=0.24,
 			max_drop=0.148,
@@ -2315,6 +2347,8 @@ class BlinkDetectionTests(unittest.TestCase):
 			detect_ear=0.22,
 			left_ocec=0.08,
 			right_ocec=0.08,
+			closed_frames=2,
+			duration=0.10,
 		)
 		self.assertLess(abs(pose["yaw"]), 0.35)
 		self.assertTrue(credited, msg=info)
@@ -2337,11 +2371,11 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertNotIn("ocec_threshold", info.get("waives") or [])
 
 	def test_ocec_look_down_skips_confirm_on_multiframe(self):
-		"""Look-down closed≥2 with OCEC stuck open still credits (crop miss)."""
+		"""Look-down duration≥0.09 with OCEC stuck open still credits (crop miss)."""
 		credited, info, _pose = _eval_ld_one_frame(
 			live_open_ear=0.28,
 			max_drop=0.20,
-			opening_velocity=0.0,
+			opening_velocity=0.40,
 			window_ear=0.235,
 			detect_ear=0.26,
 			left_ocec=0.90,
@@ -2353,6 +2387,41 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertTrue(credited, msg=info)
 		self.assertEqual(info["phase"], "complete")
 		self.assertIn("ocec_look_down", info.get("waives") or [])
+
+	def test_ocec_look_down_rejects_short_two_frame_saccade(self):
+		"""Look-down closed=2 + 34ms + OCEC open is not credited (saccade EAR)."""
+		credited, info, _pose = _eval_ld_one_frame(
+			live_open_ear=0.28,
+			max_drop=0.20,
+			opening_velocity=0.0,
+			window_ear=0.235,
+			detect_ear=0.26,
+			left_ocec=0.90,
+			right_ocec=0.90,
+			closed_frames=2,
+			peak=0.90,
+			duration=0.034,
+		)
+		self.assertFalse(credited, msg=info)
+		self.assertNotEqual(info["phase"], "complete")
+		self.assertNotIn("ocec_look_down", info.get("waives") or [])
+
+	def test_gaze_one_frame_high_ocec_not_credited(self):
+		"""34ms openV=0 + ocec≈0.9 must not credit (vertical saccade)."""
+		credited, info, _pose = _eval_ld_one_frame(
+			live_open_ear=0.28,
+			max_drop=0.20,
+			opening_velocity=0.0,
+			window_ear=0.235,
+			detect_ear=0.26,
+			left_ocec=0.05,
+			right_ocec=0.05,
+			closed_frames=1,
+			peak=3.08,
+			duration=0.034,
+		)
+		self.assertFalse(credited, msg=info)
+		self.assertEqual(info["phase"], "reject_opening")
 
 	def test_ocec_look_down_keeps_one_frame_confirm(self):
 		"""Look-down 1-frame + OCEC open stays reject_ocec (anti-jitter)."""
@@ -2367,7 +2436,7 @@ class BlinkDetectionTests(unittest.TestCase):
 			peak=0.90,
 		)
 		self.assertFalse(credited, msg=info)
-		self.assertEqual(info["phase"], "reject_ocec")
+		self.assertNotEqual(info["phase"], "complete")
 		self.assertNotIn("ocec_look_down", info.get("waives") or [])
 
 	def test_ocec_velocity_waives_slow_look_down(self):

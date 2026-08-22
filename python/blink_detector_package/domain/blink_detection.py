@@ -79,6 +79,9 @@ OCEC_CONFIRM_MIN_DROP = 0.35
 # duration p50≈0.08). Do not waive sub-60ms jitter (1 Hz storm path).
 # Do not retune short_look_down_velocity / LOOK_DOWN_* in this pass.
 OCEC_VELOCITY_MIN_DURATION = 0.06
+# 1-frame (~34ms) EAR dips must not get ocec_opening / threshold /
+# aperture / clf — OCEC also fires on vertical gaze (POG 2026-08-22:
+# ocec_drop 0.80–0.99 with openV=0). Do not retune LOOK_DOWN_* / 0.35.
 # Short+shallow opening kill / no peak-waive. The 2026-08-12 down-left 1 Hz
 # storm was yaw≈1.1; CLASSIFIER_SIDE_YAW_WAIVE (0.35) is the crop/veto band
 # and was too broad — chat-bottom often lands |yaw| 0.35–0.80
@@ -688,8 +691,12 @@ class BlinkDetectionState:
 			return True, drop
 		return drop >= float(OCEC_CONFIRM_MIN_DROP), drop
 
-	def _ocec_waives_ear_miss(self, yaw, ocec_ok, strong_ocec_drop):
+	def _ocec_waives_ear_miss(
+		self, yaw, ocec_ok, strong_ocec_drop, duration=0.0
+	):
 		"""True when OCEC saw a close in the scored yaw band (not side crop)."""
+		if float(duration or 0.0) < OCEC_VELOCITY_MIN_DURATION:
+			return False
 		return (
 			bool(ocec_ok)
 			and strong_ocec_drop is not None
@@ -1940,8 +1947,9 @@ class BlinkDetectionState:
 				side_and_down = pose_w >= 0.5 and side_glance
 				if pose_w >= 0.5:
 					if self.closed_frames < 2:
-						# One-frame: reopen+depth, or strong close+depth
-						# (openV often 0 on real high-FPS blinks).
+						# One-frame: reopen+depth only. Peak-without-openV
+						# credited vertical saccades (POG 2026-08-22:
+						# 34ms openV=0 ocec≈0.9 ld_one_frame_peak).
 						one_drop = lerp(
 							0.0, LOOK_DOWN_ONE_FRAME_MIN_DROP, pose_w
 						)
@@ -1953,27 +1961,13 @@ class BlinkDetectionState:
 							LOOK_DOWN_ONE_FRAME_MIN_OPENING,
 							pose_w,
 						)
-						one_peak = lerp(
-							FRONTAL_OPENING_PEAK_WAIVE,
-							LOOK_DOWN_ONE_FRAME_STRONG_PEAK,
-							pose_w,
-						)
 						depth_ok = (
 							self.max_drop_percentage >= one_drop
 							and absolute_drop >= one_abs
 						)
-						peak_waive = (
-							measured_peak >= one_peak and not side_and_down
-						)
 						opening_ok = depth_ok and (
 							self.peak_opening_velocity >= one_open
-							or peak_waive
 						)
-						if opening_ok and (
-							peak_waive
-							and self.peak_opening_velocity < one_open
-						):
-							waives.append("ld_one_frame_peak")
 					else:
 						ld_reopen = (
 							self.peak_opening_velocity >= opening_floor
@@ -2008,6 +2002,8 @@ class BlinkDetectionState:
 					not opening_ok
 					and measured_peak >= FRONTAL_OPENING_PEAK_WAIVE
 					and allow_frontal_extras
+					and self.closed_frames >= 2
+					and blink_duration >= OCEC_VELOCITY_MIN_DURATION
 				):
 					if blink_duration < SHORT_BLINK_DURATION:
 						# Frontal short peak-waive still needs depth (open0 FP).
@@ -2163,6 +2159,7 @@ class BlinkDetectionState:
 					gate["yaw"],
 					ocec_ok,
 					strong_ocec_drop,
+					duration=blink_duration,
 				)
 				if ocec_ear_waive:
 					if not opening_ok:
@@ -2187,21 +2184,30 @@ class BlinkDetectionState:
 						info_pose["aperture_ok"] = True
 						waives.append("ocec_aperture")
 				# Laptop look-down: OCEC crop stays open (drop≈0) on real
-				# multi-frame EAR blinks (POG 2026-08-15 soak: 60 LD
-				# closed≥2 reject_ocec, ocec_drop p50=0). Keep 1-frame
-				# confirm — those are jitter. Do not lower OCEC_CONFIRM_MIN_DROP.
+				# EAR blinks (POG 2026-08-15 soak: 60 LD closed≥2
+				# reject_ocec, ocec_drop p50=0). Do not skip confirm on
+				# closed≥2 alone — that credited 34ms saccades (POG
+				# 2026-08-22). Rescue crop-miss only when duration already
+				# clears SHORT_BLINK_DURATION. Do not lower
+				# OCEC_CONFIRM_MIN_DROP.
 				if (
 					not ocec_ok
 					and treat_as_look_down
-					and (
-						self.closed_frames >= 2
-						or blink_duration >= SHORT_BLINK_DURATION
-					)
+					and blink_duration >= SHORT_BLINK_DURATION
 				):
 					ocec_ok = True
 					self._confirm_ocec_ok = True
 					info_pose["ocec_ok"] = True
 					waives.append("ocec_look_down")
+				# Sub-60ms + no reopen is a saccade/crop glitch even when
+				# OCEC is high (POG 2026-08-22: 34ms openV=0 ocec≈0.9
+				# via ld_one_frame_peak / ld_strong_peak).
+				if (
+					blink_duration < OCEC_VELOCITY_MIN_DURATION
+					and self.peak_opening_velocity < MIN_OPENING_VELOCITY
+					and abs(float(gate["yaw"])) < CLASSIFIER_SIDE_YAW_WAIVE
+				):
+					opening_ok = False
 				gates_ok = (
 					duration_ok
 					and threshold_ok
@@ -2304,6 +2310,7 @@ class BlinkDetectionState:
 						# close. Missing OCEC → keep Stage 4 veto.
 						if (
 							clf_veto
+							and blink_duration >= OCEC_VELOCITY_MIN_DURATION
 							and strong_ocec_drop is not None
 							and strong_ocec_drop >= OCEC_CONFIRM_MIN_DROP
 						):
