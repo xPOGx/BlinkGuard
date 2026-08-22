@@ -41,7 +41,7 @@ LOOK_DOWN_MIN_OPENING_VELOCITY = 0.15
 # One-frame LD: depth + (reopen or strong peak).
 # Post-1.05/0.040: still ~154 reject_opening (POG 2026-08-10 evening) —
 # real blinks at peak≈0.7–1.0, abs≈0.032–0.038, openV often missed.
-LOOK_DOWN_ONE_FRAME_MIN_OPENING = 0.25
+LOOK_DOWN_ONE_FRAME_MIN_OPENING = 0.22
 LOOK_DOWN_ONE_FRAME_MIN_DROP = 0.12
 LOOK_DOWN_ONE_FRAME_MIN_ABS = 0.035
 LOOK_DOWN_ONE_FRAME_STRONG_PEAK = 0.85
@@ -147,6 +147,12 @@ AWAITING_REOPEN_MAX_S = 0.35
 # and re-seed live_open (POG 2026-08-09: <2 min away → sticky skip_eyes_closed).
 FACE_ABSENT_CLEAR_GATES_S = 1.0
 FACE_ABSENT_RESEED_LIVE_S = 1.5
+# Glance/saccade: 2D EAR collapses without lids shutting. Do not latch
+# skip_eyes_closed while pose is still moving (POG 2026-08-22 soak).
+EYES_CLOSED_MOTION_SKIP = 0.08
+# Look-down open vs stale frontal live_open often sits 0.55–0.68.
+# Requiring 0.70 left skip_eyes_closed stuck with open lids (POG soak).
+LOOK_DOWN_CLOSED_RELEASE_RATIO = 0.58
 
 # Opening waive when effective close peak is strong but reopen velocity missed.
 # Applies frontal *and* look-down / ear_depressed (POG 2026-08-09 reject_opening).
@@ -724,7 +730,9 @@ class BlinkDetectionState:
 				(1 - alpha) * self.live_open_ocec + alpha * val
 			)
 
-	def _update_live_open_ear(self, ear_smooth, closing_velocity, current_time):
+	def _update_live_open_ear(
+		self, ear_smooth, closing_velocity, current_time, pose_w=0.0
+	):
 		"""
 		Track current open-lid height so look-down open is not 'half-closed'.
 
@@ -747,8 +755,11 @@ class BlinkDetectionState:
 			self._live_open_stable_since = None
 			self._prev_ear_for_live = ear
 			return
+		# Frontal true-shut only. Look-down compressed EAR vs a stale frontal
+		# live_open must still fall, or skip_eyes_closed deadlocks (POG soak).
 		if (
 			self.eyes_closed
+			and float(pose_w) < 0.5
 			and ear < self.live_open_ear * EYES_CLOSED_RATIO
 		):
 			self._live_open_stable_since = None
@@ -1278,6 +1289,27 @@ class BlinkDetectionState:
 				self.awaiting_reopen_since = None
 			return
 
+		# Look-down open lids vs stale frontal live_open (field 0.55–0.68).
+		ld_release = max(
+			EYES_CLOSED_RATIO + 0.03,
+			LOOK_DOWN_CLOSED_RELEASE_RATIO,
+		)
+		if (
+			pose_w >= 0.5
+			and open_ratio >= ld_release
+			and (self.eyes_closed or self.awaiting_reopen)
+		):
+			self._low_ear_since = None
+			if self._open_ear_since is None:
+				self._open_ear_since = current_time
+			elif (
+				current_time - self._open_ear_since
+			) >= EYES_OPEN_HOLD_S:
+				self.eyes_closed = False
+				self.awaiting_reopen = False
+				self.awaiting_reopen_since = None
+			return
+
 		# Soft clear: look-down "open" often sits ~0.73–0.85 of live ref.
 		if open_ratio >= EYES_OPEN_SOFT_RATIO and (
 			self.eyes_closed or self.awaiting_reopen
@@ -1296,7 +1328,10 @@ class BlinkDetectionState:
 		self._open_ear_since = None
 
 		if open_ratio < EYES_CLOSED_RATIO:
-			if self._low_ear_since is None:
+			if self._recent_pose_motion >= EYES_CLOSED_MOTION_SKIP:
+				# Saccade / glance: EAR is junk, not a held close.
+				self._low_ear_since = None
+			elif self._low_ear_since is None:
 				self._low_ear_since = current_time
 			elif (current_time - self._low_ear_since) >= EYES_CLOSED_HOLD_S:
 				# Latch even while a candidate is active so held-shut lids
@@ -1422,7 +1457,15 @@ class BlinkDetectionState:
 			ear_raw,
 			current_time,
 		)
-		self._update_live_open_ear(ear_smooth, closing_velocity, current_time)
+		pose_w_early = float(gate.get("pose_weight") or 0.0)
+		if self.ear_depressed:
+			pose_w_early = 1.0
+		self._update_live_open_ear(
+			ear_smooth,
+			closing_velocity,
+			current_time,
+			pose_w=pose_w_early,
+		)
 		self._update_live_open_aperture(
 			left_aperture, right_aperture, closing_velocity
 		)

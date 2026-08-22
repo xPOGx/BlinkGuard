@@ -649,6 +649,33 @@ class BlinkDetectionTests(unittest.TestCase):
 		self.assertLess(state.live_open_ear, 0.34)
 		self.assertFalse(state.eyes_closed)
 
+	def test_saccade_does_not_latch_eyes_closed(self):
+		"""Quick gaze dart dips EAR without held-shut lids."""
+		state = BlinkDetectionState(target_fps=30)
+		t = _seed_open_eye(state, ear=0.28)
+		for i in range(8):
+			t += 0.03
+			pose = estimate_head_pose(
+				_frontal_landmarks(pitch_shift=-8.0 * i)
+			)
+			state.detect(0.13, t, pose=pose)
+		self.assertFalse(state.eyes_closed)
+
+	def test_look_down_open_unsticks_skip_eyes_closed(self):
+		"""Open lids looking down vs stale frontal live_open (field 0.60–0.66)."""
+		state = BlinkDetectionState(target_fps=30)
+		t = _seed_open_eye(state, ear=0.30)
+		state.live_open_ear = 0.30
+		state.eyes_closed = True
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.20
+		for _ in range(8):
+			t += 0.05
+			state.detect(0.19, t, pose=pose)
+		self.assertFalse(state.eyes_closed)
+		_credited, info = state.detect(0.13, t + 0.05, pose=pose)
+		self.assertNotEqual(info.get("phase"), "skip_eyes_closed")
+
 	def test_adaptive_threshold_bounds(self):
 		low = get_adaptive_ear_drop_threshold(0.15)
 		high = get_adaptive_ear_drop_threshold(0.35)
@@ -1475,6 +1502,35 @@ class BlinkDetectionTests(unittest.TestCase):
 		credited, info = state.detect(0.26, t, pose=pose)
 		self.assertFalse(credited)
 		self.assertEqual(info["phase"], "reject_opening")
+
+	def test_look_down_one_frame_openv_022_credits(self):
+		"""Named split chat_look_down: leftover FN is reject_opening.
+
+		LOOK_DOWN_ONE_FRAME_MIN_OPENING 0.25→0.22; openV=0.10 still rejects
+		(test_look_down_weak_open_no_credit). 0.23 + depth should pass opening.
+		"""
+		state = BlinkDetectionState(target_fps=20)
+		t = _seed_open_eye(state, ear=0.28)
+		pose = estimate_head_pose(_frontal_landmarks(pitch_shift=-35.0))
+		state.resting_pitch = pose["pitch"] - 0.20
+		state.blink_in_progress = True
+		state.blink_start_time = t
+		state.closed_frames = 1
+		state.peak_closing_velocity = 1.0
+		state.peak_closing_velocity_measured = 1.0
+		state.peak_opening_velocity = 0.23
+		state.max_drop_percentage = 0.20
+		state.max_left_drop = 0.20
+		state.max_right_drop = 0.18
+		state._candidate_pose_delta = 0.0
+		state._ear_window.clear()
+		for _ in range(3):
+			state._ear_window.append(0.24)
+		t += 0.08
+		credited, info = state.detect(0.27, t, pose=pose)
+		self.assertNotEqual(info.get("phase"), "reject_opening")
+		if credited:
+			self.assertEqual(info["phase"], "complete")
 
 	def test_look_down_credits_at_074_recovery(self):
 		"""Chat reopen ear/live≈0.75 must credit (0.78 timed out real blinks)."""
