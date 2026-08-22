@@ -15,8 +15,8 @@ import {
 	t,
 } from "../../../shared/i18n";
 import {
-	prunePopupPositionsByDisplayId,
-	prunePopupSizesByDisplayId,
+	capPopupPositionsByDisplayId,
+	capPopupSizesByDisplayId,
 	samePopupPositionsByDisplayId,
 	samePopupSizesByDisplayId,
 	sanitizeExercisePrompts,
@@ -51,10 +51,12 @@ import {
 	ambientDesktopBounds,
 	systemChromeRects,
 	layoutForDisplays,
+	migratePopupPositionsToWorkAreaRelative,
 	nextUnsavedDisplayId,
 	resolveOpenWindowPosition,
 	resolvePopupPositionForDisplay,
 	resolvePopupSizeForDisplay,
+	toWorkAreaRelativePosition,
 } from "./window-position";
 
 type ReminderKind = "starting" | "blink" | "stopped";
@@ -64,7 +66,7 @@ const DISPLAY_RECOVER_DEBOUNCE_MS = 150;
 export type PopupPlacementPersist = {
 	map: Record<string, Point>;
 	sizes?: Record<string, Size>;
-	/** Last-save mirrors; omit to leave unchanged (prune-only). */
+	/** Last-save mirrors; omit to leave unchanged. */
 	position?: Point;
 	size?: Size;
 };
@@ -849,7 +851,7 @@ export class WindowManager {
 
 	/**
 	 * Clamp a candidate top-left to the target display's workArea.
-	 * When recovered, persists via `persistPopupPlacement` (caller echoes prefs).
+	 * Visual only — does not persist (Save / commitPlacement write maps).
 	 */
 	clampPopupPosition(
 		candidate: Point | null,
@@ -858,14 +860,11 @@ export class WindowManager {
 	): Point {
 		const popupSize = size ?? this.preferences.popupSize;
 		const display = targetDisplay ?? this.displayForCandidate(candidate, popupSize);
-		const { position, recovered } = resolvePopupPositionForDisplay(
+		const { position } = resolvePopupPositionForDisplay(
 			candidate,
 			popupSize,
 			display.workArea,
 		);
-		if (recovered) {
-			this.commitPlacement(position, String(display.id));
-		}
 		return position;
 	}
 
@@ -885,27 +884,35 @@ export class WindowManager {
 
 	saveEditorGeometryAll(size: Size, candidate: Point): Point {
 		const source = this.displayForCandidate(candidate, size);
+		const displays = screen.getAllDisplays().map((display) => ({
+			id: String(display.id),
+			workArea: display.workArea,
+		}));
 		const layouts = layoutForDisplays(
 			candidate,
 			size,
 			source.workArea,
-			screen.getAllDisplays().map((display) => ({
-				id: String(display.id),
-				workArea: display.workArea,
-			})),
+			displays,
 		);
 		const positions = { ...this.preferences.popupPositionsByDisplayId };
 		const sizes = { ...this.preferences.popupSizesByDisplayId };
+		const workAreaById = new Map(
+			displays.map((display) => [display.id, display.workArea]),
+		);
 		for (const [id, layout] of Object.entries(layouts)) {
-			positions[id] = layout.position;
+			const workArea = workAreaById.get(id);
+			positions[id] = workArea
+				? toWorkAreaRelativePosition(layout.position, workArea)
+				: layout.position;
 			sizes[id] = layout.size;
 		}
 		const self = layouts[String(source.id)];
 		const nextPosition = self?.position ?? candidate;
 		const nextSize = self?.size ?? size;
+		const liveIds = displays.map((display) => display.id);
 		this.persistPopupPlacement?.({
-			map: positions,
-			sizes,
+			map: capPopupPositionsByDisplayId(positions, liveIds),
+			sizes: capPopupSizesByDisplayId(sizes, liveIds),
 			position: nextPosition,
 			size: nextSize,
 		});
@@ -937,14 +944,14 @@ export class WindowManager {
 
 	/**
 	 * Revalidate reminder/editor independently after hot-plug / metrics changes.
+	 * Moves windows on-screen only — does not rewrite per-display maps (so a
+	 * powered-off / Win+P display keeps its saved position and size).
 	 * Exercise / look-away stay ephemeral left/right bias on the active display.
 	 */
 	recoverOpenPopupPositions(): void {
 		this.migrateLegacyPopupPositions();
-		let changed = false;
-		if (this.recoverTrackedPopup(this.reminder)) changed = true;
-		if (this.recoverTrackedPopup(this.editor)) changed = true;
-		if (this.pruneStaleDisplayPositions()) changed = true;
+		this.recoverTrackedPopup(this.reminder);
+		this.recoverTrackedPopup(this.editor);
 
 		if (this.exercise && !this.exercise.isDestroyed()) {
 			const next = getLeftBiasedPopupPosition(340, 200);
@@ -955,8 +962,6 @@ export class WindowManager {
 			this.setWindowPositionIfOpen(this.lookAway, next);
 		}
 		this.repositionAmbient();
-
-		if (changed) this.sendPreferences();
 	}
 
 	registerDisplayListeners(): void {
@@ -1116,15 +1121,11 @@ export class WindowManager {
 		const saved =
 			this.preferences.popupPositionsByDisplayId[displayId] ?? null;
 		const popupSize = this.popupSizeForDisplay(display);
-		const { position, recovered } = resolvePopupPositionForDisplay(
+		const { position } = resolvePopupPositionForDisplay(
 			saved,
 			popupSize,
 			display.workArea,
 		);
-		if (recovered) {
-			this.commitPlacement(position, displayId);
-			this.sendPreferences();
-		}
 		return position;
 	}
 
@@ -1132,10 +1133,17 @@ export class WindowManager {
 		const seedId = this.getPopupPositionSeedDisplayId(
 			this.preferences.popupPosition,
 		);
-		const next = seedPopupPositionsFromLegacy(
+		const seeded = seedPopupPositionsFromLegacy(
 			this.preferences.popupPositionsByDisplayId,
 			this.preferences.popupPosition,
 			seedId,
+		);
+		const next = migratePopupPositionsToWorkAreaRelative(
+			seeded,
+			screen.getAllDisplays().map((display) => ({
+				id: String(display.id),
+				workArea: display.workArea,
+			})),
 		);
 		if (
 			!samePopupPositionsByDisplayId(
@@ -1143,10 +1151,7 @@ export class WindowManager {
 				this.preferences.popupPositionsByDisplayId,
 			)
 		) {
-			this.persistPopupPlacement?.({
-				map: next,
-				position: next[seedId] ?? this.preferences.popupPosition ?? undefined,
-			});
+			this.persistPopupPlacement?.({ map: next });
 		}
 		this.migrateLegacyPopupSizes();
 	}
@@ -1171,8 +1176,8 @@ export class WindowManager {
 		});
 	}
 
-	private recoverTrackedPopup(window: BrowserWindow | null): boolean {
-		if (!window || window.isDestroyed()) return false;
+	private recoverTrackedPopup(window: BrowserWindow | null): void {
+		if (!window || window.isDestroyed()) return;
 		const bounds = window.getBounds();
 		const display = getDisplayForPopupRect(
 			bounds.x,
@@ -1196,42 +1201,9 @@ export class WindowManager {
 		);
 		const sizeChanged =
 			fitted.width !== bounds.width || fitted.height !== bounds.height;
-		if (!recovered && !sizeChanged) return false;
+		if (!recovered && !sizeChanged) return;
 		if (recovered) this.setWindowPositionIfOpen(window, position);
 		if (sizeChanged) window.setSize(fitted.width, fitted.height);
-		this.commitPlacement(
-			recovered ? position : current,
-			String(display.id),
-			fitted,
-		);
-		return true;
-	}
-
-	private pruneStaleDisplayPositions(): boolean {
-		const liveIds = screen.getAllDisplays().map((display) => String(display.id));
-		if (liveIds.length === 0) return false;
-		const prunedPositions = prunePopupPositionsByDisplayId(
-			this.preferences.popupPositionsByDisplayId,
-			liveIds,
-		);
-		const prunedSizes = prunePopupSizesByDisplayId(
-			this.preferences.popupSizesByDisplayId,
-			liveIds,
-		);
-		const positionsChanged = !samePopupPositionsByDisplayId(
-			prunedPositions,
-			this.preferences.popupPositionsByDisplayId,
-		);
-		const sizesChanged = !samePopupSizesByDisplayId(
-			prunedSizes,
-			this.preferences.popupSizesByDisplayId,
-		);
-		if (!positionsChanged && !sizesChanged) return false;
-		this.persistPopupPlacement?.({
-			map: prunedPositions,
-			sizes: prunedSizes,
-		});
-		return true;
 	}
 
 	private displayForCandidate(candidate: Point | null, size: Size): Display {
@@ -1259,20 +1231,35 @@ export class WindowManager {
 		displayId: string,
 		size?: Size,
 	): void {
+		const liveIds = screen.getAllDisplays().map((display) => String(display.id));
 		this.persistPopupPlacement?.({
-			map: {
-				...this.preferences.popupPositionsByDisplayId,
-				[displayId]: position,
-			},
+			map: capPopupPositionsByDisplayId(
+				{
+					...this.preferences.popupPositionsByDisplayId,
+					[displayId]: this.toStoredPopupPosition(position, displayId),
+				},
+				liveIds,
+			),
 			sizes: size
-				? {
-						...this.preferences.popupSizesByDisplayId,
-						[displayId]: size,
-					}
+				? capPopupSizesByDisplayId(
+						{
+							...this.preferences.popupSizesByDisplayId,
+							[displayId]: size,
+						},
+						liveIds,
+					)
 				: undefined,
 			position,
 			size,
 		});
+	}
+
+	private toStoredPopupPosition(position: Point, displayId: string): Point {
+		const display = screen
+			.getAllDisplays()
+			.find((entry) => String(entry.id) === displayId);
+		if (!display) return position;
+		return toWorkAreaRelativePosition(position, display.workArea);
 	}
 
 	private closeWindow(

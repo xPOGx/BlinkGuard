@@ -27,12 +27,15 @@ import {
 	ambientDesktopBounds,
 	systemChromeRects,
 	layoutForDisplays,
+	migratePopupPositionsToWorkAreaRelative,
 	nextUnsavedDisplayId,
+	fromWorkAreaRelativePosition,
 	resolveOpenWindowPosition,
 	resolvePopupPosition,
 	resolvePopupPositionForDisplay,
 	resolvePopupSizeForDisplay,
 	resolveVisiblePopupPosition,
+	toWorkAreaRelativePosition,
 } from "../../../electron/infrastructure/windows/window-position";
 
 const primaryWorkArea = {
@@ -270,6 +273,54 @@ describe("window-position", () => {
 					primaryWorkArea,
 				),
 			).toEqual({ position: primaryCenter, recovered: true });
+		});
+
+		it("applies a workArea-relative saved offset after the display origin moves", () => {
+			const offset = { x: 80, y: 90 };
+			expect(
+				resolvePopupPositionForDisplay(offset, popupSize, secondaryWorkArea),
+			).toEqual({
+				position: fromWorkAreaRelativePosition(offset, secondaryWorkArea),
+				recovered: false,
+			});
+			const shiftedSecondary = { ...secondaryWorkArea, x: 0, y: 0 };
+			expect(
+				resolvePopupPositionForDisplay(offset, popupSize, shiftedSecondary),
+			).toEqual({
+				position: fromWorkAreaRelativePosition(offset, shiftedSecondary),
+				recovered: false,
+			});
+		});
+
+		it("round-trips screen coordinates through workArea-relative storage", () => {
+			const screenPoint = { x: 2100, y: 180 };
+			const relative = toWorkAreaRelativePosition(screenPoint, secondaryWorkArea);
+			expect(relative).toEqual({
+				x: screenPoint.x - secondaryWorkArea.x,
+				y: screenPoint.y - secondaryWorkArea.y,
+			});
+			expect(fromWorkAreaRelativePosition(relative, secondaryWorkArea)).toEqual(
+				screenPoint,
+			);
+		});
+
+		it("migrates in-workArea absolute points to relative offsets", () => {
+			const map = {
+				"1": { x: 100, y: 200 },
+				"2": { x: 2100, y: 180 },
+			};
+			expect(
+				migratePopupPositionsToWorkAreaRelative(map, [
+					{ id: "1", workArea: primaryWorkArea },
+					{ id: "2", workArea: secondaryWorkArea },
+				]),
+			).toEqual({
+				"1": { x: 100, y: 200 },
+				"2": toWorkAreaRelativePosition(
+					{ x: 2100, y: 180 },
+					secondaryWorkArea,
+				),
+			});
 		});
 
 		it("centers on miss without marking recovered", () => {

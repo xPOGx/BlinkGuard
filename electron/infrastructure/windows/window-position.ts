@@ -188,7 +188,51 @@ export function resolveVisiblePopupPosition(
 	);
 }
 
-/** Keep the point if it sits on this workArea; otherwise center on it. */
+/** Screen top-left → offset from this workArea origin (survives origin shifts). */
+export function toWorkAreaRelativePosition(
+	position: Point,
+	workArea: WorkArea,
+): Point {
+	return {
+		x: position.x - workArea.x,
+		y: position.y - workArea.y,
+	};
+}
+
+export function fromWorkAreaRelativePosition(
+	offset: Point,
+	workArea: WorkArea,
+): Point {
+	return {
+		x: workArea.x + offset.x,
+		y: workArea.y + offset.y,
+	};
+}
+
+/**
+ * Convert in-workArea absolute points to workArea-relative offsets.
+ * Off-screen / already-relative entries are left unchanged.
+ */
+export function migratePopupPositionsToWorkAreaRelative(
+	map: Record<string, Point>,
+	displays: readonly DisplayWorkArea[],
+): Record<string, Point> {
+	const next = { ...map };
+	for (const display of displays) {
+		const saved = next[display.id];
+		if (!saved) continue;
+		if (!isPointInWorkArea(saved, display.workArea)) continue;
+		const relative = toWorkAreaRelativePosition(saved, display.workArea);
+		if (relative.x === saved.x && relative.y === saved.y) continue;
+		next[display.id] = relative;
+	}
+	return next;
+}
+
+/**
+ * Keep the point if it sits on this workArea; otherwise treat it as a
+ * workArea-relative offset (origin shift / secondary display). True miss → center.
+ */
 export function resolvePopupPositionForDisplay(
 	saved: Point | null,
 	popupSize: Size,
@@ -204,6 +248,10 @@ export function resolvePopupPositionForDisplay(
 	}
 	if (isPointInWorkArea(saved, workArea)) {
 		return { position: saved, recovered: false };
+	}
+	const translated = fromWorkAreaRelativePosition(saved, workArea);
+	if (isPointInWorkArea(translated, workArea)) {
+		return { position: translated, recovered: false };
 	}
 	return { position: fallback, recovered: true };
 }

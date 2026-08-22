@@ -819,7 +819,7 @@ function sanitizePopupPosition(value: unknown): Point | null {
 	return { x: Math.round(x), y: Math.round(y) };
 }
 
-const POPUP_POSITIONS_BY_DISPLAY_MAX = 16;
+export const POPUP_POSITIONS_BY_DISPLAY_MAX = 16;
 
 /** Coerce stored/IPC per-display popup points; drop junk keys. */
 export function sanitizePopupPositionsByDisplayId(
@@ -868,7 +868,7 @@ export function seedPopupPositionsFromLegacy(
 	return { [id]: { x: legacyPoint.x, y: legacyPoint.y } };
 }
 
-/** Drop map keys that are not in the live display-id list. */
+/** Drop map keys that are not in the live display-id list (tests / explicit reset). */
 export function prunePopupPositionsByDisplayId(
 	map: Record<string, Point>,
 	liveDisplayIds: readonly string[],
@@ -880,6 +880,34 @@ export function prunePopupPositionsByDisplayId(
 		next[id] = point;
 	}
 	return next;
+}
+
+function capPopupMapByDisplayId<T>(
+	map: Record<string, T>,
+	liveDisplayIds: readonly string[],
+	max: number,
+): Record<string, T> {
+	const keys = Object.keys(map);
+	if (keys.length <= max) return { ...map };
+	const live = new Set(liveDisplayIds);
+	const liveEntries: [string, T][] = [];
+	const disconnected: [string, T][] = [];
+	for (const entry of Object.entries(map)) {
+		(live.has(entry[0]) ? liveEntries : disconnected).push(entry);
+	}
+	return Object.fromEntries([...liveEntries, ...disconnected].slice(0, max));
+}
+
+/**
+ * Keep disconnected-display layouts. Only drop extras when over `max`,
+ * preferring live ids so a dock/unplug cycle does not forget a screen.
+ */
+export function capPopupPositionsByDisplayId(
+	map: Record<string, Point>,
+	liveDisplayIds: readonly string[],
+	max = POPUP_POSITIONS_BY_DISPLAY_MAX,
+): Record<string, Point> {
+	return capPopupMapByDisplayId(map, liveDisplayIds, max);
 }
 
 function sanitizePopupSize(value: unknown, fallback: Size): Size {
@@ -967,6 +995,14 @@ export function prunePopupSizesByDisplayId(
 		next[id] = size;
 	}
 	return next;
+}
+
+export function capPopupSizesByDisplayId(
+	map: Record<string, Size>,
+	liveDisplayIds: readonly string[],
+	max = POPUP_POSITIONS_BY_DISPLAY_MAX,
+): Record<string, Size> {
+	return capPopupMapByDisplayId(map, liveDisplayIds, max);
 }
 
 function sanitizePopupColors(value: unknown, fallback: PopupColors): PopupColors {

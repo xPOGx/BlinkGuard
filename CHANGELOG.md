@@ -4,6 +4,10 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+### Fixed
+
+- Popup: keep per-display position and size when a monitor sleeps, unplugs, or becomes primary
+
 ## [2.14.0] - 2026-08-21
 
 ### Added

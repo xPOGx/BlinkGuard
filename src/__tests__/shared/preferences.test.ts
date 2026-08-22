@@ -14,6 +14,8 @@ import {
 	DEFAULT_KEYBOARD_SHORTCUTS,
 	DEFAULT_PREFERENCES,
 	findDuplicateShortcutActions,
+	capPopupPositionsByDisplayId,
+	capPopupSizesByDisplayId,
 	prunePopupPositionsByDisplayId,
 	prunePopupSizesByDisplayId,
 	samePopupPositionsByDisplayId,
@@ -691,6 +693,24 @@ describe("popupPositionsByDisplayId", () => {
 			false,
 		);
 	});
+
+	it("keeps disconnected display layouts until over the cap", () => {
+		const map = {
+			"1": { x: 10, y: 20 },
+			"2": { x: 30, y: 40 },
+		};
+		expect(capPopupPositionsByDisplayId(map, ["1"])).toEqual(map);
+		const overflow: Record<string, { x: number; y: number }> = {
+			live: { x: 1, y: 1 },
+		};
+		for (let i = 0; i < 16; i += 1) {
+			overflow[`old-${i}`] = { x: i, y: i };
+		}
+		const capped = capPopupPositionsByDisplayId(overflow, ["live"], 16);
+		expect(capped.live).toEqual({ x: 1, y: 1 });
+		expect(Object.keys(capped)).toHaveLength(16);
+		expect(capped["old-15"]).toBeUndefined();
+	});
 });
 
 describe("popupSizesByDisplayId", () => {
@@ -741,5 +761,13 @@ describe("popupSizesByDisplayId", () => {
 		expect(
 			samePopupSizesByDisplayId(map, { "1": { width: 300, height: 120 } }),
 		).toBe(false);
+	});
+
+	it("keeps disconnected sizes until over the cap", () => {
+		const map = {
+			"1": { width: 300, height: 120 },
+			"2": { width: 400, height: 180 },
+		};
+		expect(capPopupSizesByDisplayId(map, ["1"])).toEqual(map);
 	});
 });
