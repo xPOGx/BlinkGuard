@@ -4,9 +4,17 @@ All notable changes to BlinkGuard are documented here. The format is based on [K
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-08-22
+
+### Changed
+
+- Camera: retrain Stage 4 personal classifier on mixed traces (OCEC drop/missing)
+
 ### Fixed
 
 - Popup: keep per-display position and size when a monitor sleeps, unplugs, or becomes primary
+- Camera: unstick skip_eyes_closed after glances
+- Reminders: keep the Windows taskbar visible under ambient glow
 
 ## [2.14.0] - 2026-08-21
 

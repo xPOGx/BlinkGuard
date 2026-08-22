@@ -44,7 +44,7 @@
 - **20-20-20 look-away** and **eye exercises** — independent timers; Skip / Snooze; exercises auto-close after 30 seconds
 - **Quiet hours, fullscreen, and per-app pause** — hide prompts during quiet time (optional per-weekday hours), fullscreen, or listed foreground apps
 - **Progress** — stats, goals, levels, achievements, rewards, and a shareable card
-- **Your overlay** — drag, resize, colors, transparency; layout remembered per display; optional sounds and native OS toasts
+- **Your overlay** — drag, resize, colors, transparency; layout remembered per display (kept if a monitor sleeps or unplugs); optional sounds and native OS toasts
 - **Local by design** — preferences via `electron-store`; named Setups; backup/import JSON; English and Ukrainian; dark / light. Camera frames never leave the machine ([PRIVACY.md](PRIVACY.md))
 
 ### Camera and power users
